@@ -69,7 +69,7 @@ export function WebhooksCard({ restaurantId }: { restaurantId: string }) {
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={async () => { await toggleWebhook(h.id, !h.is_active); await load() }}
-                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${h.is_active ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-500"}`}
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${h.is_active ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"}`}
                   >
                     {h.is_active ? "Activo" : "Pausado"}
                   </button>

@@ -1,6 +1,12 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
+  // El servidor de Playwright usa su propio `distDir` (`NEXT_DIST_DIR`) para no
+  // chocar con un `next dev` que el desarrollador ya tenga abierto: el lock del
+  // servidor vive en `<distDir>/dev/lock`, así que compartir `.next` hacía
+  // fallar el arranque del webServer y dejaba la única salida en reutilizar el
+  // servidor ajeno (con su caché y sus credenciales, que pueden estar obsoletas).
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   allowedDevOrigins: [
     "3000-07e71408-162f-4d55-afcf-13420ba7fef0.softgen.dev",
     "3000-07e71408-162f-4d55-afcf-13420ba7fef0.proxy.daytona.work",

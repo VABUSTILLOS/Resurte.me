@@ -202,7 +202,7 @@ export function LeadConversationPanel({
               type="button"
               onClick={onBack}
               aria-label="Volver a la lista"
-              className="-ml-1 rounded-lg p-2 text-gray-400 hover:bg-gray-100 lg:hidden"
+              className="-ml-1 rounded-lg p-2 text-gray-500 hover:bg-gray-100 lg:hidden"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>

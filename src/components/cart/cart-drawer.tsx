@@ -234,7 +234,7 @@ export function CartDrawer() {
                       <p className="text-[13px] text-[var(--text-secondary)]">{item.brand}</p>
 
                       {item.stock_status === "low_stock" && (
-                        <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
+                        <span className="text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
                           Pocas unidades
                         </span>
                       )}
@@ -387,7 +387,7 @@ export function CartDrawer() {
             <div className="flex gap-2">
               <button
                 onClick={clearCart}
-                className="px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-red-600 hover:bg-red-50 rounded-[10px] transition-colors shrink-0"
+                className="px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-red-700 hover:bg-red-50 rounded-[10px] transition-colors shrink-0"
               >
                 Vaciar
               </button>

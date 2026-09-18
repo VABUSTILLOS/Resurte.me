@@ -287,7 +287,7 @@ export function CalificarClient() {
               </p>
 
               {error ? (
-                <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mt-2">
+                <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mt-2">
                   {error}
                 </p>
               ) : null}

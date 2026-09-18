@@ -548,10 +548,10 @@ export default function RestaurantePage() {
                   <span className="text-xs text-gray-500 truncate flex-1">
                     {publicRestaurantUrl(restaurant.slug)}
                   </span>
-                  <button onClick={handleCopyUrl} className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors">
+                  <button aria-label={t("common.copy")} onClick={handleCopyUrl} className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors">
                     {copied ? <Check className="w-4 h-4 text-[#0E7A0E]" /> : <Copy className="w-4 h-4" />}
                   </button>
-                  <a
+                  <a aria-label="Abrir menú público"
                     href={publicRestaurantUrl(restaurant.slug)}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -607,7 +607,7 @@ export default function RestaurantePage() {
                           className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
                             b.dine_in_active
                               ? "bg-purple-100 text-purple-700"
-                              : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                           }`}
                           title="Activar/desactivar pedidos en mesa (dine-in)"
                         >
@@ -618,7 +618,7 @@ export default function RestaurantePage() {
                           className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
                             b.scheduled_orders_active
                               ? "bg-indigo-100 text-indigo-700"
-                              : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                           }`}
                           title="Aceptar pedidos programados (fecha/hora)"
                         >
@@ -642,7 +642,7 @@ export default function RestaurantePage() {
                     >
                       <Clock className="w-4 h-4" />
                     </button>
-                    <button
+                    <button aria-label={t("common.delete")}
                       onClick={() => handleRemoveBranch(b.id)}
                       className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                     >

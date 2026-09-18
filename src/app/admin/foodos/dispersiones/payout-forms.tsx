@@ -266,7 +266,7 @@ export function RecordPayoutDialog({
         {state.error && (
           <p
             role="alert"
-            className="mt-3 rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs text-red-600"
+            className="mt-3 rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs text-red-700"
           >
             {state.error}
           </p>

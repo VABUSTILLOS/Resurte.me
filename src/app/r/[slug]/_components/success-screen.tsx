@@ -64,7 +64,7 @@ export function SuccessScreen({
         <p className="text-sm text-stone-400 mt-4">{sf(lang, "reference")}: #{orderId.slice(0, 8).toUpperCase()}</p>
         <Link
           href={`/r/${restaurant.slug}/pedido/${orderId}`}
-          className="mt-6 block w-full py-3 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700"
+          className="mt-6 block w-full py-3 rounded-xl bg-emerald-700 text-white font-bold hover:bg-emerald-700"
         >
           {sf(lang, "trackOrder")}
         </Link>

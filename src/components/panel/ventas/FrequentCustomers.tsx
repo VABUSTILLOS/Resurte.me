@@ -56,7 +56,7 @@ export default function FrequentCustomers({
         )}
         <button
           onClick={onCopy}
-          className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
+          className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
           title="Copiar lista de clientes"
           aria-label="Copiar clientes frecuentes"
         >
@@ -65,7 +65,7 @@ export default function FrequentCustomers({
         </button>
         <button
           onClick={onToggle}
-          className="flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
+          className="flex items-center gap-1 text-xs font-semibold text-gray-600 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
           aria-expanded={showClientes}
           aria-label="Mostrar u ocultar clientes frecuentes"
         >
@@ -192,13 +192,13 @@ export default function FrequentCustomers({
                       <div className="flex items-center gap-1">
                         <button
                           onClick={onConfirmDelete}
-                          className="px-2 py-1 text-[10px] font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600"
+                          className="px-2 py-1 text-[10px] font-semibold text-white bg-red-700 rounded-lg hover:bg-red-600"
                         >
                           Sí
                         </button>
                         <button
                           onClick={onCancelDelete}
-                          className="px-2 py-1 text-[10px] font-semibold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200"
+                          className="px-2 py-1 text-[10px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
                         >
                           No
                         </button>

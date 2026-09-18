@@ -89,7 +89,7 @@ function ReminderButtons({
             target="_blank"
             rel="noopener noreferrer"
             onClick={logWhatsappSent}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#25D366]/15 text-[#128C4A] px-3 py-1.5 rounded-xl hover:bg-[#25D366]/25 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#25D366]/15 text-[#0B5C2E] px-3 py-1.5 rounded-xl hover:bg-[#25D366]/25 transition-colors"
           >
             <MessageCircle className="w-3.5 h-3.5" />
             {hasHistory ? "Sugerir reorden" : "Recordar pedido"}
@@ -102,7 +102,7 @@ function ReminderButtons({
       {client.user_id ? (
         <Link
           href={`/comercializacion/pedidos?prospecto=${client.id}`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#0E7A0E]/10 text-[#0E7A0E] px-3 py-1.5 rounded-xl hover:bg-[#0E7A0E]/15 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#0E7A0E]/10 text-brand-600 px-3 py-1.5 rounded-xl hover:bg-[#0E7A0E]/15 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           Hacer pedido

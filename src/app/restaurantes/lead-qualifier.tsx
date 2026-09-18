@@ -48,7 +48,7 @@ const FEATURE_LABELS: Record<string, string> = {
   wallet_passes: "Tarjeta de lealtad",
   app_marca: "App y sitio de tu marca",
   sitio_ia: "Sitio con SEO local",
-  pos_integraciones: "Punto de venta",
+  pos_mostrador: "Punto de venta en mostrador",
   catering: "Catering por volumen",
 }
 
@@ -287,7 +287,7 @@ export function LeadQualifier() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="dueno@turestaurante.com"
-                  className="touch-target mt-2 w-full rounded-xl border border-[#E4E1DA] bg-[#FDFCFA] px-3 text-base text-[#242529] placeholder:text-[#A9AEB6] focus:border-[#0E7A0E] focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/20"
+                  className="touch-target mt-2 w-full rounded-xl border border-[#E4E1DA] bg-[#FDFCFA] px-3 text-base text-[#242529] placeholder:text-gray-500 focus:border-[#0E7A0E] focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/20"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">

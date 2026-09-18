@@ -223,7 +223,7 @@ export default function CombosPage() {
                     <h3 className="font-semibold text-gray-900">{c.name}</h3>
                     {c.highlight && <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full mt-1 inline-block">{t("foodos.combos.featured")}</span>}
                   </div>
-                  <button onClick={() => handleDeleteCombo(c.id)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                  <button aria-label={t("common.delete")} onClick={() => handleDeleteCombo(c.id)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {c.item_ids.map((id) => (
@@ -287,7 +287,7 @@ export default function CombosPage() {
                       {t("foodos.combos.boost", { amount: formatMoney(r.boost_amount) })}
                     </span>
                   )}
-                  <button onClick={() => handleDeleteRule(r.id)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                  <button aria-label={t("common.delete")} onClick={() => handleDeleteRule(r.id)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
             </div>

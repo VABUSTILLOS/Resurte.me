@@ -213,7 +213,7 @@ function PanelContent({
                         <div className="border-t border-gray-100 my-1" />
                         <button
                           onClick={() => { setSelectedCollection(null); setShowPicker(false); router.push("/panel") }}
-                          className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-700 hover:bg-red-50 transition-colors"
                         >
                           {t("panel.clearSelection")}
                         </button>

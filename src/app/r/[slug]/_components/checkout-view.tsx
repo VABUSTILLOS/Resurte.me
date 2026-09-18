@@ -539,13 +539,13 @@ export function CheckoutView({
             </div>
 
             {error && (
-              <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>
+              <p className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>
             )}
 
             <button
               onClick={onSubmit}
               disabled={loading || cart.length === 0 || !openStatus.isOpen}
-              className="mt-4 w-full py-3 rounded-xl foodos-accent bg-emerald-600 text-white font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="mt-4 w-full py-3 rounded-xl foodos-accent bg-emerald-700 text-white font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

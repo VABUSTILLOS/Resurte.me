@@ -8,8 +8,17 @@
  *    (`crm_prospects.estimated_value`, migración `00184`). Es una intención.
  *  - **real** — lo que el cliente vinculado ha pagado de verdad, derivado de
  *    `orders` por `crm_prospects.user_id → orders.user_id` (nunca por
- *    `orders.seller_id`: esa columna existe pero ninguna ruta la escribe, así
- *    que usarla daría cero siempre). Es un hecho.
+ *    `orders.seller_id`: esa columna existió hasta `00189`, ninguna ruta la
+ *    escribió nunca y ya no está). Es un hecho.
+ *
+ * El previsto es además una **foto, no una serie**: `estimated_value` guarda el
+ * valor declarado *hoy* y el esquema no conserva ningún histórico de cómo
+ * evolucionó. El CRM puede responder «cuánto vale el pipeline ahora» y no puede
+ * responder «cuánto valía hace un mes», y esa segunda pregunta **no se puede
+ * improvisar** a partir de la primera. Se deja escrito en vez de resuelto a
+ * medias: una tabla de snapshots sin lector es exactamente la superficie muerta
+ * que `00189` acaba de eliminar, así que no se crea hasta que exista la
+ * superficie que la lea.
  *
  * La diferencia entre ambas es la métrica útil, y tiene una regla: **solo se
  * calcula cuando las dos existen**. Si falta una, la diferencia es `null` y la

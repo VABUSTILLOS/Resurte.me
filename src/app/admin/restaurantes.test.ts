@@ -244,7 +244,9 @@ describe("getAdminFoodosRestaurants", () => {
     // Sin compras del dueño B, el restaurante B no hereda el nivel de A.
     expect(b.weekSpend).toBe(0)
     expect(b.earnedTier).toBe("Verde")
-    expect(b.features).toEqual([])
+    // Verde no aporta ningún escalón: la única capacidad que aparece es la de
+    // línea base, que se usa desde el primer nivel y no se cobra.
+    expect(b.features).toEqual(["pos_integraciones"])
   })
 
   it("un override vigente gana sobre el nivel ganado y abre sus capacidades", async () => {

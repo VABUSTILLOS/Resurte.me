@@ -151,7 +151,7 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
                 </div>
               )}
               {lowStock && !outOfStock && (
-                <div className="absolute top-4 right-4 bg-[#F5A623] text-white text-xs font-semibold px-3 py-1 rounded-full">
+                <div className="absolute top-4 right-4 bg-amber-700 text-white text-xs font-semibold px-3 py-1 rounded-full">
                   Pocas unidades
                 </div>
               )}
@@ -184,7 +184,7 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
             {category && (
               <Link
                 href={`/${citySlug}/categoria/${category.slug}`}
-                className="inline-flex items-center gap-1.5 self-start text-sm text-[#0E7A0E] font-medium bg-[#e8f5e9] px-3 py-1 rounded-full hover:bg-[#c8e6c8] transition-colors mb-4"
+                className="inline-flex items-center gap-1.5 self-start text-sm text-brand-600 font-medium bg-[#e8f5e9] px-3 py-1 rounded-full hover:bg-[#c8e6c8] transition-colors mb-4"
               >
                 <span>{getCategoryIcon(category.icon, category.slug)}</span>
                 {category.name}
@@ -213,7 +213,7 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
 
             {/* Stock status */}
             {lowStock && !outOfStock && (
-              <p className="mt-3 text-sm text-[#F5A623] font-medium flex items-center gap-1.5">
+              <p className="mt-3 text-sm text-amber-700 font-medium flex items-center gap-1.5">
                 <Package className="w-4 h-4" />
                 Quedan pocas unidades — ¡apresúrate!
               </p>
@@ -230,7 +230,7 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
                     <span className="text-lg text-[var(--text-secondary)] line-through">
                       ${originalPrice.toFixed(2)}
                     </span>
-                    <span className="text-sm font-semibold text-[#DE3534] bg-[#fdf2f2] px-2 py-0.5 rounded-full">
+                    <span className="text-sm font-semibold text-[#C42B2A] bg-[#fdf2f2] px-2 py-0.5 rounded-full">
                       -{discountPercent}%
                     </span>
                   </>
@@ -290,7 +290,7 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
                               Más barato
                             </span>
                           ) : (
-                            <span className="inline-block text-[11px] font-semibold text-[#DE3534] bg-[#fdf2f2] px-1.5 py-0.5 rounded-full">
+                            <span className="inline-block text-[11px] font-semibold text-[#C42B2A] bg-[#fdf2f2] px-1.5 py-0.5 rounded-full">
                               +{Math.round(candidate.deltaPct)}%
                             </span>
                           )}
@@ -344,7 +344,7 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
                 disabled={outOfStock}
                 className={`flex-1 h-12 flex items-center justify-center gap-2 text-sm font-semibold rounded-xl transition-all duration-200 ${
                   added
-                    ? "bg-green-500 text-white"
+                    ? "bg-green-700 text-white"
                     : "bg-[#0E7A0E] text-white hover:bg-[#0D720D] active:bg-[#0A610A] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 }`}
               >
@@ -475,7 +475,7 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
               onClick={handleAdd}
               className={`flex items-center justify-center gap-1.5 shrink-0 h-11 px-4 rounded-xl text-sm font-semibold transition-all duration-200 touch-target ${
                 added
-                  ? "bg-green-500 text-white"
+                  ? "bg-green-700 text-white"
                   : "bg-[#0E7A0E] text-white hover:bg-[#0D720D] active:bg-[#0A610A] shadow-sm"
               }`}
             >

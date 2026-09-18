@@ -262,7 +262,7 @@ export default function AnaliticaPage() {
                   </span>
                   <div
                     className={`w-full rounded-t transition-all ${
-                      d.revenue > 0 ? "bg-emerald-500 group-hover:bg-emerald-600" : "bg-gray-100"
+                      d.revenue > 0 ? "bg-emerald-700 group-hover:bg-emerald-800" : "bg-gray-100"
                     }`}
                     style={{ height: `${Math.max(d.revenue > 0 ? (d.revenue / trend.max) * 100 : 3, 3)}%` }}
                     title={`${d.date}: $${d.revenue.toFixed(0)}${d.waste > 0 ? ` · ${t("analitica.kpiWaste")} $${d.waste.toFixed(0)}` : ""}`}
@@ -294,7 +294,7 @@ export default function AnaliticaPage() {
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${d.margin >= 0 ? "bg-emerald-500" : "bg-red-400"}`}
+                        className={`h-full rounded-full ${d.margin >= 0 ? "bg-emerald-700" : "bg-red-500"}`}
                         style={{ width: `${Math.max((Math.abs(d.margin) / topMax) * 100, 2)}%` }}
                       />
                     </div>

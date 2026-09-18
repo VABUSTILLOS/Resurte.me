@@ -287,12 +287,12 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
             value={query}
             onChange={(e) => { setQuery(e.target.value); setSelectedIdx(0) }}
             placeholder="Buscar platillos, productos, inventario..."
-            className="flex-1 text-base text-gray-900 placeholder:text-gray-400 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            className="flex-1 text-base text-gray-900 placeholder:text-gray-500 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           />
-          <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-gray-100 text-[10px] font-medium text-gray-400 font-mono">
+          <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-gray-100 text-[10px] font-medium text-gray-600 font-mono">
             esc
           </kbd>
-          <button onClick={onClose} className="sm:hidden p-1 rounded-lg hover:bg-gray-100 text-gray-400">
+          <button aria-label="Cerrar" onClick={onClose} className="sm:hidden p-1 rounded-lg hover:bg-gray-100 text-gray-500">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -325,7 +325,7 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
                   <div className="text-xs text-gray-400 truncate">{r.subtitle}</div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-[10px] text-gray-300 bg-gray-50 px-1.5 py-0.5 rounded">{r.toolLabel}</span>
+                  <span className="text-[10px] text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded">{r.toolLabel}</span>
                   {idx === selectedIdx && <ArrowRight className="w-4 h-4 text-[#0E7A0E]" />}
                 </div>
               </button>

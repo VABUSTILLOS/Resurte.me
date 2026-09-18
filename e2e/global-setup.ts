@@ -1,4 +1,7 @@
-import type { FullConfig } from "@playwright/test"
+import { readFile } from "node:fs/promises"
+import { join } from "node:path"
+
+import { chromium, type FullConfig } from "@playwright/test"
 
 /**
  * Calentamiento de rutas.
@@ -8,7 +11,23 @@ import type { FullConfig } from "@playwright/test"
  * de 30 s: es la causa número uno de flakes de e2e en este repo. Este setup
  * compila las rutas antes de que arranque el primer test.
  *
- * Es un calentamiento, **no una aserción**: si una ruta no responde se
+ * Son **dos pasadas**, porque Next compila dos cosas distintas:
+ *
+ * 1. `warm()` — `fetch`. Compila los **módulos de servidor**: el HTML llega.
+ * 2. `warmClient()` — un navegador real con `waitUntil: "load"`. Compila los
+ *    **bundles de cliente**. Un `fetch` no ejecuta JavaScript, así que hasta
+ *    que un navegador real pide una ruta su *client chunk* sigue sin
+ *    compilarse — y esa compilación se paga dentro del presupuesto de la
+ *    primera aserción, no en este setup.
+ *
+ * La segunda pasada no es un lujo, es una medición: en frío, el *client chunk*
+ * de `/panel` tardó **23,6 s** en compilar con dos navegaciones en paralelo,
+ * mientras que la primera pasada ya había calentado su parte de servidor. Eso
+ * consumía entero el presupuesto de 8 s de la aserción del banner de cookies
+ * y el de 30 s de `waitForSelector("main#main-content")` en `/` — fallos que
+ * reportaban el servidor de desarrollo como si fueran defectos del producto.
+ *
+ * Ambas pasadas son **calentamiento, no aserción**: si una ruta no responde se
  * registra y el run continúa, porque el spec real es quien debe reportar el
  * fallo que importa. Los reintentos también cubren el caso de que el
  * `webServer` todavía no esté escuchando.
@@ -136,28 +155,73 @@ const ROUTE_TIMEOUT_MS = 15_000
  * deadline**: al agotarse, deja de calentar, nombra lo que faltó y devuelve el
  * control a los tests.
  *
- * 120 s es una fracción declarada del presupuesto del job (`timeout-minutes:
- * 25` = 1500 s), no un ajuste a ninguna medición de corte: se midió que en
- * frío las 64 rutas tardan del orden de 50 s (17 s con 21 rutas, escalado), así
- * que un presupuesto menor cortaría el calentamiento en cada corrida. Con esta
- * cota el peor caso baja de 3,2 h a 2 min, y los tests conservan ~23 min.
+ * 180 s es una fracción declarada del presupuesto del job (`timeout-minutes:
+ * 25` = 1500 s). Antes eran 120 s, con la medición "en frío las 64 rutas tardan
+ * del orden de 50 s". Esa cifra es falsa y ahora se sabe por qué: se tomó de
+ * corridas en las que el manifest ya estaba corrupto, y un servidor que
+ * responde 500 no compila nada, así que "calentar" 64 rutas parecía
+ * instantáneo.
+ *
+ * Medido con `CONCURRENCY = 1` sobre `distDir` fresco y servidor recién
+ * arrancado: 68 rutas en 107 s y en 169 s (la varianza entre corridas es de
+ * ~1,6×, con la CPU compartida). Escalado a las 83 rutas reales el orden de
+ * magnitud es 130–200 s. Con 120 s el presupuesto cortaba el calentamiento en
+ * cada corrida fría, que es justo lo que este comentario quería evitar.
+ *
+ * Con esta cota el peor caso baja de 3,2 h a 3 min, y los tests conservan ~22
+ * min. Al agotarse no se pierde nada: lo que falte se compila durante los tests.
+ *
+ * **Medido después: 180 s NO alcanzan en dev.** En una corrida fría real el
+ * calentamiento hizo 48/83 en 21 s y luego se atascó ~159 s en una sola ruta
+ * (`/api/admin/products/audit`, que no responde: 3 intentos × 15 s), y el
+ * presupuesto se agotó con 29 rutas sin calentar — las 11 últimas de `ROUTES`
+ * más las 18 de `API_ROUTES`. Las 130–200 s extrapoladas se quedaron cortas
+ * porque la varianza entre corridas es mayor de lo medido, y porque el deadline
+ * se comprueba **entre lotes**, así que una ruta en vuelo puede pasarse del
+ * presupuesto sin que se la interrumpa.
+ *
+ * En modo "prod" del `webServer` esto deja de importar: sin compilación bajo
+ * demanda las 83 rutas responden de inmediato y el calentamiento es casi
+ * instantáneo. La cota sigue siendo la correcta para CI, que corre en dev.
  */
-const WARM_BUDGET_MS = 120_000
+const WARM_BUDGET_MS = 180_000
 
 /**
- * Rutas calentadas en paralelo por lote.
+ * Rutas calentadas por lote. **Debe quedarse en 1.**
  *
  * El bucle era estrictamente secuencial "porque en paralelo varias
- * compilaciones simultáneas de Next en dev se pelean por la CPU". Eso es
- * cierto **sin cota**. Medido en caliente sobre 66 rutas: 1 → 2,9 s, 2 → 2,6 s,
- * 4 → 2,45 s, 8 → 2,3 s, 16 → 2,6 s. Es decir, la ganancia es pequeña y se
- * agota en 4; a partir de ahí solo crece la contención de CPU, que es lo que el
- * comentario original temía. Cuatro es el punto donde la curva se aplana.
+ * compilaciones simultáneas de Next en dev se pelean por la CPU". Una ronda
+ * anterior subió esta constante a 4 con una medición de *rendimiento*
+ * (1 → 2,9 s, 2 → 2,6 s, 4 → 2,45 s, 8 → 2,3 s, 16 → 2,6 s: la ganancia se
+ * agota en 4). La medición era correcta y aun así la conclusión era errónea: el
+ * costo de la concurrencia no es la CPU, es la **corrupción del manifest**.
  *
- * La cura del calentamiento no es esta constante, es el deadline: esto solo
- * evita que el caso frío desaproveche los huecos de espera.
+ * Next en dev reescribe `dev/prerender-manifest.json` cada vez que descubre una
+ * ruta prerenderizable, y **no trunca**: si la escritura nueva es más corta que
+ * la anterior, deja la cola de la vieja pegada al final y el archivo deja de
+ * ser JSON. Con una sola ruta en vuelo cada escritura es un superconjunto de la
+ * anterior, así que el archivo solo crece y nunca queda basura. Con cuatro, dos
+ * descubrimientos que terminan en la misma ventana escriben a la vez y el más
+ * corto gana.
+ *
+ * Medido con `warm()` sobre `distDir` fresco y servidor recién arrancado (solo
+ * `fetch`, sin navegador): con `CONCURRENCY = 4` el manifest queda corrupto en
+ * la ruta 8 de 64 (`pos=1468 len=1631`), y con `CONCURRENCY = 1` sobrevive sano
+ * a las 68 rutas (`OK 14712`), en dos corridas.
+ *
+ * El daño es permanente para esa instancia: el `SyntaxError` hace crashear a
+ * `next-server`, `next dev` lo reinicia, el reinicio reescribe otro manifest
+ * corto sin truncar y la corrupción se perpetúa. Borrar el archivo no lo
+ * recupera; solo parar el servidor y borrar el `distDir`. Por eso la corrida
+ * que se corrompe no falla de forma legible: deja cientos de errores JSON y
+ * todos los tests en timeout. `assertManifestSano` corta ese caso al principio.
+ *
+ * En modo "prod" del `webServer` nada de esto puede ocurrir: sin `next dev` no
+ * hay manifest que reescribir, así que la constante pasa a ser una simple
+ * cortesía de carga y podría subirse. Se queda en 1 porque en prod tampoco
+ * cuesta: sin compilación que serializar, las rutas responden al instante.
  */
-const CONCURRENCY = 4
+const CONCURRENCY = 1
 
 /** Cada cuántas rutas se imprime progreso. */
 const PROGRESS_EVERY = 8
@@ -198,6 +262,115 @@ const API_ROUTES = [
 
 const ALL_ROUTES = [...ROUTES, ...API_ROUTES]
 
+/**
+ * Rutas cuyo **bundle de cliente** se compila con un navegador real.
+ *
+ * Es un subconjunto, no la lista entera: la primera pasada ya cubre los
+ * módulos de servidor de las 83, y lo que queda por pagar aquí es el *client
+ * chunk*. Se eligen las que un spec `@ci` visita en su **primera** aserción
+ * —que es donde la compilación compite con el timeout— y las de bundle más
+ * pesado. La compilación es del segmento, no del valor, así que un slug por
+ * patrón dinámico basta.
+ *
+ * Criterio de inclusión: la ruta aparece en la primera aserción de un spec con
+ * un presupuesto corto (8–30 s) o es la raíz de un segmento grande
+ * (`/panel`, `/admin`, `/comer`).
+ */
+const BROWSER_ROUTES = [
+  // Raíces de los segmentos grandes: el chunk más caro de cada uno.
+  "/",
+  "/comer",
+  "/cdmx",
+  "/panel",
+  "/admin",
+  // Primera aserción de a11y.spec.ts y keyboard.spec.ts (presupuesto 30 s).
+  "/blog",
+  "/cdmx/carrito",
+  "/cdmx/buscar",
+  "/recompensas",
+  "/ruta-inexistente-xyz",
+  // Primera aserción de first-visit.spec.ts (presupuesto 8 s) y del carrito.
+  "/cdmx/checkout",
+  // Rutas dinámicas: a11y.spec.ts descubre estos enlaces en tiempo de ejecución
+  // y navega a ellos. Si el módulo `[slug]` no está compilado, la primera
+  // navegación compila y el servidor de desarrollo tira la conexión
+  // (`net::ERR_ABORTED` / `ECONNRESET`) dentro del presupuesto de 30 s.
+  // Los slugs son de `supabase/seed.sql`; si el dato no existe la ruta se
+  // compila igual (renderiza 404), que es justo lo que hace falta.
+  "/cdmx/categoria/frutas-verduras",
+  "/cdmx/producto/manzana-roja",
+]
+
+/** Timeout por ruta en la pasada de navegador. */
+const BROWSER_ROUTE_TIMEOUT_MS = 30_000
+
+/**
+ * Presupuesto de la pasada de navegador, en milisegundos.
+ *
+ * Tiene su **propio** deadline en vez de compartir el de la primera pasada:
+ * compartirlo haría que un calentamiento de servidor lento se comiera
+ * justamente la pasada que evita los flakes, que es el fallo que este archivo
+ * existe para no tener. 90 s es una fracción declarada del job
+ * (`timeout-minutes: 25` = 1500 s); medido, las 11 rutas tardan del orden de
+ * 25 s en frío.
+ */
+const BROWSER_WARM_BUDGET_MS = 90_000
+
+/**
+ * Compila los *client chunks* de `routes` navegando con un navegador real.
+ *
+ * `waitUntil: "load"` es la clave y no un margen: se cumple cuando los scripts
+ * diferidos ya se descargaron **y ejecutaron**, que es exactamente cuando el
+ * bundle de cliente está compilado y disponible. `domcontentloaded` dispara
+ * antes de eso, así que no serviría para calentar. `networkidle` tampoco:
+ * varias de estas rutas mantienen peticiones de fondo y no lo alcanzan.
+ *
+ * Se reutiliza un solo contexto y una sola página — la compilación es por
+ * ruta, no por pestaña — y un fallo se registra sin abortar el resto.
+ */
+async function warmClient(
+  baseURL: string,
+  routes: readonly string[],
+  deadline: number
+): Promise<string[]> {
+  const failures: string[] = []
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null
+  try {
+    browser = await chromium.launch()
+  } catch (error) {
+    // Sin navegador no hay segunda pasada, pero los tests corren igual: es un
+    // calentamiento, no un requisito.
+    console.warn(`[e2e] Pasada de navegador omitida: no se pudo lanzar chromium (${String(error)})`)
+    return [...routes]
+  }
+
+  try {
+    const context = await browser.newContext()
+    const page = await context.newPage()
+    for (const route of routes) {
+      if (Date.now() >= deadline) {
+        failures.push(route)
+        continue
+      }
+      try {
+        await page.goto(new URL(route, baseURL).toString(), {
+          waitUntil: "load",
+          timeout: BROWSER_ROUTE_TIMEOUT_MS,
+        })
+      } catch {
+        // Un timeout o un error de navegación no aborta: la ruta queda como
+        // "no calentada" y los tests que la toquen pagarán la compilación,
+        // igual que antes de que esta pasada existiera.
+        failures.push(route)
+      }
+    }
+    await context.close()
+  } finally {
+    await browser.close()
+  }
+  return failures
+}
+
 async function warm(baseURL: string, route: string, deadline: number): Promise<boolean> {
   for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
     if (Date.now() >= deadline) return false
@@ -217,9 +390,66 @@ async function warm(baseURL: string, route: string, deadline: number): Promise<b
   return false
 }
 
+/**
+ * Aborta si el manifest de prerenderizado de `next dev` está corrupto.
+ *
+ * `next dev` escribe `<distDir>/dev/prerender-manifest.json` de forma no
+ * atómica y, de vez en cuando, un escritor con contenido **más corto** pisa a
+ * otro **sin truncar**: el archivo queda como `{…válido…}{…restos…}` y
+ * `JSON.parse` revienta con `Unexpected non-whitespace character after JSON at
+ * position N`. Medido: 796 bytes válidos + 163 de restos de una versión
+ * anterior.
+ *
+ * Lo que hace que esto merezca una guarda es que el daño es **permanente para
+ * esa instancia del servidor**: cada request posterior responde 500 y el
+ * manifest **no se regenera ni borrándolo** (comprobado). Sin la guarda, el
+ * run entero produce cientos de errores JSON y todos los tests caen por
+ * timeout, reportando el servidor de desarrollo como si fuera el producto.
+ * Con ella, el run muere en un segundo y dice qué hacer.
+ *
+ * Se comprueba dos veces —antes y después del calentamiento— porque el
+ * calentamiento es justo la fase de compilación intensiva en la que se ha
+ * observado la corrupción.
+ *
+ * En modo "prod" del `webServer` (ver `playwright.config.ts`) esta guarda no
+ * tiene nada que vigilar y se convierte en un no-op: el manifest de `dev/` no
+ * existe, porque lo escribe `next dev` y un build de producción sirve el de la
+ * raíz del distDir, escrito una sola vez por `next build` y sin escritores
+ * concurrentes. El `readFile` falla y se sale por el `return` de abajo, que es
+ * exactamente el comportamiento correcto.
+ */
+async function assertManifestSano(config: FullConfig): Promise<void> {
+  const webServer = config.webServer
+  const env = webServer && typeof webServer === "object" ? webServer.env : undefined
+  const distDir = env?.NEXT_DIST_DIR ?? process.env.NEXT_DIST_DIR ?? ".next"
+  const manifestPath = join(distDir, "dev", "prerender-manifest.json")
+
+  let raw: string
+  try {
+    raw = await readFile(manifestPath, "utf8")
+  } catch {
+    // Sin manifest todavía: es el estado normal antes de la primera compilación.
+    return
+  }
+
+  try {
+    JSON.parse(raw)
+  } catch (error) {
+    throw new Error(
+      `[e2e] ${manifestPath} está corrupto: ${String(error)}. ` +
+        "Es un defecto conocido de `next dev` (escritura no atómica del manifest de prerenderizado) " +
+        "y deja el servidor inutilizable de forma permanente: todos los tests responderían 500 y " +
+        "fallarían por timeout, no por su causa real. Borrar el archivo NO lo recupera. " +
+        "Parar cualquier `next dev` sobre ese distDir, borrar el distDir y repetir."
+    )
+  }
+}
+
 export default async function globalSetup(config: FullConfig): Promise<void> {
   const baseURL =
     config.projects[0]?.use.baseURL ?? `http://localhost:${process.env.E2E_PORT ?? "3000"}`
+
+  await assertManifestSano(config)
 
   const started = Date.now()
   const deadline = started + WARM_BUDGET_MS
@@ -230,8 +460,9 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   let done = 0
   let nextReport = PROGRESS_EVERY
 
-  // Por lotes acotados: en frío cada ruta espera E/S y compilación, así que
-  // unas pocas en vuelo solapan esas esperas sin pelearse por la CPU.
+  // Un lote por vez: `CONCURRENCY` es 1 a propósito (ver su docstring — más de
+  // una ruta en vuelo corrompe el manifest). El lote sigue existiendo porque es
+  // el punto donde se consulta el deadline y se acumula lo que quedó pendiente.
   for (let index = 0; index < ALL_ROUTES.length; index += CONCURRENCY) {
     if (Date.now() >= deadline) {
       pending.push(...ALL_ROUTES.slice(index))
@@ -271,7 +502,30 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     )
   }
 
-  if (pending.length === 0 && failures.length === 0) {
-    console.log(`[e2e] Calentamiento de ${ALL_ROUTES.length} rutas en ${seconds}s`)
+  // Segunda pasada: los *client chunks*, que un `fetch` no toca. Arranca con su
+  // propio deadline para que una primera pasada lenta no la deje sin aire.
+  const clientStarted = Date.now()
+  const clientFailures = await warmClient(
+    baseURL,
+    BROWSER_ROUTES,
+    clientStarted + BROWSER_WARM_BUDGET_MS
+  )
+  const clientSeconds = Math.round((Date.now() - clientStarted) / 1000)
+
+  if (clientFailures.length > 0) {
+    console.warn(
+      `[e2e] Bundles de cliente sin calentar en ${clientSeconds}s: ${clientFailures.join(", ")}`
+    )
   }
+
+  if (pending.length === 0 && failures.length === 0 && clientFailures.length === 0) {
+    console.log(
+      `[e2e] Calentamiento de ${ALL_ROUTES.length} rutas (servidor) y ${BROWSER_ROUTES.length} bundles de cliente en ${seconds + clientSeconds}s`
+    )
+  }
+
+  // El calentamiento es la fase de compilación intensiva: es donde se ha visto
+  // corromperse el manifest. Volver a comprobarlo aquí evita que la suite
+  // arranque sobre un servidor ya muerto.
+  await assertManifestSano(config)
 }

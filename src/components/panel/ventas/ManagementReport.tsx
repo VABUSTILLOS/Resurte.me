@@ -43,7 +43,7 @@ export default function ManagementReport({
               key={p}
               onClick={() => onPeriodChange(p)}
               className={`px-3 py-1 text-[10px] font-semibold rounded-lg transition-colors ${
-                reportPeriod === p ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                reportPeriod === p ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
             >
               {p === "hoy" ? "Hoy" : p === "7d" ? "7 días" : "30 días"}
@@ -64,7 +64,7 @@ export default function ManagementReport({
             disabled={reportEntries.length === 0}
             title="Copiar reporte gerencial del período"
             aria-label="Copiar reporte gerencial"
-            className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Copy className="w-3.5 h-3.5" />
             Copiar reporte

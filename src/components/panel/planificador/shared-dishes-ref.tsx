@@ -26,7 +26,7 @@ export default function SharedDishesRef({ collectionName, collectionSlug }: Shar
           <>3. {t("planificador.step3")}</>,
         ].map((step, i) => (
           <li key={i} className="flex items-start gap-2">
-            <span className="mt-0.5 w-5 h-5 shrink-0 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">
+            <span className="mt-0.5 w-5 h-5 shrink-0 rounded-full bg-emerald-700 text-white text-[10px] font-bold flex items-center justify-center">
               {i + 1}
             </span>
             <span className="leading-relaxed">{step}</span>
@@ -35,7 +35,7 @@ export default function SharedDishesRef({ collectionName, collectionSlug }: Shar
       </ol>
       <Link
         href="/panel/costeo"
-        className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[11px] font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
+        className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 text-white text-[11px] font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
       >
         <Calculator className="w-3.5 h-3.5" />
         {t("planificador.goToCosteador")}

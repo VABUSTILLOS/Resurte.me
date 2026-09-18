@@ -106,7 +106,7 @@ export default function ToolGuide({
                       {onToggleCollapsed && (
                         <button
                           onClick={onToggleCollapsed}
-                          className="hidden lg:flex p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
+                          className="hidden lg:flex p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
                           aria-label={collapsed ? "Expandir guía" : "Colapsar guía"}
                           title={collapsed ? "Expandir" : "Colapsar"}
                         >
@@ -115,7 +115,7 @@ export default function ToolGuide({
                       )}
                       <button
                         onClick={onClose}
-                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
+                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
                         aria-label="Cerrar guía"
                       >
                         <X className="w-4 h-4" />
@@ -171,7 +171,7 @@ export default function ToolGuide({
                         className={`mt-2.5 w-full text-xs font-bold rounded-lg px-3 py-2 transition-colors ${
                           demoOn
                             ? "bg-gray-900 text-white hover:bg-gray-700"
-                            : "bg-amber-500 text-white hover:bg-amber-600"
+                            : "bg-amber-700 text-white hover:bg-amber-700"
                         }`}
                       >
                         {demoOn ? "Salir del modo demo" : "Ver con datos de ejemplo"}
@@ -196,7 +196,7 @@ export default function ToolGuide({
                   {isLast ? (
                     <button
                       onClick={handleDismiss}
-                      className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 rounded-lg transition-colors"
+                      className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-700 px-3.5 py-2 rounded-lg transition-colors"
                     >
                       <Check className="w-4 h-4" />
                       ¡Listo!

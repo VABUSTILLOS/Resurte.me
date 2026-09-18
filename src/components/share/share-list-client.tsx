@@ -218,7 +218,7 @@ export function ShareListClient() {
           onChange={(event) => setText(event.target.value)}
           rows={entries.length > 8 ? 12 : 6}
           placeholder={"Un producto por renglón. Por ejemplo:\n2 kg de tomate\n1 lechuga\n3 limones"}
-          className="w-full rounded-xl border border-[#e0dbd2] bg-white p-3 text-sm text-[#343538] placeholder:text-[#B0B3B8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E7A0E] focus-visible:ring-offset-1"
+          className="w-full rounded-xl border border-[#e0dbd2] bg-white p-3 text-sm text-[#343538] placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E7A0E] focus-visible:ring-offset-1"
         />
         <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
           Acepta cantidades al inicio (“2 kg de tomate”), con x (“tomate x3”) o entre paréntesis

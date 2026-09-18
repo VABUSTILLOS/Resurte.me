@@ -123,7 +123,7 @@ export function ComercializacionLayoutClient({
               <span className="relative">
                 <item.icon className="w-5 h-5" />
                 {"badge" in item && item.badge && overdueCount > 0 && (
-                  <span className="absolute -top-1 -right-1.5 inline-flex items-center justify-center min-w-4 h-4 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold">
+                  <span className="absolute -top-1 -right-1.5 inline-flex items-center justify-center min-w-4 h-4 px-0.5 rounded-full bg-red-700 text-white text-[9px] font-bold">
                     {overdueCount}
                   </span>
                 )}

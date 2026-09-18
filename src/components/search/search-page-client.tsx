@@ -342,7 +342,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
               {selectedCategory && selectedCat && (
                 <button
                   onClick={() => setSelectedCategory(null)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-[#0E7A0E]/10 text-[#0E7A0E] hover:bg-[#0E7A0E]/20 transition-colors touch-target"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-[#0E7A0E]/10 text-brand-600 hover:bg-[#0E7A0E]/20 transition-colors touch-target"
                 >
                   {getCategoryIcon(selectedCat.icon, selectedCat.slug)} {selectedCat.name}
                   <X className="w-3 h-3" />

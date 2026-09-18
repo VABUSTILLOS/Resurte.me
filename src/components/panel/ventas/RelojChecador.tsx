@@ -54,7 +54,7 @@ export default function RelojChecador({
         )}
         <button
           onClick={onToggle}
-          className="ml-auto flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
+          className="ml-auto flex items-center gap-1 text-xs font-semibold text-gray-600 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
           aria-expanded={showReloj}
           aria-label="Mostrar u ocultar reloj checador"
         >
@@ -125,7 +125,7 @@ export default function RelojChecador({
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-gray-800 truncate">
                         {e.nombre}
-                        {e.abierto && <span className="ml-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">en turno</span>}
+                        {e.abierto && <span className="ml-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">en turno</span>}
                       </p>
                       <p className="text-[10px] text-gray-400">
                         {e.rol ? `${e.rol} · ` : ""}hoy {Math.floor(e.minutos / 60)}h {Math.round(e.minutos % 60)}min · ${((e.minutos / 60) * e.tarifa).toFixed(0)}
@@ -141,7 +141,7 @@ export default function RelojChecador({
                     <button
                       onClick={() => onFicharSalida(e.id)}
                       disabled={!e.abierto}
-                      className="px-2.5 py-1.5 text-[10px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="px-2.5 py-1.5 text-[10px] font-semibold text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       aria-label={`Fichar salida de ${e.nombre}`}
                     >
                       Salida
@@ -158,13 +158,13 @@ export default function RelojChecador({
                       <div className="flex items-center gap-1">
                         <button
                           onClick={onConfirmDelete}
-                          className="px-2 py-1 text-[10px] font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600"
+                          className="px-2 py-1 text-[10px] font-semibold text-white bg-red-700 rounded-lg hover:bg-red-600"
                         >
                           Sí
                         </button>
                         <button
                           onClick={onCancelDelete}
-                          className="px-2 py-1 text-[10px] font-semibold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200"
+                          className="px-2 py-1 text-[10px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
                         >
                           No
                         </button>
@@ -190,7 +190,7 @@ export default function RelojChecador({
                 <p className="text-[10px] font-semibold text-gray-400 uppercase">Resumen de {dateLabel(selectedDate)}</p>
                 <button
                   onClick={onCopyHoras}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
                 >
                   <Copy className="w-3.5 h-3.5" />
                   Copiar reporte de horas

@@ -21,7 +21,7 @@ export default function CorteCaja({ methodBreakdown, revenue, dayEntryCount, sel
         <button
           onClick={onCopy}
           disabled={dayEntryCount === 0}
-          className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title="Copiar corte de caja del día seleccionado"
           aria-label="Copiar corte de caja"
         >

@@ -1619,8 +1619,9 @@ export async function getAdminProspectDetail(prospectId: number): Promise<{
  * lugar de repetir la consulta, por dos razones distintas:
  *
  *  - **Corrección:** `crm_prospects.user_id → orders.user_id` es el único camino
- *    que existe hacia el dinero. `orders.seller_id` está declarada pero ninguna
- *    ruta la escribe, así que atribuir por vendedor daría cero siempre.
+ *    que existe hacia el dinero. `orders.seller_id` existió hasta `00189`,
+ *    ninguna ruta la escribió nunca, y ya no está: atribuir por vendedor habría
+ *    dado cero siempre.
  *  - **Contrato:** `crm-reader.contract.test.ts` fija los módulos autorizados a
  *    consultar `crm_prospects`. Añadir aquí un lector propio obligaría a ampliar
  *    esa lista, y la lista es precisamente lo que impide que vuelvan a convivir

@@ -236,7 +236,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       </h1>
 
       {error && (
-        <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+        <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -349,7 +349,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-emerald-600 px-4 py-3 sm:py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          className="w-full rounded-lg bg-emerald-700 px-4 py-3 sm:py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
         >
           {loading ? "Cargando..." : isLogin ? "Iniciar Sesión" : "Crear Cuenta"}
         </button>

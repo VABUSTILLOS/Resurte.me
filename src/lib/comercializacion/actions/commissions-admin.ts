@@ -24,7 +24,7 @@
  *
  * La atribución reutiliza la regla de siempre:
  * `crm_prospects.seller_id → user_id → orders.user_id`, porque
- * `orders.seller_id` (00052) no lo escribe ninguna ruta.
+ * `orders.seller_id` (00052, eliminada en 00189) no la escribía ninguna ruta.
  */
 
 import { createServiceClient } from "@/lib/supabase/service"

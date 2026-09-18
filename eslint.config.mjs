@@ -41,7 +41,11 @@ const eslintConfig = [
     },
   },
   {
-    ignores: ["node_modules/**", ".next/**", ".vercel/**", "out/**", "build/**", "next-env.d.ts", "scripts/archive/**", "test-results/**", "playwright-report/**", "blob-report/**"],
+    // `.next*/**` y no `.next/**`: el e2e le da a su servidor un `distDir` propio
+    // (`NEXT_DIST_DIR` en next.config.ts) para no chocar con el `next dev` del
+    // desarrollador, y ese caché no es código: sin este glob, ESLint lo lintea y
+    // `npm run verify` pasa de verde a ~24.000 problemas según corras o no el e2e.
+    ignores: ["node_modules/**", ".next*/**", ".vercel/**", "out/**", "build/**", "next-env.d.ts", "scripts/archive/**", "test-results/**", "playwright-report/**", "blob-report/**"],
   },
 ];
 

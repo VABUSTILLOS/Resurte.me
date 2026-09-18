@@ -1,7 +1,19 @@
-import { readFileSync, readdirSync, statSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { join, relative } from "node:path"
-import ts from "typescript"
 import { describe, expect, it } from "vitest"
+import {
+  BLANCO,
+  PALETA,
+  afordanciasMuertas,
+  archivosTsx,
+  contarToken,
+  describir,
+  desdeHex,
+  medirPares,
+  razon,
+  rgbDeToken,
+  sinComentarios,
+} from "./contrast"
 
 /**
  * Contrato de contraste del panel de admin (A16).
@@ -65,244 +77,17 @@ import { describe, expect, it } from "vitest"
  * nunca subir.
  *
  * El entorno de vitest es `node` (sin jsdom), así que el contrato se fija sobre
+ *
+ * El andamiaje de medición (matemática de color, recorrido del AST, emparejado
+ * de tokens) vive en `src/lib/contrast.ts`, compartido con el contrato de
+ * `/panel`: es la misma matemática y no debe haber dos copias que puedan
+ * divergir. Aquí queda lo propio de `/admin`: el perímetro, los umbrales y las
+ * listas de prohibidos y reemplazos.
  * el AST del archivo, igual que `a11y-static.contract.test.ts`.
  */
 
 const RAIZ = process.cwd()
 const ADMIN = join(RAIZ, "src", "app", "admin")
-
-type RGB = readonly [number, number, number]
-
-/** OKLCH → sRGB: matriz OKLab de Björn Ottosson, gamma sRGB y recorte a [0,1]. */
-function oklchARgb(L: number, C: number, h: number): RGB {
-  const hr = (h * Math.PI) / 180
-  const a = C * Math.cos(hr)
-  const b = C * Math.sin(hr)
-  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3
-  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3
-  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3
-  const lineal = [
-    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
-  ]
-  const gamma = (x: number): number => {
-    const c = Math.min(1, Math.max(0, x))
-    return c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055
-  }
-  const r = Math.round(gamma(lineal[0]!) * 255)
-  const g = Math.round(gamma(lineal[1]!) * 255)
-  const bl = Math.round(gamma(lineal[2]!) * 255)
-  return [r, g, bl]
-}
-
-function desdeHex(hex: string): RGB {
-  const r = Number.parseInt(hex.slice(1, 3), 16)
-  const g = Number.parseInt(hex.slice(3, 5), 16)
-  const b = Number.parseInt(hex.slice(5, 7), 16)
-  return [r, g, b]
-}
-
-/** Luminancia relativa WCAG 2.x. */
-function luminancia([r, g, b]: RGB): number {
-  const canal = (x: number): number => {
-    const v = x / 255
-    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
-  }
-  return 0.2126 * canal(r) + 0.7152 * canal(g) + 0.0722 * canal(b)
-}
-
-function razon(a: RGB, b: RGB): number {
-  const [alto, bajo] = [luminancia(a), luminancia(b)].sort((p, q) => q - p)
-  return (alto! + 0.05) / (bajo! + 0.05)
-}
-
-/** Composición alfa sobre un fondo opaco (sRGB, sin espacio lineal). */
-function componer(fg: RGB, bg: RGB, alfa: number): RGB {
-  return [
-    Math.round(fg[0] * alfa + bg[0] * (1 - alfa)),
-    Math.round(fg[1] * alfa + bg[1] * (1 - alfa)),
-    Math.round(fg[2] * alfa + bg[2] * (1 - alfa)),
-  ]
-}
-
-const BLANCO: RGB = [255, 255, 255]
-
-/**
- * Paleta medida. Se construye leyendo las dos fuentes de verdad del proyecto en
- * vez de copiar valores: `theme.css` trae los tokens de Tailwind v4 en OKLCH y
- * `globals.css` la paleta propia en hex.
- */
-const PALETA = new Map<string, RGB>()
-
-function grupo(m: RegExpMatchArray, i: number): string {
-  const v = m[i]
-  if (v === undefined) throw new Error(`grupo ${i} ausente en ${m[0]}`)
-  return v
-}
-
-const themeCss = readFileSync(join(RAIZ, "node_modules", "tailwindcss", "theme.css"), "utf8")
-const globalsCss = readFileSync(join(RAIZ, "src", "app", "globals.css"), "utf8")
-
-for (const m of themeCss.matchAll(/--color-([a-z-]+?)-(\d{2,3}):\s*oklch\(([\d.]+)%\s+([\d.]+)\s+([\d.]+)\)/g)) {
-  PALETA.set(`${grupo(m, 1)}-${grupo(m, 2)}`, oklchARgb(Number(grupo(m, 3)) / 100, Number(grupo(m, 4)), Number(grupo(m, 5))))
-}
-for (const m of globalsCss.matchAll(/--color-([a-z-]+?)-(\d{2,3}):\s*(#[0-9a-fA-F]{6})/g)) {
-  PALETA.set(`${grupo(m, 1)}-${grupo(m, 2)}`, desdeHex(grupo(m, 3)))
-}
-PALETA.set("white", BLANCO)
-PALETA.set("black", [0, 0, 0])
-
-const FAMILIAS =
-  "cs-green|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|gray|slate|zinc|neutral|stone|brand|cream|warm"
-
-const RE_TEXTO = new RegExp(`^text-(${FAMILIAS})-(\\d{2,3})(?:/(\\d+))?$`)
-const RE_FONDO = new RegExp(`^bg-(${FAMILIAS})-(\\d{2,3})(?:/(\\d+))?$`)
-const RE_FONDO_HEX = /^bg-\[(#[0-9a-fA-F]{3,8})\](?:\/(\d+))?$/
-const RE_VARIANTE =
-  /^(?:(?:hover|focus|focus-visible|active|disabled|group-hover|group-focus|peer-checked|sm|md|lg|xl|2xl|dark|motion-reduce|motion-safe|aria-[a-z]+|data-\[[^\]]*\]):)+/
-
-/** Sin comentarios, conservando los saltos de línea para no desplazar las líneas. */
-function sinComentarios(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
-    .replace(/(^|[^:])\/\/.*$/gm, "$1")
-}
-
-function archivosTsx(dir: string, out: string[] = []): string[] {
-  for (const entrada of readdirSync(dir)) {
-    if (entrada === "node_modules" || entrada.startsWith(".")) continue
-    const p = join(dir, entrada)
-    if (statSync(p).isDirectory()) archivosTsx(p, out)
-    else if (p.endsWith(".tsx")) out.push(p)
-  }
-  return out
-}
-
-function literales(n: ts.Node, out: string[] = []): string[] {
-  if (
-    ts.isStringLiteral(n) ||
-    ts.isNoSubstitutionTemplateLiteral(n) ||
-    ts.isTemplateHead(n) ||
-    ts.isTemplateMiddle(n) ||
-    ts.isTemplateTail(n)
-  ) {
-    out.push(n.text)
-  }
-  // El callback NO debe devolver nada: `ts.forEachChild` interpreta un retorno
-  // truthy como «deja de recorrer». Devolver el acumulador aquí truncaba el
-  // recorrido en el primer literal, así que de un `className={`... ${...}`}`
-  // sólo se leía la cabecera y las ramas del ternario quedaban sin medir.
-  ts.forEachChild(n, (c) => {
-    literales(c, out)
-  })
-  return out
-}
-
-/** ¿La expresión puede pintar un valor primitivo (texto o número)? */
-function pintaPrimitivo(e: ts.Expression): boolean {
-  if (
-    ts.isStringLiteral(e) ||
-    ts.isNumericLiteral(e) ||
-    ts.isNoSubstitutionTemplateLiteral(e) ||
-    ts.isTemplateExpression(e) ||
-    ts.isIdentifier(e) ||
-    ts.isPropertyAccessExpression(e) ||
-    ts.isElementAccessExpression(e) ||
-    ts.isCallExpression(e)
-  ) {
-    return true
-  }
-  if (ts.isParenthesizedExpression(e)) return pintaPrimitivo(e.expression)
-  if (ts.isConditionalExpression(e)) return pintaPrimitivo(e.whenTrue) || pintaPrimitivo(e.whenFalse)
-  if (ts.isBinaryExpression(e)) {
-    const k = e.operatorToken.kind
-    // `a && <Icono/>` / `a || b` / `a ?? b`: sólo el lado derecho llega a pintarse.
-    if (k === ts.SyntaxKind.AmpersandAmpersandToken || k === ts.SyntaxKind.BarBarToken || k === ts.SyntaxKind.QuestionQuestionToken) {
-      return pintaPrimitivo(e.right)
-    }
-    if (k === ts.SyntaxKind.PlusToken) return pintaPrimitivo(e.left) || pintaPrimitivo(e.right)
-  }
-  return false
-}
-
-/** ¿El elemento pinta texto visible? Decide el umbral (4.5:1 con texto, 3.0:1 gráfico). */
-function llevaTexto(n: ts.Node): boolean {
-  // Un atributo no pinta texto: `className={`...`}` no puede subir el umbral.
-  if (ts.isJsxAttribute(n)) return false
-  if (ts.isJsxText(n)) return n.text.trim().length > 0
-  if (ts.isJsxExpression(n)) {
-    if (n.expression && pintaPrimitivo(n.expression)) return true
-    // `{cond && <span>hola</span>}` no pinta una primitiva, pero el `<span>` sí
-    // lleva texto: se sigue bajando por los hijos en vez de cortar aquí.
-  }
-  let encontrado = false
-  n.forEachChild((c) => {
-    if (llevaTexto(c)) {
-      encontrado = true
-      return c
-    }
-  })
-  return encontrado
-}
-
-/**
- * Valores posibles de una expresión de `className`. Un ternario tiene ramas
- * mutuamente excluyentes: unirlas inventa pares que nunca se pintan juntos
- * (`text-white` sobre `bg-white` = 1.00:1). Cada valor es una alternativa real.
- */
-function valores(n: ts.Node): string[] {
-  if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) return [n.text]
-  if (ts.isTemplateExpression(n)) {
-    let acumulado = [n.head.text]
-    for (const span of n.templateSpans) {
-      const trozos = valores(span.expression)
-      const lit = span.literal.text
-      const siguiente: string[] = []
-      for (const a of acumulado) for (const t of trozos) siguiente.push(a + t + lit)
-      if (siguiente.length) acumulado = siguiente
-    }
-    return acumulado
-  }
-  if (ts.isJsxExpression(n)) return n.expression ? valores(n.expression) : [""]
-  if (ts.isParenthesizedExpression(n)) return valores(n.expression)
-  if (ts.isConditionalExpression(n)) {
-    const ramas = [...valores(n.whenTrue), ...valores(n.whenFalse)].filter((v) => v.trim().length > 0)
-    return ramas.length ? ramas : [""]
-  }
-  if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.PlusToken) {
-    const izq = valores(n.left)
-    const der = valores(n.right)
-    const out: string[] = []
-    for (const a of izq) for (const b of der) out.push(a + b)
-    return out
-  }
-  // Identificadores, llamadas y condicionales no estáticos: valor desconocido.
-  return [""]
-}
-
-/** Alternativas de render de un `className`: cada una es su propia lista de tokens. */
-function alternativas(init: ts.Node): string[][] {
-  const lista = [...new Set(valores(init))]
-  const utiles = lista.length ? lista : [""]
-  const partir = (v: string) => v.split(/\s+/).filter(Boolean)
-  if (utiles.length > 32) {
-    // Demasiadas combinaciones: se mide la unión y se asume el peor caso.
-    return [[...new Set(utiles.flatMap(partir))]]
-  }
-  return utiles.map(partir)
-}
-
-/** Cuenta un token respetando límites de palabra (no confunde `-600` con `-6000`). */
-function contarToken(src: string, token: string): number {
-  const escapado = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  return (src.match(new RegExp(`(?<![\\w-])${escapado}(?![\\w-])`, "g")) ?? []).length
-}
-
-/**
- * Archivos con su propio contrato (B36) o de la línea de trabajo concurrente.
- * Las rutas son relativas a `src/app/admin`.
- */
 const CON_CONTRATO_PROPIO = [
   "productos/page.tsx",
   "components/ProductFormModal.tsx",
@@ -405,178 +190,9 @@ const REEMPLAZOS: Record<string, string> = {
   "bg-emerald-500": "bg-emerald-700",
   "bg-[#25D366]": "bg-[#0F7A3D]",
 }
+const medicion = medirPares(PERIMETRO, FUENTES)
 
-function rgbDeToken(util: string): { rgb: RGB; alfa: number } | null {
-  const neutro = util.match(/^(?:text|bg)-(white|black)(?:\/(\d+))?$/)
-  if (neutro) {
-    return { rgb: neutro[1] === "white" ? BLANCO : [0, 0, 0], alfa: Number(neutro[2] ?? 100) / 100 }
-  }
-  const hex = util.match(RE_FONDO_HEX)
-  if (hex) {
-    const h = hex[1]!
-    const completo = h.length === 4 ? `#${h[1]!}${h[1]!}${h[2]!}${h[2]!}${h[3]!}${h[3]!}` : h
-    return { rgb: desdeHex(completo.slice(0, 7)), alfa: Number(hex[2] ?? 100) / 100 }
-  }
-  const m = util.match(RE_TEXTO) ?? util.match(RE_FONDO)
-  if (!m) return null
-  const clave = `${m[1]}-${m[2]}`
-  const rgb = PALETA.get(clave)
-  if (!rgb) return null
-  return { rgb, alfa: Number(m[3] ?? 100) / 100 }
-}
-
-interface Par {
-  archivo: string
-  linea: number
-  texto: string
-  fondo: string
-  variante: string
-  ratio: number
-  umbral: number
-}
-
-function medirPares(): { pares: number; fallos: Par[]; sinHex: string[]; conTexto: number } {
-  const fallos: Par[] = []
-  const sinHex: string[] = []
-  let pares = 0
-  let conTextoTotal = 0
-
-  for (const archivo of PERIMETRO) {
-    const src = FUENTES.get(archivo)!
-    const sf = ts.createSourceFile(archivo, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-    const rel = relative(RAIZ, archivo)
-
-    const visitar = (n: ts.Node): void => {
-      const etiqueta = ts.isJsxElement(n) ? n.openingElement : ts.isJsxSelfClosingElement(n) ? n : null
-      if (etiqueta) {
-        const attr = etiqueta.attributes.properties.find(
-          (a) => ts.isJsxAttribute(a) && a.name.getText(sf) === "className",
-        )
-        if (attr && ts.isJsxAttribute(attr) && attr.initializer) {
-          const conTexto = llevaTexto(n)
-          if (conTexto) conTextoTotal++
-          const umbral = conTexto ? 4.5 : 3.0
-          const linea = sf.getLineAndCharacterOfPosition(etiqueta.getStart(sf)).line + 1
-
-          for (const toks of alternativas(attr.initializer)) {
-          const grupos = new Map<string, string[]>()
-          for (const t of toks) {
-            const variante = t.match(RE_VARIANTE)?.[0] ?? ""
-            const util = t.slice(variante.length)
-            const lista = grupos.get(variante)
-            if (lista) lista.push(util)
-            else grupos.set(variante, [util])
-          }
-
-          const base = grupos.get("") ?? []
-          const textosBase = base.filter((u) => u.startsWith("text-"))
-          const fondosBase = base.filter((u) => u.startsWith("bg-"))
-
-          for (const [variante, utils] of grupos) {
-            const textosPropios = utils.filter((u) => u.startsWith("text-"))
-            const fondosPropios = utils.filter((u) => u.startsWith("bg-"))
-            // Herencia de estado: un `hover:bg-*` sin `hover:text-*` deja el color
-            // de texto de la base sobre el fondo nuevo, y esa mezcla es la que ve
-            // el usuario al pasar el ratón. Medir sólo dentro del mismo ámbito de
-            // variante dejaba fuera `text-gray-500 hover:bg-gray-100` (4.39:1).
-            if (variante !== "" && textosPropios.length === 0 && fondosPropios.length === 0) continue
-            const textos = variante === "" || textosPropios.length > 0 ? textosPropios : textosBase
-            const fondos = variante === "" || fondosPropios.length > 0 ? fondosPropios : fondosBase
-            for (const tt of textos) {
-              const t = rgbDeToken(tt)
-              if (!t) {
-                if (RE_TEXTO.test(tt) || tt.startsWith("text-white")) sinHex.push(`${rel}:${linea} ${tt}`)
-                continue
-              }
-              for (const bt of fondos) {
-                const b = rgbDeToken(bt)
-                if (!b) {
-                  if (RE_FONDO.test(bt) || RE_FONDO_HEX.test(bt)) sinHex.push(`${rel}:${linea} ${bt}`)
-                  continue
-                }
-                const fondo = b.alfa < 1 ? componer(b.rgb, BLANCO, b.alfa) : b.rgb
-                const texto = t.alfa < 1 ? componer(t.rgb, fondo, t.alfa) : t.rgb
-                pares++
-                const ratio = razon(texto, fondo)
-                if (ratio < umbral) {
-                  fallos.push({ archivo: rel, linea, texto: tt, fondo: bt, variante, ratio, umbral })
-                }
-              }
-            }
-          }
-          }
-        }
-      }
-      ts.forEachChild(n, visitar)
-    }
-    visitar(sf)
-  }
-  return { pares, fallos, sinHex, conTexto: conTextoTotal }
-}
-
-const medicion = medirPares()
-
-/**
- * Variantes de estado. Repetir en ellas el mismo valor que ya tiene la base deja
- * la afordancia muerta: el `text-gray-400 hover:text-gray-600` que se corrigió
- * en la ronda 15 no hacía nada al pasar el ratón.
- */
-const VARIANTES_DE_ESTADO = new Set([
-  "hover",
-  "focus",
-  "focus-visible",
-  "focus-within",
-  "active",
-  "group-hover",
-  "group-focus",
-])
-
-function afordanciasMuertas(): { revisadas: number; muertas: string[] } {
-  const muertas: string[] = []
-  let revisadas = 0
-  for (const archivo of PERIMETRO) {
-    const src = FUENTES.get(archivo)!
-    const sf = ts.createSourceFile(archivo, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-    const rel = relative(RAIZ, archivo)
-    const visitar = (n: ts.Node): void => {
-      const etiqueta = ts.isJsxElement(n) ? n.openingElement : ts.isJsxSelfClosingElement(n) ? n : null
-      if (etiqueta) {
-        const attr = etiqueta.attributes.properties.find(
-          (a) => ts.isJsxAttribute(a) && a.name.getText(sf) === "className",
-        )
-        if (attr && ts.isJsxAttribute(attr) && attr.initializer) {
-          const linea = sf.getLineAndCharacterOfPosition(etiqueta.getStart(sf)).line + 1
-          // Por literal y no por unión de ramas: un ternario que pone la base en
-          // una rama y el hover en otra no es una afordancia muerta.
-          for (const literal of literales(attr.initializer)) {
-            const utils = literal.split(/\s+/).filter(Boolean)
-            if (utils.length === 0) continue
-            revisadas++
-            for (const util of utils) {
-              const prefijo = util.match(RE_VARIANTE)?.[0]
-              if (!prefijo) continue
-              const variantes = prefijo.split(":").slice(0, -1)
-              if (!variantes.some((v) => VARIANTES_DE_ESTADO.has(v))) continue
-              const base = util.slice(prefijo.length)
-              if (utils.includes(base)) muertas.push(`${rel}:${linea}  ${util} repite ${base}`)
-            }
-          }
-        }
-      }
-      ts.forEachChild(n, visitar)
-    }
-    visitar(sf)
-  }
-  return { revisadas, muertas }
-}
-
-const afordancias = afordanciasMuertas()
-
-function describir(p: Par): string {
-  const r = p.ratio.toFixed(2)
-  const v = p.variante ? ` [${p.variante}]` : ""
-  return `${p.archivo}:${p.linea}  ${p.texto} sobre ${p.fondo} = ${r}:1 (umbral ${p.umbral})${v}`
-}
+const afordancias = afordanciasMuertas(PERIMETRO, FUENTES)
 
 describe("contraste del panel de admin (A16)", () => {
   it("la matemática de color es la de WCAG", () => {

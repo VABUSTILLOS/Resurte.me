@@ -47,7 +47,7 @@ export default function MermaEntriesList({
               <div>
                 <div className="flex items-center gap-1.5">
                   <p className="text-sm font-medium text-gray-800">{cat?.label}</p>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-50 text-red-600 font-medium">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 font-medium">
                     {cause?.icon} {cause?.label || "Sin causa"}
                   </span>
                 </div>

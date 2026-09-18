@@ -7,12 +7,18 @@
  *
  * ## Por qué el embed de `profiles` lleva hint de FK
  *
- * `orders` tiene DOS claves foráneas hacia `profiles`: `orders_user_id_fkey`
+ * `orders` llegó a tener DOS claves foráneas hacia `profiles`: `orders_user_id_fkey`
  * (por `user_id`) y `orders_seller_id_fkey` (por `seller_id`, añadida por la
  * migración 00052). Con dos relaciones, PostgREST rechaza el embed sin hint
  * con `PGRST201` ("more than one relationship was found for 'orders' and
- * 'profiles'") y el panel de pedidos deja de cargar. El hint fija el cliente
- * del pedido (`user_id`), que es el que el panel muestra.
+ * 'profiles'") y el panel de pedidos deja de cargar.
+ *
+ * `seller_id` **nunca se escribió ni se leyó**, y la migración 00189 la elimina
+ * junto con su FK: hoy `orders` solo tiene una relación con `profiles` y el
+ * `PGRST201` ya no puede ocurrir. El hint se conserva —no estorba, y una FK
+ * nombrada explícitamente se resuelve igual aunque sea la única— para que el
+ * cliente del pedido (`user_id`) siga siendo una decisión escrita y no un
+ * accidente del esquema.
  *
  * ## Columnas opcionales
  *

@@ -28,7 +28,7 @@ export default function ActiveDishes({
         <h3 className="text-sm font-semibold text-gray-700">
           {t("planificador.activeDishes", { count: sharedDishes.length })}
         </h3>
-        <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full ml-auto">
+        <span className="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full ml-auto">
           {t("planificador.fromCosteador")}
         </span>
       </div>

@@ -58,7 +58,7 @@ export default function DishesList({
                 })()}
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <button onClick={() => onDuplicate(dish)} className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-500 transition-colors" title="Duplicar platillo" aria-label={`Duplicar ${dish.name}`}>
+                <button onClick={() => onDuplicate(dish)} className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-700 transition-colors" title="Duplicar platillo" aria-label={`Duplicar ${dish.name}`}>
                   <Plus className="w-4 h-4" />
                 </button>
                 <button onClick={() => onEdit(dish)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title={t("costeo.editDish")} aria-label={`Editar ${dish.name}`}>

@@ -50,7 +50,7 @@ export default function SalesGoals({
         <h3 className="text-sm font-semibold text-gray-900">Metas de venta</h3>
         <button
           onClick={onToggle}
-          className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
+          className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
           title={showGoals ? "Cerrar edición" : "Editar metas diaria y mensual"}
           aria-label="Editar metas de venta"
         >

@@ -56,11 +56,11 @@ export function TierBenefitsSection() {
                 <span
                   className={`absolute -top-2.5 left-4 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${
                     tier === "verde"
-                      ? "bg-emerald-600"
+                      ? "bg-emerald-700"
                       : tier === "plata"
                         ? "bg-slate-500"
                         : tier === "oro"
-                          ? "bg-amber-600"
+                          ? "bg-amber-700"
                           : "bg-violet-600"
                   }`}
                 >

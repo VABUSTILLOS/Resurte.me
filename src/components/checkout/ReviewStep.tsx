@@ -121,7 +121,7 @@ export function ReviewStep({
                 </span>
                 <span className="font-medium text-gray-900 shrink-0">
                   {item.quantity === 0 ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 border border-red-300 text-red-600 text-[10px] font-bold uppercase tracking-wide">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 border border-red-300 text-red-700 text-[10px] font-bold uppercase tracking-wide">
                       En 0
                     </span>
                   ) : (
@@ -152,7 +152,7 @@ export function ReviewStep({
                 </span>
                 <span className="font-medium text-gray-900 shrink-0">
                   {bump.quantity === 0 ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 border border-red-300 text-red-600 text-[10px] font-bold uppercase tracking-wide">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 border border-red-300 text-red-700 text-[10px] font-bold uppercase tracking-wide">
                       En 0
                     </span>
                   ) : (

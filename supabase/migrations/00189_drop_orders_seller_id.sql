@@ -1,0 +1,32 @@
+-- 00189_drop_orders_seller_id.sql
+--
+-- Elimina `orders.seller_id` (CRM1 de la auditoría de estatus).
+--
+-- PROBLEMA: la columna se añadió en 00052 como "atribución de pedidos asistidos
+-- por el vendedor", con FK a `profiles(id)` y su índice `idx_orders_seller`.
+-- **Ninguna ruta la escribió nunca, y ninguna la lee.** La comisión del vendedor
+-- se resuelve por otra cadena —`crm_prospects.seller_id` → `user_id` →
+-- `orders.user_id`— y así está documentado en 00155. Una columna de atribución
+-- que siempre vale NULL no es deuda inocua: invita a que la siguiente pantalla
+-- la use como si tuviera datos y devuelva cero en silencio, que es exactamente
+-- el error que 00155 se molestó en evitar. Además mantiene viva una FK a
+-- `profiles` y un índice que nadie consulta.
+--
+-- EVIDENCIA (auditoría de estatus, Ronda 23):
+--   · `supabase/migrations/**` → la columna solo aparece en el `ADD COLUMN`
+--     (00052), en su índice (00052) y en tres comentarios (00071, 00155).
+--   · Ninguna vista, función RPC ni policy RLS sobre `orders` la referencia.
+--   · `src/**` y `e2e/**` → cero referencias; todos los `seller_id` del código
+--     son de `crm_prospects`, `crm_activities`, `crm_tasks`, `commission_*` o
+--     `crm_agent_messages`.
+--
+-- ALCANCE: es la única migración destructiva de la ronda, y borra una columna
+-- **vacía**. `DROP COLUMN` no reescribe la tabla en Postgres moderno (marca la
+-- columna en el catálogo), pero sí toma un `ACCESS EXCLUSIVE` sobre `orders`;
+-- se ejecuta en su propia sentencia, sin envolverla en una transacción larga.
+-- Se lleva por delante, sin nombrarlos, la FK y el índice de la columna.
+--
+-- Idempotente: `IF EXISTS` la hace segura de re-ejecutar.
+
+ALTER TABLE public.orders
+  DROP COLUMN IF EXISTS seller_id;

@@ -290,7 +290,7 @@ export default function BumpAffinitySection({
               className={`inline-flex items-center justify-center w-7 h-7 rounded-lg border shrink-0 ${
                 pair.is_active
                   ? "bg-brand-50 border-brand-200 text-brand-700"
-                  : "bg-gray-50 border-gray-200 text-gray-400"
+                  : "bg-gray-50 border-gray-200 text-gray-500"
               }`}
             >
               <Power className="w-3.5 h-3.5" />

@@ -13,8 +13,11 @@
 # testing
 /coverage
 
-# next.js
-/.next/
+# next.js — y cualquier caché de build derivado: NEXT_DIST_DIR (next.config.ts)
+# deja al webServer de Playwright elegir su propio distDir, así que el patrón
+# tiene que cubrir `.next*` y no solo `.next`; si no, cada distDir nuevo aparece
+# como carpeta sin seguimiento en git.
+/.next*/
 /out/
 
 # production

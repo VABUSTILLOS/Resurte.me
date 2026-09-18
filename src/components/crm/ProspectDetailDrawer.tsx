@@ -870,11 +870,11 @@ export function ProspectDetailDrawer({
                 )}
               </div>
               {detail.activities.length === 0 ? (
-                <p className="rounded-xl bg-gray-50 px-3 py-4 text-center text-[11px] text-gray-400">
+                <p className="rounded-xl bg-gray-50 px-3 py-4 text-center text-[11px] text-gray-500">
                   Sin actividad registrada
                 </p>
               ) : visibleActivities.length === 0 ? (
-                <p className="rounded-xl bg-gray-50 px-3 py-4 text-center text-[11px] text-gray-400">
+                <p className="rounded-xl bg-gray-50 px-3 py-4 text-center text-[11px] text-gray-500">
                   Sin actividades de este tipo. Cambia el filtro para ver el resto.
                 </p>
               ) : (

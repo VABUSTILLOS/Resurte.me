@@ -207,7 +207,7 @@ export function WalletCardView(props: WalletCardViewProps) {
               />
             ) : (
               <div
-                className="flex h-[220px] w-[220px] items-center justify-center rounded-xl bg-neutral-100 text-xs text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                className="flex h-[220px] w-[220px] items-center justify-center rounded-xl bg-neutral-100 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
                 aria-live="polite"
               >
                 {sf(lang, "walletLoading")}

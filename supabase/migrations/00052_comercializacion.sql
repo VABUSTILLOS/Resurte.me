@@ -121,6 +121,9 @@ CREATE INDEX IF NOT EXISTS idx_crm_activities_seller    ON crm_activities(seller
 CREATE INDEX IF NOT EXISTS idx_crm_activities_occurred  ON crm_activities(occurred_at);
 
 -- 4. Atribución de pedidos asistidos por el vendedor
+-- Se conserva aquí porque esta migración ya está aplicada y es historia: la
+-- columna NUNCA se escribió ni se leyó, y **00189 la elimina**. La atribución
+-- real es crm_prospects.seller_id → user_id → orders.user_id (ver 00155).
 ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS seller_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
 

@@ -456,11 +456,11 @@ export default function PanelPage() {
           onClick={() => setShowSearch(true)}
           aria-label="Buscar platillos, productos o inventario (atajo: Control K)"
           aria-keyshortcuts="Control+k"
-          className="w-full mb-4 sm:mb-6 bg-white rounded-xl border border-gray-100 px-4 py-2.5 sm:py-3 flex items-center gap-3 text-sm text-gray-400 hover:border-gray-200 hover:text-gray-500 transition-colors group touch-target"
+          className="w-full mb-4 sm:mb-6 bg-white rounded-xl border border-gray-100 px-4 py-2.5 sm:py-3 flex items-center gap-3 text-sm text-gray-500 hover:border-gray-200 hover:text-gray-700 transition-colors group touch-target"
         >
           <Search className="w-4 h-4 shrink-0" aria-hidden="true" />
           <span className="flex-1 text-left">Buscar platillos, productos, inventario...</span>
-          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-50 text-[10px] font-medium text-gray-300 font-mono border border-gray-100 group-hover:border-gray-200">
+          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-50 text-[10px] font-medium text-gray-500 font-mono border border-gray-100 group-hover:border-gray-200">
             <span className="text-xs">⌘</span>K
           </kbd>
         </button>

@@ -85,7 +85,7 @@ export default function PurchaseOrder({
                           <span>{item.id.startsWith("proj-") ? "🔍" : getStatus(item).icon}</span>
                           <span className="font-semibold text-gray-700 truncate">{item.name}</span>
                           {item.id.startsWith("proj-") && (
-                            <span className="text-[9px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded-full font-medium">Proyección</span>
+                            <span className="text-[9px] bg-cyan-50 text-cyan-700 px-1.5 py-0.5 rounded-full font-medium">Proyección</span>
                           )}
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
@@ -126,10 +126,10 @@ export default function PurchaseOrder({
                     <span>{item.id.startsWith("proj-") ? "🔍" : getStatus(item).icon}</span>
                     <span className="font-semibold text-gray-700 truncate">{item.name}</span>
                     {item.id.startsWith("proj-") && (
-                      <span className="text-[9px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded-full font-medium">Proyección</span>
+                      <span className="text-[9px] bg-cyan-50 text-cyan-700 px-1.5 py-0.5 rounded-full font-medium">Proyección</span>
                     )}
                     {item.proveedorId && (
-                      <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-full font-medium hidden sm:inline">
+                      <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium hidden sm:inline">
                         {proveedorName(item.proveedorId)}
                       </span>
                     )}

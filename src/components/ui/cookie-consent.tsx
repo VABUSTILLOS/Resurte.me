@@ -2,15 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { Cookie, X } from "lucide-react"
-
-const STORAGE_KEY = "resurte_cookie_consent"
+import { readConsentDecision, writeConsentDecision } from "@/lib/cookie-consent"
 
 export function CookieConsent() {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (!stored) {
+    if (readConsentDecision() === null) {
       // Small delay so the banner appears after page load
       const timer = setTimeout(() => setVisible(true), 800)
       return () => clearTimeout(timer)
@@ -18,12 +16,12 @@ export function CookieConsent() {
   }, [])
 
   const acceptAll = () => {
-    localStorage.setItem(STORAGE_KEY, "accepted")
+    writeConsentDecision("accepted")
     setVisible(false)
   }
 
   const acceptEssential = () => {
-    localStorage.setItem(STORAGE_KEY, "essential")
+    writeConsentDecision("essential")
     setVisible(false)
   }
 

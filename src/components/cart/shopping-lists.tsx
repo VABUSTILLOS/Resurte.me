@@ -141,7 +141,7 @@ export function ShoppingLists() {
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => handleApply(list)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0E7A0E]/10 text-[#0E7A0E] text-xs font-semibold hover:bg-[#0E7A0E]/15 transition-colors"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0E7A0E]/10 text-brand-600 text-xs font-semibold hover:bg-[#0E7A0E]/15 transition-colors"
                     title="Agregar al carrito"
                   >
                     <ShoppingCart className="w-3.5 h-3.5" />

@@ -362,7 +362,7 @@ export function OnboardingWizard({
                               setData((d) => ({ ...d, monthlyBudget: Number(e.target.value) || 0 }))
                             }
                             placeholder="Ej: 25000"
-                            className="flex-1 text-lg font-bold text-gray-900 bg-transparent border-none outline-none placeholder:text-gray-300"
+                            className="flex-1 text-lg font-bold text-gray-900 bg-transparent border-none outline-none placeholder:text-gray-500"
                           />
                           <span className="text-gray-400 text-sm">MXN/mes</span>
                         </div>
@@ -477,8 +477,8 @@ export function OnboardingWizard({
                   }
                   className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
                     (step === 0 && !data.businessType) || (step === 1 && data.monthlyBudget <= 0) || saving
-                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                      : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm"
+                      ? "bg-gray-200 text-gray-600 cursor-not-allowed"
+                      : "bg-emerald-700 text-white hover:bg-emerald-700 shadow-sm"
                   }`}
                 >
                   {saving ? (

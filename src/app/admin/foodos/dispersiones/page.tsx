@@ -163,7 +163,7 @@ export default function AdminFoodosPayoutsPage() {
       {error && !loading && (
         <div
           role="alert"
-          className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600"
+          className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700"
         >
           {error}
         </div>
@@ -219,7 +219,7 @@ export default function AdminFoodosPayoutsPage() {
           <section className="mb-8">
             <h2 className="text-sm font-semibold text-gray-900 mb-2">Saldo por restaurante</h2>
             {report.restaurants.length === 0 ? (
-              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-400">
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-500">
                 Todavía no hay restaurantes FoodOS.
               </div>
             ) : (
@@ -227,7 +227,7 @@ export default function AdminFoodosPayoutsPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
+                      <tr className="bg-gray-50 text-left text-xs text-gray-500 font-medium">
                         <th className="px-5 py-3">Restaurante</th>
                         <th className="px-5 py-3">Custodia</th>
                         <th className="px-5 py-3 text-right">Cobrado</th>
@@ -325,7 +325,7 @@ export default function AdminFoodosPayoutsPage() {
               )}
             </div>
             {report.history.length === 0 ? (
-              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-400">
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-500">
                 Todavía no se ha registrado ninguna dispersión.
               </div>
             ) : (
@@ -333,7 +333,7 @@ export default function AdminFoodosPayoutsPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
+                      <tr className="bg-gray-50 text-left text-xs text-gray-500 font-medium">
                         <th className="px-5 py-3">Fecha</th>
                         <th className="px-5 py-3">Restaurante</th>
                         <th className="px-5 py-3">Periodo</th>

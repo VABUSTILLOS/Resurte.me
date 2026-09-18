@@ -237,7 +237,7 @@ export default function CartPage() {
           className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
             confirmClear
               ? "bg-[#de3534] text-white"
-              : "text-[#de3534] hover:bg-red-50 border border-transparent hover:border-red-200"
+              : "text-[#C42B2A] hover:bg-red-50 border border-transparent hover:border-red-200"
           }`}
         >
           <Trash2 className="w-4 h-4" />
@@ -431,7 +431,7 @@ export default function CartPage() {
           )}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors"
+          className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-green-700 text-white font-semibold rounded-xl hover:bg-green-700 transition-colors"
         >
           <Package className="w-5 h-5" />
           Pedir por WhatsApp

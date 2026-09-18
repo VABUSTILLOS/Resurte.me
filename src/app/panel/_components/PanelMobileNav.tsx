@@ -129,7 +129,7 @@ export function PanelMobileNav({ open, onClose, selectedCollection }: PanelMobil
                         {area.label}
                       </span>
                       {area.key === "sistema" && (
-                        <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full whitespace-nowrap">
                           Incluido gratis
                         </span>
                       )}

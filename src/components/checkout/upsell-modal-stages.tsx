@@ -56,7 +56,7 @@ export function OfferStage({ offer, isDownsell, error, onAccept, onDecline }: Of
           </span>
         )}
         {offer.discount_pct > 0 && (
-          <span className="text-[11px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded">
+          <span className="text-[11px] font-bold text-white bg-emerald-700 px-1.5 py-0.5 rounded">
             Ahorra ${savings.toFixed(2)}
           </span>
         )}

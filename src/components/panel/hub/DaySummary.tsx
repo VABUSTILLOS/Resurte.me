@@ -44,7 +44,7 @@ export default function DaySummary({ todaySales, puntosHoy, goalProgress, onCopy
           <Receipt className="w-5 h-5 text-[#0E7A0E] shrink-0" />
           <h3 className="font-semibold text-gray-900 text-sm truncate">Resumen del día</h3>
           {todaySales.count === 0 && (
-            <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0">Sin ventas aún</span>
+            <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full shrink-0">Sin ventas aún</span>
           )}
           <ChevronDown
             className={`w-4 h-4 text-gray-400 shrink-0 transition-transform sm:hidden ${bodyVisible ? "" : "rotate-180"}`}
@@ -55,7 +55,7 @@ export default function DaySummary({ todaySales, puntosHoy, goalProgress, onCopy
           <button
             onClick={onCopy}
             disabled={copyDisabled}
-            className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Copiar resumen del día"
             aria-label="Copiar resumen del día"
           >

@@ -217,7 +217,7 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
                     <div className="flex flex-col items-center">
                       <div
                         className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          done ? "bg-emerald-600 text-white" : "bg-stone-100 text-stone-400"
+                          done ? "bg-emerald-700 text-white" : "bg-stone-100 text-stone-600"
                         } ${active ? "ring-4 ring-emerald-100" : ""}`}
                       >
                         {step.icon}
@@ -288,7 +288,7 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
                 href={data.delivery.tracking_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 flex items-center justify-center gap-2 w-full min-h-11 rounded-xl bg-emerald-600 text-white text-sm font-bold"
+                className="mt-4 flex items-center justify-center gap-2 w-full min-h-11 rounded-xl bg-emerald-700 text-white text-sm font-bold"
               >
                 <MapPin className="w-4 h-4" /> Seguir al repartidor
               </a>
@@ -420,7 +420,7 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
                     setCancelError(null)
                     setConfirmingCancel(true)
                   }}
-                  className="w-full min-h-11 rounded-xl border border-rose-200 text-rose-600 text-sm font-bold hover:bg-rose-50 flex items-center justify-center gap-2"
+                  className="w-full min-h-11 rounded-xl border border-rose-200 text-rose-700 text-sm font-bold hover:bg-rose-50 flex items-center justify-center gap-2"
                 >
                   <XCircle className="w-4 h-4" />
                   {lang === "es" ? "Cancelar pedido" : "Cancel order"}
@@ -444,7 +444,7 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
         <div className="flex gap-2">
           <Link
             href={`/r/${slug}?reorden=${orderId}`}
-            className="flex-1 text-center py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700"
+            className="flex-1 text-center py-3 rounded-xl bg-emerald-700 text-white text-sm font-bold hover:bg-emerald-700"
           >
             {lang === "es" ? "🔁 Volver a pedir" : "🔁 Order again"}
           </Link>
@@ -533,7 +533,7 @@ function ReviewForm({ orderId }: { orderId: string }) {
       <button
         onClick={submit}
         disabled={rating === 0 || sending}
-        className="mt-3 w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"
+        className="mt-3 w-full py-2.5 rounded-xl bg-emerald-700 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"
       >
         {sending ? "Enviando…" : "Enviar reseña"}
       </button>

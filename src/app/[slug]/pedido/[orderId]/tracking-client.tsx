@@ -285,7 +285,7 @@ export function TrackingClient() {
                       className={`w-8 h-8 rounded-full flex items-center justify-center ${
                         isDone
                           ? "bg-brand-600 text-white"
-                          : "bg-gray-200 text-gray-400"
+                          : "bg-gray-200 text-gray-600"
                       } ${isCurrent ? "ring-4 ring-brand-100" : ""}`}
                     >
                       {STATUS_ICONS[status]}

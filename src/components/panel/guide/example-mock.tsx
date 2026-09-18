@@ -20,7 +20,7 @@ export default function ExampleMock({ fields, title }: ExampleMockProps) {
         <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
           {title ?? "Vista previa"}
         </p>
-        <span className="text-[9px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+        <span className="text-[9px] font-bold text-white bg-emerald-700 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
           Datos de ejemplo
         </span>
       </div>

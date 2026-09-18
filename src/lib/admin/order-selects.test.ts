@@ -11,10 +11,14 @@ import {
 } from "./order-selects"
 
 /**
- * Regresión de PGRST201: `orders` tiene dos FKs a `profiles`
+ * Regresión de PGRST201: `orders` llegó a tener dos FKs a `profiles`
  * (`orders_user_id_fkey` y `orders_seller_id_fkey`, esta última de la
- * migración 00052). Un embed sin hint hace que PostgREST rechace la consulta
- * completa y el panel de pedidos muestre "Error al cargar los pedidos".
+ * migración 00052). Un embed sin hint hacía que PostgREST rechazara la
+ * consulta completa y el panel de pedidos mostrara "Error al cargar los
+ * pedidos". `orders_seller_id_fkey` desapareció con la columna en 00189, así
+ * que hoy el hint ya no desambigua nada — pero se sigue exigiendo: la decisión
+ * de qué cliente se muestra debe quedar escrita, no depender de que el esquema
+ * deje de ser ambiguo por casualidad.
  */
 describe("embeds de profiles", () => {
   const selects: Array<[string, string]> = [

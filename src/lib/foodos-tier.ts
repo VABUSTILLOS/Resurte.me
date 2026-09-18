@@ -38,9 +38,18 @@ export type { FoodosEntitlementState }
  */
 const LOOKBACK_DAYS = 45
 
-/** Entitlements de un restaurante sin compras registradas. */
+/**
+ * Entitlements de un restaurante sin compras registradas, o de una lectura que
+ * no se pudo completar.
+ *
+ * `available` se vacía a propósito aunque el nivel sea Verde: este estado
+ * significa "no se pudo leer", no "leyó y no tiene nada". Dejarlo en lo que
+ * `summarizeEntitlements("Verde")` devuelva afirmaría capacidades que nadie
+ * verificó contra la base.
+ */
 const EMPTY_STATE: FoodosEntitlementState = {
   ...summarizeEntitlements("Verde"),
+  available: [],
   earnedTier: "Verde",
   tier: "Verde",
   overridden: false,

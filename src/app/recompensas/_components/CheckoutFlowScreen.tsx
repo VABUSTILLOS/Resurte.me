@@ -139,7 +139,7 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
             <div key={i} className="flex items-center">
               <motion.div
                 className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                  i + 1 <= step ? "bg-brand-500 text-white" : "bg-cream-100 text-[#6e737b]"
+                  i + 1 <= step ? "bg-brand-500 text-white" : "bg-cream-100 text-warm-600"
                 }`}
                 animate={i + 1 < step ? { scale: [1, 1.2, 1] } : {}}
               >
@@ -347,7 +347,7 @@ function Step2Context({
             placeholder="Nombre de tu restaurante"
             aria-invalid={nameMissing}
             className="w-full rounded-xl bg-white border border-cream-300 px-4 py-3 text-warm-700 text-sm 
-              focus:outline-none focus:border-brand-500 placeholder:text-warm-400"
+              focus:outline-none focus:border-brand-500 placeholder:text-warm-500"
           />
           {nameMissing && (
             <p className="mt-2 text-xs font-semibold text-amber-700">
@@ -371,7 +371,7 @@ function Step2Context({
             onChange={(e) => setMapsLink(e.target.value)}
             placeholder="https://maps.google.com/..."
             className="w-full rounded-xl bg-white border border-cream-300 px-4 py-3 text-warm-700 text-sm 
-              focus:outline-none focus:border-brand-500 placeholder:text-warm-400"
+              focus:outline-none focus:border-brand-500 placeholder:text-warm-500"
           />
         </div>
 
@@ -390,7 +390,7 @@ function Step2Context({
             onChange={(e) => setSocial(e.target.value)}
             placeholder="@taqueriaelpariente"
             className="w-full rounded-xl bg-white border border-cream-300 px-4 py-3 text-warm-700 text-sm 
-              focus:outline-none focus:border-brand-500 placeholder:text-warm-400"
+              focus:outline-none focus:border-brand-500 placeholder:text-warm-500"
           />
         </div>
 
@@ -409,7 +409,7 @@ function Step2Context({
             placeholder="Ej. Quiero atraer más clientes en horario de comida (2-5pm)..."
             rows={3}
             className="w-full rounded-xl bg-white border border-cream-300 px-4 py-3 text-warm-700 text-sm 
-              focus:outline-none focus:border-brand-500 placeholder:text-warm-400 resize-none"
+              focus:outline-none focus:border-brand-500 placeholder:text-warm-500 resize-none"
           />
         </div>
       </div>

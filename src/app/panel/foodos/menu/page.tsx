@@ -399,8 +399,8 @@ export default function MenuPage() {
                       <span className="text-[10px] text-gray-400">({itemsByCategory.get(c.id)?.length ?? 0})</span>
                     </button>
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => setEditingCategory(c)} className="p-1 text-gray-400 hover:text-[#0E7A0E]"><Pencil className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => handleDeleteCategory(c.id)} className="p-1 text-gray-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button aria-label={t("common.edit")} onClick={() => setEditingCategory(c)} className="p-1 text-gray-400 hover:text-[#0E7A0E]"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button aria-label={t("common.delete")} onClick={() => handleDeleteCategory(c.id)} className="p-1 text-gray-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
                 )}
@@ -415,7 +415,7 @@ export default function MenuPage() {
             <div key={c.id}>
               <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
                 {c.name}
-                <button
+                <button aria-label={t("common.add")}
                   onClick={() => { setEditingItem({ ...EMPTY_ITEM, category_id: c.id }); setShowItemForm(true) }}
                   className="p-1 rounded-md text-gray-400 hover:text-[#0E7A0E] hover:bg-[#F0FDF4]"
                 >
@@ -454,7 +454,7 @@ export default function MenuPage() {
                             <Building2 className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        <button
+                        <button aria-label={t("common.edit")}
                           onClick={() => setEditingItem({
                             id: item.id, category_id: item.category_id, name: item.name,
                             description: item.description ?? "", price: String(item.price), cost: String(item.cost),
@@ -464,7 +464,7 @@ export default function MenuPage() {
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => handleDeleteItem(item.id)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600">
+                        <button aria-label={t("common.delete")} onClick={() => handleDeleteItem(item.id)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -482,7 +482,7 @@ export default function MenuPage() {
                           )
                         })()}
                       </div>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${item.is_available ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${item.is_available ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
                         {item.is_available ? t("foodos.menu.available") : t("foodos.menu.unavailable")}
                       </span>
                     </div>
@@ -538,7 +538,7 @@ export default function MenuPage() {
                             <Building2 className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        <button
+                        <button aria-label={t("common.edit")}
                           onClick={() => setEditingItem({
                             id: item.id, category_id: item.category_id, name: item.name,
                             description: item.description ?? "", price: String(item.price), cost: String(item.cost),
@@ -548,7 +548,7 @@ export default function MenuPage() {
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => handleDeleteItem(item.id)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600">
+                        <button aria-label={t("common.delete")} onClick={() => handleDeleteItem(item.id)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -561,7 +561,7 @@ export default function MenuPage() {
                             {optionGroups.filter((g) => g.item_id === item.id).length} opciones
                           </span>
                         )}
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${item.is_available ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${item.is_available ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
                           {item.is_available ? t("foodos.menu.available") : t("foodos.menu.unavailable")}
                         </span>
                       </div>

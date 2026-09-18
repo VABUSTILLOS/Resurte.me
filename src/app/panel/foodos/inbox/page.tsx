@@ -212,7 +212,7 @@ export default function WaInboxPage() {
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-gray-800 font-mono">{c.phone}</p>
                   {c.unread > 0 && (
-                    <span className="text-[10px] font-bold bg-[#25D366] text-white px-2 py-0.5 rounded-full">{c.unread}</span>
+                    <span className="text-[10px] font-bold bg-[#0F7A3D] text-white px-2 py-0.5 rounded-full">{c.unread}</span>
                   )}
                 </div>
                 <p className="text-xs text-gray-500 truncate mt-0.5">
@@ -277,7 +277,7 @@ export default function WaInboxPage() {
                         setError(err instanceof Error ? err.message : "Error al enviar catálogo")
                       }
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#25D366] text-white text-xs font-bold hover:bg-[#1fb857]"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0F7A3D] text-white text-xs font-bold hover:bg-[#0B5C2E]"
                   >
                     <Store className="w-3.5 h-3.5" /> Enviar catálogo
                   </button>
@@ -313,7 +313,7 @@ export default function WaInboxPage() {
                 <button
                   type="submit"
                   disabled={sending || !reply.trim()}
-                  className="p-2.5 rounded-xl bg-[#25D366] text-white hover:bg-[#1fb857] disabled:opacity-40"
+                  className="p-2.5 rounded-xl bg-[#0F7A3D] text-white hover:bg-[#0B5C2E] disabled:opacity-40"
                   aria-label="Enviar"
                 >
                   {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}

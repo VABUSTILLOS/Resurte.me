@@ -179,7 +179,7 @@ export function ProofSection({ orderId, proofPath, status, onChanged }: Props) {
             type="button"
             disabled={busy}
             onClick={() => void remove()}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-red-600 bg-white border border-red-200 hover:bg-red-50 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-red-700 bg-white border border-red-200 hover:bg-red-50 disabled:opacity-50 transition-colors"
           >
             {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
             Quitar comprobante

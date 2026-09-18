@@ -16,6 +16,7 @@ import {
   isCashbackTier,
   lockedFeatures,
   lockedTierFor,
+  perksForTier,
   minTierFor,
   nextTier,
   summarizeEntitlements,
@@ -23,6 +24,7 @@ import {
   TIER_RANK,
   type FoodosFeature,
 } from "@/lib/foodos-entitlements"
+import { POS_DESCRIPTOR_LIST } from "@/lib/pos/registry"
 
 const ALL_TIERS: CashbackTier[] = ["Verde", "Plata", "Oro", "Diamante"]
 const ALL_FEATURES = Object.keys(FEATURE_MIN_TIER) as FoodosFeature[]
@@ -45,7 +47,8 @@ describe("FEATURE_MIN_TIER", () => {
         feature === "marketing_ia" ||
         feature === "flotilla" ||
         feature === "pos_mostrador" ||
-        feature === "comandero"
+        feature === "comandero" ||
+        feature === "pos_integraciones"
       ) {
         continue
       }
@@ -54,15 +57,38 @@ describe("FEATURE_MIN_TIER", () => {
   })
 
   it("lo caro de operar no se desbloquea antes de Diamante", () => {
-    // El costo real (IA de salón, sitio, integraciones ajenas) sigue arriba.
-    for (const feature of ["mesero_ia", "sitio_ia", "pos_integraciones"] as FoodosFeature[]) {
+    // El costo real (IA de salón, sitio propio) sigue arriba.
+    for (const feature of ["mesero_ia", "sitio_ia"] as FoodosFeature[]) {
       expect(FEATURE_MIN_TIER[feature]).toBe("Diamante")
     }
   })
 
-  it("ninguna capacidad se desbloquea en Verde", () => {
-    expect(featuresForTier("Verde")).toEqual([])
-    expect(lockedFeatures("Verde")).toHaveLength(ALL_FEATURES.length)
+  it("en Verde solo vive lo que no tiene nada que operar", () => {
+    // El candado de nivel cobra **costo de operación**. `pos_integraciones` está
+    // en Verde por una razón concreta y comprobable: ningún adaptador de POS
+    // está implementado, así que no hay costo que cobrar y pedir Diamante por
+    // ella sería cobrar por una hoja de ruta. Si algún día se implementa el
+    // primero, este test falla y obliga a subir el nivel — que es justo la
+    // conversación que hay que tener en ese momento, no después.
+    const implementados = POS_DESCRIPTOR_LIST.filter((d) => d.implemented)
+    expect(implementados).toEqual([])
+    expect(FEATURE_MIN_TIER.pos_integraciones).toBe("Verde")
+  })
+
+  it("una capacidad de línea base no es escalón de ningún nivel", () => {
+    // Es la otra mitad del test anterior, y la que evita la mentira cómoda:
+    // la escalera pública y el CTA de nivel prometen "lo que te da subir". Si
+    // `pos_integraciones` contara como aporte, la escalera anunciaría con una
+    // palomita —en los cuatro niveles— una superficie que no funciona. Lo que
+    // es línea base se ve y se usa, pero no se vende como logro de nivel.
+    for (const tier of ALL_TIERS) {
+      expect(perksForTier(tier)).not.toContain("pos_integraciones")
+      expect(featuresUnlockedByNextTier(tier)).not.toContain("pos_integraciones")
+      expect(featuresForTier(tier)).toContain("pos_integraciones")
+    }
+    // Y la escalera pública se construye con `perksForTier`, no con
+    // `featuresForTier`: esa es la línea que sostiene todo lo anterior.
+    expect(PUBLIC_TIER_LADDER[0]?.features).toEqual([])
   })
 
   it("FOODOS_FEATURES cubre exactamente las capacidades declaradas", () => {
@@ -363,10 +389,14 @@ describe("PUBLIC_TIER_LADDER", () => {
     expect(PUBLIC_TIER_LADDER.map((t) => t.cashbackPct)).toEqual([5, 10, 15, 20])
   })
 
-  it("las capacidades de cada nivel coinciden con featuresForTier", () => {
+  it("las capacidades de cada nivel son las que el nivel aporta, no las que se usan", () => {
     for (const entry of PUBLIC_TIER_LADDER) {
-      expect(entry.features).toEqual(featuresForTier(entry.tier))
+      expect(entry.features).toEqual(perksForTier(entry.tier))
     }
+    // La distinción es real y no cosmética: la capacidad de línea base se usa
+    // desde el primer nivel pero no la aporta ninguno.
+    expect(featuresForTier("Verde")).toContain("pos_integraciones")
+    expect(PUBLIC_TIER_LADDER[0]?.features).not.toContain("pos_integraciones")
   })
 
   it("Verde no abre ninguna capacidad premium", () => {
@@ -374,9 +404,12 @@ describe("PUBLIC_TIER_LADDER", () => {
     expect(verde?.features).toEqual([])
   })
 
-  it("Diamante abre todo el catálogo", () => {
+  it("Diamante abre todo el catálogo de escalones", () => {
     const diamante = PUBLIC_TIER_LADDER[3]
-    expect(diamante?.features).toEqual(FOODOS_FEATURE_ORDER)
+    expect(diamante?.features).toEqual(perksForTier("Diamante"))
+    expect(diamante?.features).toEqual(
+      FOODOS_FEATURE_ORDER.filter((f) => f !== "pos_integraciones"),
+    )
   })
 
   it("el mínimo que califica una semana se re-exporta desde utils", () => {
@@ -423,8 +456,22 @@ describe("canUseFeature / lockedTierFor", () => {
 
   it("en Verde, ninguna capacidad premium es usable sin ser admin", () => {
     for (const feature of FOODOS_FEATURE_ORDER) {
+      if (feature === "pos_integraciones") continue
       expect(canUseFeature("Verde", feature)).toBe(false)
       expect(lockedTierFor("Verde", feature)).not.toBeNull()
+    }
+  })
+
+  it("una capacidad de línea base sí se puede usar desde Verde, sin ser admin", () => {
+    // El reverso exacto del test anterior. `pos_integraciones` no tiene candado
+    // porque no hay nada que cobrar: los seis adaptadores están sin implementar.
+    // Se ve en el panel en cualquier nivel, se puede intentar, y el error que
+    // recibe el restaurantero es el verdadero ("tu proveedor no está
+    // implementado"), no un muro de pago por una capacidad que no existe.
+    for (const tier of ALL_TIERS) {
+      expect(canUseFeature(tier, "pos_integraciones")).toBe(true)
+      expect(lockedTierFor(tier, "pos_integraciones")).toBeNull()
+      expect(hasFeature(tier, "pos_integraciones")).toBe(true)
     }
   })
 })

@@ -394,7 +394,7 @@ export default function RepartoPage() {
                       type="button"
                       disabled={busy}
                       onClick={() => void send(job, "picked_up")}
-                      className="touch-target flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 motion-reduce:transition-none"
+                      className="touch-target flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 motion-reduce:transition-none"
                     >
                       {busy ? (
                         <Loader2
@@ -415,7 +415,7 @@ export default function RepartoPage() {
                       type="button"
                       onClick={() => startAction(job, "pin")}
                       aria-expanded={isOpen && mode === "pin"}
-                      className="touch-target flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 motion-reduce:transition-none"
+                      className="touch-target flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 motion-reduce:transition-none"
                     >
                       <KeyRound className="w-4 h-4" aria-hidden />
                       {t("courierDeliver")}
@@ -501,7 +501,7 @@ export default function RepartoPage() {
                         type="button"
                         disabled={busy}
                         onClick={() => void send(job, "delivered")}
-                        className="touch-target flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50 motion-reduce:transition-none"
+                        className="touch-target flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50 motion-reduce:transition-none"
                       >
                         {busy && (
                           <Loader2

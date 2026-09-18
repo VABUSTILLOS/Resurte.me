@@ -463,7 +463,7 @@ function IdleState({
           <label htmlFor="invoice-total" className="text-warm-700 text-xs font-semibold">
             Total de la factura (opcional)
           </label>
-          <div className="mt-1.5 flex items-center rounded-2xl bg-white border border-cream-300 px-4 py-3 shadow-sm focus-within:border-brand-500/50">
+          <div className="mt-1.5 flex items-center rounded-2xl bg-white border border-cream-300 px-4 py-3 shadow-sm transition-all focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/10">
             <span className="text-[#6e737b] text-sm mr-1">$</span>
             <input
               id="invoice-total"

@@ -113,7 +113,7 @@ export default function AddDishForm({
               className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
                 newDishCategory === cat.key
                   ? cat.color
-                  : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                  : "bg-gray-50 text-gray-600 hover:bg-gray-100"
               }`}
             >
               {cat.label}
@@ -189,7 +189,7 @@ export default function AddDishForm({
                     className={`text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors ${
                       ing.unitPrice === invMatch.pricePerUnit
                         ? "bg-cyan-100 text-cyan-700 border border-cyan-300"
-                        : "bg-cyan-50 text-cyan-600 border border-cyan-200 hover:bg-cyan-100"
+                        : "bg-cyan-50 text-cyan-700 border border-cyan-200 hover:bg-cyan-100"
                     }`}
                     title="Click para usar el precio de tu inventario"
                   >

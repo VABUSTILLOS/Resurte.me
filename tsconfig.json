@@ -40,5 +40,13 @@
   "exclude": [
     "node_modules",
     "supabase/functions"
-  ]
+  ],
+  // Next reescribe este archivo (le añade los globs de tipos de su `distDir`) cada
+  // vez que el `distDir` no es `.next`, y con el e2e eso lo ensuciaba en cada
+  // corrida. La comprobación de Next es `'extends' in tsConfig || 'references' in
+  // tsConfig` (writeConfigurationDefaults.js): declarar `references` — vacío, sin
+  // proyectos referenciados, así que no cambia lo que compila `tsc` — la hace salir
+  // sin tocar nada. Si algún día Next deja de respetarlo, el síntoma es visible:
+  // `git status` vuelve a marcar este archivo.
+  "references": []
 }

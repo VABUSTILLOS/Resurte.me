@@ -421,7 +421,7 @@ export function SellerProspectDetail({
               {prospect.user_id && (
                 <Link
                   href={`/comercializacion/pedidos?prospecto=${prospect.id}`}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#0E7A0E]/10 px-3 py-1.5 text-xs font-semibold text-[#0E7A0E] transition-colors hover:bg-[#0E7A0E]/15"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#0E7A0E]/10 px-3 py-1.5 text-xs font-semibold text-brand-600 transition-colors hover:bg-[#0E7A0E]/15"
                 >
                   🛒 Hacer pedido
                 </Link>

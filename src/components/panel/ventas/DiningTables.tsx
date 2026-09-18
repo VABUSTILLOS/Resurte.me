@@ -41,7 +41,7 @@ export default function DiningTables({ crud, mesasOcupadasHoy, now }: DiningTabl
         )}
         <button
           onClick={onToggle}
-          className="ml-auto flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
+          className="ml-auto flex items-center gap-1 text-xs font-semibold text-gray-600 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
           aria-expanded={showMesas}
           aria-label="Mostrar u ocultar mesas del salón"
         >
@@ -120,7 +120,7 @@ export default function DiningTables({ crud, mesasOcupadasHoy, now }: DiningTabl
                         </p>
                       </div>
                       {ocupada ? (
-                        <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full shrink-0">
+                        <span className="text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-full shrink-0">
                           Ocupada · {Math.floor(mins / 60)}h {mins % 60}min
                         </span>
                       ) : (
@@ -140,13 +140,13 @@ export default function DiningTables({ crud, mesasOcupadasHoy, now }: DiningTabl
                         <div className="flex items-center gap-1">
                           <button
                             onClick={onConfirmDelete}
-                            className="px-2 py-1 text-[10px] font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600"
+                            className="px-2 py-1 text-[10px] font-semibold text-white bg-red-700 rounded-lg hover:bg-red-600"
                           >
                             Sí
                           </button>
                           <button
                             onClick={onCancelDelete}
-                            className="px-2 py-1 text-[10px] font-semibold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200"
+                            className="px-2 py-1 text-[10px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
                           >
                             No
                           </button>

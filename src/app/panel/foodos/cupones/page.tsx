@@ -134,7 +134,7 @@ export default function CuponesPage() {
       )}
 
       {coupons.length === 0 ? (
-        <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center text-gray-400">
+        <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center text-gray-500">
           <Ticket className="w-10 h-10 mx-auto mb-3 text-gray-300" />
           Aún no tienes cupones. Crea el primero para promocionar tu menú.
         </div>
@@ -145,7 +145,7 @@ export default function CuponesPage() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-mono font-black text-gray-900">{c.code}</span>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${c.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${c.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
                     {c.is_active ? "Activo" : "Inactivo"}
                   </span>
                 </div>
@@ -157,7 +157,7 @@ export default function CuponesPage() {
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <button
+                <button aria-label="Editar cupón"
                   onClick={() => setForm({
                     id: c.id,
                     code: c.code,
@@ -172,7 +172,7 @@ export default function CuponesPage() {
                 >
                   <Pencil className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleDelete(c.id)} className="p-2 rounded-lg text-gray-400 hover:text-red-600">
+                <button aria-label="Eliminar cupón" onClick={() => handleDelete(c.id)} className="p-2 rounded-lg text-gray-400 hover:text-red-600">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

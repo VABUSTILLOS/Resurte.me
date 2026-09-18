@@ -96,7 +96,10 @@ test.describe("accesibilidad navegación por teclado", { tag: "@ci" }, () => {
 
   // El drawer del carrito es flujo móvil: en desktop el icono enlaza a /cart.
   test("Escape cierra el drawer del carrito", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "networkidle" })
+    // `domcontentloaded` + esperar el contenido, no `networkidle`: la red de un
+    // `next dev` puede no callarse nunca (HMR + peticiones de fondo) y agota el
+    // presupuesto del test sin que el producto tenga nada que ver.
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
     await page.waitForSelector("main#main-content")
     const opener = page
       .locator('button[aria-label*="Abrir carrito"]:visible')
@@ -113,7 +116,8 @@ test.describe("accesibilidad navegación por teclado", { tag: "@ci" }, () => {
   })
 
   test("Escape cierra el drawer de checkout", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "networkidle" })
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForSelector("main#main-content")
     const addButton = page
       .locator('button[aria-label^="Agregar"][aria-label$="al carrito"]:visible')
       .first()

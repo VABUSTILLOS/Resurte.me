@@ -168,7 +168,7 @@ export default function VentasPage() {
             {entries.length > 0 && (
               <button
                 onClick={copySummary}
-                className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
                 title="Copiar resumen del día seleccionado"
                 aria-label="Copiar resumen de ventas"
               >
@@ -178,7 +178,7 @@ export default function VentasPage() {
             )}
             <Link
               href="/panel/comanda"
-              className="flex items-center gap-1.5 text-xs font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 px-2.5 py-1 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 text-xs font-semibold text-orange-700 bg-orange-50 hover:bg-orange-100 px-2.5 py-1 rounded-lg transition-colors"
               title="Ver monitor de producción en cocina"
               aria-label="Abrir monitor de cocina"
             >
@@ -199,7 +199,7 @@ export default function VentasPage() {
             <p className="font-semibold mb-0.5">Aún no tienes platillos costeados</p>
             <p>Costa tu menú primero para que las ventas calculen el costo real de cada platillo.</p>
           </div>
-          <Link href="/panel/costeo" className="ml-auto text-xs font-semibold bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 transition-colors shrink-0">
+          <Link href="/panel/costeo" className="ml-auto text-xs font-semibold bg-amber-700 text-white px-3 py-1.5 rounded-lg hover:bg-amber-800 transition-colors shrink-0">
             Ir a Costeo
           </Link>
         </div>

@@ -165,7 +165,7 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator, balance = 0 }: 
                 className={`rounded-full px-1.5 py-px text-[10px] font-bold tabular-nums ${
                   activeCategory === cat.id
                     ? "bg-white/20 text-white"
-                    : "bg-cream-100 text-[#6e737b]"
+                    : "bg-cream-100 text-warm-600"
                 }`}
               >
                 {count}

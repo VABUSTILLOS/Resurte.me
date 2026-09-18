@@ -417,14 +417,14 @@ export function PedidosPage({
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
+                      <button aria-label="Disminuir cantidad"
                         onClick={() => updateQty(i.product.id, -1)}
                         className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="text-sm font-semibold w-6 text-center">{i.quantity}</span>
-                      <button
+                      <button aria-label="Aumentar cantidad"
                         onClick={() => updateQty(i.product.id, 1)}
                         className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600"
                       >
@@ -433,7 +433,7 @@ export function PedidosPage({
                       <span className="text-sm font-bold text-gray-900 w-20 text-right">
                         {formatMoney(i.product.price * i.quantity)}
                       </span>
-                      <button
+                      <button aria-label="Eliminar del pedido"
                         onClick={() => removeFromCart(i.product.id)}
                         className="p-1 text-gray-400 hover:text-red-500"
                       >
@@ -502,7 +502,7 @@ export function PedidosPage({
             {orders.map((o) => (
               <li key={o.id} className="py-3 flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400">
+                  <span className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-500">
                     <Package className="w-4 h-4" />
                   </span>
                   <div className="min-w-0">

@@ -108,7 +108,7 @@ export function PipelineView({
               <p className="text-xs font-bold text-gray-700">
                 {PROSPECT_STATUS_LABEL[col]}
               </p>
-              <span className="text-[10px] font-bold text-gray-400 bg-white rounded-full px-1.5 py-0.5">
+              <span className="text-[10px] font-bold text-gray-500 bg-white rounded-full px-1.5 py-0.5">
                 {items.length}
               </span>
             </div>
@@ -163,7 +163,7 @@ export function PipelineView({
                       <button
                         onClick={() => moveStatus(p, prevCol)}
                         disabled={updating === p.id}
-                        className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-40"
+                        className="p-1 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40"
                         title={`Mover a ${PROSPECT_STATUS_LABEL[prevCol]}`}
                       >
                         <ChevronLeft className="w-3.5 h-3.5" />
@@ -175,7 +175,7 @@ export function PipelineView({
                       <button
                         onClick={() => moveStatus(p, nextCol)}
                         disabled={updating === p.id}
-                        className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-40"
+                        className="p-1 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40"
                         title={`Mover a ${PROSPECT_STATUS_LABEL[nextCol]}`}
                       >
                         <ChevronRight className="w-3.5 h-3.5" />

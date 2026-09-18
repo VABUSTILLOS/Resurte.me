@@ -139,7 +139,7 @@ export function OrderItemsList({
                   />
                 )}
                 {item.quantity === 0 ? (
-                  <span className="shrink-0 text-[10px] font-bold text-[#DC2626] bg-[#FEF2F2] border border-[#FCA5A5] rounded-full px-2 py-0.5 uppercase tracking-wide">
+                  <span className="shrink-0 text-[10px] font-bold text-[#B91C1C] bg-[#FEF2F2] border border-[#FCA5A5] rounded-full px-2 py-0.5 uppercase tracking-wide">
                     En 0
                   </span>
                 ) : (
@@ -163,7 +163,7 @@ export function OrderItemsList({
                 <p className="text-sm font-semibold text-[#242529] truncate">
                   {bump.quantity}× {name}
                 </p>
-                <span className="shrink-0 text-[10px] font-bold text-[#B87A3A] bg-[#FDF3E3] border border-[#EEDCC4] rounded-full px-2 py-0.5 uppercase tracking-wide">
+                <span className="shrink-0 text-[10px] font-bold text-[#8A5A28] bg-[#FDF3E3] border border-[#EEDCC4] rounded-full px-2 py-0.5 uppercase tracking-wide">
                   Especial
                 </span>
               </div>
@@ -181,7 +181,7 @@ export function OrderItemsList({
                   />
                 )}
                 {bump.quantity === 0 ? (
-                  <span className="shrink-0 text-[10px] font-bold text-[#DC2626] bg-[#FEF2F2] border border-[#FCA5A5] rounded-full px-2 py-0.5 uppercase tracking-wide">
+                  <span className="shrink-0 text-[10px] font-bold text-[#B91C1C] bg-[#FEF2F2] border border-[#FCA5A5] rounded-full px-2 py-0.5 uppercase tracking-wide">
                     En 0
                   </span>
                 ) : (

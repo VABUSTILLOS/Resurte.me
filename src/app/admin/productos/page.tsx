@@ -4029,7 +4029,7 @@ function AdminProductsContent() {
             onClick={() => purgeTrash()}
             disabled={purging || counts.trash === 0}
             title={`Borrar definitivamente los productos con más de ${TRASH_RETENTION_DAYS} días en la papelera`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {purging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
             Vaciar papelera
@@ -4643,7 +4643,7 @@ function AdminProductsContent() {
                               )}
                               {product.barcode && (
                                 <span
-                                  className="px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-mono"
+                                  className="px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-mono"
                                   title="Código de barras"
                                 >
                                   {product.barcode}
@@ -4692,14 +4692,14 @@ function AdminProductsContent() {
                             aria-label={`Precio base de ${product.name}`}
                             className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-500"
                           />
-                          <button
+                          <button aria-label="Guardar precio"
                             onClick={() => savePrice(product)}
                             disabled={saving.has(product.id)}
                             className="p-1 rounded-lg text-green-700 hover:bg-green-50"
                           >
                             <Check className="w-4 h-4" />
                           </button>
-                          <button
+                          <button aria-label="Cancelar edición"
                             onClick={() => setEditingPrice(null)}
                             className="p-1 rounded-lg text-gray-600 hover:bg-gray-100"
                           >
@@ -4859,7 +4859,7 @@ function AdminProductsContent() {
                     </td>
                     <td className="px-5 py-3 hidden md:table-cell">
                       <div className="flex items-center gap-1.5">
-                        <button
+                        <button aria-label="Mostrar en WhatsApp"
                           onClick={() => toggleWhatsApp(product)}
                           disabled={saving.has(product.id)}
                           className={`relative w-9 h-5 rounded-full transition-colors ${

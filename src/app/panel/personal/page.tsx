@@ -250,7 +250,7 @@ export default function PersonalPage() {
                         type="button"
                         onClick={() => revoke(m)}
                         aria-label={t("personal.revokeAria", { email: m.member_email })}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-100 text-xs text-red-600 hover:bg-red-50"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-100 text-xs text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         {t("personal.revoke")}

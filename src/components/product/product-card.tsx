@@ -178,7 +178,7 @@ export const ProductCard = memo(function ProductCard({
 
           {/* Low stock badge */}
           {lowStock && !hasDiscount && (
-            <div className="absolute top-2 left-2 bg-[#f5a623] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10" role="status">
+            <div className="absolute top-2 left-2 bg-amber-700 text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10" role="status">
               Pocas unidades
             </div>
           )}

@@ -161,7 +161,7 @@ export default function CartPage() {
                 </div>
 
                 {item.stock_status === "low_stock" && (
-                  <span className="inline-block text-[11px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium mt-1">
+                  <span className="inline-block text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full font-medium mt-1">
                     Pocas unidades
                   </span>
                 )}
@@ -188,7 +188,7 @@ export default function CartPage() {
                   </div>
 
                   <div className="flex items-center gap-1 border border-gray-200 rounded-lg">
-                    <button
+                    <button aria-label="Disminuir cantidad"
                       onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
                       className="p-2 rounded-md hover:bg-gray-100 transition-colors touch-target"
                     >
@@ -197,7 +197,7 @@ export default function CartPage() {
                     <span className="w-10 text-center font-semibold text-gray-900 text-sm">
                       {item.quantity}
                     </span>
-                    <button
+                    <button aria-label="Aumentar cantidad"
                       onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
                       className="p-2 rounded-md hover:bg-gray-100 transition-colors touch-target"
                     >

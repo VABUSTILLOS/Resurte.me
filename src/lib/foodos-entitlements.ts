@@ -57,27 +57,41 @@ export const TIER_LABEL_KEY: Record<CashbackTier, string> = {
  * Regla del producto: Plata abre marketing; Oro abre lo que hace que el
  * restaurante **cobre y opere** (Flotilla, POS de mostrador y comandero);
  * Diamante abre lo que se apoya en volumen ya probado (Mesero IA, wallet,
- * app de marca, sitio IA, integraciones POS ajenas y catering).
+ * app de marca, sitio IA y catering).
  *
  * Por qué POS y comandero bajaron de Diamante a Oro: son el valor que
  * convence —el restaurantero los usa cada día en el salón y en la caja— y
  * dejarlos en el tope significaba que nadie podía comprobarlos antes de
- * comprometer una recompra. Lo caro de operar (Mesero IA, sitio IA,
- * integraciones) sigue arriba, que es donde está el costo real.
+ * comprometer una recompra. Lo caro de operar (Mesero IA, sitio IA) sigue
+ * arriba, que es donde está el costo real.
+ *
+ * Por qué `pos_integraciones` está en **Verde**, que es la única capacidad que
+ * vive ahí: el candado de nivel existe para **cobrar lo que cuesta operar**, y
+ * hoy no hay nada que operar — los seis adaptadores comerciales están
+ * declarados con `implemented: false` (`src/lib/pos/registry.ts`) y el webhook
+ * responde 503. Dejar esa capacidad en Diamante pedía el nivel más caro a
+ * cambio de una hoja de ruta, que es la forma más limpia de cobrar por algo que
+ * no se entrega. La superficie **se conserva** —el restaurantero ve que su
+ * proveedor está contemplado y qué le falta, y el camino que sí funciona (la
+ * importación CSV del menú) está al lado— pero no se cobra por ella.
+ * **Cuándo subirla:** cuando exista el primer adaptador, su costo de operación
+ * aparece y Diamante vuelve a ser el nivel correcto. La condición está congelada
+ * en `src/lib/foodos-entitlements.test.ts`, que exige que la única capacidad en
+ * Verde sea una sin un solo adaptador implementado.
  */
 export const FEATURE_MIN_TIER: Record<FoodosFeature, CashbackTier> = {
   marketing_ia: "Plata",
   flotilla: "Oro",
   mesero_ia: "Diamante",
   // POS nativo y comandero: el restaurantero cobra y opera el salón aquí mismo.
-  // Ojo: `pos_integraciones` es lo OPUESTO — conectar un punto de venta ajeno,
-  // y eso sí sigue en Diamante.
   pos_mostrador: "Oro",
   comandero: "Oro",
   wallet_passes: "Diamante",
   app_marca: "Diamante",
   sitio_ia: "Diamante",
-  pos_integraciones: "Diamante",
+  // Ver el docstring de arriba: es lo OPUESTO a `pos_mostrador` — conectar un
+  // punto de venta ajeno — y no se cobra mientras no haya adaptador.
+  pos_integraciones: "Verde",
   catering: "Diamante",
 }
 
@@ -144,7 +158,8 @@ export const FOODOS_FEATURES: Record<FoodosFeature, FoodosFeatureInfo> = {
     feature: "pos_integraciones",
     labelKey: "foodos.entitlements.featurePosIntegraciones",
     descriptionKey: "foodos.entitlements.featurePosIntegracionesDesc",
-    minTier: "Diamante",
+    // Verde mientras no exista adaptador; ver FEATURE_MIN_TIER.
+    minTier: "Verde",
   },
   catering: {
     feature: "catering",
@@ -159,6 +174,8 @@ export const FOODOS_FEATURES: Record<FoodosFeature, FoodosFeatureInfo> = {
  * es explícito (no alfabético) para controlar qué se muestra primero.
  */
 const FEATURE_ORDER_BY_TIER: FoodosFeature[] = [
+  // Verde — sin candado: no hay nada que cobrar todavía.
+  "pos_integraciones",
   // Plata
   "marketing_ia",
   // Oro
@@ -170,7 +187,6 @@ const FEATURE_ORDER_BY_TIER: FoodosFeature[] = [
   "wallet_passes",
   "app_marca",
   "sitio_ia",
-  "pos_integraciones",
   "catering",
 ]
 
@@ -196,6 +212,26 @@ export function asCashbackTier(value: string | null | undefined): CashbackTier {
 /** Nivel mínimo para usar una capacidad. */
 export function minTierFor(feature: FoodosFeature): CashbackTier {
   return FEATURE_MIN_TIER[feature]
+}
+
+/**
+ * ¿Esta capacidad es un **escalón** — algo que un nivel abre — o es línea base?
+ *
+ * El escalón de niveles responde "qué me da subir". Una capacidad que ya se usa
+ * en Verde no da nada al subir, así que no es un escalón: es parte de lo que el
+ * nivel base incluye. La distinción existe porque hay **una** capacidad así,
+ * `pos_integraciones`, y sin ella la escalera pública de niveles la anunciaría
+ * con una palomita en los cuatro niveles —como beneficio del nivel gratuito y
+ * como logro del más caro— cuando lo único que hay es una superficie en
+ * preparación. Por eso `PUBLIC_TIER_LADDER` se construye con `perksForTier`,
+ * que filtra por esta función.
+ *
+ * Ojo: esto NO decide si se puede usar. `hasFeature` sigue siendo el único
+ * predicado de escritura, y para una capacidad de línea base es `true` en todos
+ * los niveles — que es justo lo que se busca: se ve, se usa, y no se cobra.
+ */
+function esEscalon(feature: FoodosFeature): boolean {
+  return TIER_RANK[FEATURE_MIN_TIER[feature]] > TIER_RANK.Verde
 }
 
 /** ¿El nivel alcanza para la capacidad? */
@@ -237,6 +273,19 @@ export function featuresForTier(tier: CashbackTier): FoodosFeature[] {
 /** Capacidades que el nivel todavía no alcanza. */
 export function lockedFeatures(tier: CashbackTier): FoodosFeature[] {
   return FOODOS_FEATURE_ORDER.filter((f) => !hasFeature(tier, f))
+}
+
+/**
+ * Lo que **el nivel aporta**: las capacidades que se abren al llegar a él.
+ *
+ * No es lo mismo que `featuresForTier`, y la diferencia es la única capacidad de
+ * línea base (`pos_integraciones`, ver `esEscalon`): se usa desde Verde, así que
+ * ningún nivel la aporta. Quien pregunta "¿qué me da subir?" —la escalera
+ * pública de niveles— usa esta función; quien pregunta "¿qué puedo usar?" usa
+ * `featuresForTier`.
+ */
+export function perksForTier(tier: CashbackTier): FoodosFeature[] {
+  return FOODOS_FEATURE_ORDER.filter((f) => esEscalon(f) && hasFeature(tier, f))
 }
 
 /** Siguiente nivel del escalón (null en el tope). */
@@ -360,7 +409,7 @@ export const PUBLIC_TIER_LADDER: PublicTierInfo[] = TIER_LADDER.map((step) => ({
   tier: step.tier,
   weeks: step.weeks,
   cashbackPct: step.pct,
-  features: featuresForTier(step.tier),
+  features: perksForTier(step.tier),
 }))
 
 /** Gasto mínimo (MXN) que califica una semana. Único origen: `utils`. */

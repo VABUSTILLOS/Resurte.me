@@ -134,7 +134,7 @@ export default function CocinaPage() {
       </div>
 
       {sorted.length === 0 ? (
-        <div className="bg-white border border-dashed border-stone-300 rounded-2xl p-16 text-center text-stone-400">
+        <div className="bg-white border border-dashed border-stone-300 rounded-2xl p-16 text-center text-stone-500">
           <ChefHat className="w-10 h-10 mx-auto mb-3 text-stone-300" />
           Sin pedidos en cocina. Los nuevos aparecen aquí automáticamente.
         </div>
@@ -186,7 +186,7 @@ export default function CocinaPage() {
                   className={`w-full py-2.5 rounded-xl text-white text-sm font-bold ${
                     order.status === "confirmed"
                       ? "bg-purple-600 hover:bg-purple-700"
-                      : "bg-emerald-600 hover:bg-emerald-700"
+                      : "bg-emerald-700 hover:bg-emerald-800"
                   }`}
                 >
                   {order.status === "confirmed"

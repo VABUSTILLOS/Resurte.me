@@ -18,10 +18,10 @@ México, semana ISO). Fuente única: `src/lib/wallet-progress.ts`
 
 | Nivel | Requisito | Desbloquea |
 |---|---|---|
-| **Verde** | 0 semanas | FoodOS base: menú, pedidos, QR, KDS, cupones, propina, SPEI, lealtad por puntos, reseñas, WhatsApp catálogo, tracking |
+| **Verde** | 0 semanas | FoodOS base: menú, pedidos, QR, KDS, cupones, propina, SPEI, lealtad por puntos, reseñas, WhatsApp catálogo, tracking, **conexión de punto de venta** (sin candado: no hay adaptador que cobrar) |
 | **Plata** | 2 semanas | Marketing IA |
-| **Oro** | 3 semanas | Flotilla |
-| **Diamante** | 4 semanas | Mesero IA, Wallet, app/PWA de marca, sitio IA + SEO local, POS, catering |
+| **Oro** | 3 semanas | Flotilla, POS de mostrador, comandero |
+| **Diamante** | 4 semanas | Mesero IA, Wallet, app/PWA de marca, sitio IA + SEO local, catering |
 
 ## Estado
 
@@ -337,7 +337,7 @@ gateado es generar, editar y publicar.
 pedidos, que es el camino caliente. Publicar, ocultar y borrar revalidan las
 cuatro cosas: el panel, el tag `foodos-seo`, la ruta pública y el sitemap.
 
-### ✅ Fase 7 — Punto de venta y catering (nivel Diamante)
+### ✅ Fase 7 — Punto de venta y catering (catering en Diamante; POS sin candado de nivel)
 
 Dos caminos para vender fuera del mostrador: conectar la caja que el
 restaurante ya tiene, y cotizar eventos por volumen. Ninguno de los dos puede
@@ -389,6 +389,16 @@ es el punto único de extensión y hoy devuelve `unimplementedPosAdapter`. Fingi
 una sincronización produciría un menú desincronizado en silencio, que es peor
 que no tener la integración. El camino sin credenciales sigue siendo la
 importación CSV del menú.
+
+**Y por eso no tiene candado de nivel.** `pos_integraciones` vivió en Diamante
+—el nivel más caro— mientras los seis adaptadores estaban sin implementar: pedía
+lo máximo a cambio de una hoja de ruta. La capacidad es hoy **línea base**
+(Verde): se ve y se usa en cualquier nivel, porque no hay costo que cobrar. Para
+que la escalera pública de `/restaurantes` no la anuncie como beneficio de subir
+a Verde, la escalera se construye con `perksForTier` (lo que el nivel **aporta**)
+y no con `featuresForTier` (lo que el restaurante **puede usar**). El test
+congela la condición de subida: falla en cuanto exista un adaptador implementado
+y obliga a decidir el nivel en el momento en que aparece el costo.
 
 #### Catering
 

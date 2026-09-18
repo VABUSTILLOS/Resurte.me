@@ -102,7 +102,7 @@ export default function CombosSection({
                   ))}
                 </div>
                 {missing.length > 0 && (
-                  <div className="mb-3 flex items-center gap-2 text-[11px] font-medium text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                  <div className="mb-3 flex items-center gap-2 text-[11px] font-medium text-red-700 bg-red-50 rounded-lg px-3 py-2">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     {missing.length === 1
                       ? `El platillo "${firstMissing?.dishName ?? ""}" ya no existe — su costo cuenta como $0.`
@@ -159,7 +159,7 @@ export default function CombosSection({
           <div className="mb-3">
             <p className="text-xs text-gray-400 mb-2">Selecciona los platillos del menú (mínimo 2):</p>
             {dishes.length === 0 ? (
-              <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2">
+              <p className="text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">
                 Primero costea tu menú para poder armar combos.
               </p>
             ) : (
@@ -181,13 +181,13 @@ export default function CombosSection({
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => setComboQty(dish.id, selected.qty - 1)}
-                            className="w-6 h-6 rounded bg-amber-100 text-amber-700 font-bold hover:bg-amber-200 transition-colors"
+                            className="w-6 h-6 rounded bg-amber-100 text-amber-800 font-bold hover:bg-amber-200 transition-colors"
                             aria-label={`Reducir cantidad de ${dish.name}`}
                           >−</button>
                           <span className="w-6 text-center text-xs font-bold text-gray-800">{selected.qty}</span>
                           <button
                             onClick={() => setComboQty(dish.id, selected.qty + 1)}
-                            className="w-6 h-6 rounded bg-amber-100 text-amber-700 font-bold hover:bg-amber-200 transition-colors"
+                            className="w-6 h-6 rounded bg-amber-100 text-amber-800 font-bold hover:bg-amber-200 transition-colors"
                             aria-label={`Aumentar cantidad de ${dish.name}`}
                           >+</button>
                         </div>

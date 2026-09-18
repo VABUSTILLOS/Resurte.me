@@ -64,7 +64,7 @@ const KitchenBoard = memo(function KitchenBoard({ byStatus, onIniciar, onListo, 
                         </div>
                       )}
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                        <span className="text-[10px] text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded-full">
                           {chan?.icon} {chan?.label}
                         </span>
                         {c.entry.mesaId && mesaNombre(c.entry.mesaId) && (
@@ -85,7 +85,7 @@ const KitchenBoard = memo(function KitchenBoard({ byStatus, onIniciar, onListo, 
                         {c.status === "pendiente" && (
                           <button
                             onClick={() => onIniciar(c.entry.id, c.entry.dishName)}
-                            className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 py-1.5 rounded-lg transition-colors"
+                            className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 py-1.5 rounded-lg transition-colors"
                             title={t("comanda.startTitle", { name: c.entry.dishName })}
                             aria-label={t("comanda.startAria", { name: c.entry.dishName })}
                           >
@@ -117,7 +117,7 @@ const KitchenBoard = memo(function KitchenBoard({ byStatus, onIniciar, onListo, 
                         {c.status === "listo" && (
                           <button
                             onClick={() => onRevertir(c.entry.id)}
-                            className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 py-1.5 rounded-lg transition-colors"
+                            className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold text-gray-600 bg-gray-50 hover:bg-gray-100 py-1.5 rounded-lg transition-colors"
                             title={t("comanda.backToPending")}
                             aria-label={t("comanda.reopenAria", { name: c.entry.dishName })}
                           >

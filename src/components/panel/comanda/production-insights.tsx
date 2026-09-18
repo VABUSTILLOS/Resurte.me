@@ -55,7 +55,7 @@ export default function ProductionInsights({ inProduction, dishAvgTimes }: Produ
                 <span className="text-[10px] text-gray-400">{g.count} pz</span>
                 <span
                   className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                    g.avgMin > 15 ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"
+                    g.avgMin > 15 ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
                   }`}
                 >
                   {g.avgMin > 15 ? "⚠️ " : ""}{g.avgMin.toFixed(0)} min

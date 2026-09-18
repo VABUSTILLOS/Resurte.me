@@ -221,7 +221,7 @@ export function EmptyState({
 }) {
   return (
     <div className="text-center py-12">
-      <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 mb-3">
+      <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 mb-3">
         <span className="text-xl">📋</span>
       </div>
       <p className="text-sm font-semibold text-gray-700">{title}</p>

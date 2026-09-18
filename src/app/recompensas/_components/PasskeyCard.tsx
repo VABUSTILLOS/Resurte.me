@@ -170,7 +170,7 @@ export function PasskeyCard() {
       </p>
 
       {error && (
-        <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-600">
+        <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">
           {error}
         </p>
       )}
@@ -209,7 +209,7 @@ export function PasskeyCard() {
                   <button
                     type="submit"
                     disabled={busy}
-                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                    className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                   >
                     Guardar
                   </button>

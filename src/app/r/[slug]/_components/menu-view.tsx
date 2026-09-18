@@ -122,7 +122,7 @@ export function MenuView({
                 </div>
                 <button
                   onClick={() => onAddCombo(combo)}
-                  className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700"
+                  className="px-4 py-2 rounded-full bg-emerald-700 text-white text-sm font-bold hover:bg-emerald-700"
                 >
                   {sf(lang, "add")}
                 </button>
@@ -208,7 +208,7 @@ export function MenuView({
           <div className="max-w-4xl mx-auto px-4 py-3 flex justify-end">
             <button
               onClick={onGoToCart}
-              className="flex items-center gap-2 px-6 py-3 rounded-full foodos-accent bg-emerald-600 text-white font-bold hover:bg-emerald-700"
+              className="flex items-center gap-2 px-6 py-3 rounded-full foodos-accent bg-emerald-700 text-white font-bold hover:bg-emerald-700"
             >
               {sf(lang, "viewOrder")} ({cartCount})
               <ArrowRight className="w-4 h-4" />

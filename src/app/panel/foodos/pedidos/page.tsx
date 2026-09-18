@@ -349,7 +349,7 @@ export default function PedidosPage() {
       {newOrdersCount > 0 && (
         <button
           onClick={() => { setNewOrdersCount(0); setFilter("pending") }}
-          className="mb-4 w-full flex items-center justify-center gap-2 bg-emerald-600 text-white rounded-xl px-4 py-3 text-sm font-bold animate-pulse"
+          className="mb-4 w-full flex items-center justify-center gap-2 bg-emerald-700 text-white rounded-xl px-4 py-3 text-sm font-bold animate-pulse"
         >
           <Bell className="w-4 h-4" />
           {newOrdersCount} pedido{newOrdersCount > 1 ? "s" : ""} nuevo{newOrdersCount > 1 ? "s" : ""} — ver pendientes
@@ -439,7 +439,7 @@ export default function PedidosPage() {
                   <button
                     onClick={() => approveProof(proof.id)}
                     disabled={proofBusy === proof.id}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 disabled:opacity-50"
                   >
                     {proofBusy === proof.id ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -451,7 +451,7 @@ export default function PedidosPage() {
                   <button
                     onClick={() => rejectProof(proof.id)}
                     disabled={proofBusy === proof.id}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50 disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-red-200 text-red-700 text-xs font-semibold hover:bg-red-50 disabled:opacity-50"
                   >
                     <XCircle className="w-3.5 h-3.5" /> {t("foodos.pedidos.proofsReject")}
                   </button>
@@ -484,7 +484,7 @@ export default function PedidosPage() {
             key={c.id}
             onClick={() => setChannelFilter(c.id)}
             className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              channelFilter === c.id ? "bg-emerald-600 text-white" : "bg-white text-stone-600 border border-stone-200"
+              channelFilter === c.id ? "bg-emerald-700 text-white" : "bg-white text-stone-600 border border-stone-200"
             }`}
           >
             {c.label}
@@ -493,7 +493,7 @@ export default function PedidosPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="bg-white border border-dashed border-stone-300 rounded-2xl p-12 text-center text-stone-400">
+        <div className="bg-white border border-dashed border-stone-300 rounded-2xl p-12 text-center text-stone-500">
           {filter !== "all" ? t("foodos.pedidos.emptyFiltered") : t("foodos.pedidos.emptyAll")}
         </div>
       ) : (
@@ -600,7 +600,7 @@ export default function PedidosPage() {
                   <button
                     onClick={() => advance(order)}
                     disabled={saving === order.id}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 text-white text-sm font-bold hover:bg-emerald-800 disabled:opacity-50"
                   >
                     {saving === order.id && <Loader2 className="w-4 h-4 animate-spin" />}
                     {order.status === "pending" && t("foodos.pedidos.confirmOrder")}
@@ -611,7 +611,7 @@ export default function PedidosPage() {
                   <button
                     onClick={() => cancel(order)}
                     disabled={saving === order.id}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-red-200 text-red-700 text-sm font-semibold hover:bg-red-50 disabled:opacity-50"
                   >
                     <XCircle className="w-4 h-4" /> {t("common.cancel")}
                   </button>

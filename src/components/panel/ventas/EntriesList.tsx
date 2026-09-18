@@ -46,7 +46,7 @@ export default function EntriesList({
         <table className="w-full text-xs" aria-label={t("ventas.title")}>
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50">
-              <th scope="col" className="sticky left-0 z-10 bg-gray-50 text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Platillo</th>
+              <th scope="col" className="sticky left-0 z-10 bg-gray-50 text-left px-4 py-3 font-semibold text-gray-500 text-[10px] uppercase tracking-wider">Platillo</th>
               <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Cant.</th>
               <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Precio</th>
               <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Costo</th>
@@ -95,13 +95,13 @@ export default function EntriesList({
                         <button
                           onClick={() => onAdjustQty(e.id, -1)}
                           disabled={e.quantity <= 1}
-                          className="w-5 h-5 rounded bg-red-50 text-red-500 hover:bg-red-100 text-xs font-bold transition-colors disabled:opacity-40 touch-target"
+                          className="w-5 h-5 rounded bg-red-50 text-red-700 hover:bg-red-100 text-xs font-bold transition-colors disabled:opacity-40 touch-target"
                           aria-label={`Reducir cantidad de ${e.dishName}`}
                         >−</button>
                         <span className="w-6 text-center font-bold text-gray-800">{e.quantity}</span>
                         <button
                           onClick={() => onAdjustQty(e.id, 1)}
-                          className="w-5 h-5 rounded bg-green-50 text-green-600 hover:bg-green-100 text-xs font-bold transition-colors touch-target"
+                          className="w-5 h-5 rounded bg-green-50 text-green-700 hover:bg-green-100 text-xs font-bold transition-colors touch-target"
                           aria-label={`Aumentar cantidad de ${e.dishName}`}
                         >+</button>
                       </div>

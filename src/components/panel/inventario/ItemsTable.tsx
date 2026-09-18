@@ -92,13 +92,13 @@ export default function ItemsTable({
                     <div className="flex items-center justify-center gap-1">
                       <button
                         onClick={() => onAdjustStock(item.id, -1)}
-                        className="w-6 h-6 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 text-xs font-bold transition-colors"
+                        className="w-6 h-6 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-xs font-bold transition-colors"
                         disabled={item.stock <= 0}
                         aria-label={`Disminuir stock de ${item.name}`}
                       >−</button>
                       <button
                         onClick={() => onAdjustStock(item.id, 1)}
-                        className="w-6 h-6 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 text-xs font-bold transition-colors"
+                        className="w-6 h-6 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 text-xs font-bold transition-colors"
                         aria-label={`Aumentar stock de ${item.name}`}
                       >+</button>
                     </div>

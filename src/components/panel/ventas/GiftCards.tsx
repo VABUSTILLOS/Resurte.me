@@ -21,7 +21,7 @@ export default function GiftCards({ crud }: GiftCardsProps) {
         )}
         <button
           onClick={onToggle}
-          className="ml-auto flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
+          className="ml-auto flex items-center gap-1 text-xs font-semibold text-gray-600 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
           aria-expanded={showTarjetas}
           aria-label="Mostrar u ocultar tarjetas de regalo"
         >
@@ -67,7 +67,7 @@ export default function GiftCards({ crud }: GiftCardsProps) {
                     <span className={`text-xs font-bold shrink-0 ${t.estado === "activa" ? "text-emerald-700" : "text-gray-400"}`}>
                       ${t.saldo.toFixed(0)} / ${t.monto.toFixed(0)}
                     </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${t.estado === "activa" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${t.estado === "activa" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>
                       {t.estado === "activa" ? "Activa" : "Agotada"}
                     </span>
                     <button

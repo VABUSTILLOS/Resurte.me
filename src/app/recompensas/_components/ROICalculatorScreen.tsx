@@ -131,7 +131,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
               </p>
             </div>
             {/* Custom toggle */}
-            <button
+            <button aria-label="Cambiar a modo crecimiento"
               onClick={() => setGrowthMode(!growthMode)}
               className={`relative h-7 w-12 rounded-full transition-colors ${
                 growthMode ? "bg-amber-500" : "bg-cream-300"

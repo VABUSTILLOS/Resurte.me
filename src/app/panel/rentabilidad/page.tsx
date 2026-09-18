@@ -553,7 +553,7 @@ export default function RentabilidadPage() {
               <h3 className="font-bold text-gray-900 text-sm">{t("rentabilidad.categoryAnalysis")}</h3>
             </div>
             {worstCategory && foodCostStatus(worstCategory.avgFc, panelCfg) === "red" && (
-              <span className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-full font-semibold">
+              <span className="text-[10px] bg-red-50 text-red-700 px-2 py-1 rounded-full font-semibold">
                 {t("rentabilidad.worstFoodCost", { category: worstCategory.category, pct: worstCategory.avgFc.toFixed(1) })}
               </span>
             )}
@@ -738,7 +738,7 @@ export default function RentabilidadPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h4 className="font-semibold text-gray-900 text-sm">{dish.name}</h4>
-                      <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
+                      <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
                         {dish.category}
                       </span>
                       {dish.example && (

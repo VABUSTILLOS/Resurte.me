@@ -105,7 +105,7 @@ export function PaymentStep({
                   className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                     paymentMethod === method.value
                       ? "bg-brand-600 text-white"
-                      : "bg-gray-100 text-gray-500"
+                      : "bg-gray-100 text-gray-600"
                   }`}
                 >
                   {PAYMENT_ICONS[method.value]}

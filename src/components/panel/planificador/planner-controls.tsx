@@ -64,7 +64,7 @@ export default function PlannerControls({
             </p>
             <button
               onClick={onUseDemand}
-              className="ml-auto text-xs font-semibold bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors shrink-0"
+              className="ml-auto text-xs font-semibold bg-emerald-700 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors shrink-0"
               aria-label={t("planificador.useDemandAria")}
             >
               {t("planificador.useDemand")}

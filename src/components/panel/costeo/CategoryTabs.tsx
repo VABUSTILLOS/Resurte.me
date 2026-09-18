@@ -46,7 +46,7 @@ export default function CategoryTabs({
           className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
             categoryFilter === cat.key
               ? cat.color
-              : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+              : "bg-gray-50 text-gray-600 hover:bg-gray-100"
           }`}
         >
           {cat.label}

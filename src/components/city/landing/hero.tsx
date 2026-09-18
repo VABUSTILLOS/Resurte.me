@@ -88,7 +88,7 @@ export function HeroSection({
                           onOpenSearchOverlay()
                         }
                       }}
-                      className="flex-1 text-sm text-[#343538] py-3 sm:py-3.5 bg-transparent outline-none placeholder:text-[#B0B3B8] placeholder:text-xs sm:placeholder:text-sm"
+                      className="flex-1 text-sm text-[#343538] py-3 sm:py-3.5 bg-transparent outline-none placeholder:text-gray-500 placeholder:text-xs sm:placeholder:text-sm"
                     />
                   </div>
                   <button

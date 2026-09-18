@@ -280,7 +280,7 @@ export default function TableroPage() {
                 <span className="text-[10px] text-stone-400 font-semibold">{d.count || ""}</span>
                 <div
                   title={`${d.key} · ${d.count} · ${formatMoney(d.revenue)}`}
-                  className="w-full rounded-t-lg bg-emerald-500/80 hover:bg-emerald-500 transition-colors"
+                  className="w-full rounded-t-lg bg-emerald-700 hover:bg-emerald-800 transition-colors"
                   style={{ height: `${Math.max((d.count / maxDay) * 100, d.count ? 8 : 2)}%` }}
                 />
                 <span className="text-[10px] text-stone-500 capitalize truncate">{d.label}</span>
@@ -302,7 +302,7 @@ export default function TableroPage() {
                   </span>
                 </div>
                 <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${row.share}%` }} />
+                  <div className="h-full bg-emerald-700 rounded-full" style={{ width: `${row.share}%` }} />
                 </div>
               </div>
             ))}
@@ -580,7 +580,7 @@ function AiUsageCard({ usage }: { usage: AiUsageSnapshot }) {
       </div>
       <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-[width] ${usage.nearCap ? "bg-amber-500" : "bg-emerald-500"}`}
+          className={`h-full rounded-full transition-[width] ${usage.nearCap ? "bg-amber-700" : "bg-emerald-700"}`}
           style={{ width: `${pct}%` }}
         />
       </div>

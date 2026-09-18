@@ -25,6 +25,7 @@ import {
 import { RoiCalculator } from "./roi-calculator"
 import { LeadQualifier } from "./lead-qualifier"
 import {
+  FEATURE_MIN_TIER,
   FOODOS_FEATURE_ORDER,
   PUBLIC_TIER_LADDER,
   QUALIFYING_WEEK_MIN,
@@ -101,7 +102,7 @@ const FEATURE_COPY: Record<FoodosFeature, { label: string; description: string; 
   pos_integraciones: {
     label: "Conectar tu punto de venta",
     description:
-      "Conecta la caja que ya usas y mantén un solo menú y un solo inventario en los dos lados.",
+      "En preparación: todavía no publicamos el adaptador de ningún proveedor, así que hoy tu menú se importa por CSV. Está incluida en todos los niveles y no te costará ninguno.",
     icon: Plug,
   },
   catering: {
@@ -131,7 +132,7 @@ const TIER_COPY: Record<string, { name: string; requirement: string; note: strin
   Diamante: {
     name: "Diamante",
     requirement: `4 semanas de ${formatMxn(QUALIFYING_WEEK_MIN)}`,
-    note: "Se abre lo que atiende el volumen: IA, lealtad, app de tu marca, sitio propio, integraciones y catering.",
+    note: "Se abre lo que atiende el volumen: IA, lealtad, app de tu marca, sitio propio y catering.",
   },
 }
 
@@ -332,6 +333,13 @@ export default function RestaurantesPage() {
               const copy = FEATURE_COPY[feature]
               const Icon = copy.icon
               const tier = PUBLIC_TIER_LADDER.find((s) => s.features.includes(feature))
+              // Sin escalón que la aporte, la capacidad es de línea base: se usa
+              // desde el primer nivel, así que el badge lo dice en vez de callarse.
+              const badge = tier
+                ? `Nivel ${TIER_COPY[tier.tier]?.name ?? tier.tier}`
+                : FEATURE_MIN_TIER[feature] === "Verde"
+                  ? "En todos los niveles"
+                  : null
               return (
                 <article
                   key={feature}
@@ -339,9 +347,9 @@ export default function RestaurantesPage() {
                 >
                   <div className="flex items-center justify-between">
                     <Icon className="h-5 w-5 text-brand-600" aria-hidden="true" />
-                    {tier && (
+                    {badge && (
                       <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
-                        Nivel {TIER_COPY[tier.tier]?.name ?? tier.tier}
+                        {badge}
                       </span>
                     )}
                   </div>

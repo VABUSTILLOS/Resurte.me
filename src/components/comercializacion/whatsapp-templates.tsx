@@ -82,7 +82,7 @@ export function WhatsappTemplateMenu({
       ) : (
         <button
           onClick={() => setOpen(!open)}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#25D366]/15 text-[#128C4A] px-3 py-1.5 rounded-xl hover:bg-[#25D366]/25 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#25D366]/15 text-[#0B5C2E] px-3 py-1.5 rounded-xl hover:bg-[#25D366]/25 transition-colors"
           aria-haspopup="menu"
           aria-expanded={open}
         >

@@ -73,7 +73,7 @@ const ComandaList = memo(function ComandaList({ filtered, onIniciar, onListo, on
                           className={`text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors ${
                             c.status === s
                               ? `${STATUS_META[s].bg} ${STATUS_META[s].color}`
-                              : "text-gray-400 bg-gray-50 hover:bg-gray-100"
+                              : "text-gray-600 bg-gray-50 hover:bg-gray-100"
                           }`}
                           aria-label={`${statusShortLabel(s)}: ${c.entry.dishName}`}
                         >

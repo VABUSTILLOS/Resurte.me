@@ -16,7 +16,7 @@ export default function SeasonTransfers({ transfers, onAccept, onDismiss }: Seas
       <div className="flex items-center gap-2 mb-2">
         <span className="text-xl">🥬</span>
         <h3 className="font-semibold text-emerald-800">{t("planificador.transfersTitle")}</h3>
-        <span className="text-[10px] bg-emerald-200 text-emerald-700 px-2 py-0.5 rounded-full">{t("planificador.transfersBadge")}</span>
+        <span className="text-[10px] bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full">{t("planificador.transfersBadge")}</span>
       </div>
       <div className="flex flex-wrap gap-2 mb-3">
         {transfers.map((t, i) => (
@@ -28,7 +28,7 @@ export default function SeasonTransfers({ transfers, onAccept, onDismiss }: Seas
       <div className="flex gap-2">
         <button
           onClick={onAccept}
-          className="text-xs font-semibold bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors"
+          className="text-xs font-semibold bg-emerald-700 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors"
         >
           {t("planificador.acceptTransfers")}
         </button>

@@ -36,9 +36,10 @@
 --
 --  2. La atribución se resuelve igual que en el dashboard del vendedor
 --     (crm_prospects.seller_id → user_id → orders.user_id). `orders`
---     tiene una columna `seller_id` (00052) que NINGUNA ruta escribe
---     nunca: usarla daría cero siempre. Se mantiene la regla existente
---     para que el vendedor y el admin no vean cifras distintas.
+--     tenía una columna `seller_id` (00052) que NINGUNA ruta escribió
+--     nunca —usarla habría dado cero siempre— y que **00189 ya eliminó**.
+--     Se mantiene la regla existente para que el vendedor y el admin no
+--     vean cifras distintas.
 --
 --  3. El devengo SÍ refresca las ventas mientras el periodo siga
 --     `devengada`. Un pedido pagado después del cierre pertenece a ese

@@ -197,9 +197,9 @@ export function qualifyLead(input: Partial<LeadAnswers> | null | undefined): Lea
       signals.push({
         points: 8,
         reason: "Su operación depende de libretas y hojas de cálculo.",
-        feature: "pos_integraciones",
+        feature: "pos_mostrador",
       })
-      features.add("pos_integraciones")
+      features.add("pos_mostrador")
       break
     case "ninguno":
       signals.push({ points: 0, reason: "No declaró un problema concreto." })

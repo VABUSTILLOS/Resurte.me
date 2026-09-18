@@ -24,7 +24,7 @@ export function CatalogSearchBar({ value, onChange, onSubmit }: CatalogSearchBar
                     placeholder=" "
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
-                    className="marquee-input w-full text-sm text-[#343538] py-3 bg-transparent outline-none placeholder:text-[#B0B3B8]"
+                    className="marquee-input w-full text-sm text-[#343538] py-3 bg-transparent outline-none placeholder:text-gray-500"
                   />
                   <MarqueePlaceholder text="Buscar frutas, verduras, carnes, abarrotes..." />
                 </div>

@@ -63,7 +63,12 @@ test.describe("accesibilidad WCAG (axe-core)", { tag: "@ci" }, () => {
 
   for (const [label, url] of pages) {
     test(`sin violaciones críticas/serias en ${label}`, async ({ page }) => {
-      await page.goto(url, { waitUntil: "networkidle" })
+      // `networkidle` no es una señal de accesibilidad: mide que la red se
+      // calle, y en un `next dev` con HMR y peticiones de fondo puede no
+      // callarse nunca — medido: 30 s de espera bajo carga, mientras el mismo
+      // test en `mobile-chromium` pasaba en 3,4 s con la caché caliente. La
+      // señal real es el contenido: se espera a `main#main-content`.
+      await page.goto(url, { waitUntil: "domcontentloaded" })
       await page.waitForSelector("main#main-content")
       const results = await runAxe(page)
       const critical = results.violations.filter(
@@ -95,7 +100,8 @@ test.describe("accesibilidad WCAG (axe-core)", { tag: "@ci" }, () => {
       console.log("SKIP storefront: no se encontró enlace /r/ en /comer")
       return
     }
-    await page.goto(href, { waitUntil: "networkidle" })
+    await page.goto(href, { waitUntil: "domcontentloaded" })
+    await page.waitForSelector("main#main-content")
     const results = await runAxe(page)
     const critical = results.violations.filter(
       (v) => v.impact === "critical" || v.impact === "serious",
@@ -126,7 +132,7 @@ test.describe("accesibilidad WCAG (axe-core)", { tag: "@ci" }, () => {
         console.log(`SKIP ${label}: no se encontró enlace en /cdmx`)
         continue
       }
-      await page.goto(href, { waitUntil: "networkidle" })
+      await page.goto(href, { waitUntil: "domcontentloaded" })
       await page.waitForSelector("main#main-content")
       const results = await runAxe(page)
       const critical = results.violations.filter(

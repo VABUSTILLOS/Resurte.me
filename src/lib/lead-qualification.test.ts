@@ -181,9 +181,12 @@ describe("qualifyLead — capacidades recomendadas", () => {
     expect(flotillaOnly.recommendedFeatures).toEqual(["flotilla"])
     expect(flotillaOnly.recommendedTier).toBe("Oro")
 
+    // `operacion` recomienda el POS nativo, no la integración con un POS ajeno:
+    // la segunda no tiene adaptador, así que recomendarla sería mandar al
+    // prospecto a una puerta que no abre. El POS de mostrador sí existe hoy.
     const posOnly = qualifyLead({ biggestPain: "operacion" })
-    expect(posOnly.recommendedFeatures).toEqual(["pos_integraciones"])
-    expect(posOnly.recommendedTier).toBe("Diamante")
+    expect(posOnly.recommendedFeatures).toEqual(["pos_mostrador"])
+    expect(posOnly.recommendedTier).toBe("Oro")
   })
 
   it("toma el nivel MÁS ALTO de las capacidades recomendadas, no el más bajo", () => {

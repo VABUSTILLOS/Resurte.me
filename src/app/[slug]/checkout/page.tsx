@@ -382,7 +382,7 @@ export default function CheckoutPage() {
             )}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-4 py-3 sm:py-2 bg-green-500 text-white text-xs font-semibold rounded-lg hover:bg-green-600 transition-colors touch-target"
+            className="inline-flex items-center gap-1.5 px-4 py-3 sm:py-2 bg-green-700 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition-colors touch-target"
           >
             <MessageCircle className="w-3.5 h-3.5" />
             Pedir por WhatsApp
@@ -399,8 +399,8 @@ export default function CheckoutPage() {
                 step === s
                   ? "bg-brand-600 text-white"
                   : step > s || (step === "payment" && s === "review")
-                  ? "bg-green-500 text-white"
-                  : "bg-gray-200 text-gray-500"
+                  ? "bg-green-700 text-white"
+                  : "bg-gray-200 text-gray-600"
               }`}
             >
               {step > s || (step === "payment" && s === "review") ? (

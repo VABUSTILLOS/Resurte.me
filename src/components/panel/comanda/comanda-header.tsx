@@ -20,7 +20,7 @@ export default function ComandaHeader({ collectionName, hasComandas, onCopyRepor
           {hasComandas && (
             <button
               onClick={onCopyReporte}
-              className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
               title={t("comanda.copyReportTitle")}
               aria-label={t("comanda.copyReportLabel")}
             >

@@ -83,7 +83,7 @@ export function SyncStatusBadge() {
                   retryPendingSyncs()
                   setOpenConflict(false)
                 }}
-                className="flex-1 px-3 py-2 rounded-lg bg-amber-600 text-xs font-semibold text-white hover:bg-amber-700 transition-colors touch-target"
+                className="flex-1 px-3 py-2 rounded-lg bg-amber-700 text-xs font-semibold text-white hover:bg-amber-700 transition-colors touch-target"
               >
                 {t("panel.syncConflictRetry")}
               </button>

@@ -467,7 +467,7 @@ export default function ClientesPage() {
         </div>
         <button
           onClick={() => openAutomationForm()}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-600"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 text-white text-sm font-bold hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-700"
         >
           <Plus className="w-4 h-4" /> {t("foodos.clientes.newAutomation")}
         </button>
@@ -623,7 +623,7 @@ export default function ClientesPage() {
                             <button
                               onClick={handleSaveProfile}
                               disabled={saving}
-                              className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                              className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 disabled:opacity-50"
                             >
                               {t("foodos.marketing.customerSave")}
                             </button>
@@ -702,7 +702,7 @@ export default function ClientesPage() {
                     <div key={a.id} className="bg-stone-50 rounded-xl p-3">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-bold text-stone-900">{a.name}</p>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${a.is_active ? "bg-emerald-100 text-emerald-700" : "bg-stone-200 text-stone-500"}`}>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${a.is_active ? "bg-emerald-100 text-emerald-700" : "bg-stone-200 text-stone-600"}`}>
                           {a.is_active ? t("foodos.clientes.active") : t("foodos.clientes.inactive")}
                         </span>
                       </div>
@@ -722,7 +722,7 @@ export default function ClientesPage() {
                           onClick={() => runCampaign(a)}
                           disabled={sendingCampaign === a.id || !a.is_active}
                           title={a.is_active ? t("foodos.clientes.runNowTitle") : t("foodos.clientes.runDisabledTitle")}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-40"
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 disabled:opacity-40"
                         >
                           {sendingCampaign === a.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
                           {t("foodos.clientes.run")}
@@ -853,7 +853,7 @@ export default function ClientesPage() {
             <button
               onClick={handleSaveLoyalty}
               disabled={saving}
-              className="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"
+              className="w-full py-2.5 rounded-xl bg-emerald-700 text-white text-sm font-bold hover:bg-emerald-800 disabled:opacity-50"
             >
               Guardar programa
             </button>
@@ -978,7 +978,7 @@ export default function ClientesPage() {
                       aria-pressed={autoForm.channel === opt.id}
                       className={`px-2 py-2 rounded-xl text-[11px] font-bold transition-colors ${
                         autoForm.channel === opt.id
-                          ? "bg-emerald-600 text-white"
+                          ? "bg-emerald-700 text-white"
                           : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                       }`}
                     >
@@ -1014,7 +1014,7 @@ export default function ClientesPage() {
                       aria-pressed={aiTone === tone.id}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
                         aiTone === tone.id
-                          ? "bg-emerald-600 text-white"
+                          ? "bg-emerald-700 text-white"
                           : "bg-white text-stone-600 border border-stone-200"
                       }`}
                     >
@@ -1026,7 +1026,7 @@ export default function ClientesPage() {
                   type="button"
                   onClick={handleGenerateCopy}
                   disabled={aiBusy || !aiBrief.trim()}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 disabled:opacity-50"
                 >
                   {aiBusy ? (
                     <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -1114,7 +1114,7 @@ export default function ClientesPage() {
               <button
                 type="submit"
                 disabled={saving || !autoForm.name.trim()}
-                className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-emerald-700 text-white font-bold rounded-xl hover:bg-emerald-800 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {t("common.save")}

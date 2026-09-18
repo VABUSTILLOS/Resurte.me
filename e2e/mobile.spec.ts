@@ -39,28 +39,24 @@ async function seedPanelCollection(page: Page): Promise<void> {
 }
 
 /**
- * La guía paso a paso se auto-abre la primera vez (`useToolGuide` arranca en
- * `useState(() => !seen)` y `seen` vive en localStorage, que está vacío en cada
- * contexto de test nuevo). En móvil su drawer (`z-[90]`, ancho
- * `100vw - 3rem`) tapa el panel y su backdrop `z-[85]` intercepta los taps.
- * Cada herramienta tiene su propia guía (`toolKey` distinto), así que hay que
- * despejarla tras CADA navegación, no solo al entrar al panel.
+ * Precondición de las navegaciones al panel: en un contexto sin decisión de
+ * cookies la guía paso a paso NO se auto-abre, porque `useToolGuide` exige
+ * `readConsentDecision() !== null` antes de abrirse. Su drawer (`z-[90]`, ancho
+ * `100vw - 3rem`) y su backdrop (`z-[85]`, `inset-0`) taparían el hub.
+ *
+ * Antes esto era un bucle de descarte con timeouts (3000/800 ms) que escondía
+ * la carrera real: la guía se abría al montar, el banner de consentimiento
+ * aparecía 800 ms después, y el primer tap de un usuario nuevo cerraba la guía
+ * en vez de consentir. Ahora se afirma la invariante, que es determinista y
+ * además la vigila.
+ *
+ * Se espera primero al banner —señal fiable de que la decisión sigue
+ * pendiente— y solo entonces se comprueba la ausencia de la guía: así un
+ * auto-open tardío tampoco pasa desapercibido.
  */
-async function dismissToolGuide(page: Page): Promise<void> {
-  const close = page.getByRole("button", { name: "Cerrar guía" })
-  // El aside se renderiza condicionalmente (`{open && …}`), de modo que
-  // "visible" es una señal fiable de que hay una guía abierta. Los `timeout`
-  // cortos son deliberados: durante la animación de salida el botón sigue en el
-  // DOM, y un `tap()` sin límite se quedaría reintentando hasta agotar el test.
-  for (let i = 0; i < 2; i++) {
-    try {
-      await close.first().waitFor({ state: "visible", timeout: i === 0 ? 3000 : 800 })
-    } catch {
-      return // la guía ya estaba vista o no aplica a esta ruta
-    }
-    await close.first().tap({ timeout: 2000 }).catch(() => {})
-    await close.first().waitFor({ state: "detached", timeout: 1500 }).catch(() => {})
-  }
+async function expectToolGuideClosed(page: Page): Promise<void> {
+  await expect(page.getByRole("button", { name: "Aceptar todas" })).toBeVisible({ timeout: 8000 })
+  await expect(page.getByRole("button", { name: "Cerrar guía" })).toHaveCount(0)
 }
 
 // Todo describe del archivo lleva `{ tag: "@ci" }`: sin la etiqueta estos tests
@@ -217,7 +213,7 @@ test.describe("móvil: producto — barra sticky add-to-cart", { tag: "@ci" }, (
 async function openPanelSheet(page: Page): Promise<ReturnType<Page["getByRole"]>> {
   await seedPanelCollection(page)
   await page.goto("/panel", { waitUntil: "domcontentloaded" })
-  await dismissToolGuide(page)
+  await expectToolGuideClosed(page)
   const hamburger = page.getByRole("button", { name: "Abrir menú de herramientas" })
   // El sheet se anuncia con `aria-label={t("panel.title")}` = "Mi Restaurante"
   // (ver `PanelMobileNav.tsx`), no con el literal "Panel de Herramientas".
@@ -932,7 +928,7 @@ test.describe("móvil: colecciones — SearchBar abre overlay Fase 6", { tag: "@
     test.skip(!href, "no hay colecciones en /cdmx")
     const collectionUrl = href!
 
-    await page.goto(collectionUrl, { waitUntil: "domcontentloaded" })
+    await page.goto(collectionUrl, { waitUntil: "load" })
     // El header desktop (hidden md:block) comparte placeholder; scope al <main>.
     const input = page.locator("main").getByPlaceholder("Buscar productos...").first()
     await expect(input).toBeVisible({ timeout: 5000 })
@@ -1109,7 +1105,12 @@ test.describe("móvil: Fase 7 — quick-add uniforme y sin solapes", { tag: "@ci
 
   // Los botones del cookie banner y su close deben medir >= 44px (7C).
   test("los botones del cookie banner miden al menos 44px", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    // `load` y no `domcontentloaded`: el banner lo monta un efecto tras
+    // hidratar (`setTimeout(..., 800)`), y `domcontentloaded` dispara antes de
+    // que corran los scripts diferidos. Con la caché fría y dos navegadores en
+    // paralelo, hidratar puede tardar más que el presupuesto de 5 s y el test
+    // fallaba por la señal de espera, no por el banner.
+    await page.goto("/cdmx", { waitUntil: "load" })
     const accept = page.getByRole("button", { name: "Aceptar todas" })
     await expect(accept).toBeVisible({ timeout: 5000 })
     const essential = page.getByRole("button", { name: "Solo necesarias" })
@@ -1702,7 +1703,7 @@ test.describe("Fase 14 móvil: footer compacto, landings de negocio y hub del pa
     // El hub (ToolGrid + BackupStrip) solo se monta con colección seleccionada.
     await seedPanelCollection(page)
     await page.goto("/panel", { waitUntil: "domcontentloaded" })
-    await dismissToolGuide(page)
+    await expectToolGuideClosed(page)
     await page.waitForTimeout(1500)
 
     // ToolGrid: primera card (Link horizontal) mide <110px en móvil.
@@ -1772,7 +1773,7 @@ test.describe("Fase 16 — Hub del panel des-saturado en móvil y barra de acces
   test.beforeEach(async ({ page }) => {
     await seedPanelCollection(page)
     await page.goto("/panel", { waitUntil: "domcontentloaded" })
-    await dismissToolGuide(page)
+    await expectToolGuideClosed(page)
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
   })
 
@@ -1792,9 +1793,9 @@ test.describe("Fase 16 — Hub del panel des-saturado en móvil y barra de acces
   }
 
   // La colección se siembra en `beforeEach`, así que el hub ya está activo;
-  // solo hay que garantizar que la guía paso a paso no lo tape.
+  // `expectToolGuideClosed` deja constancia de que la guía no lo tapa.
   async function selectCollection(page: import("@playwright/test").Page) {
-    await dismissToolGuide(page)
+    await expectToolGuideClosed(page)
   }
 
   test("LiveStats es una tira horizontal swipeable en móvil", async ({ page }) => {
@@ -1840,17 +1841,12 @@ test.describe("Fase 16 — Hub del panel des-saturado en móvil y barra de acces
   test("el FAB abre el sheet de herramientas y navega a Ventas", async ({ page }) => {
     await selectCollection(page)
 
-    // Despeja overlays que cubren la esquina del FAB en contexto limpio.
-    const closeGuide = page.getByRole("button", { name: "Cerrar guía" })
-    if (await closeGuide.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await closeGuide.tap()
-      await page.waitForTimeout(300)
-    }
+    // Contexto limpio: el primer tap es del banner (la guía no se auto-abre sin
+    // decisión de cookies), y hasta aceptarlo la esquina del FAB queda tapada.
     const acceptCookies = page.getByRole("button", { name: "Aceptar todas" })
-    if (await acceptCookies.isVisible().catch(() => false)) {
-      await page.waitForTimeout(700)
-      await acceptCookies.tap()
-    }
+    await page.waitForTimeout(700) // deja terminar la animación de entrada
+    await acceptCookies.tap()
+    await expect(acceptCookies).not.toBeVisible()
 
     const fab = page.getByRole("button", { name: "Abrir herramientas" })
     await expect(fab).toBeVisible({ timeout: 8000 })
@@ -1927,14 +1923,15 @@ test.describe("Fase 17 — Panel: banner oculto, ThemeToggle con feedback, foote
   test.beforeEach(async ({ page }) => {
     await seedPanelCollection(page)
     await page.goto("/panel", { waitUntil: "domcontentloaded" })
-    await dismissToolGuide(page)
+    await expectToolGuideClosed(page)
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
   })
 
   // La colección se siembra en `beforeEach`, así que el hub (FAB, banner,
-  // ToolGrid) ya está activo; solo hay que garantizar que la guía no lo tape.
+  // ToolGrid) ya está activo; `expectToolGuideClosed` deja constancia de que la
+  // guía no lo tapa.
   async function selectCollection(page: import("@playwright/test").Page) {
-    await dismissToolGuide(page)
+    await expectToolGuideClosed(page)
   }
 
   test("el banner 'personalizadas para' está oculto en móvil", async ({ page }) => {
@@ -1988,7 +1985,7 @@ test.describe("Fase 17 — Panel: banner oculto, ThemeToggle con feedback, foote
   test("la comanda del panel no menciona SoftRestaurant", async ({ page }) => {
     await selectCollection(page)
     await page.goto("/panel/comanda", { waitUntil: "domcontentloaded" })
-    await dismissToolGuide(page)
+    await expectToolGuideClosed(page)
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
     const text = await page.evaluate(() => document.body.innerText.toLowerCase())
     expect(text).not.toContain("softrestaurant")
@@ -2031,13 +2028,13 @@ test.describe("Fase 18 — Semáforo de rentabilidad: el simulador ajusta el pre
   test.beforeEach(async ({ page }) => {
     await seedPanelCollection(page)
     await page.goto("/panel", { waitUntil: "domcontentloaded" })
-    await dismissToolGuide(page)
+    await expectToolGuideClosed(page)
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
   })
 
   test("subir el simulador aumenta el precio de venta y deja el costo intacto", async ({ page }) => {
     await page.goto("/panel/rentabilidad", { waitUntil: "domcontentloaded" })
-    await dismissToolGuide(page)
+    await expectToolGuideClosed(page)
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
 
     const slider = page.getByRole("slider", { name: "Ajustar precio de venta" })

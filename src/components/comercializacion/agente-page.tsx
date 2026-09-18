@@ -541,7 +541,7 @@ function DraftModal({
           onChange={(e) => setText(e.target.value)}
         />
         {!draft.whatsapp && (
-          <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+          <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
             ⚠️ Este prospecto no tiene número de WhatsApp registrado. Agrégalo
             en su ficha antes de enviar.
           </p>

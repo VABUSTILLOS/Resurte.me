@@ -1,5 +1,5 @@
 /**
- * Registro de proveedores de punto de venta (Fase 7, nivel Diamante).
+ * Registro de proveedores de punto de venta (Fase 7, sin candado de nivel).
  *
  * Núcleo **puro**: describe qué es cada proveedor, qué credenciales pide y qué
  * sabe hacer. No hace red ni toca Supabase, así que el panel, el validador y
@@ -11,6 +11,12 @@
  * cambiar un booleano más el adaptador — no rehacer la superficie. Fingir una
  * sincronización produciría un menú desincronizado en silencio, que es peor
  * que no ofrecerla.
+ *
+ * Y precisamente porque **ninguno** está implementado, la capacidad no tiene
+ * candado de nivel (`pos_integraciones` es la única en `Verde`; ver
+ * `FEATURE_MIN_TIER`). El candado existe para cobrar lo que cuesta operar; hoy
+ * no hay nada que operar, así que pedir Diamante por esto sería cobrar por una
+ * hoja de ruta. Cuando el primer adaptador exista, el nivel sube con él.
  *
  * El camino de entrada sin credenciales sigue siendo la importación CSV de
  * `/panel/foodos/menu`, que ya existía antes de esta fase.

@@ -11,6 +11,7 @@
 --   · 00032 → whatsapp_messages.store_id DEFAULT default_order_store_id()
 --   · 00033 → addresses.guest_token (+ índice)
 --   · 00052 → profiles.role, crm_prospects, crm_activities, orders.seller_id
+--            (orders.seller_id se elimina en 00189: nunca se escribió)
 --   · 00053 → panel_dishes
 --
 -- Esta migración NO introduce esquema nuevo: re-afirma, de forma idempotente,

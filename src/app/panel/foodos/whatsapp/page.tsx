@@ -292,7 +292,7 @@ export default function WhatsAppPage() {
                     setConnection(null)
                     setAccessToken("")
                   }}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-red-200 text-red-700 text-sm font-semibold hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4" /> Desconectar
                 </button>
@@ -398,7 +398,7 @@ export default function WhatsAppPage() {
           <button
             onClick={handleSync}
             disabled={syncing || connection?.status !== "connected" || curated.length === 0}
-            className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#25D366] text-white text-sm font-bold hover:bg-[#1fb857] disabled:opacity-40"
+            className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#0F7A3D] text-white text-sm font-bold hover:bg-[#0B5C2E] disabled:opacity-40"
           >
             {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Sincronizar catálogo a WhatsApp

@@ -63,7 +63,7 @@ export function RepurchaseCouponBanner() {
             activeCoupon.code.startsWith("EXTRA-") ? "reactivation" : "post_purchase"
           )
         }}
-        className="shrink-0 rounded-lg bg-white px-4 py-2 text-sm font-bold text-orange-600 transition-colors hover:bg-amber-50"
+        className="shrink-0 rounded-lg bg-white px-4 py-2 text-sm font-bold text-orange-700 transition-colors hover:bg-amber-50"
       >
         Aplicar
       </button>

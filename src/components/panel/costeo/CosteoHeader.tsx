@@ -38,7 +38,7 @@ export default function CosteoHeader({
           {dishCount > 0 && (
             <button
               onClick={onExportCsv}
-              className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
               title="Exportar platillos del filtro activo a CSV"
             >
               <Download className="w-3.5 h-3.5" />

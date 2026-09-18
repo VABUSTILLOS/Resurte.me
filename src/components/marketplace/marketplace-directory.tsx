@@ -85,7 +85,7 @@ export function MarketplaceDirectory({ entries }: Props) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Busca restaurante, platillo, cocina o ciudad…"
-              className="w-full rounded-2xl bg-white pl-12 pr-4 py-4 text-gray-800 text-base shadow-lg placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-white/30"
+              className="w-full rounded-2xl bg-white pl-12 pr-4 py-4 text-gray-800 text-base shadow-lg placeholder:text-gray-500 focus:outline-none focus:ring-4 focus:ring-white/30"
             />
           </div>
         </div>

@@ -36,7 +36,7 @@ export default function ConfirmImportModal({ confirmImport, onCancel, onConfirm 
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-700 text-white hover:bg-emerald-700 transition-colors"
           >
             {t("planificador.confirmOverwrite")}
           </button>

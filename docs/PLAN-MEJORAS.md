@@ -27,7 +27,8 @@
 > hardware— o de trabajo que aún no toca. El detalle está en las actas de las
 > rondas 20 y 21, más abajo.
 >
-> Convenciones: ✅ implementada · 🔜 backlog priorizado. Los **IDs de fila** se
+> Convenciones: ✅ implementada · 🟡 resuelta a medias, con la parte que queda
+> abierta nombrada en la propia fila · 🔜 backlog priorizado. Los **IDs de fila** se
 > acotan **por sección** —el `A14` de §8 no es el `A14` de la Ronda 13, y es a
 > propósito—: un puntero desnudo («ver la fila X») solo resuelve si la fila está
 > en su propia sección o si su ID es único en todo el documento; si el ID se
@@ -250,7 +251,7 @@ que el restaurante ya gana comprando, no con una suscripción.
 
 | # | Fase | Estado |
 |---|---|---|
-| PF1 | **Entitlements por nivel** (fases 0–1). `src/lib/foodos-entitlements.ts` es la fuente única: `marketing_ia` (Plata), `flotilla` (Oro), `mesero_ia`/`wallet_passes`/`app_marca`/`sitio_ia`/`pos_integraciones`/`catering` (Diamante). El nivel se **computa en vivo** desde las semanas calificadas (`computeWeekProgress`, `America/Mexico_City`, ≥ $2,500 MXN) y solo se persisten los overrides de admin (`foodos_entitlement_overrides`, migración `00120`). Contrato de gates: **una escritura lanza** (`requireFoodosFeature()`, primera línea), **una lectura degrada** (`canUseX()` → `[]`/`null`). El gate por rol sigue aplicando **además** | ✅ |
+| PF1 | **Entitlements por nivel** (fases 0–1). `src/lib/foodos-entitlements.ts` es la fuente única: `marketing_ia` (Plata), `flotilla`/`pos_mostrador`/`comandero` (Oro), `mesero_ia`/`wallet_passes`/`app_marca`/`sitio_ia`/`catering` (Diamante) y `pos_integraciones` en **Verde** —sin candado, porque no hay adaptador que cobrar (ver `RD1`). El nivel se **computa en vivo** desde las semanas calificadas (`computeWeekProgress`, `America/Mexico_City`, ≥ $2,500 MXN) y solo se persisten los overrides de admin (`foodos_entitlement_overrides`, migración `00120`). Contrato de gates: **una escritura lanza** (`requireFoodosFeature()`, primera línea), **una lectura degrada** (`canUseX()` → `[]`/`null`). El gate por rol sigue aplicando **además** | ✅ |
 | PF2 | **Capa de IA compartida** (fase 1). `src/lib/ai/llm.ts` + `src/lib/ai/budget.ts` con adaptadores (OmniRoute → OpenAI/gateway compatible → Kie.ai) y una regla de oro: **`generateText` nunca lanza** — sin credenciales, sin presupuesto o con el proveedor caído devuelve plantilla determinista, así que el producto entero funciona sin ninguna variable de IA. `foodos_ai_usage` (migración `00121`) lleva el contador diario por restaurante | ✅ |
 | PF3 | **Mesero IA y Marketing IA** (fases 2–3). Mesero IA: máquina de estados de WhatsApp (`state-machine.ts`) + `src/lib/foodos-order-create.ts` como **productor único de pedidos** (lo comparten el storefront y el mesero). Marketing IA: segmentación RFM (`foodos-rfm.ts`), copy por capacidad y `src/lib/messaging/{channel,sms,send}.ts`. La IA solo reescribe el tono: **nunca fija precios ni publica sola** | ✅ |
 | PF4 | **Flotilla, Wallet, sitio IA/PWA, POS y catering** (fases 4–7). Flotilla con asignación por turno/cupo/carga y adaptador de reparto externo (`src/lib/flotilla/provider.ts`); tarjeta de lealtad Apple/Google; sitio IA con páginas que nacen en `draft` y el dueño aprueba (`approved_at`); PWA de marca por restaurante (`/r/[slug]/manifest.webmanifest`); POS con registro de adaptadores y reconciliación; catering por volumen con el total decidido en el servidor. Cada capacidad lleva su propia migración (`00122`–`00130`) | ✅ |
@@ -1191,10 +1192,10 @@ e2e/keyboard.spec.ts` → verde. El contrato recorre 391 archivos en ~1,1 s.
 
 | # | Deuda | Estado |
 |---|---|---|
-| A14 | **`framer-motion` sin `MotionConfig` en 20 archivos ajenos** al perímetro de esta ronda (`src/app/panel/foodos/**`, `src/app/recompensas/**`, `src/components/auth/**`). R6 los cuenta y los excluye por perímetro; la deuda es real y es de la otra sesión | 🔜 |
-| A15 | **Un sitio con foco sin indicador, ajeno**: `src/app/recompensas/_components/InvoiceScannerScreen.tsx:468`. R1 lo detecta y lo excluye. Mismo arreglo de una línea que los 9 de esta ronda | 🔜 |
+| A14 | **`framer-motion` sin `MotionConfig`**: remedido por AST en la Ronda 23. Son **19 archivos** (no 20) y **todos** viven en `src/app/recompensas/_components/**`; las otras dos carpetas que citaba la fila (`src/app/panel/foodos/**`, `src/components/auth/**`) tienen **cero**. Y **no eran deuda**: `src/app/recompensas/page.tsx` monta `MotionConfig reducedMotion="user"` envolviendo todos sus usos, así que los 19 lo heredan. Lo que sí faltaba era que esa cobertura estuviera **verificada**: `AJENOS` excluye `recompensas` del perímetro, de modo que borrar ese `MotionConfig` no habría roto ningún test. Ahora es contrato — `COBERTURA_MOTION` + `R6b`/`R6c` en `src/lib/a11y-static.contract.test.ts`, con 6 pruebas nuevas que incluyen el fixture de un hijo sin cobertura propia ni ancestro declarado | ✅ |
+| A15 | **Un sitio con foco con indicador insuficiente, ajeno**: `src/app/recompensas/_components/InvoiceScannerScreen.tsx:466`. La regla de foco lo detectaba y lo excluía por ser archivo ajeno. **Medido en la Ronda 23: sí era real, pero la redacción "sin indicador" era inexacta** — el indicador vivía en el contenedor (`focus-within:border-brand-500/50`), que compuesto sobre blanco da **2.19:1**, por debajo del 3:1 de WCAG 1.4.11, y solo cambiaba **1.59:1** respecto al borde sin foco (`cream-300`). Arreglado con el patrón que el propio repo ya usaba (`src/components/search/search-bar.tsx:82`): borde a opacidad completa + anillo → **5.2:1**. Barrido el repo entero: es el único indicador de foco con alfa baja | ✅ |
 | A16 | **Contraste de `/admin/**`**: axe sigue sin mirarlos y B36/B37 cubrían solo `/admin/productos`. **Cerrado para `/admin/**` en la ronda 15** con un contrato estático por AST sobre los 50 archivos restantes (`src/lib/admin-contrast.contract.test.ts`, 12 pruebas). Queda fuera `/panel/**`, que se declara abajo como CX1 | ✅ |
-| A17 | **`iconOnlyButton` (113) y `inputNoName` (135)** medidos por AST y **deliberadamente fuera del contrato**: su tasa de falsos positivos es alta (iconos con `title`, inputs con `htmlFor`+`id` o dentro de un `<label>`), y congelar una línea base ruidosa consagra el ruido. Se declaran medidos, no aprobados | 🔜 |
+| A17 | **`iconOnlyButton` (113) e `inputNoName` (135)** medidos por AST y **deliberadamente fuera del contrato**: «su tasa de falsos positivos es alta (iconos con `title`, inputs con `htmlFor`+`id` o dentro de un `<label>`)». **Remedido en la Ronda 23 (`a7`), y la fila estaba mal en las dos cifras y en las dos razones.** *Controles*: no son 113, son **25**, y los 25 son **verdaderos positivos** (inspeccionados uno a uno). Los falsos que la fila atribuía a «iconos con `title`» venían de tres formas que un detector que lee el AST —y no la cadena de texto— sí distingue: `aria-label={t("…")}` (una **expresión** no es un nombre ausente), texto pintado por expresión (`{copiado ? "copiado" : "copiar"}`, `{t("common.save")}`) y props por spread. Corregidas las tres, los 25 se arreglaron con `aria-label` (23 literales + 2 `t("common.*")`) y **`R7` los congela en cero** con tolerancia cero, más 7 pruebas de detector. *Campos*: no son 135, son **193**. Aquí la fila acierta en el fondo —el nombre puede venir de un `<label htmlFor>` en otro nodo, de lo que renderice un componente contenedor (`<Field label=…>`) o de un spread, y ninguna de las tres se resuelve sin salir del archivo— pero no sirve para congelar: de los 193, **79** son ruido por esas vías y **114** quedan limpios, y al triar los 79 aparecieron **defectos reales mezclados** (un `<label>` **hermano** sin `htmlFor` no asocia nada y el heurístico lo daba por nombrado). Congelar consagraría el ruido en las dos direcciones: un defecto nuevo disfrazado de ruido no subiría el total, y los 79 se absolverían sin mirarlos. Queda **medido, con las vías de falso positivo enumeradas y sin contrato**, y la razón escrita en la cabecera de `src/lib/a11y-static.contract.test.ts` | 🟡 |
 
 ### Ronda 14 — La máquina de estados y quien la pinta
 
@@ -1398,20 +1399,20 @@ texto secundario legítimo. La decisión #6 del contrato lo deja escrito.
 
 | # | Deuda | Estado |
 |---|---|---|
-| CX1 | **`/panel/**` sin cobertura de contraste**: es el resto de A16. El perímetro del contrato es `/admin/**`; el panel de negocio usa la misma paleta y no tiene contrato propio | 🔜 |
-| CX2 | **A14 obsoleta**: los 28 imports / 9 `MotionConfig` que declaraba ya no coinciden con el árbol. O se remide o se retira la fila | 🔜 |
-| CX3 | **A15 sigue real y se movió**: `src/app/recompensas/_components/InvoiceScannerScreen.tsx:474`. Arreglo de una línea, archivo ajeno | 🔜 |
+| CX1 | **`/panel/**` sin cobertura de contraste**: es el resto de A16. El perímetro del contrato era `/admin/**`; el panel de negocio usaba la misma paleta y no tenía contrato propio. **Cerrado en la Ronda 23 (`a1`)**: existe `src/lib/panel-contrast.contract.test.ts` con perímetro propio sobre `src/app/panel` (recursivo, incluye `foodos/**`) y 13 pruebas. La matemática no se copió —se extrajo a `src/lib/contrast.ts`, de donde ahora beben los dos contratos, porque dos copias de la misma matemática divergen y la segunda es la que nadie revisa—. Medición de partida: **475 pares en 48 archivos, 60 por debajo de 4.5:1**, más dos afordancias muertas que resultaron ser falsos positivos (declarados en `VARIANTES_DE_INHIBICION`); **51 arreglos aplicados**. Tres decisiones quedaron escritas para que no se re-litiguen: `text-emerald-600` (3.65 sobre blanco) **no** se prohíbe en bloque sino que se caza donde falla, los neutros **no** se prohíben aquí (su deuda es del repositorio y la posee `a4`) pero sí se les pone un **trinquete** de una sola dirección, y los rellenos **sí** se prohíben sin exenciones —las barras de gráfico que los usaban se oscurecieron a `-700` en vez de exentarse, para que la prohibición no necesite ninguna excepción copiable mal—. Los rellenos de gráfico, que `medirPares` no ve porque no forman par texto/fondo, se miden aparte contra WCAG 1.4.11 (3:1) sobre las dos superficies reales de `/panel`: la tarjeta y el carril | ✅ |
+| CX2 | **A14 obsoleta**: los 28 imports / 9 `MotionConfig` que declaraba ya no coinciden con el árbol. O se remide o se retira la fila. **Remedida en la Ronda 23**: 28 imports reales por AST en total y **19 sin `MotionConfig` propio**, todos en `src/app/recompensas/_components/**` y cubiertos por el `MotionConfig` del padre. Ni eran deuda ni eran 20 archivos en tres carpetas: fila corregida en §8 y la cobertura heredada convertida en contrato (`R6b`/`R6c`) | ✅ |
+| CX3 | **A15 sigue real y se movió**: `src/app/recompensas/_components/InvoiceScannerScreen.tsx:474`. Arreglo de una línea, archivo ajeno. **Resuelto en la Ronda 23**: el indicador existía pero medía 2.19:1 (bajo el 3:1 de 1.4.11); ahora usa el patrón de `src/components/search/search-bar.tsx:82` y mide 5.2:1 | ✅ |
 | CX4 | **Integridad del propio documento**: el contrato leía las filas como **una lista global** y el documento acota los IDs **por sección**. Medido en la Ronda 17: los «26 IDs duplicados» eran en realidad **46 IDs reutilizados entre secciones a propósito** con **cero colisiones dentro de una misma** —el defecto era el diagnóstico, no el documento—; lo que sí era real son las **17 filas de rango** (`A1-A8`, `BL1-BL10`…) que expanden a **82 filas** invisibles al contrato. Cerrado: el contrato expande rangos, resuelve por sección, exige calificar el ID ambiguo y vigila duplicados intra-sección y solapes rango/fila | ✅ |
-| CX5 | **R1 con un hueco**: `ring-0` y `border-transparent` no cuentan como indicador de foco para el contrato estático | 🔜 |
-| CX6 | **Fallo latente en la paleta propia**: `warm-400` (`#8F939B`) da **3.08** sobre blanco y **2.95** sobre `gray-50`; `cream-600` (`#999893`) da **2.89** y **2.77**. Ninguno se usa hoy como texto en `/admin`, así que no hay fallo vivo — pero el día que se use, falla | 🔜 |
-| CX7 | **El verde de WhatsApp**: `#25D366` da **1.98:1** con texto blanco. Es el color de marca del canal y por eso se declaró en vez de prohibirse; el barrido lo movió a `#0F7A3D` (**5.42**) donde se usa como relleno con texto | 🔜 |
-| CX8 | **654 `text-gray-400` fuera del perímetro** en todo `src/**` (0 en `/admin` propio, 27 en los 5 archivos ajenos). Fuera de política, sin contrato que lo mida | 🔜 |
-| CX9 | **775 `text-gray-500` en todo `src/**`** (281 en `/admin`). El contrato los mide por par donde tiene perímetro; fuera de él, nadie | 🔜 |
+| CX5 | **R1 con un hueco**: `ring-0` y `border-transparent` no cuentan como indicador de foco para el contrato estático. **Cerrado en la Ronda 23** (`a2`): `VALOR_SIN_PINTURA` (`src/lib/a11y-static.contract.test.ts:229-230`) ya cubre `ring-0`, `ring-[0px]`, `ring-transparent`, `border-0`, `border-[0px]`, `border-transparent`, `bg-transparent`, `shadow-none`, `outline-none`, `outline-transparent`…, y el detector se reescribió con `ultimaVariante()`/`VARIANTE_PROPIA`/`pintaFoco()`. Medido: **0 apariciones de `focus-within:bg-*`** y una sola de `focus-within:ring-0`, que resultó falso positivo (el `focus:ring-2` sí pinta) | ✅ |
+| CX6 | **Fallo latente en la paleta propia**: `warm-400` (`#8F939B`) da **3.08** sobre blanco y **2.95** sobre `gray-50`; `cream-600` (`#999893`) da **2.89** y **2.77**. Ninguno se usa hoy como texto en `/admin`, así que no hay fallo vivo — pero el día que se use, falla. **Remedido y cerrado en la Ronda 23** (`a3`): no era solo latente, había **4 usos vivos** — `text-warm-400` como `placeholder:` sobre `bg-white` en `src/app/recompensas/_components/CheckoutFlowScreen.tsx:350,374,393,412` (**3.08:1**) → sustituidos por `warm-500` (**4.56**). `cream-600` sigue en 0 usos. La matemática vive ahora en `src/lib/contrast.ts` (`SUPERFICIES_CLARAS`, `PALETA_LATENTE`) y la guarda en `src/lib/latent-palette.contract.test.ts`, que barre los **489 archivos `.tsx` de `src/**`** con `contarToken` (6 pruebas; probado revirtiendo un uso: reporta `CheckoutFlowScreen.tsx: 1`) | ✅ |
+| CX7 | **El verde de WhatsApp**: `#25D366` da **1.98:1** con texto blanco. Es el color de marca del canal y por eso se declaró en vez de prohibirse; el barrido lo movió a `#0F7A3D` (**5.42**) donde se usa como relleno con texto. **Verificado en la Ronda 23**: quedan **13 apariciones de `25D366`** y ninguna es relleno con texto — `hover:border-[#25D366]` (`contact/page.tsx:168`), `border-[#25D366]/20 bg-[#F2FBF5]` y `hover:border-[#25D366]/40` (`admin/whatsapp/page.tsx:1500,1535,1784`), tintes `bg-[#25D366]/15` (`dashboard-page.tsx:92`, `whatsapp-templates.tsx:85`) y `hover:bg-[#25D366]/10`; el único relleno con texto ya usa `#0F7A3D` (`product-detail-client.tsx:370`). El resto son las listas de prohibición de los dos contratos | ✅ |
+| CX8 | **654 `text-gray-400` fuera del perímetro** en todo `src/**` (0 en `/admin` propio, 27 en los 5 archivos ajenos). Fuera de política, sin contrato que lo mida. **Barrido y cerrado en la Ronda 23 (`a4`)**: 191 fallos crudos en todo `src/**`, **162 falsos positivos**, **29 exentos** y **`aArreglar=0`** — los 654 se habían contado sin medir el par, y medido no queda ninguno vivo. El trabajo real estaba en las **110 + 11 ediciones** (111 archivos) que hicieron falta para llegar a ese cero, y sobre todo en las **4 reglas de exención** que particionan los 29 últimos sin solape ni resto (`control-inactivo-por-variante` 3, `control-inactivo-por-rama` 4, `relleno-translucido` 20, `color-de-ejecucion` 2). Contrato: `src/lib/neutral-contrast.contract.test.ts`, 8 pruebas, con presupuestos exactos por regla y tres aserciones complementarias (ningún vivo, suma exacta, ninguna regla muerta) | ✅ |
+| CX9 | **775 `text-gray-500` en todo `src/**`** (281 en `/admin`). El contrato los mide por par donde tiene perímetro; fuera de él, nadie. **Cerrado con CX8 en la Ronda 23 (`a4`)**: la medición por par cubre ahora `src/**` entero (`pares=2459`, `sinHex=0`) y el barrido destapó **dos defectos estructurales del propio medidor**, los dos silenciosos. (1) `RE_VARIANTE` no incluía `placeholder:`, de modo que todo `placeholder:text-*` era **invisible**: había **15 pares, 10 en fallo** (cuatro `placeholder:text-gray-400` → `gray-500`, un `gray-300`, cinco hex). (2) La familia `neutral` **no estaba en `PALETA`** porque Tailwind v4 escribe los acromáticos como `oklch(70.8% 0 none)` —hue literal `none`— y el patrón exigía `[\d.]+`: **13 pares descartados en silencio**, uno de ellos **vivo** (`wallet-card-view.tsx:209`, `text-neutral-500` sobre `bg-neutral-100` = **4.35**, corregido a `neutral-600` = 6.16). Un medidor que se salta en silencio lo que no entiende no es un medidor: ahora `numeroOklch()` acepta `none` y `medirPlaceholders()` cierra el hueco de `placeholder:` | ✅ |
 
 **Verificación final medida.** `npx tsc --noEmit` → **0** ·
-**`npm test` → 333 archivos / 5687 pruebas, 0 en rojo** · `npm run build` → exit 0
-· los cuatro contratos de esta superficie (`admin-contrast` 12, B36 13,
-`a11y-static` y `docs-pointers`) → **51 pruebas, 0 en rojo**.
+**`npm test` → 367 archivos / 6408 pruebas, 0 en rojo** · `npm run build` → exit 0
+· los cuatro contratos de esta superficie (`admin-contrast` 12, `admin-productos-contrast`
+13, `a11y-static` 37 y `docs-pointers` 9) → **71 pruebas, 0 en rojo**.
 
 **Dos gates en rojo, y los dos son de otro.** `npm run knip` dio exit 1 a mitad de
 ronda con 3 exports sin consumidor en `src/lib/foodos-moderation.ts:92/148/153`;
@@ -1939,11 +1940,11 @@ contenido del mensaje de error.
 
 | # | Deuda | Estado |
 |---|---|---|
-| CRM1 | **`orders.seller_id` existe y ninguna ruta la escribe.** El aviso de `00155:39` se confirmó: usarla para atribuir comisión daría **cero siempre**. El camino del dinero es `crm_prospects.user_id → orders.user_id` y así se dejó | 🔜 |
+| CRM1 | **`orders.seller_id` existía y ninguna ruta la escribía.** El aviso de `00155:39` se confirmó: usarla para atribuir comisión daría **cero siempre**. El camino del dinero es `crm_prospects.user_id → orders.user_id` y así se dejó. **Cerrada en la ronda 23** eliminando la columna (`00189`): su único efecto real era la segunda FK `orders → profiles`, causa del `PGRST201` de los embeds | ✅ |
 | CRM2 | **`getProspectClientOrders` limitaba a 50 pedidos.** Las ventas y la comisión salían de las **mismas 50 filas** de la lista, así que a partir del pedido 51 el ingreso quedaba **subestimado en silencio** —con la etiqueta prometiendo «histórico»—. El total se separó de la lista: `scanPaidRevenue` (`src/lib/comercializacion/actions/vinculos.ts`) escanea el historial con la ventana alta y la **fila de más** de `readCrmPipelineValue` (`CRM_REVENUE_SCAN_LIMIT`), y si el historial no cupiera la cifra se pinta como **mínimo** (`≥ $X`, `formatMeasuredAmount`), nunca como total | ✅ |
-| CRM3 | **No se puede verificar RLS real en producción**, solo lo que declaran las migraciones. `crm_tasks` tiene RLS encendida y **0 políticas**: el acceso depende de que todo pase por `createServiceClient()` | 🔜 |
+| CRM3 | **No se puede verificar RLS real en producción**, solo lo que declaran las migraciones. `crm_tasks` tiene RLS encendida y **0 políticas**: el acceso depende de que todo pase por `createServiceClient()`. **Cerrada en la ronda 23**: el perímetro resultó ser de **24 tablas**, no una, y su modelo de acceso quedó declarado con el archivo que lo demuestra (`rls-declared.contract.test.ts`). La parte que sigue abierta es la de arriba —**RLS real no se puede verificar desde el repo**, solo declararse— y por eso el contrato verifica la declaración, no la base | 🟡 |
 | CRM4 | **La atribución de uso de columnas salió de grep de identificadores.** Una referencia dinámica (nombre construido en runtime) podría escapar al inventario de H3 | 🔜 |
-| CRM5 | **`estimated_value` es un valor declarado, no un histórico.** El pipeline es una **foto**, no una tendencia: no se puede responder "¿cuánto valía el pipeline el mes pasado?" | 🔜 |
+| CRM5 | **`estimated_value` es un valor declarado, no un histórico.** El pipeline es una **foto**, no una tendencia: no se puede responder "¿cuánto valía el pipeline el mes pasado?". **Cerrada en la ronda 23 declarando la limitación, no construyendo la serie** (una tabla de snapshots sin lector sería superficie muerta); `crm-forecast.contract.test.ts` (15) la hace falsable | ✅ |
 | CRM6 | **El motivo de pérdida no se puede exigir retroactivamente.** Las filas históricas en `perdido` no lo tienen y el `CHECK` lo permite a propósito; cualquier métrica por motivo tendrá denominador parcial | 🔜 |
 
 **Lección.** El CRM no estaba a medio construir: estaba **construido y sin boca ni
@@ -2000,7 +2001,7 @@ contratos de test que vigilan **esta misma documentación**.
 | AU6 | **Facturación CFDI no existe.** Grep de `cfdi/timbrado/facturapi/sat/rfc` en `src/` sin resultados. Lo que el panel llama "facturas" son **tickets subidos por usuarios para ganar créditos** (`invoice_submissions`): aprobarlos acredita monedero vía `approve_invoice_submission` (00144), no timbra nada. Bloquea al restaurantero que necesita factura y depende de contratar un PAC. Nota: `docs/REPORTE-FUNCIONES-Y-MEJORAS.md` lo listaba como función existente y **quedó corregido** por esta ronda | 🔜 |
 | AU7 | **Huecos y duplicidad en la bitácora admin.** El contrato `src/lib/admin-audit.contract.test.ts` ya exigía que toda ruta mutante audite o esté exenta con motivo escrito; la excepción de `bump-affinity` era **más estrecha que la ruta** (justificaba `weight` pero no el alta ni la baja del par, que sí son merchandising) y se corrigió con `affinity_pair_create` / `_update` / `_delete`. La **duplicidad** también quedó cerrada: se retiró `src/lib/audit.ts` —el módulo legado de 4 acciones que espejaba en `notifications`— y `/api/admin/audit-log` ahora lee `admin_audit_log`, el mismo libro que la pestaña de `/admin/bitacoras`. Retirarlo destapó **dos huecos que solo el legado cubría**: la **asignación de repartidor** no tenía equivalente en el catálogo nuevo (`order_driver_assigned` / `order_driver_unassigned`, añadidas con test) y `product_images_update` / `products_seed` quedaron sin escritor al retirar los endpoints de `AU8` (eliminadas de `AUDIT_ACTIONS`). Un registro que no registra todo no es un registro | ✅ |
 | AU8 | **Dos endpoints admin no usaban `requireAdmin()`.** `seed-products` y `update-images` se protegían con token de entorno (`SEED_API_TOKEN` / `ADMIN_API_SECRET`, fail-closed) y llevaban datos hardcodeados de un solo uso. Violaban el invariante #1 de `docs/agents/admin.md:11-12`. Eran scripts, no features: **retirados** en la Ronda 20 | ✅ |
-| AU9 | **El CRM tiene el ciclo de retroalimentación roto.** Son las seis filas `CRM1`–`CRM6` que declaró la ronda 18. Una quedó cerrada: **`CRM2`** —las ventas y la comisión del cliente vinculado se calculaban sobre las 50 filas de la lista, no sobre el historial— se separó la medición de la presentación (`scanPaidRevenue` + `formatMeasuredAmount`, con `≥` cuando el historial no cabe en la ventana). Siguen abiertas `CRM1` (`orders.seller_id` sin escritor), `CRM3` (`crm_tasks` con **0 políticas RLS**), `CRM4` (atribución de uso por grep), `CRM5` (`estimated_value` es foto, no histórico) y `CRM6` (motivo de pérdida no retroactivo). La ronda 18 le dio boca y manos; todavía no le dio memoria | 🔜 |
+| AU9 | **El CRM tiene el ciclo de retroalimentación roto.** Son las seis filas `CRM1`–`CRM6` que declaró la ronda 18. Tres quedaron cerradas. **`CRM2`** —las ventas y la comisión del cliente vinculado se calculaban sobre las 50 filas de la lista, no sobre el historial— se separó la medición de la presentación (`scanPaidRevenue` + `formatMeasuredAmount`, con `≥` cuando el historial no cabe en la ventana). **`CRM1`** (`orders.seller_id` sin escritor) se cerró eliminando la columna, porque el silencio no era un dato. **`CRM5`** (`estimated_value` es foto, no histórico) se cerró **declarando la limitación y no construyendo la serie**: el CRM puede decir cuánto vale el pipeline ahora y no puede decir cuánto valía el mes pasado, y esa segunda pregunta no se deriva de la primera. **`CRM3`** quedó a medias por construcción: el perímetro resultó ser de **24 tablas** con RLS y cero políticas, no una, y su modelo de acceso se declaró con evidencia (`rls-declared.contract.test.ts`); lo que sigue abierto es que **RLS real no se puede verificar desde el repo**, solo declararse. Siguen abiertas `CRM4` (atribución de uso por grep) y `CRM6` (motivo de pérdida no retroactivo). La ronda 18 le dio boca y manos; la 23 le dio memoria de lo que sabe y de lo que no | 🟡 |
 | AU10 | **La cobertura e2e es desigual y no autentica.** Sin e2e para ~10 secciones admin (bitácoras-UI, comisiones, conversion, proveedores, recompensas, seo-ia, sistema, whatsapp, dispersiones, repartidores), y el propio `docs/agents/admin.md:1247` admite que `e2e/a11y.spec.ts` **no** sirve para `/admin/*`. El repo no tiene seed ni credenciales, así que el e2e verifica guards y render, no flujos. Se suma al backlog de accesibilidad ya abierto (`A14`–`A17`, `CX1`–`CX9`) y al de flakiness (`E7`–`E11`) | 🔜 |
 
 **Lo que esta ronda desmintió.** El inventario de `docs/REPORTE-FUNCIONES-Y-MEJORAS.md`
@@ -2065,7 +2066,8 @@ comandero bajaron de Diamante a Oro. El criterio no fue "abrir más" sino
 **separar lo que hace cobrar de lo que hace escaparate**: un restaurante que no
 puede cobrar no aprovecha ninguna otra capacidad, y las dos que se bajaron son
 justo las de operar el día. `pos_integraciones` —conectar un punto de venta
-**ajeno**— se quedó en Diamante a propósito. El modo prueba ya existía y
+**ajeno**— se quedó en Diamante a propósito (hasta la **Ronda 23**, que la sacó
+del candado al comprobar que ningún adaptador está implementado: ver `RD1`). El modo prueba ya existía y
 funcionaba: el hueco real era que `preview-gates.contract.test.ts` vigilaba el
 aviso de bloqueo pero **no** el host del demo, así que un `ToolPreviewNotice` sin
 `ToolGuideHost` habría sido un botón muerto —poder *ver* lo que no se puede
@@ -2351,6 +2353,216 @@ y la suite `@ci` completa en **443 passed / 122 skipped / 0 failed**, con el
 calentamiento ampliado de 72 a 83 rutas sin tocar su presupuesto (120 s × 5
 sigue por debajo del timeout de 25 min del job). El e2e autenticado queda
 declarado como bloqueado por credenciales.
+
+### Ronda 23 — El arnés que mentía y los medidores que se saltaban lo que no entendían
+
+**Origen.** El usuario pidió una auditoría de estatus —qué funciona y qué no, en
+`/panel` y en `/admin`— porque el sitio le resultaba opaco. La auditoría
+(`docs/AUDITORIA-ESTATUS.md`, 54 superficies) produjo el mapa; este documento
+produjo el orden. La ronda ataca lo que la auditoría marcó como crítico, y lo
+ataca en un orden deliberado: **primero el arnés de pruebas, después las
+mediciones**. No por elegancia, sino porque en esta ronda se comprobó dos veces
+que un medidor puede mentir en silencio, y que un arnés roto hace que todo lo
+demás sea fe. Arreglar el sitio con un arnés que miente es cambiar números sin
+cambiar nada.
+
+**Oleada B — el arnés.** Cuatro entregas, y la cuarta se llevó el tiempo.
+
+- **`b1` — el consentimiento y la guía se pisaban.** El aviso de cookies y el
+  panel de guía de la herramienta podían estar abiertos a la vez, y el
+  consentimiento —que es obligación legal— perdía. El contrato de flotantes ya
+  había arreglado el pill; lo roto era el **drawer** (`z-[90]`) y su backdrop.
+  Se extrajo `src/lib/cookie-consent.ts` (la decisión, pura y testeable), se
+  refactorizó el componente y se reescribió `use-tool-guide.ts` para que la guía
+  **ceda** ante el consentimiento. El renombre `dismissToolGuide` →
+  `expectToolGuideClosed` no es cosmético: el nombre viejo afirmaba una
+  intención y el nuevo afirma un **resultado observable**, que es lo que el test
+  comprueba. Cuatro capas de prueba (8 unitarias, 8 de contrato, 4 de e2e).
+- **`b2`/`b3` — el arnés de e2e corría contra un servidor compartido.** `distDir`
+  configurable, `/.next*/` en `.gitignore`, `NEXT_DIST_DIR` y `workers` en
+  `playwright.config.ts`, `reuseExistingServer: false`, puerto propio (`3210`) y
+  `tsconfig.json` con `"references": []` para que Next deje de añadir entradas.
+  Los workers bajaron de 4 a **2**: no es prudencia, es que con 4 el
+  calentamiento **corrompía** el `prerender-manifest.json`.
+- **`b4` — la migración del e2e a `next build` + `next start`.** El e2e corría
+  sobre `next dev`, y `next dev` tenía dos problemas medidos: corrompía el
+  manifest (arriba) y **crecía ~7 MB/s hasta los 6.6 GB** en una máquina de
+  16 GB con swap al 85 % —el mismo `next build` pide **216 MB** y tarda 50,2 s,
+  treinta veces menos—. La migración se implementó (`build:e2e`, `SERVER_MODE`,
+  `ES_PROD`, `command`/`timeout` condicionales) y **falló: 10 rojos de 11 en
+  5m32s**. La cadena de sondas que encontró la causa es el contenido real de esta
+  entrega: `example.com` **se colgaba** y `about:blank` no; `page.setContent`
+  también se colgaba, así que no era la red ni el JS; un `TMPDIR` fresco lo
+  arreglaba. La causa: **168 perfiles `playwright_chromiumdev_profile-*` zombis**
+  acumulados en el `$TMPDIR` del sistema, que hacían que Chromium se quedara
+  esperando con **CPU al 0 %** y sin error. El arreglo es un `TMPDIR` propio
+  purgado en cada arranque, exportado desde `playwright.config.ts`. Re-validado:
+  **11 passed en 1,4 min**. La firma —`domcontentloaded` a los 42 ms, `evaluate`
+  OK a los 42 ms, colgado a los 200–1500 ms, CPU 0 %— queda escrita porque
+  distingue esta avería de las otras cuatro que se midieron en la ronda.
+
+**Oleada A — las mediciones.** Ocho entregas. La moraleja se repite: **casi todos
+los números del backlog eran falsos**, y los que no lo eran estaban sin medir.
+
+- **`a1` — contraste de `/panel`.** El contrato de contraste existía para
+  `/admin` y no para el panel del restaurantero. Se extrajo la matemática WCAG a
+  `src/lib/contrast.ts` (el contrato de admin pasó de 720 a ~318 líneas sin
+  perder una prueba) y se midió: **48 archivos, 475 pares, 60 fallos AA** y dos
+  afordancias muertas que resultaron ser falsos positivos (hoy declarados en
+  `VARIANTES_DE_INHIBICION`). **51 arreglos aplicados**, con un aplicador que
+  exige unicidad antes de escribir. Nace `panel-contrast.contract.test.ts`
+  (13 pruebas) con un **ratchet** de deuda (`DEUDA_NEUTROS`) que impide que los
+  grises vuelvan a subir aunque no se exija el cero hoy.
+- **`a2` — el hueco de foco.** 256 `outline-none` en el perímetro y **cero**
+  `focus-within:bg-*` reales: el anillo de foco se apagaba sin poner nada en su
+  lugar. El detector se reescribió con `ultimaVariante()`, `VARIANTE_PROPIA`,
+  `VALOR_SIN_PINTURA` y `pintaFoco()` —porque `focus-within:ring-0` **no** es un
+  fallo si después una variante propia sí pinta— y ganó 4 pruebas.
+- **`a3` — la paleta latente.** `warm-400` mide **3,08** sobre blanco: falla AA.
+  No era un token muerto: tenía **4 usos reales**, todos como `placeholder:` en
+  `CheckoutFlowScreen.tsx:350,374,393,412`. Pasaron a `warm-500` (4,56). La
+  prueba de vida del contrato se hizo plantando el token a mano y viendo fallar
+  la guarda.
+- **`a4` — la política de grises (`CX8`/`CX9`).** El barrido completo de
+  `src/**` dio **191 fallos crudos → 162 falsos positivos → 29 exentos →
+  `aArreglar=0`**, con **110 + 11 ediciones** en 111 archivos y **4 reglas de
+  exención** que particionan los 29 sin solape ni resto (`control-inactivo-por-variante`
+  3, `control-inactivo-por-rama` 4, `relleno-translucido` 20, `color-de-ejecucion`
+  2). El contrato `neutral-contrast.contract.test.ts` (8 pruebas) exige tres
+  cosas a la vez: que no quede ningún vivo, que cada regla gaste **exactamente**
+  su presupuesto, y que ninguna regla quede muerta.
+- **`a5`/`a6`/`a7` — las tres filas que estaban mal.** `A14` decía que los
+  archivos de `recompensas` no estaban cubiertos por `MotionConfig`; medido por
+  AST son **20 archivos, 19 con import real**, todos bajo el `MotionConfig` del
+  padre —y `AJENOS` excluía `recompensas`, así que la regla `R6` **no los veía**:
+  el contrato era ciego al directorio y la fila describía esa ceguera como
+  hallazgo—. `A15` sí era un fallo vivo: `InvoiceScannerScreen.tsx:466` tenía
+  `focus-within:border-brand-500/50` a **2,19:1** (bajo el 3:1 de componentes);
+  quedó en **5,2:1** con el patrón ya usado en `search-bar.tsx`. Y `A17` —la fila
+  que decía que los dos detectores de nombre accesible tenían «tasa de falsos
+  positivos alta» y los declaraba **medidos, no aprobados**— resultó ser cierta al
+  medirla y **falsa tras corregir el detector**: no eran 113 botones sin nombre
+  sino **25**, y los 25 eran verdaderos. Los falsos venían de tres formas que un
+  detector que lee el AST sí distingue y uno que lee la cadena de texto no
+  (`aria-label={t("…")}`, texto pintado por expresión, props por spread). Los 25
+  se arreglaron con `aria-label` y **`R7` los congela en cero** con tolerancia
+  cero. Los campos sí se quedan medidos y sin contrato —**193**, no 135— por una
+  razón que la fila no decía: de los 193, 79 son ruido legítimo y 114 limpios, y
+  al triar los 79 aparecieron **defectos reales mezclados** (un `<label>`
+  **hermano** sin `htmlFor` no asocia nada y el heurístico lo daba por nombrado).
+  Congelar consagraría el ruido en las dos direcciones.
+
+| # | Entrega | Estado |
+|---|---|---|
+| RB1 | **Precedencia consentimiento → guía.** `src/lib/cookie-consent.ts`, drawer y backdrop reordenados, `use-tool-guide.ts` cede. 8 + 8 + 4 pruebas en tres capas | ✅ |
+| RB2 | **Aislamiento del arnés.** `distDir` configurable, `NEXT_DIST_DIR`, `/.next*/` ignorado, `tsconfig` sin referencias basura, puerto propio 3210 | ✅ |
+| RB3 | **Workers 4 → 2 y `reuseExistingServer: false`.** Con 4 el calentamiento corrompía el `prerender-manifest.json` en la ruta 8 de 64 | ✅ |
+| RB4 | **E2E sobre `next build` + `next start`.** El cuelgue era un `$TMPDIR` con **168 perfiles de Chromium zombis**, no el servidor de producción: 10 rojos/5m32s → **11 passed/1,4 min** | ✅ |
+| RA1 | **Contraste de `/panel`.** 475 pares medidos, 60 fallos AA, 51 arreglos; `panel-contrast.contract.test.ts` (13) con ratchet de neutros | ✅ |
+| RA2 | **Hueco de foco.** Detector R1 reescrito (`ultimaVariante`, `pintaFoco`); 256 `outline-none` auditados, cero `focus-within:bg-*` reales | ✅ |
+| RA3 | **Paleta latente.** `warm-400` a 3,08 con 4 usos vivos → `warm-500` (4,56); `latent-palette.contract.test.ts` (6) | ✅ |
+| RA4 | **Política de grises (`CX8`/`CX9`).** 191 crudos → 162 falsos → 29 exentos → **0 vivos**; 121 ediciones; 4 reglas con presupuesto; `neutral-contrast.contract.test.ts` (8) | ✅ |
+| RA5 | **`A14` remedida.** 20 archivos (19 con import real), todos bajo el `MotionConfig` del padre; `AJENOS` hacía la regla `R6` ciega al directorio | ✅ |
+| RA6 | **`A15` verificada y arreglada.** `InvoiceScannerScreen.tsx:466` de **2,19:1** a **5,2:1** | ✅ |
+| RA7 | **`A17` decidida.** 76→25 botones y 1190→193 campos tras 4 ajustes de precisión; 25/25 verdaderos positivos, los 25 arreglados con `aria-label`; **`R7` congela `controles=0`**; campos medidos y **no** congelados, con la razón escrita | ✅ |
+| RA8 | **Registro.** Auditoría y filas `CX5`–`CX9`/`A17` corregidas con las mediciones de la ronda; conteo del pie actualizado | ✅ |
+| RC1 | **`orders.seller_id` eliminada.** Columna de atribución que **nadie escribió ni leyó nunca**, y cuya única consecuencia real era la segunda FK `orders → profiles` que causaba el `PGRST201` de los embeds. Migración `00189`; `orders-seller-id.contract.test.ts` (9) congela la eliminación, porque el modo de fallo es **volver a añadirla** | ✅ |
+| RC2 | **RLS sin políticas, declarada.** 24 tablas con RLS encendida y cero políticas: 9 sin un solo `COMMENT ON TABLE` y 14 con un comentario que describía la tabla pero **no quién puede leerla**. Todas se acceden con `createServiceClient()` (o por RPC restringida a `service_role`). `rls-declared.contract.test.ts` (11) exige que cada una declare su modelo de acceso **con el archivo que lo demuestra** | ✅ |
+| RC3 | **`CRM5` — el previsto es una foto, y ahora se dice.** `crm_prospects.estimated_value` no tiene histórico y el CRM **no puede** responder «cuánto valía el pipeline el mes pasado»; la pregunta no se improvisa desde la cifra de hoy. Se **declara en vez de construir la serie**: una tabla de snapshots sin lector es la superficie muerta que `00189` acaba de eliminar. `crm-forecast.contract.test.ts` (15) hace falsable la declaración — falla si aparece la serie, si `estimated_value` se duplica en otra tabla, si el módulo del dinero deja de ser puro o si vuelve a citarse `orders.seller_id` | ✅ |
+| RD1 | **POS fuera del candado de pago.** `pos_integraciones` estaba en **Diamante** —el nivel más caro— y **no hace nada**: los seis adaptadores comerciales están declarados `implemented: false` (`src/lib/pos/registry.ts`) y el webhook responde 503. Se conserva la superficie y se baja a **Verde**. La bajada de una línea no bastaba: `PUBLIC_TIER_LADDER` se deriva de `featuresForTier`, así que la escalera pública habría anunciado "Conectar tu punto de venta" **como beneficio del nivel gratuito** —y del más caro a la vez—. Se separan los dos predicados: `perksForTier` (lo que el nivel **aporta**, excluye la línea base) alimenta la escalera; `featuresForTier` (lo que el nivel **puede usar**) alimenta al admin, la adopción y el panel. El test congela la condición de subida: si algún día se implementa un adaptador, falla y obliga a subir el nivel | ✅ |
+
+**Lo que esta ronda desmintió.** Siete cosas, y las siete apuntan al mismo sitio.
+
+La primera: que el e2e estuviera roto por el servidor. La migración a
+producción era correcta y **el fallo estaba en el sistema operativo**, en un
+directorio temporal con 168 perfiles zombis. Costó seis sondas porque el síntoma
+—Chromium colgado con CPU al 0 % y sin error— no se parece a ninguna causa
+conocida.
+
+La segunda: que `next dev` fuera lento. No era lento, era **insaciable**: ~7 MB/s
+hasta 6.6 GB. La firma que lo separa de un servidor caído está escrita arriba,
+porque los dos se ven igual desde el test.
+
+La tercera: que el `prerender-manifest.json` se corrompiera por un bug de Next.
+Lo corrompía **el propio calentamiento** con `CONCURRENCY = 4`; con 1 no falla
+nunca (64 rutas, 168,7 s). Y Next escribe ese archivo **sin truncar**, así que un
+fallo a mitad deja restos y el `JSON.parse` siguiente revienta: la avería se
+**autoalimenta** y es permanente en `dev`.
+
+La cuarta, y la más incómoda: que los detectores del backlog midieran lo que
+decían medir. `A17` declaraba una tasa de falsos positivos que era cierta con el
+detector viejo y **dejó de serlo** cuando el detector se corrigió; `A14`
+describía como hallazgo la **ceguera** del contrato a `recompensas`. Y en `a4`,
+los dos defectos peores no los encontró el barrido sino la desconfianza en el
+barrido: `RE_VARIANTE` **no incluía `placeholder:`**, así que todo
+`placeholder:text-*` era invisible (**15 pares, 10 en fallo**), y la familia
+`neutral` **no estaba en `PALETA`** porque Tailwind v4 escribe los acromáticos
+como `oklch(70.8% 0 none)` —hue literal `none`— mientras el patrón exigía
+`[\d.]+`: **13 pares descartados en silencio**, uno de ellos **vivo**
+(`wallet-card-view.tsx:209`, 4,35 → 6,16). Un medidor que se salta sin avisar lo
+que no entiende no es un medidor, es una opinión con salida numérica.
+
+La quinta: que «medido» y «aprobado» fueran estados del mismo eje. No lo son.
+`A17` estaba **medida y mal**. Los campos de `a7` quedan **medidos y sin
+aprobar**, y eso es un estado legítimo y escrito: 193 con las vías de falso
+positivo enumeradas, porque congelarlos consagraría el ruido.
+
+La sexta, y la que más se parece a un patrón: que **el silencio del esquema se
+lee igual que su acierto**. `orders.seller_id` existía desde `00052`, con FK a
+`profiles` e índice propio, y **ninguna vista, RPC ni política la leía**, y
+ningún archivo de `src/` o `e2e/` la nombraba: era una columna de atribución que
+devolvía `NULL` para siempre y que invitaba a construir sobre ella una
+atribución que nunca habría funcionado. Su único efecto medible era la segunda FK
+`orders → profiles`, exactamente la causa del `PGRST201` que
+`src/lib/admin/order-selects.ts` documenta y su test vigila. Y en la misma línea,
+**24 tablas con RLS encendida y cero políticas**: deny-by-default, correcto, y
+sin una línea que dijera quién las lee — la superficie se veía idéntica con el
+permiso bien puesto que con el permiso mal puesto. En los dos casos la reparación
+fue la misma: no cambiar el comportamiento, sino **escribir la decisión donde se
+pueda verificar**. `00189` elimina la columna y el contrato congela la
+eliminación; el registro de RLS nombra las 24 tablas y el archivo que prueba cada
+acceso. La tercera cara del mismo silencio la puso `CRM5`: `estimated_value` es
+una cifra declarada **sin serie detrás**, y el CRM puede decir cuánto vale el
+pipeline hoy y no cuánto valía el mes pasado. La tentación era construir la
+tabla de snapshots; la decisión fue **no hacerlo**, porque una tabla de
+histórico sin lector es exactamente la superficie muerta que `00189` acababa de
+eliminar, y en su lugar dejar la limitación escrita y **falsable**: si alguien
+crea la serie, el contrato falla y le obliga a actualizar la declaración.
+
+La séptima, y la que cierra el círculo: que **un candado de nivel fuera una
+decisión de una línea**. `pos_integraciones` estaba en Diamante y no hacía nada;
+sacarla de ahí parecía mover un valor en un mapa. No lo era, porque el mismo
+`featuresForTier` que decide qué **puede usar** un restaurante es el que arma la
+**escalera de marketing**, y en la escalera una capacidad de nivel Verde no
+significa "es gratis": significa "es el beneficio que te da subir a Verde", que
+se anuncia con palomita en los cuatro niveles. El candado tenía un solo nombre y
+tres significados —*qué me da subir*, *qué puedo usar* y *qué aporta mi nivel*—
+y ninguno estaba escrito. La reparación no fue bajar el nivel, sino **separar los
+predicados**: `perksForTier` (lo que el nivel **aporta**) para la escalera
+pública, `featuresForTier` (lo que el nivel **puede usar**) para el admin, la
+adopción y el panel. La capacidad es la misma, y ahora cada superficie responde
+la pregunta que de verdad hace.
+
+**Lección:** *un número de backlog no es un hecho, es una medición caducada; y un
+medidor que descarta en silencio lo que no entiende convierte cada cero en una
+pregunta abierta.* Las tres mitades de esta ronda son la misma lección vista desde
+tres lados: el arnés de pruebas (Oleada B) mentía por causas que estaban **fuera**
+del código, los medidores (Oleada A) mentían por causas que estaban **dentro** del
+suyo, y el esquema (Oleada C) **no mentía: callaba**, que desde fuera se lee
+igual. En los tres casos la reparación no fue ajustar el número, sino hacer que el
+instrumento **diga lo que no puede ver**. La Oleada D añade el cuarto lado: un
+**mismo nombre con dos lecturas**, donde la reparación es nombrar cada lectura.
+
+**Cierre medido.** `npm run verify` en verde al cerrar las cuatro oleadas:
+typecheck, lint, **370 archivos de test / 6,445 pruebas**, `knip` exit 0 — desde
+los 362 / 6,349 de la Ronda 22. Siete contratos nuevos
+(`panel-contrast` 13, `neutral-contrast` 8, `latent-palette` 6,
+`cookie-consent` 8, `orders-seller-id` 9, `rls-declared` 11,
+`crm-forecast` 15) y uno extendido
+(`a11y-static`, 33 → **37**, con la regla `R7`). En e2e: **11 passed en 1,4 min**
+sobre `next build` + `next start`, desde los 10 rojos en 5m32s del primer
+intento. La Ronda 23 queda **cerrada**: `d1` era lo último pendiente de las
+oleadas A–D.
 
 ## Agentes de mantenimiento por dominio
 

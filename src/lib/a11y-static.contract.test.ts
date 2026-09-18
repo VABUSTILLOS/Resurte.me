@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs"
 import { join, relative } from "node:path"
 import ts from "typescript"
 import { describe, expect, it } from "vitest"
+import { pintaPrimitivo } from "./contrast"
 
 /**
  * Guardia estática de accesibilidad — la superficie que axe no puede ver.
@@ -33,6 +34,22 @@ import { describe, expect, it } from "vitest"
  * no encuentra nada también produce cero hallazgos, y las aserciones de abajo
  * pasarían igual. Por eso cada regla tiene su positivo y su negativo sobre
  * código escrito aquí mismo, y solo después se afirma el perímetro real.
+ *
+ * R7 CIERRA UN HUECO MEDIDO, NO SOSPECHADO. `iconOnlyButton` llevaba dos rondas
+ * declarado «medido, no aprobado» por su tasa de falsos positivos. Se midió con
+ * cuatro ajustes de precisión (ver `docs/PLAN-MEJORAS.md`, fila A17): los 25
+ * hallazgos resultaron verdaderos positivos, uno por uno, y los falsos venían de
+ * tres formas que el detector ya sabe leer — `aria-label={t("…")}` (expresión,
+ * no literal), texto pintado por expresión (`{copied ? "copiado" : "copiar"}`) y
+ * props por spread. Corregidas las tres, los 25 se arreglaron y R7 congela cero.
+ *
+ * `inputNoName` NO entra aquí, y la razón es la medición, no la pereza: el
+ * nombre de un campo puede venir de un `<label htmlFor>` en otro nodo, de lo que
+ * renderice un componente contenedor (`<Field label=…>`) o de un spread, y
+ * ninguna de las tres se resuelve sin salir del archivo. Al triar los 79
+ * candidatos a ruido aparecieron defectos reales mezclados (un `<label>` hermano
+ * **sin** `htmlFor` no asocia nada), así que congelar esa cifra consagraría el
+ * ruido en ambas direcciones. Queda medido y anotado en la fila A17.
  */
 
 const RAIZ = process.cwd()
@@ -134,6 +151,8 @@ type Elemento = {
   clase: string
   /** Elementos JSX que lo contienen, del más externo al más cercano. */
   ancestros: Elemento[]
+  /** Hijos JSX directos, para decidir si el elemento pinta texto (R7). */
+  hijos: ts.Node[]
 }
 
 /**
@@ -154,17 +173,21 @@ function elementos(sf: ts.SourceFile): Elemento[] {
   const out: Elemento[] = []
   const pila: Elemento[] = []
 
-  const crear = (n: ts.JsxOpeningElement | ts.JsxSelfClosingElement): Elemento => ({
+  const crear = (
+    n: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+    hijos: ts.Node[],
+  ): Elemento => ({
     tag: n.tagName.getText(),
     attrs: n.attributes,
     linea: sf.getLineAndCharacterOfPosition(n.getStart()).line + 1,
     clase: textoAtributo(n.attributes, "className") ?? "",
     ancestros: [...pila],
+    hijos,
   })
 
   const visitar = (n: ts.Node) => {
     if (ts.isJsxElement(n)) {
-      const e = crear(n.openingElement)
+      const e = crear(n.openingElement, [...n.children])
       out.push(e)
       pila.push(e)
       for (const hijo of n.children) visitar(hijo)
@@ -172,7 +195,7 @@ function elementos(sf: ts.SourceFile): Elemento[] {
       return
     }
     if (ts.isJsxSelfClosingElement(n)) {
-      out.push(crear(n))
+      out.push(crear(n, []))
       return
     }
     if (ts.isJsxFragment(n)) {
@@ -192,23 +215,59 @@ function elementos(sf: ts.SourceFile): Elemento[] {
 
 /** Un `outline-none` de foco solo es legítimo si algo lo reemplaza. */
 const OUTLINE_NONE = /(?:^|\s)focus(?:-visible)?:outline-none(?:\s|$)/
-const INDICADOR_FOCO =
-  /focus:ring-|focus-visible:ring-|focus-visible:outline-(?!none)|focus:(?:border|bg|text|shadow|underline)-/
 
 /**
- * Un contenedor que reacciona al foco de sus hijos también es un indicador
- * visible. Solo cuentan las señales que se ven: un anillo o un cambio de borde
- * o de contorno. `focus-within:outline-none` no cuenta (quita, no pone).
+ * Descompone `sm:group-focus:ring-2` en su última variante y su valor.
+ *
+ * La versión anterior comparaba subcadenas del `className` (`/focus:ring-/`), así
+ * que un token con variantes delante —`group-focus:ring-2`, `sm:focus:ring-2`—
+ * ya contaba como indicador. Analizar el token entero conserva esa aceptación y
+ * además deja de confundir `focus-within:ring-2` con `focus:ring-2`, que son
+ * cosas distintas: la primera reacciona al foco de un hijo, no del elemento.
  */
-const INDICADOR_CONTENEDOR = /focus-within:(?:ring-|border-|outline-(?!none))/
+function ultimaVariante(token: string): { variante: string; valor: string } | null {
+  const i = token.lastIndexOf(":")
+  if (i <= 0 || i === token.length - 1) return null
+  return { variante: token.slice(0, i), valor: token.slice(i + 1) }
+}
+
+/** La variante reacciona al foco del propio elemento (`focus`, `group-focus`…). */
+const VARIANTE_PROPIA = /(?:^|[:-])(?:focus|focus-visible)$/
+/** La variante reacciona al foco de un hijo (`focus-within`, `group-focus-within`). */
+const VARIANTE_CONTENEDOR = /(?:^|[:-])focus-within$/
+
+/** Familias que pueden pintar la señal. `focus-within` no acepta `bg-`. */
+const FAMILIA_PROPIA = /^(?:ring-|border-|bg-|text-|shadow-|underline-|outline-)/
+const FAMILIA_CONTENEDOR = /^(?:ring-|border-|outline-)/
+
+/**
+ * Valores que nombran una señal de foco sin pintarla: anillo de 0px, borde o
+ * fondo transparente, sombra `none`, contorno de 0px, desplazamiento de anillo
+ * (mueve el anillo, no lo dibuja) y `ring-inset` (fija el estilo, no el ancho).
+ *
+ * Sin esta lista bastaba escribir `focus:ring-0` para satisfacer R1 sin que
+ * nadie viera nada al tabular: el contrato premiaba la forma del reemplazo en
+ * vez de su efecto, que es justo el defecto que R1 existe para encontrar.
+ */
+const VALOR_SIN_PINTURA =
+  /^(?:ring-0|ring-\[0(?:px)?\]|ring-transparent|ring-inset|ring-offset-.+|border-0|border-\[0(?:px)?\]|border-transparent|bg-transparent|text-transparent|shadow-none|shadow-transparent|outline-0|outline-\[0(?:px)?\]|outline-none|outline-transparent)$/
+
+/** ¿Algún token del `className` pinta una señal de foco visible? */
+function pintaFoco(clase: string, variantes: RegExp, familias: RegExp): boolean {
+  return clase.split(/\s+/).some((token) => {
+    const v = ultimaVariante(token)
+    if (!v || !variantes.test(v.variante)) return false
+    return !VALOR_SIN_PINTURA.test(v.valor) && familias.test(v.valor)
+  })
+}
 
 /** R1 — `focus:outline-none` sin indicador de reemplazo (WCAG 2.4.7 AA). */
 function focoSinIndicador(sf: ts.SourceFile): Elemento[] {
   return elementos(sf).filter(
     (e) =>
       OUTLINE_NONE.test(e.clase) &&
-      !INDICADOR_FOCO.test(e.clase) &&
-      !e.ancestros.some((a) => INDICADOR_CONTENEDOR.test(a.clase)),
+      !pintaFoco(e.clase, VARIANTE_PROPIA, FAMILIA_PROPIA) &&
+      !e.ancestros.some((a) => pintaFoco(a.clase, VARIANTE_CONTENEDOR, FAMILIA_CONTENEDOR)),
   )
 }
 
@@ -238,25 +297,154 @@ function tabIndexPositivo(sf: ts.SourceFile): Elemento[] {
   })
 }
 
+// ---------------------------------------------------------------------------
+// Regla R7: nombre accesible en controles que no pintan texto
+// ---------------------------------------------------------------------------
+
+/** Controles que un lector de pantalla anuncia como botón o enlace. */
+const CONTROLES = new Set(["button", "a", "summary"])
+const ATRIBUTOS_DE_NOMBRE = ["aria-label", "aria-labelledby", "title"]
+
+/**
+ * ¿El atributo nombra el elemento?
+ *
+ * Un literal vacío no nombra —`aria-label=""` es el mismo defecto con más
+ * ceremonia—, pero **cualquier expresión sí**: `aria-label={t("common.delete")}`
+ * es un nombre real que no se puede resolver sin ejecutar el código. Darlo por
+ * ausente era el falso positivo más caro del detector: en el panel casi todos
+ * los botones de icono ya venían rotulados así.
+ */
+function nombra(attrs: ts.JsxAttributes, nombre: string): boolean {
+  const a = atributo(attrs, nombre)
+  if (!a) return false
+  const i = a.initializer
+  if (!i) return true
+  if (ts.isStringLiteral(i)) return i.text.trim() !== ""
+  if (ts.isJsxExpression(i)) return i.expression !== undefined
+  return true
+}
+
+/**
+ * ¿El subárbol pinta texto que un lector de pantalla pueda anunciar?
+ *
+ * Delega en `pintaPrimitivo` de `contrast.ts` en vez de reimplementar el
+ * reconocimiento de expresiones: `{t("…")}` y `{abierto ? "− menos" : "+3 más"}`
+ * pintan texto, y una versión que solo mirara literales los habría contado como
+ * vacíos. Un icono dentro del botón también nombra **si trae su propio
+ * `aria-label`**; sin él no aporta nada, que es justo el defecto que R7 busca.
+ */
+function pintaTexto(nodos: ts.Node[]): boolean {
+  let si = false
+  const visitar = (n: ts.Node): void => {
+    if (si) return
+    if (ts.isJsxText(n)) {
+      if (n.text.trim().length > 0) si = true
+      return
+    }
+    if (ts.isStringLiteral(n) && n.text.trim().length > 0) {
+      si = true
+      return
+    }
+    if (ts.isJsxExpression(n) && n.expression && pintaPrimitivo(n.expression)) {
+      si = true
+      return
+    }
+    if (ts.isJsxElement(n) || ts.isJsxSelfClosingElement(n)) {
+      const ab = ts.isJsxElement(n) ? n.openingElement : n
+      if (nombra(ab.attributes, "aria-label") || nombra(ab.attributes, "alt")) {
+        si = true
+        return
+      }
+      if (ts.isJsxElement(n)) for (const h of n.children) visitar(h)
+      return
+    }
+    ts.forEachChild(n, visitar)
+  }
+  for (const n of nodos) visitar(n)
+  return si
+}
+
+/** Props por spread: el nombre puede venir de fuera, así que no se mide. */
+function tieneSpread(attrs: ts.JsxAttributes): boolean {
+  return attrs.properties.some((p) => ts.isJsxSpreadAttribute(p))
+}
+
+/** `display:none` / recortado: fuera del árbol de accesibilidad, no necesita nombre. */
+const FUERA_DEL_ARBOL = /(?:^|\s)(?:hidden|sr-only)(?:\s|$)/
+
+/** R7 — control sin nombre accesible (WCAG 4.1.2 A). */
+function controlSinNombre(sf: ts.SourceFile): Elemento[] {
+  return elementos(sf).filter((e) => {
+    if (!CONTROLES.has(e.tag) && textoAtributo(e.attrs, "role") !== "button") return false
+    if (tieneSpread(e.attrs)) return false
+    if (FUERA_DEL_ARBOL.test(e.clase)) return false
+    return !ATRIBUTOS_DE_NOMBRE.some((n) => nombra(e.attrs, n)) && !pintaTexto(e.hijos)
+  })
+}
+
 /**
  * R6 — un archivo que anima con framer-motion respeta la preferencia del
  * sistema. `reducedMotion="user"` no apaga las animaciones: desactiva las de
  * transformación y layout, que son las que producen mareo. Es la forma que ya
  * usa `recompensas/page.tsx`, y framer-motion no la hereda por defecto.
  */
-function motionSinPreferencia(sf: ts.SourceFile): boolean {
-  const importa = sf.statements.some(
+function importaFramerMotion(sf: ts.SourceFile): boolean {
+  return sf.statements.some(
     (s) =>
       ts.isImportDeclaration(s) &&
       ts.isStringLiteral(s.moduleSpecifier) &&
       s.moduleSpecifier.text === "framer-motion",
   )
-  if (!importa) return false
-  return !elementos(sf).some(
+}
+
+/** `MotionConfig reducedMotion="user"` montado en este archivo. */
+function tieneMotionConfig(sf: ts.SourceFile): boolean {
+  return elementos(sf).some(
     (e) =>
       e.tag === "MotionConfig" &&
       (textoAtributo(e.attrs, "reducedMotion") ?? "").replace(/["']/g, "") === "user",
   )
+}
+
+function motionSinPreferencia(sf: ts.SourceFile): boolean {
+  return importaFramerMotion(sf) && !tieneMotionConfig(sf)
+}
+
+/**
+ * Cobertura heredada de `MotionConfig`, declarada a mano.
+ *
+ * `motionSinPreferencia` mira un archivo aislado, y eso deja fuera a los hijos
+ * que animan y confían en un `MotionConfig` que vive en el padre: en
+ * `src/app/recompensas/_components/**` hay 19 así, y su cobertura real viene de
+ * `src/app/recompensas/page.tsx`, que envuelve todos sus usos. No son defectos,
+ * pero tampoco eran un hecho verificado: si alguien borra ese `MotionConfig`,
+ * los 19 pierden el movimiento reducido y ningún test se entera, porque
+ * `AJENOS` excluye `recompensas` del perímetro.
+ *
+ * Esta tabla convierte la suposición en contrato. Cada entrada dice "lo que haya
+ * bajo `ambito` hereda la preferencia de `proveedor`", y R6c comprueba que el
+ * proveedor **de verdad** monta `MotionConfig reducedMotion="user"`. Un hijo sin
+ * `MotionConfig` propio y sin proveedor declarado sigue siendo un hallazgo.
+ */
+const COBERTURA_MOTION: { ambito: string; proveedor: string }[] = [
+  {
+    ambito: join("src", "app", "recompensas", "_components"),
+    proveedor: join("src", "app", "recompensas", "page.tsx"),
+  },
+]
+
+/** Los archivos que cubren los ámbitos declarados, para recorrerlos en R6b. */
+const ALCANCE_MOTION = COBERTURA_MOTION.flatMap(({ ambito }) =>
+  archivosTsx(join(RAIZ, ambito)),
+).sort()
+
+/**
+ * ¿Anima con framer-motion, sin `MotionConfig` propio y sin un proveedor
+ * declarado que lo cubra? `ruta` es relativa a la raíz del repo.
+ */
+function motionSinCobertura(sf: ts.SourceFile, ruta: string): boolean {
+  if (!motionSinPreferencia(sf)) return false
+  return !COBERTURA_MOTION.some(({ ambito }) => ruta === ambito || ruta.startsWith(ambito + "/"))
 }
 
 // ---------------------------------------------------------------------------
@@ -359,8 +547,25 @@ function analizar(fuente: string) {
     dialogos: dialogosSinNombre(sf).map((e) => e.linea),
     imgs: imgsSinAlt(sf).map((e) => e.linea),
     tabindex: tabIndexPositivo(sf).map((e) => e.linea),
+    controles: controlSinNombre(sf).map((e) => e.linea),
     motion: motionSinPreferencia(sf),
+    motionPropio: tieneMotionConfig(sf),
   }
+}
+
+/**
+ * Igual que `analizar`, pero para las reglas que dependen de la ruta del
+ * archivo: la cobertura heredada se resuelve por dónde vive el archivo.
+ */
+function analizarEn(fuente: string, ruta: string): { sinCobertura: boolean } {
+  const sf = ts.createSourceFile(
+    "fixture.tsx",
+    fuente,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  )
+  return { sinCobertura: motionSinCobertura(sf, ruta) }
 }
 
 describe("detectores — se prueban antes de mirar el perímetro", () => {
@@ -415,6 +620,70 @@ describe("detectores — se prueban antes de mirar el perímetro", () => {
     ).toEqual([2])
   })
 
+  it("R1 no acepta un indicador que no pinta nada", () => {
+    // El hueco que cerró la Ronda 23: `focus:ring-0` es un anillo de 0px. Antes
+    // bastaba escribirlo para satisfacer el contrato sin que nada se viera.
+    for (const vacio of [
+      "focus:ring-0",
+      "focus:ring-[0px]",
+      "focus:ring-transparent",
+      "focus:ring-inset",
+      "focus:ring-offset-2",
+      "focus:border-0",
+      "focus:border-transparent",
+      "focus:bg-transparent",
+      "focus:text-transparent",
+      "focus:shadow-none",
+      "focus-visible:outline-0",
+      "focus-visible:outline-transparent",
+    ]) {
+      expect(analizar(`<button className="focus:outline-none ${vacio}">x</button>`).foco).toEqual(
+        [1],
+      )
+    }
+    // Y el contenedor tampoco se salva con un anillo de 0px.
+    expect(
+      analizar(
+        `<div className="focus-within:ring-0">\n<input className="focus:outline-none" />\n</div>`,
+      ).foco,
+    ).toEqual([2])
+    expect(
+      analizar(
+        `<div className="focus-within:border-transparent">\n<input className="focus:outline-none" />\n</div>`,
+      ).foco,
+    ).toEqual([2])
+  })
+
+  it("R1 sigue aceptando el indicador real que acompaña a un valor vacío", () => {
+    // `focus:border-transparent` no pinta, pero el anillo que lo acompaña sí: el
+    // detector mira el token, no la clase entera.
+    expect(
+      analizar(
+        `<input className="focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />`,
+      ).foco,
+    ).toEqual([])
+    expect(
+      analizar(`<input className="focus:outline-none focus:bg-brand-500" />`).foco,
+    ).toEqual([])
+  })
+
+  it("R1 no confunde focus-within con el foco del propio elemento", () => {
+    // `focus-within:ring-2` reacciona al foco de un hijo. En el propio elemento
+    // con `focus:outline-none` no pinta nada al tabular hacia él.
+    expect(analizar(`<button className="focus:outline-none focus-within:ring-2">x</button>`).foco).toEqual(
+      [1],
+    )
+  })
+
+  it("R1 acepta el indicador con variantes delante", () => {
+    // La versión por regex comparaba subcadenas, así que esto ya contaba; el
+    // analizador por token tiene que seguir aceptándolo.
+    expect(analizar(`<input className="focus:outline-none sm:focus:ring-2" />`).foco).toEqual([])
+    expect(
+      analizar(`<input className="focus:outline-none group-focus:ring-2" />`).foco,
+    ).toEqual([])
+  })
+
   it("R1 no hereda el indicador de un contenedor hermano ya cerrado", () => {
     // Si la pila no se vaciara, este segundo campo quedaría exento por error.
     const fuente = `<div className="focus-within:ring-2">\n<input className="focus:outline-none" />\n</div>\n<input className="focus:outline-none" />`
@@ -465,6 +734,30 @@ describe("detectores — se prueban antes de mirar el perímetro", () => {
     expect(analizar(comentado).motion).toBe(true)
   })
 
+  it("R6 no da por cubierto a un hijo cuyo ancestro no está declarado", () => {
+    const hijo = `import { motion } from "framer-motion"\nexport const A = () => <motion.div />`
+    // Sin `MotionConfig` propio y sin proveedor declarado para esa ruta: hallazgo.
+    expect(analizarEn(hijo, "src/app/otra/Foo.tsx").sinCobertura).toBe(true)
+  })
+
+  it("R6 acepta al hijo que vive bajo un proveedor declarado", () => {
+    const hijo = `import { motion } from "framer-motion"\nexport const A = () => <motion.div />`
+    expect(analizarEn(hijo, "src/app/recompensas/_components/Foo.tsx").sinCobertura).toBe(false)
+    // La exención es por directorio, no por subcadena: un vecino no entra.
+    expect(analizarEn(hijo, "src/app/recompensas/_components2/Foo.tsx").sinCobertura).toBe(true)
+  })
+
+  it("R6 no exime a quien monta su propio MotionConfig, esté donde esté", () => {
+    const propio = `import { motion, MotionConfig } from "framer-motion"\nexport const A = () => <MotionConfig reducedMotion="user"><motion.div /></MotionConfig>`
+    expect(analizarEn(propio, "src/app/otra/Foo.tsx").sinCobertura).toBe(false)
+  })
+
+  it("R6 no acepta un MotionConfig que no pide la preferencia del sistema", () => {
+    const flojo = `import { motion, MotionConfig } from "framer-motion"\nexport const A = () => <MotionConfig reducedMotion="always"><motion.div /></MotionConfig>`
+    expect(analizarEn(flojo, "src/app/otra/Foo.tsx").sinCobertura).toBe(true)
+    expect(analizar(flojo).motionPropio).toBe(false)
+  })
+
   it("R5 reconoce cobertura por nombre y por selector arbitrario", () => {
     // El bloque real de globals.css debe seguir cubriendo lo que ya cubría:
     // si el extractor se rompiera, todo pasaría y la guardia sería decorativa.
@@ -476,6 +769,54 @@ describe("detectores — se prueban antes de mirar el perímetro", () => {
     expect(claseCubierta("animate-[fadeUp_0.15s_ease-out]")).toBe(BLOQUE.includes(CATCH_ALL_ARBITRARIO))
     // Un token que no está en el bloque no puede darse por cubierto.
     expect(claseCubierta("animate-inventado-xyz")).toBe(false)
+  })
+
+  it("R7 encuentra el control de icono sin nombre", () => {
+    expect(analizar(`<button onClick={f}><Trash2 /></button>`).controles).toEqual([1])
+    expect(analizar(`<a href="/x"><ExternalLink /></a>`).controles).toEqual([1])
+    expect(analizar(`<div role="button" onClick={f}><Trash2 /></div>`).controles).toEqual([1])
+  })
+
+  it("R7 no marca el control que ya tiene nombre", () => {
+    expect(analizar(`<button aria-label="Eliminar"><Trash2 /></button>`).controles).toEqual([])
+    expect(analizar(`<button title="Cerrar"><X /></button>`).controles).toEqual([])
+    expect(analizar(`<button aria-labelledby="titulo"><X /></button>`).controles).toEqual([])
+    // El nombre puede ser una expresión: no se resuelve sin ejecutar el código.
+    expect(
+      analizar(`<button aria-label={t("common.delete")}><Trash2 /></button>`).controles,
+    ).toEqual([])
+  })
+
+  it("R7 ve el texto pintado por expresión, no solo los literales", () => {
+    expect(analizar(`<button>{t("common.save")}</button>`).controles).toEqual([])
+    expect(
+      analizar(`<button>{abierto ? "− menos" : \`+3 más\`}</button>`).controles,
+    ).toEqual([])
+    // Un icono con su propio rótulo sí nombra al botón que lo contiene.
+    expect(
+      analizar(`<button>{copiado ? <Check aria-label="Copiado" /> : <Copiar />}</button>`)
+        .controles,
+    ).toEqual([])
+  })
+
+  it("R7 no confunde un icono mudo con un nombre", () => {
+    // El icono sin rótulo es el defecto, no la coartada: no aporta nombre.
+    expect(analizar(`<button>{copiado ? <Check /> : <Copiar />}</button>`).controles).toEqual([1])
+  })
+
+  it("R7 distingue un nombre vacío de uno ausente", () => {
+    expect(analizar(`<button aria-label=""><Trash2 /></button>`).controles).toEqual([1])
+    expect(analizar(`<button aria-label=" "><Trash2 /></button>`).controles).toEqual([1])
+  })
+
+  it("R7 no mide lo que no puede decidir", () => {
+    // Spread: el nombre puede venir de fuera.
+    expect(analizar(`<button {...props}><Trash2 /></button>`).controles).toEqual([])
+    // Fuera del árbol de accesibilidad.
+    expect(analizar(`<button className="hidden"><Trash2 /></button>`).controles).toEqual([])
+    expect(analizar(`<button className="sr-only"><Trash2 /></button>`).controles).toEqual([])
+    // Un `<div>` con icono no es un control.
+    expect(analizar(`<div><Trash2 /></div>`).controles).toEqual([])
   })
 })
 
@@ -518,6 +859,12 @@ describe("perímetro — accesibilidad estática", () => {
     expect(hallazgos(tabIndexPositivo)).toEqual([])
   })
 
+  it("R7: ningún control se queda sin nombre accesible", () => {
+    // Tolerancia cero: los 25 que había se corrigieron con `aria-label` en esta
+    // ronda. Si vuelve a aparecer un botón de icono mudo, falla aquí.
+    expect(hallazgos(controlSinNombre)).toEqual([])
+  })
+
   it("R5: toda animación usada está en el bloque de movimiento reducido", () => {
     const sinCubrir: string[] = []
     for (const [token, usos] of tokensAnimate()) {
@@ -529,6 +876,21 @@ describe("perímetro — accesibilidad estática", () => {
   it("R6: quien anima con framer-motion respeta la preferencia del sistema", () => {
     const sinPreferencia = PERIMETRO.filter((f) => motionSinPreferencia(leerConAst(f)))
     expect(sinPreferencia.map(rel)).toEqual([])
+  })
+
+  it("R6b: quien anima bajo un MotionConfig heredado está declarado", () => {
+    // El ámbito vive fuera de `PERIMETRO` (es ajeno), así que se recorre aparte.
+    // El canario evita que un `readdir` roto deje la regla sin archivos que leer.
+    expect(ALCANCE_MOTION.length).toBeGreaterThan(10)
+    const sinCobertura = ALCANCE_MOTION.filter((f) => motionSinCobertura(leerConAst(f), rel(f)))
+    expect(sinCobertura.map(rel)).toEqual([])
+  })
+
+  it("R6c: cada proveedor declarado monta de verdad MotionConfig reducedMotion=user", () => {
+    const sinMontar = COBERTURA_MOTION.filter(
+      ({ proveedor }) => !tieneMotionConfig(leerConAst(join(RAIZ, proveedor))),
+    ).map(({ proveedor }) => proveedor)
+    expect(sinMontar).toEqual([])
   })
 
   it("el perímetro es el esperado (si esto cambia, las reglas de arriba cambian de significado)", () => {

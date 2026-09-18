@@ -594,7 +594,7 @@ export function ProspectosPage({
                       </button>
                       <button
                         onClick={() => handleCopyLink(p)}
-                        className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors"
+                        className="p-2 rounded-xl text-gray-600 hover:bg-gray-100 transition-colors"
                         title="Copiar link de registro"
                       >
                         {copied === p.id ? (
@@ -643,7 +643,7 @@ export function ProspectosPage({
                                 setMenuFor(null)
                                 setDeleting(p)
                               }}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-700 hover:bg-red-50"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               Eliminar

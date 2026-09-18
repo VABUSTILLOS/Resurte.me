@@ -41,15 +41,12 @@ test.describe("móvil: chrome de navegación", { tag: "@ci" }, () => {
       )
     })
     await page.goto("/panel", { waitUntil: "domcontentloaded" })
-    // Cierra la guía si se abrió automáticamente (su panel cubre todo).
-    const closeGuide = page.getByRole("button", { name: "Cerrar guía" })
-    if (await closeGuide.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await closeGuide.tap()
-      await page.waitForTimeout(400)
-    }
-    // Acepta el banner de cookies (cubre la esquina del FAB en contexto limpio).
+    // Mientras no haya decisión de cookies la guía NO se auto-abre: su drawer
+    // (ancho `100vw - 3rem`) y su backdrop (`inset-0`) taparían el banner, y el
+    // primer tap de un usuario nuevo tiene que ser el de consentir.
     const acceptCookies = page.getByRole("button", { name: "Aceptar todas" })
     await expect(acceptCookies).toBeVisible({ timeout: 8000 })
+    await expect(page.getByRole("button", { name: "Cerrar guía" })).toHaveCount(0)
     await page.waitForTimeout(700) // deja terminar la animación de entrada
     await acceptCookies.tap()
     await expect(acceptCookies).not.toBeVisible()
