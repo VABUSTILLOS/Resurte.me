@@ -1087,6 +1087,17 @@ function AdminLeadsContent() {
         </div>
       )}
 
+      {tab === "agenda" && (
+        <div
+          role="tabpanel"
+          id="crm-panel-agenda"
+          aria-labelledby="crm-tab-agenda"
+          className="space-y-4"
+        >
+          <AgendaView onOpenProspect={setDrawerId} />
+        </div>
+      )}
+
       {tab === "bandeja" && (
         <div
           role="tabpanel"

@@ -124,6 +124,19 @@ function escribeCancelado(rel: string): boolean {
   return /status:\s*["']cancelled["']/.test(src)
 }
 
+/**
+ * ¿Este archivo ESCRIBE en la tabla `orders`?
+ * Se compara sobre el texto sin espacios repetidos porque el encadenado se
+ * parte en varias líneas (`supabase\n  .from("orders")\n  .update(...)`).
+ *
+ * Sin esta condición, una superficie de UI que solo pinta `status: "cancelled"`
+ * en su propio estado —y que además LEE de `orders`— parecería una puerta.
+ */
+function escribeEnOrders(rel: string): boolean {
+  const src = (CODIGO.get(rel) ?? "").replace(/\s+/g, " ")
+  return /\.from\(\s*["']orders["']\s*\)\s*\.\s*(update|insert|upsert|delete)\s*\(/.test(src)
+}
+
 describe("order-cancellation · una sola puerta para la cascada", () => {
   it("R1 · las tres puertas del marketplace invocan la cascada", () => {
     for (const puerta of PUERTAS_DEL_MARKETPLACE) {
@@ -157,11 +170,10 @@ describe("order-cancellation · una sola puerta para la cascada", () => {
     // LÍMITE: `status/route.ts` escribe `{ status }` desde una variable, así que
     // este detector no lo ve — de él se encarga R1, que exige la invocación.
     const cancelaPedidosDelMarketplace = (rel: string) => {
-      const src = CODIGO.get(rel) ?? ""
       if (!escribeCancelado(rel)) return false
       // El marketplace se escribe con `.from("orders")`; FoodOS con
       // `.from("foodos_orders")` y las recompensas con `redemption_requests`.
-      return /\.from\(\s*["']orders["']\s*\)/.test(src)
+      return escribeEnOrders(rel)
     }
     const puertasReales = ARCHIVOS.filter(cancelaPedidosDelMarketplace)
     // Control positivo: el detector encuentra algo (si no, pasaría vacío).
