@@ -741,6 +741,11 @@ export async function getDailyBriefing(): Promise<DailyBriefing> {
   const totalTouches =
     stats.visitas + stats.whatsapps + stats.llamadas + stats.demos
 
+  // Tres estados, no dos: sin valor declarado, valorado, y valorado a medias.
+  // La etiqueta la pone `formatEstimatedTotal`, que ya resuelve los dos
+  // primeros, y el `≥` del tercero.
+  const pipelineLabel = formatEstimatedTotal({ total: stats.pipelineAbierto }, stats.pipelineTruncado)
+
   const fallbackText = [
     `📋 *Resumen del día — ${sellerName}*`,
     ``,
@@ -752,6 +757,7 @@ export async function getDailyBriefing(): Promise<DailyBriefing> {
     ``,
     `Pendientes: ${stats.seguimientosVencidos} seguimientos vencidos · ${stats.borradoresPendientes} borradores por aprobar`,
     stats.zoneLabel ? `Ruta de hoy: ${stats.zoneLabel}` : null,
+    `Pipeline abierto: ${pipelineLabel}`,
   ]
     .filter((l) => l !== null)
     .join("\n")
@@ -759,7 +765,8 @@ export async function getDailyBriefing(): Promise<DailyBriefing> {
   const userPrompt = [
     "REDACTA EL RESUMEN DIARIO DEL VENDEDOR para compartir por WhatsApp.",
     "Tono: breve, motivador, en español, con emojis sobrios. Máximo 12 líneas.",
-    "Incluye: toques de hoy por canal, pendientes (seguimientos vencidos y borradores), una sugerencia concreta para mañana y la ruta del día si existe.",
+    "Incluye: toques de hoy por canal, pendientes (seguimientos vencidos y borradores), el valor del pipeline abierto, una sugerencia concreta para mañana y la ruta del día si existe.",
+    "REGLA DEL DINERO: `pipelineAbierto` en `null` significa que NINGÚN trato abierto tiene valor declarado. En ese caso escribe «sin valor declarado» y nunca «$0»: no es que el pipeline no valga nada, es que nadie lo ha valorado. Si `pipelineTruncado` es `true`, presenta la cifra como mínimo («más de …»).",
     "",
     `VENDEDOR: ${sellerName}`,
     `DATOS: ${JSON.stringify(stats)}`,
