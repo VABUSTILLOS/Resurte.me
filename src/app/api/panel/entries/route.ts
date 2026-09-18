@@ -7,14 +7,27 @@ import { canWriteEntry } from "@/lib/panel-roles"
 
 /**
  * GET /api/panel/entries?tool=<storage-key>&collection=<slug>
- *   → { found: boolean, value?: unknown }
- * PUT /api/panel/entries { tool, collection_slug?, value }
- *   → guarda el valor completo de la clave (replace-all por dueño+tool+colección).
+ *   → { found: boolean, value?: unknown, updated_at?: string }
+ * PUT /api/panel/entries { tool, collection_slug?, value, base_updated_at? }
+ *   → { saved: true, updated_at } o 409 { conflict: true, value, updated_at }
  *
  * Persistencia genérica de las herramientas del panel (ver migración
  * 00055_panel_entries). Identidad: sesión autenticada (cookie) o header
  * `x-guest-token` (UUID anónimo del navegador, mismo patrón que las
  * direcciones guest y /api/panel/dishes).
+ *
+ * CONTROL DE CONCURRENCIA (migración 00164)
+ *
+ * El valor sigue siendo *replace-all* por dueño+tool+colección, pero ya no es
+ * ciego: el cliente manda la versión (`updated_at`) sobre la que construyó su
+ * valor. Si el servidor tiene otra, responde **409 con el valor vigente** en vez
+ * de sobrescribirlo, y el cliente combina ambos (ver `lib/panel-merge.ts`). Sin
+ * esto, un segundo dispositivo con datos obsoletos borraba en silencio lo que el
+ * primero acababa de guardar.
+ *
+ * `base_updated_at` es opcional a propósito: un cliente que no lo mande conserva
+ * el comportamiento anterior (último escritor gana). Así un despliegue del
+ * servidor no rompe las pestañas que ya estaban abiertas con el bundle viejo.
  */
 
 const TOOL_RE = /^[a-z0-9][a-z0-9-]{0,39}$/
@@ -22,6 +35,25 @@ const MAX_VALUE_BYTES = 256 * 1024 // 256 KB por clave; las listas del panel son
 
 function isValidTool(tool: unknown): tool is string {
   return typeof tool === "string" && TOOL_RE.test(tool)
+}
+
+/**
+ * Una base vacía es válida (primera escritura de una clave). Cualquier otra cosa
+ * que no sea una fecha parseable se rechaza: el RPC compara la cadena contra
+ * `updated_at` y una cadena basura nunca coincidiría, lo que devolvería un 409
+ * perpetuo en vez de un error claro.
+ */
+function parseBase(value: unknown): { ok: true; value: string | null } | { ok: false } {
+  if (value === undefined || value === null || value === "") return { ok: true, value: null }
+  if (typeof value !== "string") return { ok: false }
+  if (Number.isNaN(Date.parse(value))) return { ok: false }
+  return { ok: true, value }
+}
+
+interface PutRow {
+  applied?: boolean
+  value?: { value?: unknown } | null
+  updated_at?: string | null
 }
 
 export async function GET(req: NextRequest) {
@@ -49,11 +81,10 @@ export async function GET(req: NextRequest) {
     const [col, val] = ownerColumn(owner)
     const { data, error } = await service
       .from("panel_entries")
-      .select("payload")
+      .select("payload, updated_at")
       .eq(col, val)
       .eq("tool", tool)
       .eq("collection_slug", collection)
-      .order("created_at", { ascending: false })
       .limit(1)
 
     if (error) {
@@ -61,11 +92,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Error al cargar los datos" }, { status: 500 })
     }
 
-    const row = (data || [])[0] as { payload?: { value?: unknown } } | undefined
+    const row = (data || [])[0] as
+      | { payload?: { value?: unknown }; updated_at?: string | null }
+      | undefined
     if (!row || typeof row.payload !== "object" || row.payload === null || !("value" in row.payload)) {
       return NextResponse.json({ found: false })
     }
-    return NextResponse.json({ found: true, value: row.payload.value })
+    return NextResponse.json({
+      found: true,
+      value: row.payload.value,
+      updated_at: row.updated_at ?? null,
+    })
   } catch (err) {
     logger.error("Panel entries GET error:", err)
     return NextResponse.json({ error: "Error interno" }, { status: 500 })
@@ -88,7 +125,12 @@ export async function PUT(req: NextRequest) {
     )
     if (!rate.allowed) return rateLimitResponse(rate)
 
-    const body = (await req.json()) as { tool?: unknown; collection_slug?: string; value?: unknown }
+    const body = (await req.json()) as {
+      tool?: unknown
+      collection_slug?: string
+      value?: unknown
+      base_updated_at?: unknown
+    }
     if (!isValidTool(body.tool)) {
       return NextResponse.json({ error: "tool inválido" }, { status: 400 })
     }
@@ -98,40 +140,55 @@ export async function PUT(req: NextRequest) {
     if (!("value" in body)) {
       return NextResponse.json({ error: "Falta value" }, { status: 400 })
     }
+    const base = parseBase(body.base_updated_at)
+    if (!base.ok) {
+      return NextResponse.json({ error: "base_updated_at inválido" }, { status: 400 })
+    }
     const payload = { value: body.value }
     if (JSON.stringify(payload).length > MAX_VALUE_BYTES) {
       return NextResponse.json({ error: "El valor excede el tamaño máximo (256 KB)" }, { status: 413 })
     }
 
     const collection = body.collection_slug?.trim() || "default"
-    const [col, val] = ownerColumn(owner)
 
-    // Replace-all por dueño + tool + colección: borra y reinserta la fila.
-    const { error: deleteError } = await service
-      .from("panel_entries")
-      .delete()
-      .eq(col, val)
-      .eq("tool", body.tool)
-      .eq("collection_slug", collection)
-    if (deleteError) {
-      logger.error("Panel entries delete error:", deleteError)
-      return NextResponse.json({ error: "Error al guardar los datos" }, { status: 500 })
-    }
-
-    const { error: insertError } = await service.from("panel_entries").insert({
-      tool: body.tool,
-      collection_slug: collection,
-      user_id: owner.userId,
-      guest_token: owner.guestToken,
-      payload,
-      updated_at: new Date().toISOString(),
+    // Un solo viaje: `panel_entry_put` inserta o actualiza de forma atómica y
+    // solo si la base coincide. El `delete()` + `insert()` anterior permitía que
+    // dos escrituras concurrentes borraran ambas filas y luego insertaran dos.
+    const { data, error } = await service.rpc("panel_entry_put", {
+      p_user_id: owner.userId,
+      p_guest_token: owner.guestToken,
+      p_tool: body.tool,
+      p_collection: collection,
+      p_payload: payload,
+      p_base_updated_at: base.value,
     })
-    if (insertError) {
-      logger.error("Panel entries insert error:", insertError)
+
+    if (error) {
+      logger.error("Panel entries put error:", error)
       return NextResponse.json({ error: "Error al guardar los datos" }, { status: 500 })
     }
 
-    return NextResponse.json({ saved: true })
+    const row = (Array.isArray(data) ? data[0] : data) as PutRow | undefined
+    if (!row) {
+      logger.error("Panel entries put error: respuesta vacía del RPC")
+      return NextResponse.json({ error: "Error al guardar los datos" }, { status: 500 })
+    }
+
+    const updatedAt = row.updated_at ?? null
+
+    if (row.applied) {
+      return NextResponse.json({ saved: true, updated_at: updatedAt })
+    }
+
+    // La fila cambió desde que el cliente leyó: se devuelve el valor vigente
+    // para que combine en vez de sobrescribir.
+    const current = row.value
+    const serverValue =
+      current && typeof current === "object" && "value" in current ? current.value : null
+    return NextResponse.json(
+      { conflict: true, value: serverValue, updated_at: updatedAt },
+      { status: 409 },
+    )
   } catch (err) {
     logger.error("Panel entries PUT error:", err)
     return NextResponse.json({ error: "Error interno" }, { status: 500 })

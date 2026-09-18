@@ -179,7 +179,15 @@ BEGIN
 END;
 $fn$;
 
-REVOKE ALL ON FUNCTION public.panel_entry_put(UUID, UUID, TEXT, TEXT, JSONB, TIMESTAMPTZ) FROM PUBLIC;
+-- `FROM PUBLIC` solo NO basta en este proyecto. Supabase trae, en
+-- `pg_default_acl`, un `ALTER DEFAULT PRIVILEGES` (de `postgres` y de
+-- `supabase_admin`) que concede EXECUTE **directamente** a anon y a
+-- authenticated, además del grant implícito a PUBLIC. Revocar de PUBLIC deja
+-- los dos grants directos intactos. Hay que nombrar los tres roles.
+-- (Se corrigió aquí en sitio para que una base nueva no nazca con el agujero;
+-- el efecto sobre la base ya desplegada lo repara 00165.)
+REVOKE ALL ON FUNCTION public.panel_entry_put(UUID, UUID, TEXT, TEXT, JSONB, TIMESTAMPTZ)
+  FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.panel_entry_put(UUID, UUID, TEXT, TEXT, JSONB, TIMESTAMPTZ) TO service_role;
 
 COMMENT ON FUNCTION public.panel_entry_put(UUID, UUID, TEXT, TEXT, JSONB, TIMESTAMPTZ) IS
@@ -241,6 +249,33 @@ BEGIN
            GROUP BY user_id, guest_token, tool, collection_slug
           HAVING count(*) > 1) d;
   v_r := v_r || CASE WHEN v_n = 0 THEN 'OK sin duplicados' ELSE 'FALLO quedan ' || v_n || ' claves duplicadas' END || E'\n';
+
+  -- Privilegios de ejecución. Se comprueban explícitamente porque un guard que
+  -- no los mira da verde con el agujero abierto: eso fue exactamente el error de
+  -- la primera versión de este archivo (`REVOKE ... FROM PUBLIC` a secas).
+  v_r := v_r || CASE
+    WHEN has_function_privilege(
+           'service_role',
+           to_regprocedure('public.panel_entry_put(uuid,uuid,text,text,jsonb,timestamptz)'),
+           'EXECUTE')
+    THEN 'OK service_role puede ejecutar panel_entry_put'
+    ELSE 'FALLO service_role no puede ejecutar panel_entry_put' END || E'\n';
+
+  v_r := v_r || CASE
+    WHEN NOT has_function_privilege(
+           'anon',
+           to_regprocedure('public.panel_entry_put(uuid,uuid,text,text,jsonb,timestamptz)'),
+           'EXECUTE')
+    THEN 'OK anon no puede ejecutar panel_entry_put'
+    ELSE 'FALLO anon puede ejecutar panel_entry_put' END || E'\n';
+
+  v_r := v_r || CASE
+    WHEN NOT has_function_privilege(
+           'authenticated',
+           to_regprocedure('public.panel_entry_put(uuid,uuid,text,text,jsonb,timestamptz)'),
+           'EXECUTE')
+    THEN 'OK authenticated no puede ejecutar panel_entry_put'
+    ELSE 'FALLO authenticated puede ejecutar panel_entry_put' END || E'\n';
 
   IF v_r LIKE '%FALTA%' OR v_r LIKE '%FALLO%' THEN
     RAISE EXCEPTION E'AUTocomprobación 00164:\n%', v_r;

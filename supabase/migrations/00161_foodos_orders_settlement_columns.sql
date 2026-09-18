@@ -65,9 +65,18 @@ BEGIN
   -- Si `total` ya no es escribible por `authenticated`, la lista blanca de
   -- 00162 ya está en vigor: volver a conceder aquí reabriría el agujero en
   -- silencio (las guardas de abajo pasarían igual, porque el GRANT se
-  -- reaplicaría antes de que se ejecuten). Se corta con un error explícito.
+  -- reaplicaría antes de que se ejecuten). Se sale sin tocar nada.
+  --
+  -- Es un no-op y no un `RAISE EXCEPTION` a propósito. Cualquier replay que
+  -- llegue hasta aquí con 00162 ya aplicada (un `db push --include-all`, un
+  -- `supabase db reset` sobre una base con el historial reparado, un ledger
+  -- desincronizado) abortaba la migración entera con P0001 y dejaba el
+  -- despliegue a medias. El estado que 00162 dejó es el correcto, así que
+  -- repetir 00161 no tiene nada que arreglar: se declara y se continúa. Las
+  -- guardas de abajo siguen afirmando el estado final, que es el de 00162.
   IF NOT has_column_privilege('authenticated', 'public.foodos_orders', 'total', 'UPDATE') THEN
-    RAISE EXCEPTION 'La lista blanca de 00162 ya está aplicada. Re-ejecutar 00161 volvería a conceder UPDATE sobre las columnas de dinero; no la re-ejecutes.';
+    RAISE NOTICE '00161: la lista blanca de 00162 ya gobierna foodos_orders; nada que hacer.';
+    RETURN;
   END IF;
 
   -- Sin este REVOKE, el GRANT por columna de abajo sería decorativo: el
