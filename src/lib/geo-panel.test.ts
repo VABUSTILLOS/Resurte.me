@@ -26,10 +26,13 @@ import {
   type GeoPanelRecord,
 } from "@/lib/geo-panel"
 
+const FIRST_QUERY = GEO_QUERIES[0]!
+const FIRST_ENGINE = GEO_ENGINES[0]!
+
 const record = (over: Partial<GeoPanelRecord> = {}): GeoPanelRecord => ({
   runMonth: "2026-09",
-  queryId: GEO_QUERIES[0].id,
-  engineId: GEO_ENGINES[0].id,
+  queryId: FIRST_QUERY.id,
+  engineId: FIRST_ENGINE.id,
   cited: false,
   citationPosition: null,
   citedFact: null,
@@ -256,7 +259,9 @@ describe("computePanelMetrics", () => {
     const m = computePanelMetrics([])
     expect(m.recorded).toBe(0)
     expect(m.total).toBe(GEO_PANEL_SIZE)
-    expect(m.coverageRate).toBeNull()
+    // La cobertura es la excepción: el denominador (80 celdas) existe siempre,
+    // así que "0 de 80" es un hecho medido, no una ausencia de medición.
+    expect(m.coverageRate).toBe(0)
     expect(m.citedRate).toBeNull()
     expect(m.accuracyRate).toBeNull()
     expect(m.wrongRate).toBeNull()
@@ -333,11 +338,11 @@ describe("computePanelMetrics", () => {
   })
 
   it("las brechas traen la ruta que debería haber sido citada", () => {
-    const m = computePanelMetrics([record({ queryId: GEO_QUERIES[0].id, engineId: "chatgpt", cited: false })])
+    const m = computePanelMetrics([record({ queryId: FIRST_QUERY.id, engineId: "chatgpt", cited: false })])
     expect(m.gaps).toHaveLength(1)
-    expect(m.gaps[0].targetPath).toBe(GEO_QUERIES[0].targetPath)
-    expect(m.gaps[0].prompt).toBe(GEO_QUERIES[0].prompt)
-    expect(m.gaps[0].engineLabel).toBe("ChatGPT")
+    expect(m.gaps[0]!.targetPath).toBe(FIRST_QUERY.targetPath)
+    expect(m.gaps[0]!.prompt).toBe(FIRST_QUERY.prompt)
+    expect(m.gaps[0]!.engineLabel).toBe("ChatGPT")
   })
 
   it("ignora una celda de una pregunta desconocida", () => {
@@ -441,7 +446,7 @@ describe("formato", () => {
 
 describe("panelRowsToCsv", () => {
   it("emite encabezado y una fila por celda", () => {
-    const csv = panelRowsToCsv([record({ queryId: GEO_QUERIES[0].id, engineId: "chatgpt", cited: true, factAccuracy: "si" })])
+    const csv = panelRowsToCsv([record({ queryId: FIRST_QUERY.id, engineId: "chatgpt", cited: true, factAccuracy: "si" })])
     const lines = csv.split("\n")
     expect(lines[0]).toBe("mes,pregunta_id,pregunta,motor,citado,posicion,dato_citado,exacto,competidor,notas")
     expect(lines).toHaveLength(2)

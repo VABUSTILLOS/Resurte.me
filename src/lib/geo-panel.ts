@@ -122,7 +122,7 @@ export function monthLabel(monthKey: string): string {
   if (!m) return ""
   const month = Number(m[2])
   if (month < 1 || month > 12) return ""
-  return `${MONTH_NAMES[month - 1]} ${m[1]}`
+  return `${MONTH_NAMES[month - 1] ?? ""} ${m[1]}`
 }
 
 /** Desplaza un mes `delta` meses (negativo hacia atrás). `""` si la entrada no sirve. */
@@ -148,7 +148,7 @@ export function panelRunMonths(records: GeoPanelRecord[]): string[] {
  */
 export function previousMonthWithData(months: string[], current: string): string | null {
   const earlier = months.filter((m) => m < current).sort()
-  return earlier.length > 0 ? earlier[earlier.length - 1] : null
+  return earlier.length > 0 ? (earlier[earlier.length - 1] ?? null) : null
 }
 
 // ---------------------------------------------------------------------------
@@ -214,9 +214,12 @@ export function cellKey(queryId: string, engineId: string): string {
   return `${queryId}::${engineId}`
 }
 
-/** Celdas de un mes indexadas por `cellKey`. */
-export function indexCells(records: GeoPanelRecord[]): Map<string, GeoPanelCell> {
-  const map = new Map<string, GeoPanelCell>()
+/**
+ * Celdas de un mes indexadas por `cellKey`. Genérico para que el tipo de fila
+ * (con o sin `runMonth`) sobreviva al índice.
+ */
+export function indexCells<T extends GeoPanelCell>(records: T[]): Map<string, T> {
+  const map = new Map<string, T>()
   for (const r of records) map.set(cellKey(r.queryId, r.engineId), r)
   return map
 }
@@ -246,6 +249,11 @@ export interface GeoPanelMetrics {
   recorded: number
   /** `GEO_PANEL_SIZE` — 80. */
   total: number
+  /**
+   * Celdas llenas sobre las 80 posibles. Es la única tasa que puede ser `0`
+   * con cero filas: el denominador existe siempre (las 20 preguntas y los 4
+   * motores son fijos), así que "0 de 80" es un hecho, no una ausencia.
+   */
   coverageRate: number | null
   cited: number
   citedRate: number | null
@@ -341,7 +349,7 @@ export function normalizeCompetitorHost(value: string | null | undefined): strin
   const t = (value ?? "").trim().toLowerCase()
   if (!t) return null
   const withoutScheme = t.replace(/^[a-z][a-z0-9+.-]*:\/\//, "")
-  const host = withoutScheme.split("/")[0].replace(/^www\./, "")
+  const host = (withoutScheme.split("/")[0] ?? "").replace(/^www\./, "")
   return host || null
 }
 

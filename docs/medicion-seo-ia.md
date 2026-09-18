@@ -10,7 +10,7 @@ enlace. La cita se mide con tres instrumentos independientes:
 | --- | --- | --- |
 | Evento `ai_referral` en GA4 | Clics que **llegan** desde un motor de IA | GA4 → Informes → Interacción → Eventos |
 | Logs de Vercel | Qué crawlers de IA **leen** el sitio y cuánto | Vercel → Logs (filtrar por user-agent) |
-| Panel de prompts | Si la IA **menciona** a Resurte.me al responder | `/admin/seo-ia` (hoja de trabajo mensual) |
+| Panel de prompts | Si la IA **menciona** a Resurte.me al responder | `/admin/seo-ia` (panel mensual con persistencia) |
 
 Los tres juntos cuentan la historia completa: el crawler lee → la IA cita → alguien hace clic.
 
@@ -26,7 +26,8 @@ Los tres juntos cuentan la historia completa: el crawler lee → la IA cita → 
 - **Crawlers de IA**: los 25 user-agents autorizados en `robots.txt`, agrupados por
   familia (respuesta / entrenamiento / plataforma).
 - **Motores vigilados**: los 12 dominios que disparan el evento `ai_referral`.
-- **Panel de prompts**: 20 preguntas reales × 4 motores = 80 celdas para revisar cada mes.
+- **Panel de prompts**: 20 preguntas reales × 4 motores = 80 celdas para revisar cada mes,
+  con captura y comparación mes contra mes persistidas en `geo_panel_checks`.
 
 Los datos salen de `src/lib/geo-assets.ts`, `src/lib/ai-crawlers.ts` y
 `src/lib/geo-queries.ts`. Para cambiar la lista de preguntas, edita `GEO_QUERIES` en
@@ -51,7 +52,28 @@ Es la medición más importante y **no se puede automatizar**: hay que preguntar
    - **exacto**: `Sí` / `No` / `Parcial` — ¿la cifra que dijo la IA coincide con la del sitio?
      Una cifra mal citada es un activo roto y se corrige.
    - **competidor**: quién fue citado en lugar de Resurte.me.
-4. Guarda los resultados. La comparación mes contra mes es la señal real de progreso.
+4. Guarda cada celda en la propia tabla: pica la celda y se abre el formulario con los
+   cinco campos de arriba. El resultado se persiste en `geo_panel_checks`, así que la
+   comparación mes contra mes la calcula el panel, no tu memoria.
+
+El panel guarda **una fila por celda y por mes** (`run_month`, `query_id`, `engine_id`).
+La corrida **es** el mes: no hay que abrir nada ni cerrar nada, basta con capturar
+celdas. El selector de mes de arriba permite volver a cualquier corrida anterior.
+
+Lo que el panel te dice y por qué:
+
+- **Cobertura** (`n/80`): cuántas celdas llevas. Mientras no esté al 100%, el veredicto
+  es *Corrida incompleta* y el panel **no** concluye que no te citan: sólo que falta
+  medir. Una corrida a medias no se reporta como un fracaso de posicionamiento.
+- **Tasa de citación** y **dato correcto**: las dos tasas del mes. Si no hay celdas
+  medidas dicen *sin datos*, nunca `0%` — un `0%` afirmaría "lo medí y no pasó nada".
+- **Delta vs. el mes anterior con datos**: se muestra sólo si ese mes existe y tiene
+  celdas. Si no, aparece `—`: una variación contra "nada" sería una invención.
+- **Quién nos gana la cita**: ranking de dominios citados en las celdas donde no
+  aparecimos.
+- **Brechas accionables**: preguntas cuya página destino existe y aun así no recibieron
+  cita. Cada renglón es una página a reforzar.
+- **CSV del mes**: descarga la corrida completa para archivarla fuera del panel.
 
 Interpretación:
 

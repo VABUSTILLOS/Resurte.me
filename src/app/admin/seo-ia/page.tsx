@@ -2,7 +2,9 @@ import Link from "next/link"
 import { AI_CRAWLERS } from "@/lib/ai-crawlers"
 import { AI_ENGINES } from "@/lib/ai-referrers"
 import { getGeoInventory } from "@/lib/geo-assets"
-import { GEO_ENGINES, GEO_PANEL_FIELDS, GEO_QUERIES } from "@/lib/geo-queries"
+import { GEO_ENGINES, GEO_PANEL_FIELDS } from "@/lib/geo-queries"
+import { getGeoPanelMonth } from "./actions"
+import { GeoPanelForm } from "./panel-form"
 
 const FAMILY_LABEL: Record<string, string> = {
   respuesta: "Responde y cita",
@@ -24,7 +26,7 @@ const FAMILY_STYLE: Record<string, string> = {
  * se corre cada mes y se anota en cada celda si hubo cita.
  */
 export default async function AdminSeoIaPage() {
-  const inv = await getGeoInventory()
+  const [inv, panelData] = await Promise.all([getGeoInventory(), getGeoPanelMonth()])
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
@@ -190,55 +192,7 @@ export default async function AdminSeoIaPage() {
           ))}
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
-                  <th className="px-5 py-3 w-8">#</th>
-                  <th className="px-5 py-3 min-w-[22rem]">Pregunta</th>
-                  <th className="px-5 py-3 min-w-[10rem]">Dónde debería citar</th>
-                  {GEO_ENGINES.map((e) => (
-                    <th key={e.id} className="px-5 py-3 text-center w-24">
-                      {e.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {GEO_QUERIES.map((q, i) => (
-                  <tr key={q.id} className="hover:bg-gray-50">
-                    <td className="px-5 py-3 text-xs text-gray-400 font-mono">{i + 1}</td>
-                    <td className="px-5 py-3">
-                      <p className="text-gray-900">{q.prompt}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{q.intent}</p>
-                    </td>
-                    <td className="px-5 py-3">
-                      <Link
-                        href={q.targetPath}
-                        className="text-xs font-mono text-brand-600 hover:underline"
-                        target="_blank"
-                      >
-                        {q.targetPath}
-                      </Link>
-                    </td>
-                    {GEO_ENGINES.map((e) => (
-                      <td key={e.id} className="px-5 py-3 text-center text-gray-300">
-                        —
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <p className="text-xs text-gray-400 mt-3">
-          {inv.panelChecks} comprobaciones por corrida ({inv.panelQueries} preguntas ×{" "}
-          {inv.panelEngines} motores). Registra también <strong>qué dato se citó</strong> y{" "}
-          <strong>si era correcto</strong>: una cita con el precio equivocado es peor que no
-          aparecer.
-        </p>
+        <GeoPanelForm initialData={panelData} />
       </section>
     </div>
   )
