@@ -27,6 +27,16 @@
 > hardware— o de trabajo que aún no toca. El detalle está en las actas de las
 > rondas 20 y 21, más abajo.
 >
+> **Estado tras la Ronda 25** (guía de credenciales y su contrato): los 8 todos
+> que se venían atribuyendo en bloque a «faltan credenciales externas» quedaron
+> **rastreados hasta su origen**, y la premisa resultó **falsa en 3 de los 8**
+> —`w4-a11y` y `w4-pos-escpos` no necesitan ninguna credencial, y `w3-e2e-auth` se
+> auto-provisiona en tu propio Supabase—. Dónde se consigue cada valor, cuánto
+> cuesta y cómo se verifica está en [`docs/CREDENCIALES.md`](CREDENCIALES.md),
+> vigilado por `src/lib/credenciales.contract.test.ts`. Con esto, la frase «abierto
+> por depender de terceros» del párrafo anterior deja de ser una explicación y pasa
+> a ser **una lista con nombre y precio**.
+>
 > Convenciones: ✅ implementada · 🟡 resuelta a medias, con la parte que queda
 > abierta nombrada en la propia fila · 🔜 backlog priorizado. Los **IDs de fila** se
 > acotan **por sección** —el `A14` de §8 no es el `A14` de la Ronda 13, y es a
@@ -2687,6 +2697,78 @@ los 370 / 6,445 de la Ronda 23 —53 pruebas más—. Dos contratos nuevos
 `PROOF_METHOD_LABELS`. La migración
 `00190_email_logs_sent_at_index.sql` quedó aplicada. La Ronda 24 queda
 **cerrada**: las 11 filas `BA1`–`BD2` en ✅.
+
+### Ronda 25 — La guía que dice dónde se consigue
+
+**Origen.** Tras la Ronda 19 (auditoría de estatus) y las Rondas 20–24, quedaron
+**8 todos abiertos** que se venían atribuyendo en bloque a «faltan credenciales
+externas». Al preguntar **dónde se consiguen**, la premisa resultó **falsa en 3 de
+los 8** — y mientras fuera falsa, el operador no podía ni empezar, porque no sabía
+qué pedir, a quién, ni cuánto cuesta. El coste de la confusión era el mismo que el
+de la falta de credencial: trabajo detenido.
+
+**Oleada A — rastrear cada integración hasta su origen (`g1`, `g2`).** Nuevo
+[`docs/CREDENCIALES.md`](CREDENCIALES.md): los 9 bloqueos, cada uno con **qué
+desbloquea, dónde se consigue, cuánto cuesta y cómo se verifica**, y el orden
+recomendado por coste. Tres correcciones medidas, no supuestas:
+- **México sí está soportado por Stripe Connect.** `docs.stripe.com/connect/express-accounts`
+  lista *México* entre los países cuyas cuentas Express se pueden crear; plataforma
+  `MX` + cuentas `MX` es **misma región**, que es el requisito cuando no hay saldo
+  transfronterizo. **`w1-connect-*` no estaba bloqueado por país** y no hace falta
+  un PSP mexicano alternativo. (La doc de Express abre con un aviso de
+  «funcionalidad obsoleta» hacia **Accounts v2**: deuda futura, no bloqueo.)
+- **`w4-pos-escpos` no es un problema de credenciales.** `src/lib/foodos-printing/types.ts`
+  documenta que `printers.ts` se borró **a propósito** por no tener consumidores, y
+  los 6 adaptadores comerciales siguen `implemented: false` porque fingir una
+  sincronización produce un menú desincronizado en silencio. Lo que falta es una
+  **decisión de transporte**, no un secreto.
+- **`w4-a11y` tampoco.** Es trabajo de código, ya cubierto por la Ronda 23 (ver
+  su acta más abajo).
+- **`w3-e2e-auth` no necesita un tercero.** El usuario de prueba se auto-provisiona
+  en **tu propio Supabase** (`npm run admin create e2e@resurte.me`, `docs/OPS.md §8.2`),
+  que imprime la contraseña una sola vez.
+- **`w4-wallet` tiene, además del certificado, un bloqueo arquitectónico** que la
+  credencial no resuelve: la firma de Apple invoca `openssl smime -sign`, y el
+  propio `src/lib/foodos-wallet/apple.ts` declara que eso **no existe en
+  serverless**. El camino barato es Google (3 valores obligatorios).
+
+**Oleada B — punteros que no envejezcan (`g3`).** La guía se enlaza desde los tres
+sitios donde alguien la buscaría: el blockquote de `docs/AUDITORIA-ESTATUS.md §7`
+(tras las filas que «dependían de un tercero»), `docs/OPS.md §3` y la cabecera de
+`.env.local.example`. **Decisión de forma:** dentro de `docs/` se cita por **nombre
+de sección, nunca por número de línea** — la propia inserción de `g3` corrió
+`OPS.md` +11 líneas y rompió dos citas numéricas el mismo día.
+
+**Oleada C — el contrato que impide que envejezca (`g4`, `g5`).** Nuevo
+`src/lib/credenciales.contract.test.ts`, **7 pruebas, 4 reglas bidireccionales**:
+(1) toda integración de `src/lib/integration-status.ts` está documentada; (2) toda
+variable nombrada en la guía existe de verdad, con excepciones **razonadas**
+(`CFDI_*` propuestas, `POSTGRES_*` de plataforma); (3) los enlaces son `https` y
+los `docsUrl` de POS coinciden con el registro; (4) todo path citado existe.
+
+**Cada regla se probó con un sabotaje vivo antes de darla por buena**, y ahí estaba
+el valor: **el sabotaje destapó un agujero propio.** La regla 3 comparaba con
+`includes()`, es decir **por subcadena**, así que una guía que dijera
+`https://developer.clip.mx/VIEJO/` **pasaba**, porque la URL buena es prefijo de la
+mala. Ahora se comparan **URLs exactas**. Ocho sabotajes, ocho rojos: integración
+sin documentar, variable fantasma, excepción sin razón, excepción que sobra, enlace
+`http://`, `docsUrl` divergente, path inexistente, y la guarda de extracción
+(un contrato que no encuentra nada no vigila nada).
+
+**Lección:** la misma de las Rondas 23 y 24, un escalón más abajo. Allí fueron
+instrumentos que decían medir y no medían; aquí es **una premisa que se venía
+heredando sin comprobar** —«esto está bloqueado por credenciales»— y que al
+medirla resultó falsa en 3 de 8 casos. Y la reparación volvió a ser la misma:
+**escribir lo que no se ve**. La ronda no encendió una sola integración; cambió lo
+que el repo **sabe** sobre ellas.
+
+**Cierre medido.** `npm run verify` en verde: typecheck, lint, **374 archivos de
+test / 6,505 pruebas**, `knip` exit 0 — desde los 373 / 6,498 de la Ronda 24, es
+decir **+1 archivo y +7 pruebas, exactamente el contrato nuevo**. `docs/CREDENCIALES.md`
+no declara ningún conteo a propósito: un documento que no afirma un número no puede
+quedar obsoleto por él. Los 8 todos bloqueados quedaron reescritos con **su
+credencial, su origen y su comando de verificación** (`g6`). Sin commit: el árbol
+sigue siendo del usuario.
 
 ## Agentes de mantenimiento por dominio
 

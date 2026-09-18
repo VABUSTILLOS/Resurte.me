@@ -112,6 +112,17 @@ Si el proyecto Vercel está en plan **Hobby**, el límite es **2 crons** — añ
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | No | Clave pública que el navegador usa en `pushManager.subscribe` | Es la **misma** que `VAPID_PUBLIC_KEY`; se duplica porque el navegador necesita el prefijo `NEXT_PUBLIC_`. Si no coinciden, el push se firma con una clave distinta a la suscrita y el navegador lo descarta. |
 | `VAPID_SUBJECT` | No | Contacto del emisor VAPID | Por defecto `mailto:hola@resurte.me`. Debe ser un `mailto:` o una URL `https:`. |
 
+> 📍 **¿De dónde saco cada valor?** Esta tabla dice **cuáles** variables hacen
+> falta; [`docs/CREDENCIALES.md`](CREDENCIALES.md) dice **dónde se consigue cada
+> una**, cuánto cuesta, cuánto tarda y cómo se verifica que quedó bien. Cubre las
+> que bloquean trabajo pendiente (Stripe Connect, OXXO/SPEI/CoDi, Apple y Google
+> Wallet, CFDI) y las que ya están cableadas en el código pero apagadas (Resend,
+> WhatsApp, VAPID, Uber Direct, SMS, Kie.ai, SMTP propio de Supabase).
+>
+> ⚠️ **Empieza por la §0 de esa guía**, no por las credenciales: hay una
+> **rotación pendiente de la contraseña de Postgres** (más abajo en esta misma
+> sección) que es el único riesgo vivo de la lista y no cuesta nada cerrar.
+
 ### Rotación de `CRON_SECRET`
 1. Vercel → Project → Settings → Environment Variables → editar `CRON_SECRET` → **nuevo valor largo y aleatorio** (p.ej. `openssl rand -hex 32`).
 2. Re-deployar (los cambios de env aplican al siguiente deploy).

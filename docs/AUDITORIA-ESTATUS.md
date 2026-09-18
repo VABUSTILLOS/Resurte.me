@@ -429,6 +429,16 @@ que lo vigila.
 - **Stripe Connect** (`STRIPE_CONNECT_ENABLED`) para la dispersión automática.
 - **Certificados de Apple Wallet** (hoy 501) y credenciales de Google Wallet.
 
+> 📍 **Dónde se consigue cada una, cuánto cuesta y cómo se verifica:**
+> [`docs/CREDENCIALES.md`](CREDENCIALES.md). La guía corrige la premisa de esta
+> lista: **de los cuatro pendientes de arriba, sólo dos requieren comprar algo.**
+> Los certificados de Apple Wallet cuestan 99 USD/año y el PAC de CFDI cientos de
+> MXN/mes; OXXO/SPEI se habilitan **sin costo de alta** desde el Dashboard de
+> Stripe (sí hay comisión por operación), y **Google Wallet es gratis**. Además,
+> dos pendientes de rondas anteriores que se creían bloqueados por un tercero
+> —`w3-e2e-auth` y `w4-a11y`— **no dependen de ninguna credencial**: el primero se
+> auto-provisiona con `npm run admin create` y el segundo es trabajo de código.
+
 ---
 
 ## 8. Estado tras la Ronda 23 — los cinco instrumentos que mentían
