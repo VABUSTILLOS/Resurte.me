@@ -115,8 +115,8 @@ test.describe("comercialización — ficha del prospecto", { tag: "@ci" }, () =>
   })
 })
 
-test.describe("comercialización — sin regresión por la Ronda 16", { tag: "@ci" }, () => {
-  // La Ronda 16 le devolvió la escritura al admin y añadió dinero al CRM. El
+test.describe("comercialización — sin regresión por la Ronda 18", { tag: "@ci" }, () => {
+  // La Ronda 18 le devolvió la escritura al admin y añadió dinero al CRM. El
   // camino del vendedor es el criterio de no-regresión de esa ronda: no cambia
   // de comportamiento. Lo que se fija aquí es que la superficie del vendedor no
   // adopta los parámetros nuevos del admin ni se rompe al recibirlos.

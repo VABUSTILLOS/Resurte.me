@@ -1,7 +1,7 @@
 "use server"
 
 /**
- * Tareas del CRM (Ronda 16, F4 — migración `00185_crm_tasks.sql`).
+ * Tareas del CRM (Ronda 18, F4 — migración `00185_crm_tasks.sql`).
  *
  * La ficha de prospecto es compartida entre el panel y el vendedor, así que sus
  * comandos también: este módulo sirve a las dos superficies y resuelve el

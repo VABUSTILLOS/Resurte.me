@@ -350,6 +350,11 @@ export type FoodosFulfillment = "delivery" | "pickup" | "dine_in"
  * `processing` = el cliente ya recibió las instrucciones de un método
  * asíncrono (OXXO/SPEI/CoDi) y el pago aún no se acredita.
  * `expired` = el voucher/CLABE caducó sin pago.
+ * `amount_mismatch` = la tarjeta se cobró por un monto distinto al total
+ *   (`stripe-webhook-handlers.ts` lo escribe cuando
+ *   `isAmountSufficient()` da falso). Faltaba aquí: la columna es `TEXT` sin
+ *   CHECK, así que la base sí lo guardaba, la ruta de comprobantes lo aceptaba
+ *   y el seguimiento lo contemplaba — pero el tipo decía que no existía.
  */
 export type FoodosPaymentStatus =
   | "pending"
@@ -358,6 +363,7 @@ export type FoodosPaymentStatus =
   | "failed"
   | "expired"
   | "refunded"
+  | "amount_mismatch"
 
 /** Modificador elegido en una línea de pedido (snapshot con precio server-side). */
 export interface FoodosOrderItemModifier {

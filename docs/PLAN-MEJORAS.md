@@ -1755,6 +1755,193 @@ vigila otra cosa.*
 
 | DP1 | **La tercera forma de fila sigue sin contrato.** Medido: `### Ronda 13` numera seis filas con el ID como **prefijo** de la celda (`R1 foco`, `R2 diálogos`, `R3`…), forma que `ROW_DEF_RE` no reconoce porque exige la barra inmediatamente después de los dígitos; sus **7 citas en prosa** (`L1116`–`L1163`) son, por tanto, impoliceables. Peor: como esa declaración es invisible, el contrato cree que `R1` es único —solo lo ve en el rango `R1-R4` de `## 5. Recompensas`— cuando en realidad ya es ambiguo. Se deja sin tocar porque la sección es territorio ajeno; se declara aquí | 🔜 |
 
+### Ronda 18 — Un CRM que se puede usar de punta a punta
+
+**Punto de partida medido, no declarado.** El CRM tenía 14 módulos en `src/lib/`
+con 5 contratos `crm-*.contract.test.ts`, 7 migraciones
+(`00049/00052/00131/00139/00140/00142/00180`) y **cero acciones huérfanas**: la
+mitad *escrita* del CRM ya existía. Lo que faltaba no estaba en el backlog, y por
+eso se midió antes de proponer. Siete hallazgos, todos con archivo y línea:
+
+| # | Hallazgo medido | Consecuencia |
+|---|---|---|
+| H1 | `LeadDetailDrawer.tsx` no pasaba `slots` ni `activityActions` | El admin **no podía escribir**: leía todo y no podía tocar nada |
+| H2 | El dinero ya se calculaba (`getProspectClientOrders`) y el admin no lo veía | El dato existía y no llegaba a la pantalla |
+| H3 | `employees`, `instagram`, `weekly_volume_min/max`: **ninguna UI las escribía**, pero `agente/actions.ts` las declaraba en el prompt | El agente IA razonaba sobre **cuatro `null` permanentes** |
+| H4 | `createProspect` fijaba `seller_id: userId` | Un prospecto dado de alta por el admin nacía **asignado a quien lo creó** |
+| H5 | `perdido` era un estado **sin causa** | No se puede analizar por qué se pierde |
+| H6 | `COLUMNS_00059` declaraba 2 de las 6 columnas de esa migración | El escalón estaba incompleto: cuatro columnas fuera del contrato |
+| H7 | La última migración real era `00183` | Las nuevas son `00184`/`00185` |
+
+**Tres decisiones de alcance que resolvió el usuario, no yo:** superficie →
+**programa completo** (no un parche de lectura); dinero → **las dos cosas**
+(previsto *y* real, mostrados como conceptos distintos); tareas → **tabla
+`crm_tasks` ligada al prospecto**, con `prospect_id NOT NULL`.
+
+**F1 — el esquema y el contrato compartido.** `00184_crm_deal_closure.sql` añade
+`estimated_value NUMERIC(12,2)` (mismo tipo que `weekly_volume_min/max`, para no
+introducir una segunda escala de dinero), `loss_reason` y `closed_at`. Los cuatro
+`CHECK` son invariantes de **una sola fila**; el importante es
+`loss_reason IS NULL OR status = 'perdido'` —un motivo de pérdida sobre un trato
+abierto es dato corrupto—. **La dirección contraria no se impone**: exigir motivo
+al perder habría rechazado las filas históricas en `perdido`, y un motivo no se
+puede inventar. `00185_crm_tasks.sql` crea `crm_tasks` con
+`prospect_id NOT NULL ON DELETE CASCADE`, `CHECK ((status = 'completada') = (completed_at IS NOT NULL))`
+y **RLS encendida con 0 políticas**, siguiendo la decisión explícita de `00140`:
+el acceso pasa por `createServiceClient()` y el alcance se aplica en código
+(`CrmScope`), no relajando políticas.
+
+**Promover las cuatro huérfanas a `COLUMNS_00059` fue lo que las hizo escribibles.**
+El escalón declaraba solo `tier` y `zone` de las seis columnas de `00059`; sin
+promoverlas, ningún formulario podía escribirlas y el agente seguía leyendo `null`.
+`crm-prospects.ts` perdió `extraColumns`/`withExtras` en el mismo movimiento: al
+promoverlas, el mecanismo se quedó **sin ningún llamador**, y un mecanismo muerto
+es exactamente el campo muerto que este repo penaliza. `crm-core.ts` mapea lo nuevo
+con coerción: **`NUMERIC` llega de PostgREST como `string`**, así que sin coercionar
+el pipeline habría sumado concatenaciones.
+
+**F2 — el dinero, y la regla que lo gobierna.** Se añadió
+`estimated_value` (previsto, declarado) y `getAdminProspectClientOrders` (real,
+derivado de `crm_prospects.user_id → orders.user_id`), **delegando** en
+`getProspectClientOrders` en vez de reimplementar, para no crear un lector nuevo de
+`crm_prospects` ni duplicar la atribución. La invariante que se fijó con prueba:
+**una columna donde ningún prospecto declara valor da `null`, no `0`**. Sumar ceros
+y pintar `$0` diría "esta etapa no vale nada" cuando lo cierto es "nadie ha
+declarado valor" — es la regla de `crm-funnel.ts` ("una tasa sin denominador es
+`null`") aplicada a una suma. `sumEstimatedValue` devuelve
+`{ total: number | null, declared: number }`, pide `limit + 1` para delatar el
+corte, y `formatEstimatedTotal` pinta `Sin valor declarado` o `≥ $X` si truncó.
+
+**El "valor por etapa del embudo" del plan se cumple donde el dinero existe.** El
+plan lo pedía en `crm-funnel.ts`, que opera sobre `leads` y **no tiene funciones de
+dinero**; llevarlo allí habría significado escribir una segunda suma. Se cumple con
+la suma por columna del tablero (`sumEstimatedValue`), que es donde el pipeline
+vive. Declararlo es más honesto que forzar la simetría.
+
+**F3 — el bug que no estaba en el plan y era el peor de la ronda.**
+`crmStatusPatch` existía en `crm-core.ts` y **nunca se usaba en producción**: el
+`<select>` de estado escribía `{status}` pelado, así que **reabrir un trato perdido
+violaba el `CHECK` de `00184` en la cara del usuario**. Y el mismo defecto estaba en
+**dos** rutas: `updateCrmProspectStatus` (admin) y `updateProspect` (formulario del
+vendedor). Las dos quedaron cubiertas. El cierre pasó a ser un acto explícito:
+`closeCrmProspect(id, outcome, lossReason?)` es la **única** ruta que escribe
+`loss_reason`, con selector de motivo **obligatorio al perder** y el botón
+deshabilitado mientras falte.
+
+**F4 — las tareas.** `crm-tasks.ts` (puro, sin Supabase: `isTaskOverdue`,
+`taskUrgency`, `sortTasks`, `taskAgeDays`, `formatTaskDue`) sigue la disciplina de
+`crm-inbox.ts`: **una fecha ausente no es "hoy"** — sin `due_at` la tarea no vence.
+Cuatro desviaciones del plan, todas por medición:
+
+1. **Una sola `getTaskAgenda()` en vez de dos.** El plan pedía `getAdminTaskAgenda`
+   y `getSellerTaskAgenda`; el alcance ya lo decide `CrmScope`, así que dos
+   funciones habrían sido dos sitios donde equivocarse.
+2. **`reopenTask` no estaba en el plan** y se añadió: una tarea completada por error
+   era irreversible desde la interfaz.
+3. **El alcance de una tarea se decide sobre el prospecto, no sobre
+   `crm_tasks.seller_id`** — la columna existe pero es secundaria; el dueño del
+   trato manda.
+4. **`listProspectTasks` no se envolvió** en el registro de acciones auditadas
+   porque **no escribe**.
+
+`assignCrmProspect` y `distributeCrmProspects` **mueven las tareas abiertas con el
+trato**, y `createTask` asigna el vendedor del prospecto. La agenda usa
+**resource embedding** de PostgREST (`crm_prospects!inner(...)`): sin el `!inner`
+las filas padre llegan con `crm_prospects: null`. `LOGGED_ADMIN_ACTIONS` pasó de
+18 a 22.
+
+**F5 — el admin recupera la escritura.** Los tres formularios compartidos
+(`ProspectFormModal`, `ActivityFormModal`, `ImportCsvModal`) se movieron a
+`src/components/crm/` y **inyectan** sus acciones: es la regla que gobierna esta
+superficie —"si un comando no se inyecta, su sección no se pinta"— y por eso el
+vendedor y el admin comparten una copia y no dos. `prospect-form.tsx`,
+`activity-form.tsx` e `import-csv-modal.tsx` se borraron.
+
+El **pozo** se arregló en el origen: `ProspectInput` ganó `seller_id` opcional y
+`resolveNewProspectSeller` deja el prospecto **sin asignar** cuando quien crea es
+admin y no elige vendedor; el camino del vendedor (`seller_id = userId`) no cambió.
+El selector de vendedor se ofrece **solo en el alta**, no al editar. Y
+`updateCrmProspect` **descarta `status` y `seller_id` en runtime** antes de delegar:
+la edición no es una vía de reasignación encubierta. La bitácora guarda **los
+nombres de los campos, no los valores**, para no copiar PII al registro de auditoría.
+
+`validateProspectSegmentation` rechaza `min > max` **aunque la base no lo haga**,
+porque el agente razona sobre ese intervalo y un intervalo imposible le da un dato
+falso. `getAdminCities` existe porque `/admin/leads` es un componente cliente y no
+puede importar `@/lib/data`. El `refreshKey` del drawer existe porque `onChanged`
+**no** recarga la ficha. `deleteCrmActivity` lee **antes** de borrar, y la prueba
+fija ese orden con un `Trace` (`["read","delete"]`): invertirlo enrojece.
+`LOGGED_ADMIN_ACTIONS` 22 → 27.
+
+**F6 — el agente deja de razonar sobre `null`.** Con las cuatro columnas dentro del
+contrato y del formulario, el agente por fin recibe `employees`, `instagram` y el
+intervalo de volumen. Se eliminó `EXTRA_PROSPECT_COLUMNS` y su uso. El briefing
+suma **el pipeline abierto**, no el alcance entero, y de ahí el nombre propio
+`readOpenCrmPipelineValue` — con `openOnly` filtrando
+`.not("status","in","(cliente_activo,perdido)")`, espejo del índice parcial de
+`00184` y de `CRM_CLOSED_STATUSES`. El panel del admin conserva el alcance entero
+en `crmPipelineValue`: **los dos totales no son intercambiables y por eso tienen
+nombre distinto**. El `null` viaja hasta la plantilla y hasta el prompt, con una
+**regla escrita** para que la IA no diga `$0` cuando no hay valor declarado.
+
+**La prueba del prompt no es vacua, y se demostró mutilándola.** Sustituir el
+argumento de `:214` de `agente/actions.ts` por `null` hizo **fallar** el caso que
+exige que `Empleados: 12`, `@tacosana`, `3,000` y `6,000` aparezcan en el prompt;
+restaurado el archivo, `diff` → **idéntico** y 6/6 otra vez.
+
+**F7 — verificación y este acta.** Dos specs e2e extendidos
+(`admin-leads.spec.ts` 148 → **285** líneas, `comercializacion.spec.ts` 116 → **147**),
+con 9 casos nuevos. **La primera corrida dio 3 rojos que no eran del producto**:
+`Test timeout of 30000ms exceeded while running "beforeEach"`, porque sin
+`E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD` el helper navegaba a `/auth/login`, no
+encontraba los campos y **consumía los 30 s del test antes de que `test.skip`
+pudiera decidir**. El arreglo es de dos capas: el `beforeEach` **salta al instante**
+si faltan las credenciales, y `signInAsAdmin` devuelve `false` sin navegar en ese
+caso, con el `waitForURL` bajado de 20 s a 12 s para que un login que no cuaja deje
+sitio al `skip` en vez de comerse el presupuesto. **Medido después: 38 passed,
+3 skipped, 0 failed.** El fallo era del arnés, no de la interfaz: es la misma
+lección de la Ronda 15 — **un gate rojo no siempre es del producto**.
+
+**Verificación final medida.** `npx tsc --noEmit` → **1 error, ajeno y en vuelo**
+(`src/app/r/[slug]/pedido/[id]/order-tracking.tsx:173`, `TS2345`, marca de tiempo
+**30 s anterior** a mi medición) · `npm test` → **345 archivos / 5980 pruebas, 1 en
+rojo, ajena** (`db-function-grants.contract.test.ts:170` por
+`00186_foodos_coupon_release.sql`) · la superficie CRM entera → **21 archivos /
+620 pruebas, 0 en rojo** · e2e → **41 casos, 0 en rojo** · `npm run lint` → exit 1
+con **7 warnings, todos ajenos** en `order-tracking.tsx` · `npm run build` → exit 1
+por el mismo `TS2345` ajeno · `npm run knip` → exit 1 por **1 export ajeno**
+(`canFoodosCustomerCancel` en `src/lib/foodos-order-status.ts:125`).
+
+**Cuatro gates en rojo y los cuatro son de la misma sesión concurrente.** Los
+archivos implicados tienen marcas de tiempo **posteriores a mi último cambio**:
+`00186_foodos_coupon_release.sql` (21:24:31), `foodos-order-status.ts` (21:24:48),
+y `order-tracking.tsx` **21:35:12 — escrita mientras yo corría `lint`**, con mi
+última edición a las 21:34:20. Nada de un barrido de CRM puede producir un
+`TS2345` de `FoodosPaymentStatus` ni un import sin usar en una ruta `/r/[slug]`.
+Se declaran; no se tocan, porque escribir en un archivo que su autor tiene abierto
+es exactamente cómo se pierde trabajo ajeno. **`git log` no atribuye en este árbol**
+(auto-commit del workspace): la atribución se hace por marca de tiempo y por
+contenido del mensaje de error.
+
+**Deuda declarada, no arreglada** — con el prefijo `CRM`, que estaba libre:
+
+| # | Deuda | Estado |
+|---|---|---|
+| CRM1 | **`orders.seller_id` existe y ninguna ruta la escribe.** El aviso de `00155:39` se confirmó: usarla para atribuir comisión daría **cero siempre**. El camino del dinero es `crm_prospects.user_id → orders.user_id` y así se dejó | 🔜 |
+| CRM2 | **`getProspectClientOrders` limita a 50 pedidos.** Un cliente con más daría `revenue` **subestimado** sin avisar. Quirk heredado, no de esta ronda | 🔜 |
+| CRM3 | **No se puede verificar RLS real en producción**, solo lo que declaran las migraciones. `crm_tasks` tiene RLS encendida y **0 políticas**: el acceso depende de que todo pase por `createServiceClient()` | 🔜 |
+| CRM4 | **La atribución de uso de columnas salió de grep de identificadores.** Una referencia dinámica (nombre construido en runtime) podría escapar al inventario de H3 | 🔜 |
+| CRM5 | **`estimated_value` es un valor declarado, no un histórico.** El pipeline es una **foto**, no una tendencia: no se puede responder "¿cuánto valía el pipeline el mes pasado?" | 🔜 |
+| CRM6 | **El motivo de pérdida no se puede exigir retroactivamente.** Las filas históricas en `perdido` no lo tienen y el `CHECK` lo permite a propósito; cualquier métrica por motivo tendrá denominador parcial | 🔜 |
+
+**Lección.** El CRM no estaba a medio construir: estaba **construido y sin boca ni
+manos**. Tres de los siete hallazgos (H3, H4, H6) eran *escrituras que nadie podía
+hacer* o *datos que nadie podía llenar*, y el peor de la ronda —el `CHECK` que el
+usuario podía violar desde un `<select>`— **no estaba en el backlog**: apareció al
+leer qué escribía realmente cada ruta. Y el defecto estaba duplicado en dos rutas
+porque la misma decisión se había tomado dos veces en dos archivos.
+**Un dato que nadie puede llenar no es un dato: es un `null` que el agente se cree.**
+
 ## Agentes de mantenimiento por dominio
 
 Ver `docs/agents/` — perímetro, invariantes y verificación por feature.

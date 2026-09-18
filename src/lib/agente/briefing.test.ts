@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-// El briefing del agente y el dinero (Ronda 16, F6).
+// El briefing del agente y el dinero (Ronda 18, F6).
 //
 // Lo que se fija aquí es una sola regla, y es la que más fácil se rompe porque
 // el lenguaje la empuja: **no declarado no es cero**. `pipelineAbierto` es

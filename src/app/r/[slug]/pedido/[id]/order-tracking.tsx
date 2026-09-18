@@ -12,13 +12,17 @@ import {
 } from "lucide-react"
 import { formatMoney, modifiersSummary } from "@/lib/foodos"
 import { detectStorefrontLang } from "@/lib/foodos-i18n"
-import type { FoodosOrderItem, FoodosOrderStatus } from "@/types/foodos"
+import {
+  FOODOS_CANCEL_REFUSAL_MESSAGE,
+  foodosCustomerCancelRefusal,
+} from "@/lib/foodos-order-status"
+import type { FoodosOrderItem, FoodosOrderStatus, FoodosPaymentStatus } from "@/types/foodos"
 import { PaymentProofUpload } from "../../_components/payment-proof-upload"
 
 interface TrackData {
   id: string
   status: FoodosOrderStatus
-  payment_status: string
+  payment_status: FoodosPaymentStatus
   fulfillment: "delivery" | "pickup" | "dine_in"
   table_number: string | null
   created_at: string
@@ -66,6 +70,9 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
   const [data, setData] = useState<TrackData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [lang] = useState(() => detectStorefrontLang(slug))
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -99,6 +106,40 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
     }
   }, [orderId, slug])
 
+  /**
+   * Cancela el pedido. La ventana y el motivo los decide el servidor
+   * (`foodosCustomerCancelRefusal`, la misma regla que pinta este botón): si el
+   * restaurante confirmó el pedido mientras el comensal leía, la ruta responde
+   * 409 y aquí se muestra por qué.
+   */
+  async function handleCancel() {
+    if (!data) return
+    setCancelling(true)
+    setCancelError(null)
+    try {
+      const res = await fetch(`/api/foodos/orders/${orderId}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setCancelError(json.error ?? "No se pudo cancelar el pedido")
+        return
+      }
+      setData({
+        ...data,
+        status: "cancelled",
+        payment_status: json.order?.payment_status ?? data.payment_status,
+      })
+      setConfirmingCancel(false)
+    } catch {
+      setCancelError("Error de conexión. Intenta de nuevo.")
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   if (error && !data) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center px-4">
@@ -128,6 +169,9 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
     data.status === "cancelled"
       ? -1
       : visibleSteps.findIndex((s) => s.status === data.status)
+  // Una sola regla, la del servidor, decide si hay botón o explicación.
+  const cancelRefusal = foodosCustomerCancelRefusal(data.status, data.payment_status)
+  const isFinished = data.status === "delivered" || data.status === "cancelled"
 
   return (
     <div className="min-h-screen bg-stone-50 px-4 py-8">
@@ -331,6 +375,71 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
         )}
 
         {data.status === "delivered" && <ReviewForm orderId={orderId} />}
+
+        {/* Cancelación del comensal. Solo mientras el pedido no haya empezado;
+            fuera de esa ventana se explica el motivo en vez de esconder el
+            botón, para que nadie se quede sin saber qué hacer. */}
+        {cancelRefusal === null ? (
+          <div className="bg-white border border-stone-200 rounded-3xl p-6">
+            {confirmingCancel ? (
+              <>
+                <p className="font-bold text-stone-900">¿Cancelar el pedido?</p>
+                <p className="text-sm text-stone-500 mt-1">
+                  {lang === "es"
+                    ? "El restaurante todavía no lo ha empezado. Si lo cancelas, no se preparará."
+                    : "The restaurant hasn't started it yet. If you cancel, it won't be prepared."}
+                </p>
+                {cancelError && (
+                  <p className="text-sm font-semibold text-rose-600 mt-3">{cancelError}</p>
+                )}
+                <div className="flex gap-2 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingCancel(false)}
+                    disabled={cancelling}
+                    className="flex-1 min-h-11 rounded-xl border border-stone-300 text-stone-700 text-sm font-bold disabled:opacity-50"
+                  >
+                    {lang === "es" ? "Mantener pedido" : "Keep order"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    disabled={cancelling}
+                    className="flex-1 min-h-11 rounded-xl bg-rose-600 text-white text-sm font-bold hover:bg-rose-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {cancelling && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {lang === "es" ? "Sí, cancelar" : "Yes, cancel"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCancelError(null)
+                    setConfirmingCancel(true)
+                  }}
+                  className="w-full min-h-11 rounded-xl border border-rose-200 text-rose-600 text-sm font-bold hover:bg-rose-50 flex items-center justify-center gap-2"
+                >
+                  <XCircle className="w-4 h-4" />
+                  {lang === "es" ? "Cancelar pedido" : "Cancel order"}
+                </button>
+                {cancelError && (
+                  <p className="text-sm font-semibold text-rose-600 mt-3 text-center">
+                    {cancelError}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          !isFinished && (
+            <p className="text-xs text-stone-500 text-center px-4">
+              {FOODOS_CANCEL_REFUSAL_MESSAGE[cancelRefusal]}
+            </p>
+          )
+        )}
 
         <div className="flex gap-2">
           <Link

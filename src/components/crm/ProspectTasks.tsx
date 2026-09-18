@@ -18,7 +18,7 @@ import {
 } from "@/lib/crm-tasks"
 
 /**
- * Tareas del prospecto (Ronda 16, F4).
+ * Tareas del prospecto (Ronda 18, F4).
  *
  * Vive en `crm/` y no en una de las dos superficies porque la ficha es una sola:
  * el panel y el vendedor ven exactamente esta sección, y lo que cambia entre

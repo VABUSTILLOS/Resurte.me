@@ -148,9 +148,9 @@ test.describe("leads CRM — bandeja de conversaciones", { tag: "@ci" }, () => {
 })
 
 /**
- * Ronda 16 — el admin recupera la escritura y el dinero.
+ * Ronda 18 — el admin recupera la escritura y el dinero.
  *
- * Hasta la Ronda 16 el admin era la superficie **más pobre** del CRM: leía todo
+ * Hasta la Ronda 18 el admin era la superficie **más pobre** del CRM: leía todo
  * y no podía crear un prospecto, ni editar el contacto, ni importar CSV, ni
  * tocar una actividad, ni ver un peso. Estos casos fijan las cuatro invariantes
  * que la ronda añadió y que solo se pueden comprobar con navegador:
@@ -176,22 +176,25 @@ const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD
 
 /** Inicia sesión con las credenciales de entorno. `false` si no se pudo. */
 async function signInAsAdmin(page: Page): Promise<boolean> {
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) return false
   await page.goto("/auth/login")
   const email = page.locator("#email")
   const password = page.locator("#password")
   if ((await email.count()) === 0 || (await password.count()) === 0) return false
-  await email.fill(ADMIN_EMAIL ?? "")
-  await password.fill(ADMIN_PASSWORD ?? "")
+  await email.fill(ADMIN_EMAIL)
+  await password.fill(ADMIN_PASSWORD)
   await page.getByRole("button", { name: /Iniciar Sesión/ }).click()
   try {
-    await page.waitForURL((url) => !url.pathname.startsWith("/auth/login"), { timeout: 20_000 })
+    // Ceñido a propósito: un login que no cuaja debe devolver `false` y dejar
+    // que el test se salte, no consumir el timeout de 30 s del test.
+    await page.waitForURL((url) => !url.pathname.startsWith("/auth/login"), { timeout: 12_000 })
   } catch {
     return false
   }
   return true
 }
 
-test.describe("leads CRM — escritura del admin (Ronda 16)", { tag: "@ci" }, () => {
+test.describe("leads CRM — escritura del admin (Ronda 18)", { tag: "@ci" }, () => {
   test("?nuevo=1 no abre el alta: escribir es un acto explícito", async ({ page }) => {
     // Un enlace no puede dejar un formulario de alta abierto y listo para
     // enviar. El alta se abre desde el botón, con estado local.
@@ -215,7 +218,7 @@ test.describe("leads CRM — escritura del admin (Ronda 16)", { tag: "@ci" }, ()
   })
 })
 
-test.describe("leads CRM — comportamiento con sesión admin (Ronda 16)", { tag: "@ci" }, () => {
+test.describe("leads CRM — comportamiento con sesión admin (Ronda 18)", { tag: "@ci" }, () => {
   test.beforeEach(async ({ page }) => {
     // Sin credenciales se salta al instante: esperar a que falle el login
     // consume el tiempo del test y lo hace fallar por timeout en vez de

@@ -38,7 +38,7 @@ import {
 } from "@/lib/crm-tasks"
 
 /**
- * Contrato de las tareas del CRM (Ronda 16, migración `00185_crm_tasks.sql`).
+ * Contrato de las tareas del CRM (Ronda 18, migración `00185_crm_tasks.sql`).
  *
  * El módulo `crm-tasks.ts` es puro: lo consumen las server actions y los
  * componentes cliente. Estas pruebas fijan las tres cosas que se rompen sin

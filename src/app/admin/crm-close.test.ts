@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-// Cierre del trato del CRM (Ronda 16, F3).
+// Cierre del trato del CRM (Ronda 18, F3).
 //
 // Lo que se comprueba aquí, y por qué no basta con el contrato estático de
 // `crm-core.contract.test.ts`:

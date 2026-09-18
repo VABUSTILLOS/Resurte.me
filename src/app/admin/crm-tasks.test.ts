@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-// Tareas del CRM en el panel (Ronda 16, F4 — migración `00185_crm_tasks.sql`).
+// Tareas del CRM en el panel (Ronda 18, F4 — migración `00185_crm_tasks.sql`).
 //
 // El panel no reimplementa nada: delega en `src/lib/comercializacion/actions/tareas.ts`,
 // que es el módulo compartido con la ficha del vendedor. Lo que sí es exclusivo

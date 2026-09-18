@@ -21,7 +21,7 @@ import { completeCrmTask } from "../actions"
 import { useToast } from "@/components/toast"
 
 /**
- * Agenda de trabajo del CRM (Ronda 16, F4).
+ * Agenda de trabajo del CRM (Ronda 18, F4).
  *
  * Es la vista que responde "qué me toca hoy" sin abrir ficha por ficha. Agrupa
  * por horizonte natural —vencidas, hoy, próximos 7 días, más adelante, sin

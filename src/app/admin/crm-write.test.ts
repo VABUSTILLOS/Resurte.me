@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-// Escritura del panel en el CRM (Ronda 16, F5).
+// Escritura del panel en el CRM (Ronda 18, F5).
 //
 // El panel no reimplementa el CRM: delega en `src/lib/comercializacion/actions/`,
 // que es el mismo módulo que usa la ficha del vendedor. Lo que sí es exclusivo

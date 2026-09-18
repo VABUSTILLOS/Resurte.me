@@ -45,7 +45,7 @@ const ACTIVE_STATUSES: readonly CrmStatus[] = [
 ]
 
 /**
- * Ronda 16: los cuatro campos de segmentación (`employees`, `instagram`,
+ * Ronda 18: los cuatro campos de segmentación (`employees`, `instagram`,
  * `weekly_volume_min`, `weekly_volume_max`) son parte del contrato compartido
  * `CrmProspectRow`, así que el agente los lee de la fila como cualquier otro y
  * los cuatro llegan al prompt de `generateAgentMessage`. Antes viajaban como

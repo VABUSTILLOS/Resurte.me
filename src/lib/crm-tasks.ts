@@ -1,5 +1,5 @@
 /**
- * Ronda 16 — tareas del CRM (migración `00185_crm_tasks.sql`).
+ * Ronda 18 — tareas del CRM (migración `00185_crm_tasks.sql`).
  *
  * El CRM tenía seguimiento (`crm_prospects.next_follow_up_at`, una fecha suelta)
  * pero no trabajo: "llamar a Juan el jueves" no cabía en una columna de fecha, así

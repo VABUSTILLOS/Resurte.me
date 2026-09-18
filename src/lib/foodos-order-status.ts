@@ -82,14 +82,17 @@ export const FOODOS_CUSTOMER_CANCELLABLE_STATUSES: readonly FoodosOrderStatus[] 
 ]
 
 /**
- * Estados de pago con dinero cobrado o en vuelo. `refunded` también entra: si
- * hubo una devolución, el pedido ya se liquidó con el restaurante y no es el
- * comensal quien lo cierra.
+ * Estados de pago con dinero cobrado o en vuelo. `amount_mismatch` entra
+ * porque la tarjeta SÍ se cobró (por un monto distinto): no es un pago que
+ * falló, es un pago que hay que cuadrar con el restaurante. `refunded`
+ * también: si hubo una devolución, el pedido ya se liquidó y no es el comensal
+ * quien lo cierra.
  */
 export const FOODOS_CHARGED_PAYMENT_STATUSES: readonly FoodosPaymentStatus[] = [
   "paid",
   "processing",
   "refunded",
+  "amount_mismatch",
 ]
 
 export type FoodosCancelRefusal = "already_cancelled" | "started" | "charged"
