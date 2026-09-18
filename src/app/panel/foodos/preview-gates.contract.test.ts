@@ -44,7 +44,7 @@ import { join } from "node:path"
 const REPO = process.cwd()
 const FOODOS_DIR = join(REPO, "src", "app", "panel", "foodos")
 
-/** Las 10 superficies con capacidad premium y su capacidad asociada. */
+/** Las 11 superficies con capacidad premium y su capacidad asociada. */
 const PREMIUM_PAGES = {
   "mostrador/page.tsx": "pos_mostrador",
   "mesas/page.tsx": "comandero",
@@ -56,6 +56,7 @@ const PREMIUM_PAGES = {
   "mesero-ia/page.tsx": "mesero_ia",
   "flotilla/page.tsx": "flotilla",
   "clientes/page.tsx": "marketing_ia",
+  "app-marca/page.tsx": "app_marca",
 } as const
 
 function read(rel: string): string {

@@ -571,7 +571,7 @@ privilegios por defecto a esos roles en cada objeto nuevo de `public`.
   invitado recurrente desaparecía cada 30 días y rompía el historial.
 
 **Estado verificado (17-sep-2026):** **aplicada**. No es "la última migración del
-repo" —el repositorio va por `00157`— y **sí tiene fila en el ledger** (`00117` ·
+repo" —el repositorio va por `00163`— y **sí tiene fila en el ledger** (`00117` ·
 `address_book`), así que `db push` la aplica sola en un entorno nuevo. Sonda con
 la clave publicable:
 
@@ -896,18 +896,19 @@ que provocan si faltan:
 **Para saber si te falta algo, no adivines ni pegues SQL "por si acaso": corre
 `npm run db:status`.** Read-only, y compara el ledger en las dos direcciones.
 
-Estado medido el **17-sep-2026**: los objetos están vivos, pero el ledger **no
-está limpio**. Las cuatro migraciones más recientes (`00154`…`00157`) se
-aplicaron por **MCP**, que registra un **timestamp generado** en vez del número
-del archivo: `20260917190303` (`marketplace_delivery_proof`), `20260917215802`
-(`commission_ledger`), `20260917220238` (`commission_periods_period_index`) y
-`20260917230345` (`foodos_payouts`). Su DDL **está aplicado y coincide** con los
-archivos. No es cosmético — la CLI exige que el historial remoto sea un prefijo
-de la lista local, así que esas filas dejan `db push` **bloqueado por completo**
-con `LegacyDbPushMissingLocalError`: no se puede aplicar ninguna migración nueva
-hasta repararlas. `npm run db:status` lo detecta y te da los comandos exactos.
-La regla y el historial de incidentes están en «Regla: las migraciones numeradas
-se aplican por CLI, nunca por MCP».
+Estado medido el **18-sep-2026**: los objetos están vivos y el ledger **está
+limpio** — `00001`…`00163` emparejadas 1:1, cero huérfanas. Antes de la
+reparación de ese día sí estaba sucio: las migraciones `00154`…`00163` se habían
+aplicado por **MCP**, que registra un **timestamp generado** en vez del número
+del archivo, dejando **diez filas huérfanas** de `20260917190303`
+(`marketplace_delivery_proof`) a `20260918003729` (`geo_panel_checks`). Su DDL
+**está aplicado y coincide** con los archivos, así que la reparación fue solo de
+ledger. No era cosmético — la CLI exige que el historial remoto sea un prefijo
+de la lista local, así que esas filas dejaban `db push` **bloqueado por
+completo** con `LegacyDbPushMissingLocalError`: no se podía aplicar ninguna
+migración nueva hasta repararlas. `npm run db:status` lo detecta y te da los
+comandos exactos. La lista completa y la regla están en «Regla: las
+migraciones numeradas se aplican por CLI, nunca por MCP».
 
 ### Migraciones recientes ya aplicadas a producción
 
@@ -1000,25 +1001,62 @@ la reparación el ledger tenía 152 filas y 13 versiones sin cinco dígitos;
 después, 152 filas con `00001`…`00152` y cero.
 
 **Recaída el mismo 17-sep-2026.** Horas después de esa reparación aparecieron
-cuatro filas nuevas con timestamp —`20260917190303`, `20260917215802`,
-`20260917220238` y `20260917230345`— correspondientes a `00154`…`00157`: el MCP
-se volvió a usar, una vez por migración. No es un arrastre histórico, es la
-regla de arriba incumpliéndose otra vez — por eso la detección tiene que ser un
-comando y no una revisión a ojo. El DDL de las cuatro **sí está aplicado** y su
-texto **coincide** con los archivos (columnas `orders.delivery_proof_*`, tablas
-`commission_periods` y `foodos_payouts`, índice `idx_commission_periods_period`),
-así que la reparación es solo de ledger:
+**diez** filas nuevas con timestamp —de `20260917190303` a `20260918003729`—
+correspondientes a `00154`…`00163`: el MCP se volvió a usar, una vez por
+migración. No es un arrastre histórico, es la regla de arriba incumpliéndose
+otra vez — por eso la detección tiene que ser un comando y no una revisión a
+ojo. El DDL de las diez **sí está aplicado** y su texto **coincide** con los
+archivos, así que la reparación es solo de ledger:
 
 ```bash
 npx supabase migration repair --status reverted 20260917190303
 npx supabase migration repair --status reverted 20260917215802
 npx supabase migration repair --status reverted 20260917220238
 npx supabase migration repair --status reverted 20260917230345
+npx supabase migration repair --status reverted 20260917231133
+npx supabase migration repair --status reverted 20260917232923
+npx supabase migration repair --status reverted 20260917233053
+npx supabase migration repair --status reverted 20260917233317
+npx supabase migration repair --status reverted 20260918002550
+npx supabase migration repair --status reverted 20260918003729
 npx supabase migration repair --status applied 00154
 npx supabase migration repair --status applied 00155
 npx supabase migration repair --status applied 00156
 npx supabase migration repair --status applied 00157
+npx supabase migration repair --status applied 00158
+npx supabase migration repair --status applied 00159
+npx supabase migration repair --status applied 00160
+npx supabase migration repair --status applied 00161
+npx supabase migration repair --status applied 00162
+npx supabase migration repair --status applied 00163
 ```
+
+**Reparación ejecutada el 18-sep-2026.** Se aplicó por SQL sobre
+`supabase_migrations.schema_migrations` (mismo efecto de datos que `repair`:
+`DELETE` de las diez filas con timestamp + `INSERT` de `00154`…`00163` con su
+`name` tomado del archivo), todo en una transacción. Verificado con
+`npx supabase migration list --linked` → 163 pares `local`/`remote` idénticos y
+`npx supabase db push --linked --dry-run` → `{"upToDate":true,"migrations":[]}`.
+`npm run db:status` sale **exit 0**.
+
+La novena huérfana (`order_and_profile_column_privileges`) chocaba con
+`00161_foodos_orders_settlement_columns.sql`: había dos archivos numerados
+`00161`. El 18-sep-2026 se renumeró a
+`00162_order_and_profile_column_privileges.sql`, así que ya entra en la lista de
+arriba sin ambigüedad.
+
+**Dos archivos con el mismo número rompen `db push`.** El 17-sep-2026
+convivieron `00161_foodos_orders_settlement_columns.sql` y
+`00161_order_and_profile_column_privileges.sql` (renumerado después a `00162`);
+`supabase migration list --linked` devolvía entonces dos entradas `00161`
+idénticas y la CLI no podía decidir cuál aplicar. Antes de reparar el ledger,
+comprueba que no haya números repetidos:
+
+```bash
+ls supabase/migrations/*.sql | sed 's|.*/||' | cut -c1-5 | sort | uniq -d
+```
+
+Salida vacía = sin duplicados.
 
 `migration repair` escribe **solo** `supabase_migrations.schema_migrations`; no
 ejecuta el SQL de la migración. Mientras esas filas sigan ahí, `db push` falla
@@ -1044,6 +1082,34 @@ npx supabase migration list --linked  # detalle fila por fila
 Si hay una versión remota sin archivo local (típico de `apply_migration` por MCP),
 `dry-run` y `push` **fallan** con `LegacyDbPushMissingLocalError`; `db:status` lo
 detecta y te da la reparación.
+
+### Una migración ya aplicada no se re-ejecuta
+
+Los archivos de `supabase/migrations/` son un **registro histórico**, no un
+script idempotente. Re-correr uno viejo contra la base actual falla, o —peor—
+revierte trabajo posterior. Si `db:status` dice que está aplicada, no se toca:
+no existe caso en que re-ejecutarla sea lo correcto.
+
+Auditoría del 17-sep-2026 sobre todo el historial de migraciones: sólo **dos**
+dejan de ser re-ejecutables, ambas porque una migración posterior cambia el tipo
+de retorno de la misma función (`42P13: cannot change return type of existing
+function`).
+
+| Archivo viejo | Lo reemplaza | Qué cambió |
+|---|---|---|
+| `00038_get_products_by_collection` | `00111_collection_sale_window` | añade `sale_price`, `sale_starts_at`, `sale_ends_at` |
+| `00151_redemption_requests` | `00152_advance_redemption_reports_change` | añade `changed` al retorno de `advance_redemption()` |
+
+Re-correr `00151` responde:
+
+```
+ERROR: 42P13: cannot change return type of existing function
+HINT:  Use DROP FUNCTION advance_redemption(bigint,text,text,text,text,text,text) first.
+```
+
+La tentación es añadir ese `DROP FUNCTION` al archivo viejo. **No lo hagas**: la
+migración posterior ya lo hace, y re-correr la vieja regresaría la función a su
+versión anterior — un retroceso silencioso. El arreglo es no re-ejecutarla.
 
 ---
 

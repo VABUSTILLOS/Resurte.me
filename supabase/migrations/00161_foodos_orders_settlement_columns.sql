@@ -26,15 +26,24 @@
 -- columna al que ejecuta el UPDATE. Dejarla fuera de la lista no rompe el
 -- trigger; dejarla dentro evita que un dueño se acredite puntos a mano.
 --
--- POR QUÉ LISTA NEGATIVA Y NO POSITIVA
--- ------------------------------------
--- En `foodos_restaurants` (00160) la lista blanca es explícita porque son 17
--- columnas estables y las conoce el dueño. `foodos_orders` tiene 41 columnas
--- operativas que el panel sí necesita escribir (POS, cocina, mesas, mostrador,
--- flotilla, reparto…) y crece con cada función nueva. Una lista blanca
--- incompleta rompería el panel en tiempo de ejecución; una lista negra
--- incompleta sólo deja pasar una columna nueva, y el `$guard$` de abajo
--- obliga a decidir explícitamente sobre cada una que se agregue.
+-- SUPERADA POR 00162 (18-sep-2026)
+-- --------------------------------
+-- Aquí la lista es **negra**: conserva `UPDATE` para el dueño en las 36
+-- columnas que no están abajo. `00162_order_and_profile_column_privileges.sql`
+-- la reemplaza por una lista **blanca** (`status`, `payment_status`,
+-- `table_number`, `table_ticket_id`) y, al ir después, el estado final es el
+-- suyo. La lista negra dejaba al dueño reescribir `total`, `subtotal`,
+-- `discount`, `delivery_fee`, `tip`, `items`, `folio`… de un pedido ya
+-- cobrado: comisión de plataforma evadible y puntos de lealtad inflables.
+--
+-- La premisa de la lista negra («una lista blanca incompleta rompería el panel
+-- en tiempo de ejecución») resultó **falsa**. Barridas las 8 rutas con cliente
+-- de sesión que tocan `foodos_orders`, todas escriben sólo `status`,
+-- `payment_status`, `table_ticket_id` o `table_number`; el resto de columnas
+-- operativas se fijan en el `INSERT` de `createFoodosOrder`
+-- (`src/lib/foodos-order-create.ts:516`), que no está sujeto a
+-- `REVOKE UPDATE`. El `$guard$` #2 de abajo se acotó a ese conjunto para no
+-- afirmar lo contrario.
 --
 -- Ninguna ruta con cliente de **sesión de usuario** escribe las columnas
 -- denegadas: `stripe_payment_intent_id` / `application_fee_amount` /
@@ -53,6 +62,14 @@ DECLARE
   ];
   v_cols TEXT;
 BEGIN
+  -- Si `total` ya no es escribible por `authenticated`, la lista blanca de
+  -- 00162 ya está en vigor: volver a conceder aquí reabriría el agujero en
+  -- silencio (las guardas de abajo pasarían igual, porque el GRANT se
+  -- reaplicaría antes de que se ejecuten). Se corta con un error explícito.
+  IF NOT has_column_privilege('authenticated', 'public.foodos_orders', 'total', 'UPDATE') THEN
+    RAISE EXCEPTION 'La lista blanca de 00162 ya está aplicada. Re-ejecutar 00161 volvería a conceder UPDATE sobre las columnas de dinero; no la re-ejecutes.';
+  END IF;
+
   -- Sin este REVOKE, el GRANT por columna de abajo sería decorativo: el
   -- privilegio de tabla cubre todas las columnas (ver 00160).
   REVOKE UPDATE ON public.foodos_orders FROM authenticated, anon;
@@ -91,14 +108,12 @@ BEGIN
     RAISE EXCEPTION 'Siguen escribibles columnas de liquidación: %', array_to_string(v_bad, ', ');
   END IF;
 
-  -- 2. El panel no puede perder las columnas que opera a diario.
+  -- 2. El panel no puede perder las columnas que escribe con `UPDATE` — las
+  --    cuatro de la lista blanca de 00162 (verificado barriendo las rutas con
+  --    cliente de sesión). Acotado a estas cuatro, el guard sigue siendo
+  --    cierto si esta migración se re-ejecuta después de 00162.
   FOREACH c IN ARRAY ARRAY[
-    'status', 'payment_status', 'payment_breakdown', 'total', 'tip',
-    'subtotal', 'discount', 'delivery_fee', 'items', 'payment_method',
-    'fulfillment', 'channel', 'branch_id', 'coupon_code',
-    'table_ticket_id', 'table_number', 'scheduled_for', 'delivery_address',
-    'delivery_lat', 'delivery_lng', 'delivery_notes', 'note',
-    'cashier_user_id', 'pos_shift_id', 'folio'
+    'status', 'payment_status', 'table_ticket_id', 'table_number'
   ] LOOP
     IF NOT has_column_privilege('authenticated', 'public.foodos_orders', c, 'UPDATE') THEN
       v_missing := v_missing || c;

@@ -413,6 +413,24 @@ const TOOL_DEMOS: Record<string, ToolDemoConfig> = {
     ],
   },
 
+  "/panel/foodos/app-marca": {
+    form: [
+      { label: "Nombre bajo el icono", value: "Don Beto" },
+      { label: "Color de arranque", value: "#1A2B3C" },
+    ],
+    stats: [
+      { label: "Datos listos", value: "5 de 6", tone: "positive" },
+      { label: "Faltan", value: "1", tone: "warning" },
+      { label: "Nombre instalado", value: "Don Beto" },
+      { label: "Platillos disponibles", value: "24", tone: "positive" },
+    ],
+    list: [
+      { id: "ab1", emoji: "✅", title: "Logo, color de marca y nombre", detail: "Listos", tone: "positive" },
+      { id: "ab2", emoji: "⚠️", title: "Color de arranque", detail: "Usando el color por defecto", tone: "warning" },
+      { id: "ab3", emoji: "📱", title: "Enlace para instalar", detail: "/r/tacos-don-beto", tone: "default" },
+    ],
+  },
+
   "/panel/foodos/sitio-ia": {
     form: [
       { label: "Ciudad objetivo", value: "Guadalajara" },

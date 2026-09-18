@@ -142,9 +142,9 @@ describe("appBrandChecklist", () => {
     const steps = appBrandChecklist({ ...complete, app_short_name: null })
     const pending = steps.filter((step) => !step.done)
     expect(pending).toHaveLength(1)
-    expect(pending[0].key).toBe("short_name")
+    expect(pending[0]?.key).toBe("short_name")
     // El nombre corto se resuelve en esta misma pantalla: no se manda a otra.
-    expect(pending[0].href).toBeUndefined()
+    expect(pending[0]?.href).toBeUndefined()
     for (const step of steps.filter((s) => s.done)) {
       expect(step.href, step.key).toBeUndefined()
     }

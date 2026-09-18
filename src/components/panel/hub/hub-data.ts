@@ -7,6 +7,8 @@ import {
   Package, Receipt, Flame, QrCode, UtensilsCrossed, Gift, Megaphone,
   BarChart3, Compass, Users, Ticket, MessageCircle, Inbox, Bot, Truck,
   Wallet, Globe, Server, CalendarHeart, Banknote,
+  Smartphone,
+
 } from "lucide-react"
 
 export type HubCollection = RestaurantCollection
@@ -367,6 +369,18 @@ export const TOOLS: Tool[] = [
     short: "Sitio web",
     standalone: true,
     feature: "sitio_ia",
+  },
+  {
+    title: "App de tu marca",
+    description: "Cómo se ve tu restaurante instalado en el teléfono del comensal: el nombre bajo el icono, el color de arranque y un QR para el mostrador. No está en tiendas de apps y no manda push: el panel te lo dice antes de que lo prometas.",
+    icon: Smartphone,
+    href: "/panel/foodos/app-marca",
+    color: "text-sky-600",
+    bgColor: "bg-sky-50",
+    area: "sistema",
+    short: "App de marca",
+    standalone: true,
+    feature: "app_marca",
   },
   {
     title: "Punto de venta",
