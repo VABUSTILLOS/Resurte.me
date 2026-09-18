@@ -913,7 +913,15 @@ export async function updateOrderStatus(
   // Sin cambio real no se reescribe ni se reavisa. Los botones de estado
   // del panel y el tablero de cocina pueden dispararse dos veces con el
   // mismo valor; el UPDATE es idempotente pero el aviso al comensal no.
-  if ((current as { status: string } | null)?.status === status) return
+  const currentStatus = (current as { status: FoodosOrderStatus } | null)?.status
+  if (currentStatus === status) return
+
+  // La máquina de estados vive en `src/lib/foodos-order-status.ts`. Sin ella
+  // un pedido entregado podía volver a "en preparación" —y el comensal recibía
+  // el aviso otra vez— y un pedido cancelado podía resucitar.
+  if (currentStatus && !ownerTransitionAllowed(currentStatus, status)) {
+    throw new Error(ownerTransitionErrorMessage(currentStatus, status))
+  }
 
   const { error } = await supabase
     .from("foodos_orders")

@@ -3,7 +3,7 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireSellerOrAdminAction } from "@/lib/roles"
 import { applyCrmScope, scopeForRole, type CrmStatus } from "@/lib/crm-core"
-import { readCrmProspects } from "@/lib/crm-prospects"
+import { readCrmProspects, readOpenCrmPipelineValue } from "@/lib/crm-prospects"
 import { logger } from "@/lib/logger"
 import { getWeekBounds, getMonthBounds, getTodayBounds } from "../comercializacion/dates"
 import {
@@ -714,10 +714,11 @@ export async function getDailyBriefing(): Promise<DailyBriefing> {
     scope,
   )
 
-  const [activitiesRes, overdueRes, draftsRes] = await Promise.all([
+  const [activitiesRes, overdueRes, draftsRes, pipeline] = await Promise.all([
     activitiesQuery,
     overdueQuery,
     draftsQuery,
+    readOpenCrmPipelineValue(supabase, scope),
   ])
 
   const activities = (activitiesRes.data ?? []) as Array<{ type: string }>
@@ -731,6 +732,9 @@ export async function getDailyBriefing(): Promise<DailyBriefing> {
     seguimientosVencidos: overdueRes.count ?? 0,
     borradoresPendientes: draftsRes.count ?? 0,
     zoneLabel: zoneOfDay()?.label ?? null,
+    pipelineAbierto: pipeline.total,
+    pipelineValorados: pipeline.declared,
+    pipelineTruncado: pipeline.truncated,
   }
 
   const sellerName = await getSellerName(supabase, userId)
