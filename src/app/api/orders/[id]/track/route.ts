@@ -87,6 +87,10 @@ export async function GET(
       unit_price: number
       products: { id: number; name: string; image_url: string | null; slug: string } | null
     }>).map((item) => ({
+      // `product_id` viaja para que el cliente pueda volver a pedir: sin él, la
+      // pantalla de seguimiento no tenía forma de rehidratar el carrito y
+      // cancelar dejaba al cliente sin salida.
+      product_id: item.products?.id ?? null,
       quantity: item.quantity,
       unit_price: Number(item.unit_price),
       name: item.products?.name ?? "Producto",

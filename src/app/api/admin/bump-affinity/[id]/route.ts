@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { requireAdmin } from "@/lib/admin-auth"
 import { createServiceClient } from "@/lib/supabase/service"
+import { logAdminAction } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
 import { validateAffinityPairPatch } from "@/lib/admin-marketing-validation"
 
@@ -15,7 +16,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { response: adminDenied } = await requireAdmin()
+  const { user: adminUser, response: adminDenied } = await requireAdmin()
   if (adminDenied) return adminDenied
 
   try {
@@ -34,6 +35,15 @@ export async function PATCH(
     const supabase = await createServiceClient()
     const { error } = await supabase.from("bump_affinity").update(parsed.value).eq("id", pairId)
     if (error) throw error
+
+    await logAdminAction(supabase, {
+      actorId: adminUser?.id ?? null,
+      actorEmail: adminUser?.email ?? null,
+      action: "affinity_pair_update",
+      entity: "bump_affinity",
+      entityId: pairId,
+      detail: { ...parsed.value },
+    })
     return NextResponse.json({ ok: true })
   } catch (error) {
     logger.error("[ADMIN-BUMP-AFFINITY] update error:", error)
@@ -45,7 +55,7 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { response: adminDenied } = await requireAdmin()
+  const { user: adminUser, response: adminDenied } = await requireAdmin()
   if (adminDenied) return adminDenied
 
   try {
@@ -58,6 +68,14 @@ export async function DELETE(
     const supabase = await createServiceClient()
     const { error } = await supabase.from("bump_affinity").delete().eq("id", pairId)
     if (error) throw error
+
+    await logAdminAction(supabase, {
+      actorId: adminUser?.id ?? null,
+      actorEmail: adminUser?.email ?? null,
+      action: "affinity_pair_delete",
+      entity: "bump_affinity",
+      entityId: pairId,
+    })
     return NextResponse.json({ ok: true })
   } catch (error) {
     logger.error("[ADMIN-BUMP-AFFINITY] delete error:", error)

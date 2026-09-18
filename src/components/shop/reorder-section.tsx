@@ -7,17 +7,14 @@ import { useCart } from "@/contexts/cart-context"
 import { useToast } from "@/components/toast"
 import { getUserPurchaseHistory } from "@/lib/wallet-actions"
 import { AnalyticsEvents } from "@/lib/analytics"
+import {
+  buildReorderPlan,
+  reorderFeedback,
+  resolveReorderItem,
+  type ReorderCatalogProduct,
+  type ReorderSourceItem,
+} from "@/lib/order-reorder"
 import type { CartItem, Product } from "@/types"
-
-interface ReorderItem {
-  product_id: number
-  name: string
-  image_url: string
-  quantity: number
-  price: number
-  slug: string
-  stock_status: CartItem["stock_status"]
-}
 
 interface Props {
   /** Catálogo visible actual: se usa para precio/stock/slug al día. */
@@ -30,20 +27,26 @@ interface Props {
  * Muestra los productos del último pedido del cliente en un carrusel
  * horizontal con quick-add por producto, más un CTA para repetir el
  * pedido completo. Si el producto sigue en el catálogo se usan precio,
- * slug y stock actuales; si no, el snapshot de la orden (igual que en
- * mis-pedidos). No renderiza nada si el cliente no tiene pedidos.
+ * slug y stock actuales; si ya no está, se descarta (no se agrega a un precio
+ * que el servidor rechazaría al confirmar). No renderiza nada si el cliente no
+ * tiene pedidos.
+ *
+ * La regla de resolución vive en `@/lib/order-reorder`, compartida con la lista
+ * de pedidos y con las dos pantallas de cancelación: aquí ya no hay una copia.
+ * El snapshot histórico solo entra como respaldo si la consulta al catálogo
+ * falla.
  */
 export function ReorderSection({ products }: Props) {
   const { addItem, addOrderItems } = useCart()
   const { toast } = useToast()
-  const [items, setItems] = useState<ReorderItem[]>([])
+  const [sourceItems, setSourceItems] = useState<ReorderSourceItem[]>([])
   const [orderId, setOrderId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [addedId, setAddedId] = useState<number | null>(null)
   const [repeating, setRepeating] = useState(false)
 
   const productById = useMemo(() => {
-    const map = new Map<number, Product>()
+    const map = new Map<number, ReorderCatalogProduct>()
     for (const p of products) map.set(p.id, p)
     return map
   }, [products])
@@ -56,20 +59,7 @@ export function ReorderSection({ products }: Props) {
         const last = orders[0]
         if (!last) return
         setOrderId(last.id)
-        setItems(
-          last.items.map((item) => {
-            const current = productById.get(item.product_id)
-            return {
-              product_id: item.product_id,
-              name: current?.name ?? item.product_name,
-              image_url: current?.image_url ?? item.product_image,
-              quantity: item.quantity,
-              price: current ? (current.sale_price ?? current.price) : item.unit_price,
-              slug: current?.slug ?? `producto-${item.product_id}`,
-              stock_status: current?.stock_status ?? "in_stock",
-            }
-          }),
-        )
+        setSourceItems(last.items)
       })
       .catch(() => {
         // Sin historial disponible: la sección simplemente no se muestra.
@@ -80,40 +70,45 @@ export function ReorderSection({ products }: Props) {
     return () => {
       cancelled = true
     }
-  }, [productById])
+  }, [])
+
+  // La resolución vive en el módulo compartido. Un producto que ya no está en
+  // el catálogo se descarta en lugar de agregarse con su precio histórico: el
+  // servidor recalcula el subtotal y rechazaría el pedido.
+  const items = useMemo(
+    () =>
+      sourceItems
+        .map((item) => resolveReorderItem(item, productById))
+        .filter((item): item is CartItem => item !== null),
+    [sourceItems, productById],
+  )
 
   if (loading || items.length === 0) return null
 
-  const toCartItem = (item: ReorderItem): CartItem => ({
-    product_id: item.product_id,
-    name: item.name,
-    slug: item.slug,
-    image_url: item.image_url,
-    brand: "",
-    price: item.price,
-    sale_price: null,
-    quantity: item.quantity,
-    stock_status: item.stock_status,
-  })
-
-  const handleAddOne = (item: ReorderItem) => {
-    addItem(toCartItem(item))
-    AnalyticsEvents.addToCart({ id: item.product_id, name: item.name, price: item.price, quantity: item.quantity })
+  const handleAddOne = (item: CartItem) => {
+    addItem(item)
+    AnalyticsEvents.addToCart({
+      id: item.product_id,
+      name: item.name,
+      price: item.sale_price ?? item.price,
+      quantity: item.quantity,
+    })
     AnalyticsEvents.reorderQuickAdd(item.product_id)
     setAddedId(item.product_id)
     setTimeout(() => setAddedId(null), 1200)
   }
 
   const handleRepeatAll = () => {
-    const available = items.filter((i) => i.stock_status !== "out_of_stock")
-    if (available.length === 0) {
-      toast("Estos productos no están disponibles por ahora")
+    const plan = buildReorderPlan(sourceItems, productById)
+    const feedback = reorderFeedback(plan)
+    if (plan.items.length === 0) {
+      if (feedback) toast(feedback)
       return
     }
     setRepeating(true)
-    addOrderItems(available.map(toCartItem))
-    if (orderId !== null) AnalyticsEvents.repeatOrder(orderId, available.length)
-    toast(`${available.length} producto${available.length !== 1 ? "s" : ""} agregados al carrito`)
+    addOrderItems(plan.items)
+    if (orderId !== null) AnalyticsEvents.repeatOrder(orderId, plan.items.length)
+    if (feedback) toast(feedback)
     setTimeout(() => setRepeating(false), 1500)
   }
 
@@ -162,7 +157,7 @@ export function ReorderSection({ products }: Props) {
                   {item.name}
                 </p>
                 <p className="text-[11px] text-[var(--text-secondary)] mb-2">
-                  {item.quantity} × ${item.price.toFixed(2)}
+                  {item.quantity} × ${(item.sale_price ?? item.price).toFixed(2)}
                 </p>
                 <button
                   onClick={() => handleAddOne(item)}

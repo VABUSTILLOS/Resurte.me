@@ -28,6 +28,7 @@ import {
 } from "@/lib/order-cancellation"
 import { usePolling } from "@/hooks/use-polling"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
+import { RepeatOrderButton } from "@/components/shop/repeat-order-button"
 import type { OrderStatus, PaymentMethod, PaymentStatus } from "@/types"
 
 const ORDER_STATUSES: OrderStatus[] = [
@@ -69,7 +70,7 @@ interface TrackedOrder {
   created_at: string
   city: { slug: string; name: string } | null
   driver_name: string | null
-  items: { quantity: number; unit_price: number; name: string; image_url: string; slug: string }[]
+  items: { product_id: number | null; quantity: number; unit_price: number; name: string; image_url: string; slug: string }[]
 }
 
 export function TrackingClient() {
@@ -181,6 +182,18 @@ export function TrackingClient() {
   // servidor tuvieran dos reglas, la UI ofrecería un botón que la API rechaza.
   const cancelRefusal = customerCancelRefusal(order.status, order.payment_status)
 
+  // Sólo las partidas con `product_id` se pueden volver a pedir: sin id no hay
+  // nada que consultar en el catálogo actual.
+  const repeatableItems = order.items
+    .filter((item): item is typeof item & { product_id: number } => item.product_id !== null)
+    .map((item) => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      product_name: item.name,
+      product_image: item.image_url,
+    }))
+
   const handleCancel = async () => {
     if (!token) return
     setCancelling(true)
@@ -249,6 +262,16 @@ export function TrackingClient() {
             <p className="text-xs text-gray-500">
               Este pedido fue cancelado. Si tienes dudas, contacta a soporte.
             </p>
+            {/* Misma salida que en el detalle: cancelar no es el final del
+                recorrido, y la forma honesta de «modificar» es volver a pedir. */}
+            {repeatableItems.length > 0 && (
+              <div className="mt-4 max-w-xs mx-auto space-y-2">
+                <p className="text-xs text-gray-500">
+                  ¿Te equivocaste en algo? Vuelve a armar el pedido con los mismos productos.
+                </p>
+                <RepeatOrderButton orderId={order.id} items={repeatableItems} prominent />
+              </div>
+            )}
           </div>
         ) : (
           <div className="relative">

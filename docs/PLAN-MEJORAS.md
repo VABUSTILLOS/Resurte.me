@@ -15,6 +15,11 @@
 > lo **desmintió** (decía "42 de 61 archivos con patrones de foco" donde hay
 > 11)—, que son las otras dos fuentes legítimas de trabajo.
 >
+> **Estado tras la Ronda 19** (auditoría de estatus de las 54 superficies de
+> producto): el backlog abierto creció con las **diez debilidades que esa ronda
+> midió** (AU1–AU10). El diagnóstico completo por superficie, con evidencia
+> archivo:línea, vive en [`docs/AUDITORIA-ESTATUS.md`](AUDITORIA-ESTATUS.md).
+>
 > Convenciones: ✅ implementada · 🔜 backlog priorizado. Los **IDs de fila** se
 > acotan **por sección** —el `A14` de §8 no es el `A14` de la Ronda 13, y es a
 > propósito—: un puntero desnudo («ver la fila X») solo resuelve si la fila está
@@ -1941,6 +1946,66 @@ usuario podía violar desde un `<select>`— **no estaba en el backlog**: aparec
 leer qué escribía realmente cada ruta. Y el defecto estaba duplicado en dos rutas
 porque la misma decisión se había tomado dos veces en dos archivos.
 **Un dato que nadie puede llenar no es un dato: es un `null` que el agente se cree.**
+
+### Ronda 19 — Auditoría de estatus de las 54 superficies
+
+**Origen.** El dueño del producto pidió saber **dónde está fuerte y dónde flaquea**
+el sitio, porque la complejidad —tres productos en un dominio— ya no se puede
+sostener en la cabeza. Un pedido así se puede responder de dos maneras: repitiendo
+esta documentación, o midiendo el código. Se hizo lo segundo.
+
+**Método.** Tres auditorías independientes por subsistema —panel del restaurante,
+FoodOS y panel admin—, cada una **obligada a citar archivo y línea y a buscar
+contraejemplos en la documentación**, no a confirmarla. Este documento es
+detallado y se auto-vigila con contratos, así que una auditoría que lo repita no
+aporta nada: el valor está exactamente en las contradicciones.
+
+**Punto de partida medido.** `npm run verify` en verde: typecheck, lint, **349
+archivos de test / 6,080 tests**, `knip` exit 0. 177 migraciones en sincronía
+verificada y 21 specs e2e. **Ninguna de las 54 superficies está rota, y ninguna es
+humo.** El inventario cerrado: 13 herramientas de panel, 21 superficies de FoodOS,
+20 secciones de admin. El resultado sobre las **54 existentes** fue 23 fuertes, 29
+sólidas, 1 parcial y 1 stub; más **1 superficie inexistente** (facturación CFDI).
+
+**Advertencia sobre `git log`.** Los commits de este árbol son autocommits
+`"Save uncommitted changes"` de la aplicación. **No atribuyen trabajo ni expresan
+intención**, así que el historial se descartó como fuente: la atribución se hace
+por marca de tiempo y por contenido.
+
+**Lo que la auditoría confirmó como fuerte** —para que la ronda no se lea solo
+como una lista de defectos—: el ciclo operativo del restaurante (mostrador →
+mesas → cocina → caja → tablero) está completo y con las reglas del dominio
+cerradas y anotadas (una sola autoridad de día local, `payment_status === "paid"`
+como única regla de ingreso, folio que nunca se reutiliza); los tres pilares del
+negocio interno (`productos`, `leads`/CRM y `whatsapp` + automations) son lo más
+maduro del sitio; y la disciplina de ingeniería es poco común —incluidos
+contratos de test que vigilan **esta misma documentación**.
+
+**Deuda declarada, no arreglada** — con el prefijo `AU`, que estaba libre:
+
+| # | Deuda | Estado |
+|---|---|---|
+| AU1 | **El dinero del restaurante no llega al restaurante.** El cobro con tarjeta entra a la cuenta de la plataforma y el enrutado vía Stripe Connect existe en código pero **está apagado en producción**: `STRIPE_CONNECT_ENABLED` ausente en `src/lib/foodos-payouts.ts:9`, `src/lib/foodos/actions/payouts-admin.ts:6` y `src/app/api/admin/foodos/payouts/route.ts:14`. Hoy la dispersión es manual desde `/admin/foodos/dispersiones`. Es la deuda con más riesgo (fiscal y de confianza) y la que bloquea escalar FoodOS | 🔜 |
+| AU2 | **`pos` es un stub deliberado y no hay ESC/POS.** Los 6 proveedores de POS están declarados con `implemented:false` (`src/lib/pos/registry.ts`) y el webhook entrante responde **503**; la impresión es HTML imprimible con `window.print()` (`src/lib/foodos-printing/types.ts:9-13`). No es un fallo silencioso —está documentado— pero la superficie se ofrece en Diamante y un POS de mostrador sin impresora térmica no sobrevive en un restaurante real. El camino real hoy es la importación CSV | 🔜 |
+| AU3 | **La escalera de niveles concentra el valor en la cima.** De 10 capacidades premium, **8 exigen Diamante** (`src/lib/foodos-entitlements.ts`): POS, comandero, wallet, app de marca, sitio IA, catering, mesero IA e integraciones POS. Solo `marketing_ia` abre en Plata y `flotilla` en Oro. El upgrade depende de una recompra previa a la propia recompra, y el valor no se puede probar | 🔜 |
+| AU4 | **El acceso admin es todo-o-nada.** `MANAGED_ROLES = ["admin","vendedor","cliente"]` (`src/lib/admin-roles.ts:6`) y el `CHECK` de la base solo admite esos tres (`00067_master_admin_roles.sql:17`, reconfirmado en `00071:90`). **No existen roles granulares** de ops/marketing/finanzas: cualquier admin puede tocar productos, dinero, usuarios y CRM. Lo más cercano es el rol `vendedor`, que solo alcanza `/comercializacion` | 🔜 |
+| AU5 | **El panel del restaurante no tiene tests de superficie.** Cero archivos bajo `src/components/panel/**` (excluyendo foodos), cero para `use-synced-*` / `use-panel-role`, y el e2e solo navega 3 rutas (`e2e/mobile.spec.ts:1867,1990,2039`). La lógica de negocio está testeada; **la pantalla donde el restaurantero pasa su día no**. Es la superficie de uso diario y la menos vigilada | 🔜 |
+| AU6 | **Facturación CFDI no existe.** Grep de `cfdi/timbrado/facturapi/sat/rfc` en `src/` sin resultados. Lo que el panel llama "facturas" son **tickets subidos por usuarios para ganar créditos** (`invoice_submissions`): aprobarlos acredita monedero vía `approve_invoice_submission` (00144), no timbra nada. Bloquea al restaurantero que necesita factura y depende de contratar un PAC. Nota: `docs/REPORTE-FUNCIONES-Y-MEJORAS.md` lo listaba como función existente y **quedó corregido** por esta ronda | 🔜 |
+| AU7 | **Huecos y duplicidad en la bitácora admin.** El contrato `src/lib/admin-audit.contract.test.ts` ya exige que toda ruta mutante audite o esté exenta con motivo escrito. La excepción de `bump-affinity` era **más estrecha que la ruta**: justificaba el campo `weight` ("solo desempata entre sugerencias; no cambia precio") pero no el alta ni la baja del par, que sí son merchandising. **Corregido**: `POST` y `PATCH`/`DELETE` llaman a `logAdminAction` (`affinity_pair_create` / `_update` / `_delete`) y las dos exenciones se retiraron. Queda abierta la **duplicidad**: `/api/admin/audit-log` lee `notifications` a través del `src/lib/audit.ts` legado —4 acciones, un único consumidor— mientras la pestaña de `/admin/bitacoras` lee `admin_audit_log` (`src/lib/audit-log.ts`, 78 acciones, 44 importadores). Un registro que no registra todo no es un registro | 🔜 |
+| AU8 | **Dos endpoints admin no usan `requireAdmin()`.** `seed-products` y `update-images` se protegen con token de entorno (`SEED_API_TOKEN` / `ADMIN_API_SECRET`, fail-closed) y llevan datos hardcodeados de un solo uso. Violan el invariante #1 de `docs/agents/admin.md:11-12`. Son scripts, no features | 🔜 |
+| AU9 | **El CRM tiene el ciclo de retroalimentación roto.** Son las seis filas `CRM1`–`CRM6` que declaró la ronda 18 y **siguen abiertas**: `orders.seller_id` sin escritor, atribución por grep, `estimated_value` es foto y no histórico, motivo de pérdida no retroactivo, límite de 50 pedidos y `crm_tasks` con **0 políticas RLS**. La ronda 18 le dio boca y manos; todavía no le dio memoria | 🔜 |
+| AU10 | **La cobertura e2e es desigual y no autentica.** Sin e2e para ~10 secciones admin (bitácoras-UI, comisiones, conversion, proveedores, recompensas, seo-ia, sistema, whatsapp, dispersiones, repartidores), y el propio `docs/agents/admin.md:1247` admite que `e2e/a11y.spec.ts` **no** sirve para `/admin/*`. El repo no tiene seed ni credenciales, así que el e2e verifica guards y render, no flujos. Se suma al backlog de accesibilidad ya abierto (`A14`–`A17`, `CX1`–`CX9`) y al de flakiness (`E7`–`E11`) | 🔜 |
+
+**Lo que esta ronda desmintió.** El inventario de `docs/REPORTE-FUNCIONES-Y-MEJORAS.md`
+declaraba "Facturas (CFDI)" como función del admin y "12 herramientas" en el panel.
+Lo primero es falso —son créditos por ticket subido— y lo segundo estaba
+desactualizado: son 13. Ambas afirmaciones quedaron corregidas, porque **una
+auditoría que deja la documentación mintiendo no sirvió de nada**.
+
+**Lección:** *la documentación de este repo es tan buena que casi se puede auditar
+leyéndola. Ese es justo el motivo por el que no se puede: los tres hallazgos más
+graves de esta ronda —el dinero que no llega, el POS que no imprime y el CFDI que
+no existe— estaban todos declarados como si existieran.*
 
 ## Agentes de mantenimiento por dominio
 

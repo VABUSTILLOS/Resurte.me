@@ -62,12 +62,6 @@ const UTC_TRUNCATION_ALLOWED: Allowance[] = [
       "reportTo alimenta el filtro `created_at` de sales-report, que el servidor aplica en UTC (afirmado en route.test.ts). Pedir el día local recortaría las ventas de la tarde.",
   },
   {
-    path: "src/app/panel/foodos/caja/page.tsx",
-    max: 1,
-    reason:
-      "Nombre del CSV de cortes. Pendiente de migrar a dayKeyOf; el archivo está en vuelo en otra sesión y no se toca desde aquí para no pisar cambios.",
-  },
-  {
     path: "src/lib/supplier-admin.ts",
     max: 1,
     reason:

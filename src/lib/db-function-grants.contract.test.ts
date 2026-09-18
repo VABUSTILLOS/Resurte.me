@@ -123,6 +123,7 @@ const PUBLICO_POR_DISENO: { file: string; fn: string; motivo: string }[] = [
 const PARCIAL_INTENCIONAL: { file: string; fn: string; motivo: string }[] = [
   { file: "00165_function_execute_privileges.sql", fn: "foodos_next_folio", motivo: "La llaman acciones de servidor que corren con la sesión del dueño, no con service_role. anon y PUBLIC sí se cierran." },
   { file: "00165_function_execute_privileges.sql", fn: "increment_foodos_coupon_usage", motivo: "Se invoca dentro de la creación de pedido FoodOS con el cliente inyectado; `authenticated` lo necesita. anon y PUBLIC sí se cierran." },
+  { file: "00186_foodos_coupon_release.sql", fn: "decrement_foodos_coupon_usage", motivo: "Su gemela del incremento: la llaman la ruta de cancelación del comensal (con service_role) y el panel del dueño (con su sesión), así que `authenticated` lo necesita. El guardián de la función limita la llamada a un restaurante propio o admin. anon y PUBLIC sí se cierran." },
 ]
 
 /** Cierres incompletos que son defectos: los normaliza `00165`. */

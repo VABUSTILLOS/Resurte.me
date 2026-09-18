@@ -50,26 +50,34 @@ Marketplace mayorista B2B de insumos para restaurantes (México) + suite SaaS de
 
 - **Dashboard**: métricas de revenue, órdenes, AOV y conversión por período (recharts lazy).
 - **Pedidos**: gestión y estados, con acciones masivas (cambio de estado, confirmar pago, asignar repartidor, exportar la selección) y filtros guardados; **Productos**: catálogo, imágenes (`update-images`, `kie-ai`), seed de productos.
-- **Visibilidad / Disponibilidad**: qué productos se muestran y dónde.
-- **Proveedores**, **Usuarios**, **Facturas** (CFDI), **Recompensas** (catálogo de servicios canjeables).
-- **Conversión**: funnel; **Marketing**: campañas (incl. campañas FoodOS).
-- **WhatsApp**: mensajería + automatizaciones; **Workflows**: flujos automáticos (confirmaciones, etc.).
-- APIs admin: bump-rules, coupons, drivers, funnel, metrics, orders, products, suppliers, reward-services.
+- **Productos** (6,595 líneas): tabla server-side, bulk con deshacer, papelera 30d, IA SEO, galería, reporte de ventas.
+- **CRM / Leads**, **Comisiones**, **Proveedores**, **Restaurantes**, **Recompensas** (servicios canjeables, cola de canjes y revisión de facturas), **Usuarios**.
+- **Conversión** (funnel + cohortes + UTM); **Marketing** (order-bumps, cupones, afinidades); **Bitácoras** (auditoría, errores, emails); **SEO-IA**; **Sistema**.
+- **WhatsApp** (catálogo, plantillas, sync) + **Automatizaciones** (motor + cron diario); **Repartidores** (alta y activar/desactivar).
+- **FoodOS interno**: moderación de restaurantes (cola de revisión), dispersiones y **operar como restaurante** (impersonación con cookie de 4 h).
 - Cron (`/api/cron`), notificaciones, leads, social-proof, reportes CSP.
+- **No existe**: facturación CFDI/timbrado (lo que el panel llama "facturas" son tickets subidos por usuarios para ganar créditos — `invoice_submissions`, no valor fiscal) ni roles admin granulares (ops/marketing/finanzas). Ver `docs/AUDITORIA-ESTATUS.md`.
 
 ## 4. Panel SaaS del restaurante (`/panel`)
 
-12 herramientas con matriz de acceso por rol:
+13 herramientas con matriz de acceso por rol (`src/lib/panel-roles.ts`):
 
-| Herramienta | dueño | gerente | cocina | mesero |
-|---|:-:|:-:|:-:|:-:|
-| Ventas, Comanda | ✓ | ✓ | (comanda ✓) | ✓ |
-| Mermas, Inventario | ✓ | ✓ | ✓ | — |
-| Costeo, Planificador, Rentabilidad, Analítica, Temporada, Apertura, FoodOS | ✓ | ✓ | — | — |
-| Personal (gestión de miembros) | ✓ | — | — | — |
+| Herramienta | dueño | gerente | cocina | mesero | cajero |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Ventas | ✓ | ✓ | — | ✓ | — |
+| Comanda | ✓ | ✓ | ✓ | ✓ | — |
+| Mermas, Inventario | ✓ | ✓ | ✓ | — | — |
+| Costeo, Planificador, Rentabilidad, Analítica, Temporada, Apertura | ✓ | ✓ | — | — | — |
+| FoodOS (paraguas) | ✓ | ✓ | — | ✓ | ✓ |
+| Personal (gestión de miembros) | ✓ | — | — | — | — |
 
-- FoodOS: menú digital, combos, pedidos, clientes, tablero y configuración del restaurante; `/panel/unirse` para sumar miembros.
-- Escritura granular por clave (config solo dueño; backup solo dueño; platillos dueño/gerente).
+- FoodOS abre la puerta; detrás, una **segunda matriz** (`FOODOS_SURFACE_ACCESS`,
+  fail-closed) decide qué pantallas ve cada rol: cajero alcanza tablero, pedidos,
+  mostrador y caja; mesero, mesas y cocina.
+- Escritura granular por clave (`ROWS_WRITE_ACCESS`): config y backup solo dueño,
+  platillos dueño/gerente.
+- Persistencia real en Supabase (`/api/panel/entries`, `/api/panel/rows`), con
+  localStorage como caché y resolución de conflictos 409.
 
 ---
 

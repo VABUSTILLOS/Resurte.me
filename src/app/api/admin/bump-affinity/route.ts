@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { requireAdmin } from "@/lib/admin-auth"
 import { createServiceClient } from "@/lib/supabase/service"
+import { logAdminAction } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
 import { validateAffinityPairInput } from "@/lib/admin-marketing-validation"
 
@@ -72,7 +73,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { response: adminDenied } = await requireAdmin()
+  const { user: adminUser, response: adminDenied } = await requireAdmin()
   if (adminDenied) return adminDenied
 
   try {
@@ -96,6 +97,22 @@ export async function POST(request: NextRequest) {
       }
       throw error
     }
+
+    // El peso desempata sugerencias, pero crear el par cambia qué ve el
+    // carrito: es merchandising y tiene que quedar a nombre de alguien.
+    await logAdminAction(supabase, {
+      actorId: adminUser?.id ?? null,
+      actorEmail: adminUser?.email ?? null,
+      action: "affinity_pair_create",
+      entity: "bump_affinity",
+      entityId: data.id,
+      detail: {
+        source_product_id: parsed.value.source_product_id,
+        target_product_id: parsed.value.target_product_id,
+        kind: parsed.value.kind,
+        weight: parsed.value.weight,
+      },
+    })
     return NextResponse.json({ id: data.id }, { status: 201 })
   } catch (error) {
     logger.error("[ADMIN-BUMP-AFFINITY] create error:", error)

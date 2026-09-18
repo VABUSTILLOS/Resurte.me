@@ -15,6 +15,7 @@ import { ArrowLeft, Package, MapPin, Clock, CreditCard, DollarSign, Store, Truck
 import Link from "next/link"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { CompletePaymentButton } from "@/components/stripe/complete-payment-button"
+import { RepeatOrderButton } from "@/components/shop/repeat-order-button"
 import {
   CANCEL_REFUSAL_MESSAGE,
   customerCancelRefusal,
@@ -226,6 +227,17 @@ export function OrderDetailClient() {
               Pedido cancelado
             </div>
             <p className="text-xs text-gray-500">Este pedido fue cancelado. Si tienes dudas, contacta a soporte.</p>
+            {/* Cancelar no es el final del recorrido: la forma honesta de
+                «modificar» un pedido es volver a pedirlo. Sin esto el cliente
+                quedaba en un callejón sin salida. */}
+            {order.items.length > 0 && (
+              <div className="mt-4 max-w-xs mx-auto space-y-2">
+                <p className="text-xs text-gray-500">
+                  ¿Te equivocaste en algo? Vuelve a armar el pedido con los mismos productos.
+                </p>
+                <RepeatOrderButton orderId={order.id} items={order.items} prominent />
+              </div>
+            )}
           </div>
         ) : (
           <div className="relative">

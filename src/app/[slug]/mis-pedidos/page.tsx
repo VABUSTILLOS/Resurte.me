@@ -2,15 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { useCity } from "@/contexts/city-context"
-import { useCart } from "@/contexts/cart-context"
 import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/order-labels"
 import { getUserPurchaseHistory } from "@/lib/wallet-actions"
-import { useToast } from "@/components/toast"
-import type { OrderWithCashback, OrderItem, CartItem } from "@/types"
-import { Package, Clock, ChevronRight, ArrowLeft, RotateCcw, ShoppingCart } from "lucide-react"
+import type { OrderWithCashback, OrderItem } from "@/types"
+import { Package, Clock, ChevronRight, ArrowLeft } from "lucide-react"
+import { RepeatOrderButton } from "@/components/shop/repeat-order-button"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
-import { AnalyticsEvents } from "@/lib/analytics"
 import Link from "next/link"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 
@@ -23,11 +21,8 @@ interface OrderWithItems extends OrderWithCashback {
 
 export default function OrderHistoryPage() {
   const { city } = useCity()
-  const { addOrderItems } = useCart()
-  const { toast } = useToast()
   const [orders, setOrders] = useState<OrderWithItems[]>([])
   const [loading, setLoading] = useState(true)
-  const [reorderingId, setReorderingId] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -57,98 +52,6 @@ export default function OrderHistoryPage() {
     }
   }, [])
 
-  const handleRepeatOrder = async (order: OrderWithItems, e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (reorderingId !== null) return
-    setReorderingId(order.id)
-
-    // Rehidratar con el catálogo ACTUAL (precio, oferta, stock, slug): el
-    // servidor recalcula el subtotal contra la BD y rechaza la orden si no
-    // coincide al centavo, así que agregar con el precio histórico congelado
-    // hacía fallar "Repetir" en cuanto cambiaba cualquier precio.
-    const ids = order.items.map((i) => i.product_id)
-    const currentById = new Map<number, {
-      name: string
-      slug: string
-      image_url: string | null
-      price: number
-      sale_price: number | null
-      stock_status: "in_stock" | "low_stock" | "out_of_stock"
-      brand: string | null
-    }>()
-    let catalogFailed = false
-    try {
-      const { createClient } = await import("@/lib/supabase/client")
-      const supabase = createClient()
-      if (!supabase) throw new Error("no supabase client")
-      const { data: current, error: catalogError } = await supabase
-        .from("products")
-        .select("id, name, slug, image_url, price, sale_price, stock_status, brand")
-        .in("id", ids)
-      if (catalogError) throw catalogError
-      for (const p of current ?? []) {
-        currentById.set(p.id, p)
-      }
-    } catch {
-      // Si el catálogo no responde, se cae al snapshot de la orden (el
-      // servidor sigue validando precios al confirmar el pedido).
-      catalogFailed = true
-    }
-
-    const available: CartItem[] = []
-    let skipped = 0
-    for (const item of order.items) {
-      const current = currentById.get(item.product_id)
-      if (catalogFailed) {
-        // Fallback al snapshot histórico (mejor que no agregar nada).
-        available.push({
-          product_id: item.product_id,
-          name: item.product_name || `Producto #${item.product_id}`,
-          slug: `producto-${item.product_id}`,
-          image_url: item.product_image || "",
-          brand: "",
-          price: item.unit_price,
-          sale_price: null,
-          quantity: item.quantity,
-          stock_status: "in_stock" as const,
-        })
-        continue
-      }
-      // Fuera de catálogo o agotado: no se agrega (el servidor lo rechazaría).
-      if (!current || current.stock_status === "out_of_stock") {
-        skipped += 1
-        continue
-      }
-      available.push({
-        product_id: item.product_id,
-        name: current.name || item.product_name || `Producto #${item.product_id}`,
-        slug: current.slug || `producto-${item.product_id}`,
-        image_url: current.image_url || item.product_image || "",
-        brand: current.brand ?? "",
-        price: current.price,
-        sale_price: current.sale_price,
-        quantity: item.quantity,
-        stock_status: current.stock_status,
-      })
-    }
-
-    if (available.length > 0) {
-      addOrderItems(available)
-      AnalyticsEvents.repeatOrder(order.id, available.length)
-    }
-    if (skipped > 0) {
-      toast(
-        available.length > 0
-          ? `${skipped} producto${skipped !== 1 ? "s" : ""} ya no ${skipped !== 1 ? "están" : "está"} disponible${skipped !== 1 ? "s" : ""} y no se agregó`
-          : "Estos productos ya no están disponibles por ahora"
-      )
-    } else if (available.length > 0) {
-      toast(`${available.length} producto${available.length !== 1 ? "s" : ""} agregados al carrito`)
-    }
-
-    setTimeout(() => setReorderingId(null), 1500)
-  }
 
   if (!city) {
     return <PageSkeleton />
@@ -239,25 +142,9 @@ export default function OrderHistoryPage() {
                       Pago pendiente
                     </span>
                   )}
-                  {/* Repeat Order button */}
-                  <button
-                    onClick={(e) => void handleRepeatOrder(order, e)}
-                    disabled={reorderingId === order.id}
-                    aria-label={`Repetir pedido #${order.id} (${order.items.length} productos)`}
-                    className="flex items-center gap-1.5 px-3.5 py-2 sm:px-2.5 sm:py-1.5 sm:text-xs text-sm font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors disabled:opacity-50 touch-target"
-                  >
-                    {reorderingId === order.id ? (
-                      <>
-                        <ShoppingCart className="w-3.5 h-3.5" />
-                        ¡Agregado!
-                      </>
-                    ) : (
-                      <>
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        Repetir
-                      </>
-                    )}
-                  </button>
+                  {/* Repetir pedido: misma implementación que las dos
+                      superficies de cancelación (ver order-reorder.ts). */}
+                  <RepeatOrderButton orderId={order.id} items={order.items} />
                   <span className="text-sm font-bold text-gray-900">
                     ${order.total.toFixed(2)}
                   </span>

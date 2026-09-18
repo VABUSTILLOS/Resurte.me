@@ -905,7 +905,7 @@ export async function updateOrderStatus(
 
   const { data: current, error: readError } = await supabase
     .from("foodos_orders")
-    .select("status")
+    .select("status, restaurant_id, coupon_code")
     .eq("id", orderId)
     .maybeSingle()
   if (readError) throw new Error(readError.message)
@@ -913,7 +913,12 @@ export async function updateOrderStatus(
   // Sin cambio real no se reescribe ni se reavisa. Los botones de estado
   // del panel y el tablero de cocina pueden dispararse dos veces con el
   // mismo valor; el UPDATE es idempotente pero el aviso al comensal no.
-  const currentStatus = (current as { status: FoodosOrderStatus } | null)?.status
+  const fila = current as {
+    status: FoodosOrderStatus
+    restaurant_id: string
+    coupon_code: string | null
+  } | null
+  const currentStatus = fila?.status
   if (currentStatus === status) return
 
   // La máquina de estados vive en `src/lib/foodos-order-status.ts`. Sin ella
@@ -929,6 +934,27 @@ export async function updateOrderStatus(
     .eq("id", orderId)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/pedidos")
+
+  // Cancelar también libera el cupón que el alta del pedido consumió. La ruta
+  // del comensal ya lo hacía; sin esto, cancelar desde el panel dejaba el
+  // contador inflado —el mismo síntoma que cierra `00186`— porque el
+  // incremento (`increment_foodos_coupon_usage`) no tenía pareja en este
+  // camino. Best-effort, igual que en la ruta: el pedido ya está cancelado y
+  // deshacerlo sería peor que un contador que se corrige a mano. El guardián
+  // de la función limita la llamada al restaurante del dueño.
+  if (status === "cancelled" && fila?.coupon_code) {
+    const { error: couponError } = await supabase.rpc("decrement_foodos_coupon_usage", {
+      p_restaurant_id: fila.restaurant_id,
+      p_code: fila.coupon_code,
+    })
+    if (couponError) {
+      logger.warn("[FOODOS] no se pudo liberar el cupón al cancelar", {
+        orderId,
+        code: fila.coupon_code,
+        error: couponError.message,
+      })
+    }
+  }
 
   // after(): el aviso se manda después de responder para no dejar al
   // dueño esperando al mensajero, pero dentro de la vida de la función

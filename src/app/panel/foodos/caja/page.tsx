@@ -36,6 +36,7 @@ import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
 import { useTierGuard } from "@/hooks/use-tier-guard"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import { formatMoney } from "@/lib/foodos"
 import { downloadCsv, toCsv } from "@/lib/csv"
 import {
@@ -252,7 +253,7 @@ export default function CajaPage() {
       notes: s.notes,
     }))
     const csv = shiftHistoryCsv(rows)
-    downloadCsv(`cortes-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(csv.headers, csv.rows))
+    downloadCsv(`cortes-${dayKeyOf(DEFAULT_TIMEZONE)}.csv`, toCsv(csv.headers, csv.rows))
   }
 
   if (loading) {

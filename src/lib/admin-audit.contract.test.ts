@@ -47,10 +47,6 @@ const AUDIT_CALL_RE = /\blogAdminAction\s*\(/
  * admin. Cada entrada es una decisión, no un pendiente.
  */
 const EXEMPT: Record<string, string> = {
-  "bump-affinity/[id]/route.ts":
-    "weight solo desempata entre sugerencias; no cambia precio (00112:87-105)",
-  "bump-affinity/route.ts":
-    "weight solo desempata entre sugerencias; no cambia precio (00112:87-105)",
   "city-performance/tip/route.ts":
     "getAdminCityTip es una lectura (LLM); el POST no muta ninguna fila",
   "kie-ai/chat/route.ts": "herramienta generativa; consume cuota de API, no datos de negocio",
