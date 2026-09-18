@@ -571,7 +571,7 @@ privilegios por defecto a esos roles en cada objeto nuevo de `public`.
   invitado recurrente desaparecía cada 30 días y rompía el historial.
 
 **Estado verificado (17-sep-2026):** **aplicada**. No es "la última migración del
-repo" —el repositorio va por `00163`— y **sí tiene fila en el ledger** (`00117` ·
+repo" —el repositorio va por `00186`— y **sí tiene fila en el ledger** (`00117` ·
 `address_book`), así que `db push` la aplica sola en un entorno nuevo. Sonda con
 la clave publicable:
 
@@ -897,7 +897,10 @@ que provocan si faltan:
 `npm run db:status`.** Read-only, y compara el ledger en las dos direcciones.
 
 Estado medido el **18-sep-2026**: los objetos están vivos y el ledger **está
-limpio** — `00001`…`00163` emparejadas 1:1, cero huérfanas. Antes de la
+limpio** — `00001`…`00186` emparejadas 1:1 (**177 filas**), cero huérfanas y cero
+filas con timestamp. Ojo: la numeración **no es contigua**; hay un hueco
+deliberado en `00170`…`00178` que **no hay que rellenar** (ver «Hueco deliberado
+`00170`–`00178`»). Antes de la
 reparación de ese día sí estaba sucio: las migraciones `00154`…`00163` se habían
 aplicado por **MCP**, que registra un **timestamp generado** en vez del número
 del archivo, dejando **diez filas huérfanas** de `20260917190303`
@@ -1057,6 +1060,24 @@ ls supabase/migrations/*.sql | sed 's|.*/||' | cut -c1-5 | sort | uniq -d
 ```
 
 Salida vacía = sin duplicados.
+
+**Hueco deliberado `00170`–`00178`.** Entre `00169` y `00179` faltan **nueve
+números** y eso es **correcto**: no son huérfanas, no son un `DELETE` accidental
+y **no hay que reconstruirlas**. Fueron migraciones de **diagnóstico
+temporales** escritas durante la investigación de la caída de registro (nadie
+podía crear cuenta). Como `db push` imprime el `ERROR:` completo, el canal para
+leer el catálogo de Postgres era un `DO` que acumulaba hallazgos y terminaba en
+`RAISE EXCEPTION 'DIAGNOSTICO: %', v_r`. Las que llegaron a aplicarse se
+pasaron a `reverted` con `migration repair --status reverted` y después se
+borraron los archivos; los objetos que crearon (`public.zz_diag_log`,
+`zz_before()`, `zz_probe*`) se eliminaron en `00179`.
+
+Rellenar esos números «porque parece daño» —o recrear los archivos— ensucia el
+ledger y **vuelve a bloquear `db push`**. La regla de prefijo mira la *secuencia
+de versiones presentes*, no la contigüidad: `db push --dry-run` sale limpio con
+el hueco presente. Verificado el 18-sep-2026: `db push --linked --dry-run` →
+`{"upToDate":true,"migrations":[]}`, y `npm run db:status` sale **exit 0** con
+177 aplicadas y 0 sin fila numérica.
 
 `migration repair` escribe **solo** `supabase_migrations.schema_migrations`; no
 ejecuta el SQL de la migración. Mientras esas filas sigan ahí, `db push` falla
