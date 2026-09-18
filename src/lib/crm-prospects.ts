@@ -25,6 +25,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { isMissingColumnError } from "@/lib/sale-window"
 import {
+  CRM_CLOSED_STATUSES,
   CRM_PROSPECT_COLUMN_SETS,
   applyCrmScope,
   filterProspects,
@@ -246,4 +247,20 @@ export async function readCrmPipelineValue(
   const truncated = rows.length > limit
   const counted = truncated ? rows.slice(0, limit) : rows
   return { ...sumEstimatedValue(counted), truncated }
+}
+
+/**
+ * Valor previsto de lo que sigue **abierto**: el pipeline que queda por cerrar.
+ *
+ * Existe como nombre propio, y no como un cuarto argumento posicional en cada
+ * llamante, porque los dos totales no son intercambiables: el del alcance entero
+ * responde «cuánto dinero pasó por el CRM» y este responde «cuánto queda vivo».
+ * Un `true` suelto en la llamada no dice cuál de los dos se está pidiendo.
+ */
+export function readOpenCrmPipelineValue(
+  supabase: SupabaseClient,
+  scope: CrmScope,
+  limit: number = CRM_VALUE_SCAN_LIMIT,
+): Promise<PipelineValue> {
+  return readCrmPipelineValue(supabase, scope, limit, true)
 }

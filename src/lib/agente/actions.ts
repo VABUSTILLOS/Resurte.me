@@ -667,6 +667,19 @@ export interface DailyBriefing {
     seguimientosVencidos: number
     borradoresPendientes: number
     zoneLabel: string | null
+    /**
+     * Valor previsto de los tratos que siguen abiertos, o `null` si **ninguno**
+     * trae valor declarado.
+     *
+     * `null` y `0` no son lo mismo y por eso el tipo es anulable: `$0` diría
+     * «tu pipeline no vale nada», y lo que pasa es que nadie lo ha valorado
+     * todavía. La superficie decide cómo se lee cada caso.
+     */
+    pipelineAbierto: number | null
+    /** Cuántos de esos tratos abiertos traen valor declarado. */
+    pipelineValorados: number
+    /** `true` si la ventana de escaneo se quedó corta y la suma es un mínimo. */
+    pipelineTruncado: boolean
   }
 }
 
