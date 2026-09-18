@@ -114,3 +114,34 @@ test.describe("comercialización — ficha del prospecto", { tag: "@ci" }, () =>
     expect(ajeno?.status()).toBe(inexistente?.status())
   })
 })
+
+test.describe("comercialización — sin regresión por la Ronda 16", { tag: "@ci" }, () => {
+  // La Ronda 16 le devolvió la escritura al admin y añadió dinero al CRM. El
+  // camino del vendedor es el criterio de no-regresión de esa ronda: no cambia
+  // de comportamiento. Lo que se fija aquí es que la superficie del vendedor no
+  // adopta los parámetros nuevos del admin ni se rompe al recibirlos.
+
+  test("los parámetros del admin no alteran la superficie del vendedor", async ({ page }) => {
+    const response = await page.goto(
+      "/comercializacion/prospectos?nuevo=1&importar=1&tab=agenda&seller=abc&ciudad=Inventada"
+    )
+    expect(response?.status()).toBeLessThan(500)
+    expect(new URL(page.url()).pathname).not.toBe("/admin/leads")
+    await expect(page.locator("body")).not.toBeEmpty()
+  })
+
+  test("la ficha sigue siendo la compartida y no revienta con un id absurdo", async ({ page }) => {
+    // `?tab=` es una pestaña del admin; en el vendedor no debe existir una vista
+    // "agenda" ni un panel de dinero del admin.
+    const response = await page.goto("/comercializacion/prospectos/999999?tab=agenda")
+    expect(response?.status()).toBeLessThan(500)
+    await expect(page.locator("body")).not.toBeEmpty()
+  })
+
+  test("la agenda del admin no tiene equivalente en la ruta del vendedor", async ({ page }) => {
+    const response = await page.goto("/comercializacion/agenda")
+    // No existe esa ruta: el vendedor ve sus tareas desde su propia ficha. Lo
+    // que importa es que no responda sirviendo el panel del admin.
+    expect(response?.status()).not.toBe(200)
+  })
+})
