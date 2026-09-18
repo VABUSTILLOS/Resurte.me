@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { requireSellerOrAdminAction } from "@/lib/roles"
 import { applyCrmScope, scopeForRole, type CrmStatus } from "@/lib/crm-core"
 import { readCrmProspects, readOpenCrmPipelineValue } from "@/lib/crm-prospects"
+import { formatEstimatedTotal } from "@/lib/crm-money"
 import { logger } from "@/lib/logger"
 import { getWeekBounds, getMonthBounds, getTodayBounds } from "../comercializacion/dates"
 import {
@@ -195,7 +196,7 @@ export async function generateAgentMessage(
   })
   if (!p) throw new Error("Prospecto no encontrado")
 
-  const { employees, weekly_volume_min: volumeMin, weekly_volume_max: volumeMax } = p
+  const { employees, instagram, weekly_volume_min: volumeMin, weekly_volume_max: volumeMax } = p
 
   const sellerName = await getSellerName(supabase, userId)
   const zone = p.zone ? ZONES.find((z) => z.id === p.zone) : null
