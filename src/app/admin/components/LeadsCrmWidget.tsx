@@ -40,7 +40,7 @@ export function LeadsCrmWidget({ summary }: { summary: AdminLeadsSummary }) {
 
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center gap-3 mb-3">
-            <span className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+            <span className="w-9 h-9 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
               <Inbox className="w-4 h-4" />
             </span>
             <h3 className="text-sm font-semibold text-gray-700">Bandeja de entrada</h3>
@@ -52,7 +52,7 @@ export function LeadsCrmWidget({ summary }: { summary: AdminLeadsSummary }) {
             >
               <p
                 className={`text-xl font-bold ${
-                  board.pending > 0 ? "text-amber-600" : "text-gray-900"
+                  board.pending > 0 ? "text-amber-700" : "text-gray-900"
                 }`}
               >
                 {board.pending}
@@ -91,7 +91,7 @@ export function LeadsCrmWidget({ summary }: { summary: AdminLeadsSummary }) {
             >
               <p
                 className={`text-xl font-bold ${
-                  summary.crmFollowUpsDue > 0 ? "text-amber-600" : "text-gray-900"
+                  summary.crmFollowUpsDue > 0 ? "text-amber-700" : "text-gray-900"
                 }`}
               >
                 {summary.crmFollowUpsDue}
@@ -106,7 +106,7 @@ export function LeadsCrmWidget({ summary }: { summary: AdminLeadsSummary }) {
 
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center gap-3 mb-3">
-            <span className="w-9 h-9 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+            <span className="w-9 h-9 rounded-lg bg-orange-50 text-orange-700 flex items-center justify-center">
               <UserRoundX className="w-4 h-4" />
             </span>
             <h3 className="text-sm font-semibold text-gray-700">Sin asignar</h3>
@@ -114,7 +114,7 @@ export function LeadsCrmWidget({ summary }: { summary: AdminLeadsSummary }) {
           <a href={crmHref({ tab: "pipeline", unassigned: true })} className="group">
             <p
               className={`text-xl font-bold ${
-                summary.crmUnassigned > 0 ? "text-orange-600" : "text-gray-900"
+                summary.crmUnassigned > 0 ? "text-orange-700" : "text-gray-900"
               }`}
             >
               {summary.crmUnassigned}

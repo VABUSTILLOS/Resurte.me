@@ -154,7 +154,7 @@ function SequenceEnrollments({
             </p>
           ) : error ? (
             <div className="flex items-center gap-2 py-2">
-              <p className="flex-1 text-[11px] text-red-600">{error}</p>
+              <p className="flex-1 text-[11px] text-red-700">{error}</p>
               <button
                 type="button"
                 onClick={() => void load()}
@@ -314,7 +314,7 @@ export function LeadSequences({ onChanged }: { onChanged: () => void }) {
   if (error) {
     return (
       <div className={`${CARD} p-6 text-center`}>
-        <p className="text-sm font-medium text-red-600">{error}</p>
+        <p className="text-sm font-medium text-red-700">{error}</p>
         <button
           type="button"
           onClick={() => void load()}
@@ -585,7 +585,7 @@ function SequenceForm({ sequence, templates, onCancel, onSaved }: SequenceFormPr
                   type="button"
                   aria-label={`Quitar el paso ${index + 1}`}
                   onClick={() => setSteps((prev) => prev.filter((_, i) => i !== index))}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-white hover:text-red-600"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-white hover:text-red-700"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -654,7 +654,7 @@ function SequenceForm({ sequence, templates, onCancel, onSaved }: SequenceFormPr
         Activar al guardar
       </label>
 
-      {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+      {error && <p className="text-xs font-medium text-red-700">{error}</p>}
 
       <div className="flex items-center gap-2">
         <button

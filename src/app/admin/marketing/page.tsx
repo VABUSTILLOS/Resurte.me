@@ -313,7 +313,7 @@ function MarketingContent() {
         Marketing — bumps y cupones
       </h1>
 
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+      {error && <p className="text-sm text-red-700 mb-4">{error}</p>}
 
       {/* A15 ronda 2 — deep-link ?code= desde la alerta de cupón por expirar.
           Se renderiza sin depender de que los datos hayan cargado. */}
@@ -388,7 +388,7 @@ function MarketingContent() {
                 type="button"
                 onClick={() => void deleteRule(rule)}
                 aria-label="Eliminar regla"
-                className="text-gray-400 hover:text-red-600 p-1"
+                className="text-gray-400 hover:text-red-700 p-1"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -581,7 +581,7 @@ function MarketingContent() {
                     onClick={() => void deleteCoupon(c)}
                     aria-label={`Eliminar cupón ${c.code}`}
                     title="Eliminar"
-                    className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700"
+                    className="rounded-lg p-1.5 text-red-700 hover:bg-red-50 hover:text-red-700"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -589,7 +589,7 @@ function MarketingContent() {
                     <button
                       type="button"
                       onClick={() => void expireCoupon(c)}
-                      className="ml-1 text-xs font-semibold text-red-600 hover:underline"
+                      className="ml-1 text-xs font-semibold text-red-700 hover:underline"
                     >
                       Expirar ahora
                     </button>

@@ -94,7 +94,7 @@ export function LeadConversations({
   if (error && !inbox) {
     return (
       <div className="py-16 text-center">
-        <p className="text-sm font-medium text-red-600">{error}</p>
+        <p className="text-sm font-medium text-red-700">{error}</p>
         <button
           type="button"
           onClick={() => void load()}
@@ -261,7 +261,7 @@ export function LeadConversations({
   function BucketChip({ thread }: { thread: AdminInboxThread }) {
     if (!thread.bucket) {
       return (
-        <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
+        <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">
           Sin conversación
         </span>
       )

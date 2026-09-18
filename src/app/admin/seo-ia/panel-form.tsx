@@ -362,7 +362,7 @@ function GeoCellEditor({
               type="button"
               onClick={onClear}
               disabled={saving}
-              className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
             >
               <Trash2 className="w-4 h-4" />
               Borrar celda
@@ -598,7 +598,7 @@ export function GeoPanelForm({ initialData }: { initialData: GeoPanelMonthData }
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
+              <tr className="bg-gray-50 text-left text-xs text-gray-500 font-medium">
                 <th className="px-5 py-3 w-8">#</th>
                 <th className="px-5 py-3 min-w-[20rem]">Pregunta</th>
                 <th className="px-5 py-3 min-w-[9rem]">Dónde debería citar</th>
@@ -711,7 +711,7 @@ export function GeoPanelForm({ initialData }: { initialData: GeoPanelMonthData }
               </>
             ) : (
               <>
-                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-green-600" />
+                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-green-700" />
                 Ninguna brecha en las celdas medidas: donde debería haber cita, la hubo.
               </>
             )}
@@ -721,7 +721,7 @@ export function GeoPanelForm({ initialData }: { initialData: GeoPanelMonthData }
             {metrics.gaps.map((g) => (
               <div key={`${g.queryId}::${g.engineId}`} className="px-5 py-3">
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-700" />
                   <div className="min-w-0">
                     <p className="text-sm text-gray-900">{g.prompt}</p>
                     <p className="text-xs text-gray-400 mt-0.5">

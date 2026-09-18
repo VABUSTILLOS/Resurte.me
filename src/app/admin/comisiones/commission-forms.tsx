@@ -86,7 +86,7 @@ function Sheet({
         {subtitle && <p className="text-sm text-gray-500 mb-4">{subtitle}</p>}
         <div className="space-y-3">{children}</div>
         {error && (
-          <p role="alert" className="mt-3 rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs text-red-600">
+          <p role="alert" className="mt-3 rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs text-red-700">
             {error}
           </p>
         )}
@@ -181,7 +181,7 @@ export function PayCommissionDialog({
           maxLength={120}
         />
         {needsReference && reference.trim().length > 0 && reference.trim().length < MIN_PAYMENT_REFERENCE && (
-          <p className="mt-1 text-xs text-amber-600">
+          <p className="mt-1 text-xs text-amber-700">
             Al menos {MIN_PAYMENT_REFERENCE} caracteres.
           </p>
         )}

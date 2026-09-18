@@ -555,7 +555,7 @@ function AdminLeadsContent() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <p className="text-sm font-medium text-red-600">{error}</p>
+        <p className="text-sm font-medium text-red-700">{error}</p>
         <button
           type="button"
           onClick={() => void load()}
@@ -962,7 +962,7 @@ function AdminLeadsContent() {
                           {p.next_follow_up_at && (
                             <p
                               className={`mt-1 inline-flex items-center gap-1 text-[11px] font-medium ${
-                                overdue ? "text-red-600" : "text-gray-400"
+                                overdue ? "text-red-700" : "text-gray-400"
                               }`}
                               title={new Date(p.next_follow_up_at).toLocaleString("es-MX")}
                             >
@@ -1186,7 +1186,7 @@ function LeadInbox({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
             <thead>
-              <tr className="bg-gray-50 text-left text-xs font-medium text-gray-400">
+              <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
                 <th className="px-4 py-3">Correo</th>
                 <th className="px-4 py-3">Teléfono</th>
                 <th className="px-4 py-3">Fuente</th>
@@ -1302,7 +1302,7 @@ function LeadInbox({
                               type="button"
                               disabled={busy}
                               onClick={() => onDiscard(l)}
-                              className="inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold text-gray-500 hover:bg-gray-50 hover:text-red-600 disabled:opacity-50"
+                              className="inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold text-gray-500 hover:bg-gray-50 hover:text-red-700 disabled:opacity-50"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                               Descartar
@@ -1528,7 +1528,7 @@ function SlaView() {
   if (error || !sla) {
     return (
       <div className={CARD}>
-        <p className="py-8 text-center text-xs text-red-600">
+        <p className="py-8 text-center text-xs text-red-700">
           {error ?? "No se pudo calcular el SLA"}
         </p>
       </div>
@@ -1618,7 +1618,7 @@ function SlaView() {
                 <span className="w-28 shrink-0 text-right text-[11px] text-gray-500">
                   {load.open} abiertos
                   {load.overdue > 0 && (
-                    <span className="ml-1 font-semibold text-red-600">{load.overdue} vencidos</span>
+                    <span className="ml-1 font-semibold text-red-700">{load.overdue} vencidos</span>
                   )}
                 </span>
               </li>
@@ -1667,7 +1667,7 @@ function SlaView() {
                       )}
                     </td>
                     <td className="py-2 text-gray-600">{row.sellerName ?? "Sin asignar"}</td>
-                    <td className="py-2 text-right font-semibold text-red-600">
+                    <td className="py-2 text-right font-semibold text-red-700">
                       {formatMinutes(row.waitingMinutes)}
                     </td>
                     <td className="py-2 text-right text-gray-500">
@@ -1700,7 +1700,7 @@ function SlaStat({
 }) {
   const color =
     tone === "danger" && Number(value) > 0
-      ? "text-red-600"
+      ? "text-red-700"
       : tone === "warning" && Number(value) > 0
         ? "text-amber-700"
         : "text-gray-900"

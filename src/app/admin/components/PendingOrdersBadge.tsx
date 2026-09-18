@@ -42,7 +42,7 @@ export function PendingOrdersBadge() {
   return (
     <span
       aria-label={`${count} pedidos pendientes`}
-      className="ml-1 inline-flex min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white"
+      className="ml-1 inline-flex min-w-4 items-center justify-center rounded-full bg-amber-700 px-1 text-[10px] font-bold text-white"
     >
       {count > 99 ? "99+" : count}
     </span>

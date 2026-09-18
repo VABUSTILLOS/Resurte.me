@@ -149,7 +149,7 @@ export function LeadDistribution({
               </p>
             ) : loadError ? (
               <div className="flex items-center gap-2 py-1.5">
-                <p className="flex-1 text-[11px] text-red-600">{loadError}</p>
+                <p className="flex-1 text-[11px] text-red-700">{loadError}</p>
                 <button
                   type="button"
                   onClick={() => void loadLoads()}

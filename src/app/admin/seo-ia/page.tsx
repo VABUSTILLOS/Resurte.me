@@ -76,7 +76,7 @@ export default async function AdminSeoIaPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
+                <tr className="bg-gray-50 text-left text-xs text-gray-500 font-medium">
                   <th className="px-5 py-3">Activo</th>
                   <th className="px-5 py-3">Dónde vive</th>
                   <th className="px-5 py-3">Por qué es citable</th>

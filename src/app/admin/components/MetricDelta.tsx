@@ -34,7 +34,7 @@ export function DeltaChip({
   const Icon = direction === "up" ? TrendingUp : direction === "down" ? TrendingDown : Minus
   const good = direction !== "flat" && direction === goodDirection
   const bad = direction !== "flat" && direction !== goodDirection
-  const color = good ? "text-green-600" : bad ? "text-red-600" : "text-gray-500"
+  const color = good ? "text-green-700" : bad ? "text-red-700" : "text-gray-500"
   return (
     <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${color}`}>
       <Icon className="w-3 h-3" aria-hidden="true" />

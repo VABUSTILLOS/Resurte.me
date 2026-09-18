@@ -96,7 +96,7 @@ export function EmailsTab() {
         <p className="text-sm text-gray-500">
           Bitácora de emails transaccionales y campañas (email_logs).
           {failedCount > 0 && (
-            <span className="text-red-600 font-medium"> {failedCount} fallidos.</span>
+            <span className="text-red-700 font-medium"> {failedCount} fallidos.</span>
           )}
         </p>
         <button
@@ -147,7 +147,7 @@ export function EmailsTab() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/50 text-left text-gray-400">
+                <tr className="border-b border-gray-100 bg-gray-50/50 text-left text-gray-500">
                   <th className="px-4 py-3 font-medium">Destinatario</th>
                   <th className="px-4 py-3 font-medium">Tipo</th>
                   <th className="px-4 py-3 font-medium">Pedido</th>
@@ -181,7 +181,7 @@ export function EmailsTab() {
                         </span>
                       ) : (
                         <span
-                          className="inline-flex items-center gap-1 text-red-600"
+                          className="inline-flex items-center gap-1 text-red-700"
                           title={
                             log.error
                               ? (ERROR_LABEL[log.error] ?? log.error)

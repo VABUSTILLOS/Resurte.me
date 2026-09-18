@@ -207,7 +207,7 @@ export default function AdminComisionesPage() {
       )}
 
       {error && !loading && (
-        <div role="alert" className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
+        <div role="alert" className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -231,7 +231,7 @@ export default function AdminComisionesPage() {
           <section className="mb-6">
             <h2 className="text-sm font-semibold text-gray-900 mb-2">Pendientes de devengar</h2>
             {!hasAnyCandidate ? (
-              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-400">
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-500">
                 {hasAnyPeriod
                   ? "Todos los vendedores con ventas este mes ya tienen periodo devengado."
                   : "No hay ventas de clientes vinculados en este mes."}
@@ -241,7 +241,7 @@ export default function AdminComisionesPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
+                      <tr className="bg-gray-50 text-left text-xs text-gray-500 font-medium">
                         <th className="px-5 py-3">Vendedor</th>
                         <th className="px-5 py-3 text-right">Clientes</th>
                         <th className="px-5 py-3 text-right">Pedidos</th>
@@ -293,7 +293,7 @@ export default function AdminComisionesPage() {
               Ledger de {formatPeriodLabel(report.range.periodStart)}
             </h2>
             {!hasAnyPeriod ? (
-              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-400">
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-500">
                 Todavía no hay periodos devengados en {formatPeriodLabel(report.range.periodStart)}.
               </div>
             ) : (
@@ -301,7 +301,7 @@ export default function AdminComisionesPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
+                      <tr className="bg-gray-50 text-left text-xs text-gray-500 font-medium">
                         <th className="px-5 py-3">Vendedor</th>
                         <th className="px-5 py-3">Estado</th>
                         <th className="px-5 py-3 text-right">Ventas</th>
@@ -466,7 +466,7 @@ function PeriodRow({
                 <button
                   type="button"
                   onClick={() => onAction("cancel")}
-                  className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+                  className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors"
                 >
                   <Ban className="w-3.5 h-3.5" />
                   Cancelar
@@ -490,7 +490,7 @@ function PeriodRow({
                   <span className="text-gray-600">{m.reason}</span>
                   <span className="text-gray-400">
                     {m.createdAt.slice(0, 10)} ·{" "}
-                    <strong className={m.amount < 0 ? "text-red-600" : "text-gray-900"}>
+                    <strong className={m.amount < 0 ? "text-red-700" : "text-gray-900"}>
                       {m.amount > 0 ? "+" : ""}
                       {formatMoney(m.amount)}
                     </strong>

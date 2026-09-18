@@ -924,7 +924,7 @@ export default function AdminWhatsAppPage() {
                   <button
                     onClick={() => handleDeleteTemplate(tpl.id)}
                     disabled={busy}
-                    className="shrink-0 p-1.5 text-[#B0B3B8] hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-40"
+                    className="shrink-0 p-1.5 text-[#B0B3B8] hover:text-red-700 hover:bg-red-50 rounded-lg disabled:opacity-40"
                     aria-label={`Eliminar ${tpl.template_name}`}
                     title="Eliminar"
                   >
@@ -1058,7 +1058,7 @@ export default function AdminWhatsAppPage() {
               <button
                 onClick={handleBroadcast}
                 disabled={busy || curated.length === 0 || (bcAudience === "manual" && !bcManual.trim())}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-[#25D366] text-white text-sm font-bold rounded-full hover:bg-[#1fb857] disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2 bg-[#0F7A3D] text-white text-sm font-bold rounded-full hover:bg-[#0F6B3A] disabled:opacity-50"
               >
                 <Send className="w-4 h-4" />
                 Enviar catálogo
@@ -1095,7 +1095,7 @@ export default function AdminWhatsAppPage() {
           {/* Contadores resumen */}
           <p className="text-xs text-[var(--text-secondary)] mb-3">
             {explorerMetaTotal} productos en Meta · {explorerCounts.match} sincronizados ·{" "}
-            <span className={explorerCounts.diffs > 0 ? "text-amber-600 font-semibold" : ""}>
+            <span className={explorerCounts.diffs > 0 ? "text-amber-700 font-semibold" : ""}>
               {explorerCounts.diffs} con diferencias
             </span>
             {explorerCounts.only_meta > 0 && ` · ${explorerCounts.only_meta} solo en Meta`}
@@ -1108,7 +1108,7 @@ export default function AdminWhatsAppPage() {
               <div className="flex-1 h-2 rounded-full bg-[#F0F1F2] overflow-hidden" role="img" aria-label={`Salud del catálogo: ${healthScore}%`}>
                 <div
                   className={`h-full rounded-full transition-all ${
-                    healthScore >= 90 ? "bg-emerald-500" : healthScore >= 70 ? "bg-amber-400" : "bg-red-500"
+                    healthScore >= 90 ? "bg-emerald-700" : healthScore >= 70 ? "bg-amber-700" : "bg-red-500"
                   }`}
                   style={{ width: `${healthScore}%` }}
                 />
@@ -1181,7 +1181,7 @@ export default function AdminWhatsAppPage() {
                         {row.metaPrice != null && row.storePrice != null && " · "}
                         {row.storePrice != null && `Tienda: $${row.storePrice.toFixed(2)}`}
                         {row.metaReviewStatus && row.metaReviewStatus !== "approved" && (
-                          <span className="ml-2 text-amber-600">revisión: {row.metaReviewStatus}</span>
+                          <span className="ml-2 text-amber-700">revisión: {row.metaReviewStatus}</span>
                         )}
                       </p>
                     </div>
@@ -1241,7 +1241,7 @@ export default function AdminWhatsAppPage() {
                           className={`shrink-0 px-1.5 py-1 rounded-lg text-[10px] font-bold disabled:opacity-40 ${
                             armDeleteId === row.retailer_id
                               ? "bg-red-600 text-white"
-                              : "text-[#B0B3B8] hover:text-red-600 hover:bg-red-50"
+                              : "text-[#B0B3B8] hover:text-red-700 hover:bg-red-50"
                           }`}
                           aria-label={`Eliminar ${row.name} de Meta`}
                           title={armDeleteId === row.retailer_id ? "Confirmar eliminación" : "Eliminar de Meta"}
@@ -1351,7 +1351,7 @@ export default function AdminWhatsAppPage() {
                   type="button"
                   onClick={handleClearToken}
                   disabled={busy}
-                  className="px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-full disabled:opacity-60"
+                  className="px-4 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 rounded-full disabled:opacity-60"
                 >
                   Quitar token (usar plataforma)
                 </button>
@@ -1393,13 +1393,13 @@ export default function AdminWhatsAppPage() {
                     <p className="font-semibold text-[#242529] truncate">{q.product_name}</p>
                     <p className="text-xs text-[var(--text-secondary)]">
                       {QUEUE_REASON_LABELS[q.reason] ?? q.reason} · {ageText(q.queued_at)}
-                      {q.attempts > 0 && <span className="ml-1 text-amber-600">· intento {q.attempts + 1}</span>}
+                      {q.attempts > 0 && <span className="ml-1 text-amber-700">· intento {q.attempts + 1}</span>}
                     </p>
                   </div>
                   <button
                     onClick={() => handleRemoveQueueItem(q.id)}
                     disabled={busy}
-                    className="p-1.5 text-[#B0B3B8] hover:text-red-600"
+                    className="p-1.5 text-[#B0B3B8] hover:text-red-700"
                     aria-label={`Quitar ${q.product_name} de la cola`}
                   >
                     <X className="w-4 h-4" />
@@ -1547,7 +1547,7 @@ export default function AdminWhatsAppPage() {
                         <p className="text-xs text-[var(--text-secondary)]">
                           ${(p.sale_price ?? p.price ?? 0).toFixed(2)}
                           {item.available_in_city === false && (
-                            <span className="ml-2 text-amber-600 font-semibold">⚠ no disponible en la ciudad</span>
+                            <span className="ml-2 text-amber-700 font-semibold">⚠ no disponible en la ciudad</span>
                           )}
                         </p>
                       </div>
@@ -1557,7 +1557,7 @@ export default function AdminWhatsAppPage() {
                       <button onClick={() => move(item, 1)} disabled={busy || idx === curated.length - 1} className="p-1.5 text-[#B0B3B8] hover:text-[#242529] disabled:opacity-30" aria-label={`Bajar ${p.name}`}>
                         <ArrowDown className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleRemove(item.product_id)} disabled={busy} className="p-1.5 text-[#B0B3B8] hover:text-red-600" aria-label={`Quitar ${p.name}`}>
+                      <button onClick={() => handleRemove(item.product_id)} disabled={busy} className="p-1.5 text-[#B0B3B8] hover:text-red-700" aria-label={`Quitar ${p.name}`}>
                         ✕
                       </button>
                     </div>
@@ -1602,7 +1602,7 @@ export default function AdminWhatsAppPage() {
                 <button
                   type="submit"
                   disabled={busy || curated.length === 0 || !sendPhone.trim()}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#25D366] text-white text-sm font-bold hover:bg-[#1fb857] disabled:opacity-40"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0F7A3D] text-white text-sm font-bold hover:bg-[#0F6B3A] disabled:opacity-40"
                 >
                   <Send className="w-4 h-4" /> Enviar
                 </button>
@@ -1635,10 +1635,10 @@ export default function AdminWhatsAppPage() {
                           <span
                             className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
                               run.status === "done"
-                                ? "bg-emerald-500"
+                                ? "bg-emerald-700"
                                 : run.status === "failed"
                                   ? "bg-red-500"
-                                  : "bg-amber-400 animate-pulse"
+                                  : "bg-amber-700 animate-pulse"
                             }`}
                             aria-hidden="true"
                           />
@@ -1657,7 +1657,7 @@ export default function AdminWhatsAppPage() {
                               ` · ${run.added} nuevos, ${run.updated} act.${run.removed ? `, ${run.removed} elim.` : ""}${run.stale_count ? `, ${run.stale_count} ajenos` : ""}`}
                             {run.status === "failed" && " · falló"}
                             {run.status === "running" && " · en curso…"}
-                            {run.error && <span className="block text-red-600 mt-0.5">{run.error}</span>}
+                            {run.error && <span className="block text-red-700 mt-0.5">{run.error}</span>}
                           </span>
                         </button>
 
@@ -1675,10 +1675,10 @@ export default function AdminWhatsAppPage() {
                                       <span
                                         className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                                           item.status === "ok"
-                                            ? "bg-emerald-500"
+                                            ? "bg-emerald-700"
                                             : item.status === "error"
                                               ? "bg-red-500"
-                                              : "bg-amber-400"
+                                              : "bg-amber-700"
                                         }`}
                                         aria-hidden="true"
                                       />
@@ -1686,7 +1686,7 @@ export default function AdminWhatsAppPage() {
                                         {item.product_name}
                                         <span className="text-[#B0B3B8]"> · {item.action}</span>
                                         {item.error && (
-                                          <span className="block text-red-600 truncate">{item.error}</span>
+                                          <span className="block text-red-700 truncate">{item.error}</span>
                                         )}
                                       </span>
                                       {item.status === "error" && (
@@ -1890,7 +1890,7 @@ export default function AdminWhatsAppPage() {
 
             <ul className="space-y-2 text-sm text-[var(--text-secondary)] mb-4">
               <li className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                <span className="w-2 h-2 rounded-full bg-emerald-700" aria-hidden="true" />
                 <span><strong className="text-[#242529]">{syncPreview.diff.toCreate.length}</strong> productos nuevos se crearán en Meta</span>
               </li>
               <li className="flex items-center gap-2">
@@ -1898,7 +1898,7 @@ export default function AdminWhatsAppPage() {
                 <span><strong className="text-[#242529]">{syncPreview.diff.toUpdate.length}</strong> productos existentes se actualizarán</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-500 mt-1.5" aria-hidden="true" />
+                <span className="w-2 h-2 rounded-full bg-amber-700 mt-1.5" aria-hidden="true" />
                 <span>
                   <strong className="text-[#242529]">{syncPreview.diff.stale.length}</strong> productos están en Meta pero fuera de la curaduría
                   {syncPreview.diff.stale.length > 0 && (

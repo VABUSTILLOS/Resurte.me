@@ -8,7 +8,7 @@ import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 const SEVERITY_STYLE: Record<string, string> = {
   fatal: "bg-red-100 text-red-700",
-  error: "bg-red-50 text-red-600",
+  error: "bg-red-50 text-red-700",
   warn: "bg-amber-50 text-amber-700",
   info: "bg-blue-50 text-blue-600",
 }
@@ -140,7 +140,7 @@ export function ErroresTab() {
       )}
 
       {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
+        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
           {error}
         </div>
       )}

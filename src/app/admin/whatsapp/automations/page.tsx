@@ -210,13 +210,13 @@ export default function AdminAutomationsPage() {
       {/* Info banner */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-          <MessageCircle className="w-5 h-5 text-amber-600" />
+          <MessageCircle className="w-5 h-5 text-amber-700" />
         </div>
         <div>
           <p className="text-sm font-semibold text-amber-800 mb-1">
             Requisito: Plantillas aprobadas por Meta
           </p>
-          <p className="text-xs text-amber-600">
+          <p className="text-xs text-amber-700">
             Cada automatización usa una plantilla de WhatsApp que debe estar <strong>aprobada por Meta</strong> antes de poder enviarse. Las plantillas se configuran en el WhatsApp Business Manager. Una vez aprobadas, asigna el nombre de la plantilla en cada automatización.
           </p>
         </div>
@@ -228,7 +228,7 @@ export default function AdminAutomationsPage() {
       <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-5 mb-6">
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
-            <MessageCircle className="w-5 h-5 text-green-600" aria-hidden="true" />
+            <MessageCircle className="w-5 h-5 text-green-700" aria-hidden="true" />
           </div>
           <div>
             <h2 className="font-semibold text-green-900 mb-1">Así funciona el motor de workflows</h2>
@@ -294,7 +294,7 @@ export default function AdminAutomationsPage() {
                     return (
                       <p className="text-[11px] text-gray-400 mt-1">
                         {s.sent7d} enviados (7 días)
-                        {s.failed7d > 0 && <span className="text-red-500"> · {s.failed7d} fallidos</span>}
+                        {s.failed7d > 0 && <span className="text-red-700"> · {s.failed7d} fallidos</span>}
                         {s.lastSentAt && (
                           <>
                             {" · último "}
@@ -317,7 +317,7 @@ export default function AdminAutomationsPage() {
                 aria-label={auto.isActive ? "Desactivar automatización" : "Activar automatización"}
               >
                 {auto.isActive ? (
-                  <ToggleRight className="w-8 h-8 text-green-500" />
+                  <ToggleRight className="w-8 h-8 text-green-700" />
                 ) : (
                   <ToggleLeft className="w-8 h-8 text-gray-300" />
                 )}
@@ -345,7 +345,7 @@ export default function AdminAutomationsPage() {
                     Nombre exacto de la plantilla aprobada en Meta Business Manager
                   </p>
                   {noTemplate.has(auto.type) && (
-                    <p className="text-[10px] text-amber-600 font-semibold mt-1">
+                    <p className="text-[10px] text-amber-700 font-semibold mt-1">
                       ⚠ Sin plantilla registrada — los envíos usan texto libre (ventana de 24 h)
                     </p>
                   )}
@@ -417,7 +417,7 @@ export default function AdminAutomationsPage() {
                   {savingType === auto.type ? "Guardando…" : "Guardar configuración"}
                 </button>
                 {savedMsg && savedMsg.type === auto.type && (
-                  <p className={`text-xs mt-1 ${savedMsg.ok ? "text-green-600" : "text-red-600"}`}>
+                  <p className={`text-xs mt-1 ${savedMsg.ok ? "text-green-700" : "text-red-700"}`}>
                     {savedMsg.ok
                       ? `Automatización "${auto.label}" guardada correctamente.`
                       : `Error al guardar. ${savedMsg.detail || "Intenta de nuevo."}`}

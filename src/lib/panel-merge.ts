@@ -120,8 +120,7 @@ function mergeArrays(local: unknown[], server: unknown[]): MergeResult {
   }
 
   const serverByKey = new Map<string, unknown>()
-  for (let i = 0; i < server.length; i++) {
-    const k = serverKeys[i]
+  for (const [i, k] of serverKeys.entries()) {
     if (k !== null && !serverByKey.has(k)) serverByKey.set(k, server[i])
   }
 
@@ -130,8 +129,7 @@ function mergeArrays(local: unknown[], server: unknown[]): MergeResult {
   let localOverwrote = 0
   let localAdded = 0
 
-  for (let i = 0; i < local.length; i++) {
-    const k = localKeys[i]
+  for (const [i, k] of localKeys.entries()) {
     if (k === null) continue
     seen.add(k)
     const remote = serverByKey.get(k)
@@ -141,8 +139,7 @@ function mergeArrays(local: unknown[], server: unknown[]): MergeResult {
   }
 
   let keptFromServer = 0
-  for (let i = 0; i < server.length; i++) {
-    const k = serverKeys[i]
+  for (const [i, k] of serverKeys.entries()) {
     if (k === null || seen.has(k)) continue
     seen.add(k)
     keptFromServer++

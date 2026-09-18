@@ -33,7 +33,7 @@ const EMPTY_DRAFT: Draft = { id: null, title: "", body: "", category: "", isActi
 
 /** "18/60" — verde mientras quepa, rojo cuando ya no. */
 function counterClass(length: number, max: number): string {
-  return length > max ? "text-red-600 font-semibold" : "text-gray-400"
+  return length > max ? "text-red-700 font-semibold" : "text-gray-400"
 }
 
 /**
@@ -266,7 +266,7 @@ export function LeadQuickReplies() {
             Disponible en el compositor
           </label>
 
-          {formError && <p className="mt-1 text-[11px] text-red-600">{formError}</p>}
+          {formError && <p className="mt-1 text-[11px] text-red-700">{formError}</p>}
 
           <div className="mt-2 flex items-center gap-2">
             <button
@@ -303,7 +303,7 @@ export function LeadQuickReplies() {
         </p>
       ) : error ? (
         <div className={`${CARD} p-6 text-center`}>
-          <p className="text-sm font-medium text-red-600">{error}</p>
+          <p className="text-sm font-medium text-red-700">{error}</p>
           <button
             type="button"
             onClick={() => void load()}

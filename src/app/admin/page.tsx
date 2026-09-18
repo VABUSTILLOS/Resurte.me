@@ -284,7 +284,7 @@ function AdminDashboardContent() {
           value: `$${stats.revenueToday.toLocaleString("es-MX")}`,
           ...buildDelta(stats.revenueToday, stats.revenueYesterday),
           icon: DollarSign,
-          color: "bg-green-50 text-green-600",
+          color: "bg-green-50 text-green-700",
         },
         {
           label: "Ticket promedio hoy",
@@ -305,7 +305,7 @@ function AdminDashboardContent() {
             }
           })(),
           icon: Ban,
-          color: "bg-red-50 text-red-600",
+          color: "bg-red-50 text-red-700",
         },
       ]
     : []
@@ -318,7 +318,7 @@ function AdminDashboardContent() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <p className="text-red-600 text-sm font-medium">{error}</p>
+        <p className="text-red-700 text-sm font-medium">{error}</p>
         <p className="text-gray-400 text-xs mt-1">
           Verifica que estés autenticado como administrador.
         </p>
@@ -366,9 +366,9 @@ function AdminDashboardContent() {
                 <span
                   className={`inline-flex items-center gap-0.5 text-xs font-medium ${
                     card.trend === "up"
-                      ? "text-green-600"
+                      ? "text-green-700"
                       : card.trend === "down"
-                      ? "text-red-600"
+                      ? "text-red-700"
                       : "text-gray-400"
                   }`}
                 >
@@ -430,7 +430,7 @@ function AdminDashboardContent() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
+              <tr className="bg-gray-50 text-left text-xs text-gray-500 font-medium">
                 <th className="px-5 py-2.5">Pedido</th>
                 <th className="px-5 py-2.5">Total</th>
                 <th className="px-5 py-2.5">Pago</th>

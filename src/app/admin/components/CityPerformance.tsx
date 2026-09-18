@@ -44,7 +44,7 @@ function ScoreBar({ score }: { score: number }) {
       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-100" aria-hidden="true">
         <div
           className={`h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none ${
-            score >= 70 ? "bg-green-500" : score >= 45 ? "bg-blue-500" : "bg-amber-500"
+            score >= 70 ? "bg-green-700" : score >= 45 ? "bg-blue-500" : "bg-amber-700"
           }`}
           style={{ width: `${score}%` }}
         />
@@ -59,7 +59,7 @@ function Delta({ value }: { value: number | null }) {
     return <span className="text-[11px] text-gray-400">sin base</span>
   }
   const Icon = value > 0 ? TrendingUp : value < 0 ? TrendingDown : Minus
-  const color = value > 0 ? "text-green-600" : value < 0 ? "text-red-600" : "text-gray-500"
+  const color = value > 0 ? "text-green-700" : value < 0 ? "text-red-700" : "text-gray-500"
   return (
     <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${color}`}>
       <Icon className="h-3 w-3" aria-hidden="true" />
@@ -169,7 +169,7 @@ export function CityPerformance() {
 
       {error ? (
         <div className="py-6 text-center">
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-sm text-red-700">{error}</p>
           <button
             type="button"
             onClick={() => void load(days)}
@@ -243,7 +243,7 @@ export function CityPerformance() {
                         </td>
                         <td className="py-2.5 pr-3 text-right tabular-nums">{money(city.aov)}</td>
                         <td className="py-2.5 pr-3 text-right tabular-nums">
-                          <span className={city.cancellationRate >= 15 ? "font-semibold text-red-600" : ""}>
+                          <span className={city.cancellationRate >= 15 ? "font-semibold text-red-700" : ""}>
                             {city.cancellationRate}%
                           </span>
                         </td>
@@ -322,7 +322,7 @@ export function CityPerformance() {
           {data.needsAttention.length > 0 && (
             <div>
               <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
-                <AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden="true" />
+                <AlertTriangle className="h-4 w-4 text-amber-700" aria-hidden="true" />
                 Ciudades que necesitan atención
               </h3>
               <p className="mb-3 text-[11px] text-gray-400">
@@ -347,9 +347,9 @@ export function CityPerformance() {
                           <Lightbulb
                             className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
                               tip.severity === "critical"
-                                ? "text-red-500"
+                                ? "text-red-700"
                                 : tip.severity === "warning"
-                                  ? "text-amber-500"
+                                  ? "text-amber-700"
                                   : "text-blue-500"
                             }`}
                             aria-hidden="true"
@@ -396,7 +396,7 @@ export function CityPerformance() {
                         </button>
                       )}
                       {tips[city.cityId]?.error && (
-                        <p className="mt-1.5 text-[11px] text-red-600">{tips[city.cityId]?.error}</p>
+                        <p className="mt-1.5 text-[11px] text-red-700">{tips[city.cityId]?.error}</p>
                       )}
                     </div>
                   </li>

@@ -30,8 +30,8 @@ const SEVERITY_STYLE: Record<AdminAlert["severity"], string> = {
 }
 
 const SEVERITY_ICON_STYLE: Record<AdminAlert["severity"], string> = {
-  critical: "bg-red-100 text-red-600",
-  warning: "bg-amber-100 text-amber-600",
+  critical: "bg-red-100 text-red-700",
+  warning: "bg-amber-100 text-amber-700",
   info: "bg-blue-100 text-blue-600",
 }
 
@@ -46,7 +46,7 @@ export function AdminAlerts({ alerts }: { alerts: AdminAlert[] }) {
       <h2 className="font-semibold text-gray-900 mb-3">Alertas operativas</h2>
       {alerts.length === 0 ? (
         <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
-          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+          <CheckCircle2 className="w-5 h-5 text-green-700 shrink-0" />
           <p className="text-sm text-green-800 font-medium">
             Todo en orden. No hay alertas activas.
           </p>

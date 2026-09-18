@@ -55,9 +55,9 @@ export default async function AdminSistemaPage() {
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 mb-6 flex items-start gap-3">
         {missing === 0 ? (
-          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" aria-hidden="true" />
+          <CheckCircle2 className="w-5 h-5 text-green-700 shrink-0 mt-0.5" aria-hidden="true" />
         ) : (
-          <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
+          <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
         )}
         <p className="text-sm text-gray-700">
           <strong>
@@ -140,7 +140,7 @@ export default async function AdminSistemaPage() {
 
         {report.error ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
+            <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
             <div className="text-sm text-amber-900">
               <p className="font-semibold">No se pudo leer el reporte de permisos</p>
               <p className="mt-1 break-words font-mono text-xs">{report.error}</p>
@@ -155,7 +155,7 @@ export default async function AdminSistemaPage() {
           <>
             {unconverged.length === 0 && rolesInconsistentes.length === 0 ? (
               <div className="rounded-xl border border-green-200 bg-green-50 p-4 mb-4 flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" aria-hidden="true" />
+                <CheckCircle2 className="w-5 h-5 text-green-700 shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="text-sm text-green-900">
                   <strong>App y base de datos coinciden.</strong> Todo permiso de administrador está
                   respaldado por <code className="font-mono">profiles.role = &apos;admin&apos;</code>,
@@ -164,7 +164,7 @@ export default async function AdminSistemaPage() {
               </div>
             ) : (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-4 flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
+                <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="text-sm text-amber-900">
                   <strong>Hay divergencia entre la app y la base de datos.</strong> Los permisos
                   listados abajo conceden acceso al panel pero RLS todavía no los reconoce, así que

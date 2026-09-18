@@ -94,7 +94,7 @@ export function PeriodComparisonCard() {
 
       {error ? (
         <div className="text-center py-6">
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-sm text-red-700">{error}</p>
           <button
             type="button"
             onClick={() => void load(days)}

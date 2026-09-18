@@ -125,7 +125,7 @@ function AdminFoodosRestaurantsContent() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <p className="text-sm font-medium text-red-600">{error}</p>
+        <p className="text-sm font-medium text-red-700">{error}</p>
         <button
           type="button"
           onClick={() => void load()}
@@ -194,7 +194,7 @@ function AdminFoodosRestaurantsContent() {
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="w-full min-w-[64rem] text-sm">
           <thead>
-            <tr className="bg-gray-50 text-left text-xs font-medium text-gray-400">
+            <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
               <th className="px-5 py-3">Restaurante</th>
               <th className="px-5 py-3">Nivel</th>
               <th className="px-5 py-3">Semanas del mes</th>
@@ -336,8 +336,8 @@ function AdminFoodosRestaurantsContent() {
 }
 
 const DIRECTION_TONE: Record<"up" | "down" | "flat", string> = {
-  up: "text-emerald-600",
-  down: "text-red-600",
+  up: "text-emerald-700",
+  down: "text-red-700",
   flat: "text-gray-400",
 }
 
@@ -348,9 +348,9 @@ const DIRECTION_GLYPH: Record<"up" | "down" | "flat", string> = {
 }
 
 function rateTone(rate: number): string {
-  if (rate >= 60) return "text-emerald-600"
-  if (rate >= 25) return "text-amber-600"
-  return "text-red-600"
+  if (rate >= 60) return "text-emerald-700"
+  if (rate >= 25) return "text-amber-700"
+  return "text-red-700"
 }
 
 /**
@@ -408,7 +408,7 @@ function AdoptionPanel({ adoption }: { adoption: AdminFoodosAdoption }) {
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="w-full min-w-[52rem] text-sm">
           <thead>
-            <tr className="bg-gray-50 text-left text-xs font-medium text-gray-400">
+            <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500">
               <th className="px-5 py-3">Capacidad</th>
               <th className="px-5 py-3">Abierta en</th>
               <th className="px-5 py-3">Activación</th>

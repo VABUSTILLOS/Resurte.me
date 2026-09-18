@@ -591,7 +591,7 @@ function AdminOrdersContent() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <p className="text-red-600 text-sm font-medium">{error}</p>
+        <p className="text-red-700 text-sm font-medium">{error}</p>
         <p className="text-gray-400 text-xs mt-1">Verifica que estés autenticado como administrador.</p>
         {/* Fase 7 — recuperación ante error sin recargar la página */}
         <button
@@ -859,14 +859,14 @@ function AdminOrdersContent() {
           role="status"
           className="flex flex-wrap items-center gap-2 mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5"
         >
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-700" aria-hidden="true" />
           <span className="text-xs text-amber-800">{bulkUndoMessage(undoable.ids.length)}</span>
 
           <button
             type="button"
             onClick={() => void undoLastBulk()}
             disabled={undoRunning}
-            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-700 text-white hover:bg-amber-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Undo2 className="w-3.5 h-3.5" aria-hidden="true" />
             {undoRunning ? "Revirtiendo…" : "Deshacer"}
@@ -888,7 +888,7 @@ function AdminOrdersContent() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
+              <tr className="bg-gray-50 text-left text-xs text-gray-500 font-medium">
                 <th className="px-3 py-3 w-10">
                   <input
                     ref={selectAllRef}
@@ -939,7 +939,7 @@ function AdminOrdersContent() {
                   <td className="px-5 py-3 font-semibold text-gray-900">
                     ${order.total.toFixed(2)}
                     {order.discount ? (
-                      <span className="block text-[10px] font-medium text-green-600">
+                      <span className="block text-[10px] font-medium text-green-700">
                         −${order.discount.toFixed(2)} de cupón
                       </span>
                     ) : null}
@@ -952,8 +952,8 @@ function AdminOrdersContent() {
                         </span>
                         <span
                           className={`ml-2 text-[10px] font-medium ${
-                            order.payment_status === "paid" ? "text-green-600" :
-                            order.payment_status === "failed" ? "text-red-600" : "text-amber-600"
+                            order.payment_status === "paid" ? "text-green-700" :
+                            order.payment_status === "failed" ? "text-red-700" : "text-amber-700"
                           }`}
                         >
                           {PAYMENT_STATUS_LABEL[order.payment_status]}
@@ -984,7 +984,7 @@ function AdminOrdersContent() {
                     </select>
                     {/* Evidencia faltante: avisa, no bloquea (00154). */}
                     {order.status === "delivered" && !order.delivery_proof_path && (
-                      <span className="mt-1 flex items-center gap-1 text-[10px] font-medium text-amber-600">
+                      <span className="mt-1 flex items-center gap-1 text-[10px] font-medium text-amber-700">
                         <AlertTriangle className="w-3 h-3" />
                         Sin comprobante
                       </span>
@@ -1113,7 +1113,7 @@ function AdminOrdersContent() {
                   <span>${selectedOrder.subtotal.toFixed(2)}</span>
                 </div>
                 {selectedOrder.discount ? (
-                  <div className="flex justify-between text-green-600">
+                  <div className="flex justify-between text-green-700">
                     <span>
                       Descuento{selectedOrder.coupon_code ? ` (${selectedOrder.coupon_code})` : ""}
                     </span>

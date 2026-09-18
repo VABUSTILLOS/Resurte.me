@@ -317,7 +317,7 @@ function ConversionContent() {
 
       {error && (
         <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
+          <AlertTriangle className="h-4 w-4 shrink-0 text-red-700" />
           <p className="flex-1 text-sm text-red-700">{error}</p>
           <button
             type="button"
@@ -547,7 +547,7 @@ function ConversionContent() {
                           <td className={TD}>
                             <span className="font-medium text-gray-900">{m.label}</span>
                             {m.async && (
-                              <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">
+                              <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600">
                                 asíncrono
                               </span>
                             )}
@@ -601,7 +601,7 @@ function ConversionContent() {
               correo o por su cuenta, y este reporte no puede distinguirlo.
             </p>
             {data.recovery === null ? (
-              <p className="text-xs text-amber-600">
+              <p className="text-xs text-amber-700">
                 No se pudieron leer los correos de recuperación en este momento.
               </p>
             ) : data.recovery.every((r) => r.sent === 0) ? (
@@ -658,7 +658,7 @@ function ConversionContent() {
               que no tuvo pedidos.
             </p>
             {data.utm === null ? (
-              <p className="text-xs text-amber-600">
+              <p className="text-xs text-amber-700">
                 La columna UTM no existe en la base desplegada, así que la atribución no
                 se puede medir. No es lo mismo que "todo vino directo".
               </p>
@@ -728,7 +728,7 @@ function ConversionContent() {
           <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2">
             <TakeRateCard
               icon={Zap}
-              color="text-amber-500"
+              color="text-amber-700"
               title="Take-rate de order bumps"
               value={data.bumpTakeRate}
               hint="% de pedidos pagados que incluyeron al menos un bump"
@@ -844,7 +844,7 @@ function DeltaInline({
   return (
     <span
       className={`text-[11px] font-semibold ${
-        good ? "text-green-600" : bad ? "text-red-600" : "text-gray-500"
+        good ? "text-green-700" : bad ? "text-red-700" : "text-gray-500"
       }`}
     >
       {deltaPct > 0 ? "+" : ""}

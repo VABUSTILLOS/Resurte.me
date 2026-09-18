@@ -86,7 +86,7 @@ export function AuditoriaTab() {
         </div>
       ) : error ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <p className="text-red-600 text-sm font-medium">{error}</p>
+          <p className="text-red-700 text-sm font-medium">{error}</p>
           <button
             type="button"
             onClick={() => void load()}
@@ -100,7 +100,7 @@ export function AuditoriaTab() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
+                <tr className="bg-gray-50 text-left text-xs text-gray-500 font-medium">
                   <th className="px-5 py-3">Fecha</th>
                   <th className="px-5 py-3">Actor</th>
                   <th className="px-5 py-3">Acción</th>

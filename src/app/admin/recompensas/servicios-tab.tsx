@@ -222,7 +222,7 @@ export function ServiciosTab() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/50 text-left text-gray-400">
+                <tr className="border-b border-gray-100 bg-gray-50/50 text-left text-gray-500">
                   <th className="px-4 py-3 font-medium">Servicio</th>
                   <th className="px-4 py-3 font-medium">Nivel</th>
                   <th className="px-4 py-3 font-medium">Categoría</th>

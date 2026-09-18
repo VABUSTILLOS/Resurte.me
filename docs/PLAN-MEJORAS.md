@@ -1179,6 +1179,92 @@ e2e/keyboard.spec.ts` → verde. El contrato recorre 391 archivos en ~1,1 s.
 | A16 | **Contraste de `/admin/**` y `/panel/**`**: axe sigue sin mirarlos y B36/B37 cubren solo `/admin/productos`. La técnica de esta ronda (contrato estático por AST) es la que hace falta; el alcance es de otra ronda | 🔜 |
 | A17 | **`iconOnlyButton` (113) y `inputNoName` (135)** medidos por AST y **deliberadamente fuera del contrato**: su tasa de falsos positivos es alta (iconos con `title`, inputs con `htmlFor`+`id` o dentro de un `<label>`), y congelar una línea base ruidosa consagra el ruido. Se declaran medidos, no aprobados | 🔜 |
 
+### Ronda 14 — La máquina de estados y quien la pinta
+
+**Esta ronda empieza con una tesis equivocada y termina con una guardia que
+faltaba.** El error se declara porque es la parte útil.
+
+**La tesis original, y por qué no servía.** El reconocimiento midió deuda en
+`src/lib/panel-sync.ts`: una advertencia de conflicto escrita entera —estado
+`"conflict"`, `ConflictKind`, `clearConflicts()` exportada y sin llamadores,
+cuatro cadenas traducidas en los dos idiomas y sin un solo consumidor— que `knip`
+reportaba como export muerto. La conclusión parecía evidente: el aviso estaba
+escrito y nadie lo había enchufado.
+
+**La medición que la desmintió.** Antes de escribir nada, `git status --porcelain`
+dejó de estar limpio: **la sesión concurrente había implementado esa tesis minutos
+antes**, en 7 archivos y +489/−42 líneas. `git diff` lo prueba sin ambigüedad: en
+el HEAD confirmado `PanelSyncState` **no tenía `"conflict"`**, `ConflictKind` no
+existía, `clearConflicts()` no existía y las cinco claves `syncConflict*` eran
+**adiciones**. El reconocimiento había estado leyendo trabajo en vuelo como si
+fuera deuda consolidada. Duplicarlo o reclamarlo habría sido el error; el trabajo
+ajeno se dejó intacto.
+
+**La mitad que ya estaba en HEAD.** `src/app/api/panel/entries/route.ts` **no está
+en ese diff**: ya implementaba el protocolo completo de concurrencia
+(`base_updated_at?` → `{ saved: true, updated_at }` | `409 { conflict: true, value,
+updated_at }`), con la nota deliberada de que `base_updated_at` es opcional para
+que un despliegue no rompa las pestañas con bundle viejo. Faltaba solo el cliente.
+
+**El residuo real, medido.** De las 14 pruebas nuevas de la sesión concurrente,
+**las 14 son del store**: ninguna toca el componente. `grep -rn "SyncStatusBadge"
+src` devuelve **dos líneas** —el `import` y el render en `panel-layout-client.tsx`
+— y **ninguna prueba**. La máquina de estados y su único consumidor no estaban
+atados por nada comprobable a máquina.
+
+**El modo de fallo que eso deja abierto, y que ya ocurrió.** El bug original del
+badge no fue un estado mal pintado: fue que `conflict` **caía en la rama del
+`error`** y se veía idéntico a un fallo de guardado, con un botón que reenviaba el
+valor local y consumaba la sobrescritura silenciosa que el protocolo
+`base_updated_at` existe para impedir. Un estado declarado sin rama propia es una
+promesa que la UI no cumple, y el store, comparado consigo mismo, no puede verlo.
+
+**Lo entregado: `src/lib/panel-sync-ui.contract.test.ts`** (11 pruebas). Lee las
+dos uniones **del AST** y las compara con lo que el badge compara de verdad:
+
+| # | Fase | Estado |
+|---|---|---|
+| 1 | `PanelSyncState` ↔ ramas del badge: a lo sumo **un** estado puede quedar en la rama final | ✅ |
+| 2 | El badge ramifica por `ConflictKind` y no por una constante | ✅ |
+| 3 | Ninguna clave `panel.sync*` sin uso fuera del diccionario | ✅ |
+| 4 | `es` y `en` declaran el mismo juego de claves `panel.sync*` | ✅ |
+| 5 | Detectores probados contra fixtures sintéticas **antes** del perímetro | ✅ |
+
+**Discriminador crítico.** `sync*` no es un namespace, es un prefijo compartido:
+`panel.syncSaving` es del badge, pero `foodos.pos.syncMenu`, `syncing`,
+`syncResult` y `syncSkipped` (`es.ts:1638-1666`, bajo `foodos: {` en `es.ts:482` →
+`pos: {` en `es.ts:1601`) son de otra superficie. Las claves se leen como
+**propiedades directas del objeto `panel`** (`es.ts:1756`), no por texto: un `grep`
+de `sync` casaría las cuatro de foodos y afirmaría que están en uso cuando el badge
+no las toca.
+
+**Por qué AST y no expresiones regulares.** Un `grep` de `"conflict"` encuentra la
+palabra en el comentario que explica el estado y en un `type`; lo que decide es si
+el *badge* compara contra ese valor. Es la lección de la ronda 13 aplicada al mismo
+perímetro: para un hecho sobre lo que el código compara, el compilador o nada.
+
+**Pruebas negativas (tres, cada una restaurada byte-idéntica por md5).** La guardia
+no se declara verde: se rompe a propósito y se comprueba que **falla nombrando
+archivo y línea**.
+
+| # | Mutación | Resultado |
+|---|---|---|
+| NP1 | Se elimina la rama `if (status === "conflict")` del badge — **el bug histórico exacto** | **3 fallos**: `panel-sync.ts:24` + badge *«Sin rama propia quedan 2: "conflict", "error"»*; `panel-sync.ts:34` (ConflictKind sin ramificar); `es.ts:1769` (clave huérfana) |
+| NP2 | Se colapsan los dos mensajes de conflicto en uno (`kept-local` → `syncConflictMerged`) | **1 fallo**: `es.ts:1771` *«declara `panel.syncConflictKept` y no lo cita nadie en `src`»* |
+| NP3 | Se añade a la unión un estado que **aún no existe** (`"queued"`) | **1 fallo**: *«Sin rama propia quedan 2: "queued", "error"»* — caza un estado futuro, no solo el histórico |
+
+**Verificación de la ronda**: `npx vitest run` → **327 archivos / 5589 pruebas
+verde** (base 326/5564; +25 = las 11 de esta ronda y las 14 de la sesión
+concurrente) · `npx tsc --noEmit` → 0 · `npm run lint` → 0 · `npm run build` →
+exit 0 · **`npm run knip` → exit 0**, con lo que `npm run verify` queda verde. La
+deuda de la ronda 12 sobre knip se salda aquí: `clearConflicts()` ya tiene
+consumidor y el export muerto desapareció.
+
+**Lección.** Una máquina de estados cuyos ramos nunca se contrastan con quien los
+pinta es una guardia que miente — y `locale.test.ts` comprueba paridad de
+traducción, nunca uso, así que una cadena traducida no es evidencia de que alguien
+la renderice.
+
 ## Agentes de mantenimiento por dominio
 
 Ver `docs/agents/` — perímetro, invariantes y verificación por feature.
