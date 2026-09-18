@@ -61,7 +61,7 @@ async function probeImage(url: string): Promise<{ status: number | null; reason:
  */
 export async function POST(request: NextRequest) {
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied } = await requireAdmin({ permission: "productos" })
     if (adminDenied) return adminDenied
 
     const parsed = await readJsonBody<{

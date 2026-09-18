@@ -28,7 +28,7 @@ export const maxDuration = 120
  */
 export async function POST(request: Request) {
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied } = await requireAdmin({ permission: "productos" })
     if (adminDenied) return adminDenied
 
     const parsed = await readJsonBody<{ ids?: unknown; overwrite?: unknown }>(request)

@@ -20,6 +20,13 @@
 > midió** (AU1–AU10). El diagnóstico completo por superficie, con evidencia
 > archivo:línea, vive en [`docs/AUDITORIA-ESTATUS.md`](AUDITORIA-ESTATUS.md).
 >
+> **Estado tras la Ronda 21** (tests de superficie del panel y las reglas de
+> dinero que destaparon): de las diez debilidades `AU1`–`AU10`, **cuatro quedan
+> cerradas** (`AU4`, `AU5`, `AU7`, `AU8`) y dos avanzaron (`AU3`, `AU9`). El
+> resto sigue abierto por depender de terceros —`AU1` Connect, `AU6` PAC, `AU2`
+> hardware— o de trabajo que aún no toca. El detalle está en las actas de las
+> rondas 20 y 21, más abajo.
+>
 > Convenciones: ✅ implementada · 🔜 backlog priorizado. Los **IDs de fila** se
 > acotan **por sección** —el `A14` de §8 no es el `A14` de la Ronda 13, y es a
 > propósito—: un puntero desnudo («ver la fila X») solo resuelve si la fila está
@@ -1933,7 +1940,7 @@ contenido del mensaje de error.
 | # | Deuda | Estado |
 |---|---|---|
 | CRM1 | **`orders.seller_id` existe y ninguna ruta la escribe.** El aviso de `00155:39` se confirmó: usarla para atribuir comisión daría **cero siempre**. El camino del dinero es `crm_prospects.user_id → orders.user_id` y así se dejó | 🔜 |
-| CRM2 | **`getProspectClientOrders` limita a 50 pedidos.** Un cliente con más daría `revenue` **subestimado** sin avisar. Quirk heredado, no de esta ronda | 🔜 |
+| CRM2 | **`getProspectClientOrders` limitaba a 50 pedidos.** Las ventas y la comisión salían de las **mismas 50 filas** de la lista, así que a partir del pedido 51 el ingreso quedaba **subestimado en silencio** —con la etiqueta prometiendo «histórico»—. El total se separó de la lista: `scanPaidRevenue` (`src/lib/comercializacion/actions/vinculos.ts`) escanea el historial con la ventana alta y la **fila de más** de `readCrmPipelineValue` (`CRM_REVENUE_SCAN_LIMIT`), y si el historial no cupiera la cifra se pinta como **mínimo** (`≥ $X`, `formatMeasuredAmount`), nunca como total | ✅ |
 | CRM3 | **No se puede verificar RLS real en producción**, solo lo que declaran las migraciones. `crm_tasks` tiene RLS encendida y **0 políticas**: el acceso depende de que todo pase por `createServiceClient()` | 🔜 |
 | CRM4 | **La atribución de uso de columnas salió de grep de identificadores.** Una referencia dinámica (nombre construido en runtime) podría escapar al inventario de H3 | 🔜 |
 | CRM5 | **`estimated_value` es un valor declarado, no un histórico.** El pipeline es una **foto**, no una tendencia: no se puede responder "¿cuánto valía el pipeline el mes pasado?" | 🔜 |
@@ -1987,13 +1994,13 @@ contratos de test que vigilan **esta misma documentación**.
 |---|---|---|
 | AU1 | **El dinero del restaurante no llega al restaurante.** El cobro con tarjeta entra a la cuenta de la plataforma y el enrutado vía Stripe Connect existe en código pero **está apagado en producción**: `STRIPE_CONNECT_ENABLED` ausente en `src/lib/foodos-payouts.ts:9`, `src/lib/foodos/actions/payouts-admin.ts:6` y `src/app/api/admin/foodos/payouts/route.ts:14`. Hoy la dispersión es manual desde `/admin/foodos/dispersiones`. Es la deuda con más riesgo (fiscal y de confianza) y la que bloquea escalar FoodOS | 🔜 |
 | AU2 | **`pos` es un stub deliberado y no hay ESC/POS.** Los 6 proveedores de POS están declarados con `implemented:false` (`src/lib/pos/registry.ts`) y el webhook entrante responde **503**; la impresión es HTML imprimible con `window.print()` (`src/lib/foodos-printing/types.ts:9-13`). No es un fallo silencioso —está documentado— pero la superficie se ofrece en Diamante y un POS de mostrador sin impresora térmica no sobrevive en un restaurante real. El camino real hoy es la importación CSV | 🔜 |
-| AU3 | **La escalera de niveles concentra el valor en la cima.** De 10 capacidades premium, **8 exigen Diamante** (`src/lib/foodos-entitlements.ts`): POS, comandero, wallet, app de marca, sitio IA, catering, mesero IA e integraciones POS. Solo `marketing_ia` abre en Plata y `flotilla` en Oro. El upgrade depende de una recompra previa a la propia recompra, y el valor no se puede probar | 🔜 |
-| AU4 | **El acceso admin es todo-o-nada.** `MANAGED_ROLES = ["admin","vendedor","cliente"]` (`src/lib/admin-roles.ts:6`) y el `CHECK` de la base solo admite esos tres (`00067_master_admin_roles.sql:17`, reconfirmado en `00071:90`). **No existen roles granulares** de ops/marketing/finanzas: cualquier admin puede tocar productos, dinero, usuarios y CRM. Lo más cercano es el rol `vendedor`, que solo alcanza `/comercializacion` | 🔜 |
-| AU5 | **El panel del restaurante no tiene tests de superficie.** Cero archivos bajo `src/components/panel/**` (excluyendo foodos), cero para `use-synced-*` / `use-panel-role`, y el e2e solo navega 3 rutas (`e2e/mobile.spec.ts:1867,1990,2039`). La lógica de negocio está testeada; **la pantalla donde el restaurantero pasa su día no**. Es la superficie de uso diario y la menos vigilada | 🔜 |
+| AU3 | **La escalera de niveles concentraba el valor en la cima.** De 10 capacidades premium, **6 exigen Diamante** (`src/lib/foodos-entitlements.ts`): wallet, app de marca, sitio IA, catering, mesero IA e integraciones POS. La ronda 20 bajó **punto de venta nativo y comandero a Oro** —son las dos capacidades que hacen *cobrar y operar*, no las de escaparate, y cobrar es el mínimo para que el resto sirva—, así que hoy abren en Plata `marketing_ia`; en Oro, `flotilla`, `pos_mostrador` y `comandero`; y en Diamante las 6 restantes. El valor caro de operar ya no espera a la cima. **Sigue abierto** que la escalera se apoye en una recompra previa a la propia recompra | 🔜 |
+| AU4 | **El acceso admin era todo-o-nada.** `MANAGED_ROLES = ["admin","vendedor","cliente"]` (`src/lib/admin-roles.ts:6`) y el `CHECK` de la base solo admitía esos tres (`00067_master_admin_roles.sql:17`, reconfirmado en `00071:90`). **Cerrado en la Ronda 20** con un **eje nuevo, no un reemplazo**: `profiles.admin_permissions TEXT[]` (`00188_admin_permissions.sql`), `NULL` = sin restringir, y seis dominios (catálogo, pedidos, dinero de la red, clientes, marketing, sistema) que recortan **dentro** de la puerta. Los tres candados sobre `role` siguen intactos —`is_admin()`, las tres policies RLS y `protect_profile_role()` no se tocaron— porque un segundo eje no tiene por qué mover el primero. Administrable desde `/admin/usuarios`, con bitácora propia | ✅ |
+| AU5 | **El panel del restaurante no tenía tests de superficie.** Cero archivos bajo `src/components/panel/**` (excluyendo foodos) y el e2e solo navegaba 3 rutas (`e2e/mobile.spec.ts:1867,1990,2039`). **Cerrado en la Ronda 21** con siete archivos nuevos que cubren la lógica pura de los seis flujos que mueven dinero del panel —ventas, comanda, inventario, planificador, mermas y costeo— más un **contrato estático** del invariante "un solo productor de totales", que `docs/agents/panel.md` declaraba y **ningún test vigilaba**. Los tests destaparon **dos defectos de dinero** que no hacían fallar nada: el colchón de seguridad de la proyección fallaba en su límite exacto por coma flotante, y dos categorías de insumo caían al grupo de merma barato en silencio (2 % en vez de 3 % y 12 %). Sigue abierto lo que este entorno no puede probar: los componentes no se montan —no hay jsdom ni Testing Library— y el e2e autenticado es `AU10` | ✅ |
 | AU6 | **Facturación CFDI no existe.** Grep de `cfdi/timbrado/facturapi/sat/rfc` en `src/` sin resultados. Lo que el panel llama "facturas" son **tickets subidos por usuarios para ganar créditos** (`invoice_submissions`): aprobarlos acredita monedero vía `approve_invoice_submission` (00144), no timbra nada. Bloquea al restaurantero que necesita factura y depende de contratar un PAC. Nota: `docs/REPORTE-FUNCIONES-Y-MEJORAS.md` lo listaba como función existente y **quedó corregido** por esta ronda | 🔜 |
-| AU7 | **Huecos y duplicidad en la bitácora admin.** El contrato `src/lib/admin-audit.contract.test.ts` ya exige que toda ruta mutante audite o esté exenta con motivo escrito. La excepción de `bump-affinity` era **más estrecha que la ruta**: justificaba el campo `weight` ("solo desempata entre sugerencias; no cambia precio") pero no el alta ni la baja del par, que sí son merchandising. **Corregido**: `POST` y `PATCH`/`DELETE` llaman a `logAdminAction` (`affinity_pair_create` / `_update` / `_delete`) y las dos exenciones se retiraron. Queda abierta la **duplicidad**: `/api/admin/audit-log` lee `notifications` a través del `src/lib/audit.ts` legado —4 acciones, un único consumidor— mientras la pestaña de `/admin/bitacoras` lee `admin_audit_log` (`src/lib/audit-log.ts`, 78 acciones, 44 importadores). Un registro que no registra todo no es un registro | 🔜 |
+| AU7 | **Huecos y duplicidad en la bitácora admin.** El contrato `src/lib/admin-audit.contract.test.ts` ya exigía que toda ruta mutante audite o esté exenta con motivo escrito; la excepción de `bump-affinity` era **más estrecha que la ruta** (justificaba `weight` pero no el alta ni la baja del par, que sí son merchandising) y se corrigió con `affinity_pair_create` / `_update` / `_delete`. La **duplicidad** también quedó cerrada: se retiró `src/lib/audit.ts` —el módulo legado de 4 acciones que espejaba en `notifications`— y `/api/admin/audit-log` ahora lee `admin_audit_log`, el mismo libro que la pestaña de `/admin/bitacoras`. Retirarlo destapó **dos huecos que solo el legado cubría**: la **asignación de repartidor** no tenía equivalente en el catálogo nuevo (`order_driver_assigned` / `order_driver_unassigned`, añadidas con test) y `product_images_update` / `products_seed` quedaron sin escritor al retirar los endpoints de `AU8` (eliminadas de `AUDIT_ACTIONS`). Un registro que no registra todo no es un registro | ✅ |
 | AU8 | **Dos endpoints admin no usaban `requireAdmin()`.** `seed-products` y `update-images` se protegían con token de entorno (`SEED_API_TOKEN` / `ADMIN_API_SECRET`, fail-closed) y llevaban datos hardcodeados de un solo uso. Violaban el invariante #1 de `docs/agents/admin.md:11-12`. Eran scripts, no features: **retirados** en la Ronda 20 | ✅ |
-| AU9 | **El CRM tiene el ciclo de retroalimentación roto.** Son las seis filas `CRM1`–`CRM6` que declaró la ronda 18 y **siguen abiertas**: `orders.seller_id` sin escritor, atribución por grep, `estimated_value` es foto y no histórico, motivo de pérdida no retroactivo, límite de 50 pedidos y `crm_tasks` con **0 políticas RLS**. La ronda 18 le dio boca y manos; todavía no le dio memoria | 🔜 |
+| AU9 | **El CRM tiene el ciclo de retroalimentación roto.** Son las seis filas `CRM1`–`CRM6` que declaró la ronda 18. Una quedó cerrada: **`CRM2`** —las ventas y la comisión del cliente vinculado se calculaban sobre las 50 filas de la lista, no sobre el historial— se separó la medición de la presentación (`scanPaidRevenue` + `formatMeasuredAmount`, con `≥` cuando el historial no cabe en la ventana). Siguen abiertas `CRM1` (`orders.seller_id` sin escritor), `CRM3` (`crm_tasks` con **0 políticas RLS**), `CRM4` (atribución de uso por grep), `CRM5` (`estimated_value` es foto, no histórico) y `CRM6` (motivo de pérdida no retroactivo). La ronda 18 le dio boca y manos; todavía no le dio memoria | 🔜 |
 | AU10 | **La cobertura e2e es desigual y no autentica.** Sin e2e para ~10 secciones admin (bitácoras-UI, comisiones, conversion, proveedores, recompensas, seo-ia, sistema, whatsapp, dispersiones, repartidores), y el propio `docs/agents/admin.md:1247` admite que `e2e/a11y.spec.ts` **no** sirve para `/admin/*`. El repo no tiene seed ni credenciales, así que el e2e verifica guards y render, no flujos. Se suma al backlog de accesibilidad ya abierto (`A14`–`A17`, `CX1`–`CX9`) y al de flakiness (`E7`–`E11`) | 🔜 |
 
 **Lo que esta ronda desmintió.** El inventario de `docs/REPORTE-FUNCIONES-Y-MEJORAS.md`
@@ -2006,6 +2013,344 @@ auditoría que deja la documentación mintiendo no sirvió de nada**.
 leyéndola. Ese es justo el motivo por el que no se puede: los tres hallazgos más
 graves de esta ronda —el dinero que no llega, el POS que no imprime y el CFDI que
 no existe— estaban todos declarados como si existieran.*
+
+### Ronda 20 — De la auditoría al arreglo
+
+**Origen.** La Ronda 19 midió dónde el sitio está fuerte y dónde flaquea, y dejó
+diez debilidades priorizadas. Una lista de debilidades sin arreglo es un
+diagnóstico, no un tratamiento: esta ronda es la que **mueve el código**. El
+dueño del producto eligió el criterio de orden —*los tres ejes, en oleadas
+ordenadas por impacto sobre esfuerzo*— y una decisión de negocio que ninguna
+medición podía tomar por él: **encender Stripe Connect**, para que el dinero del
+cobro llegue directo al restaurante en vez de acumularse en la cuenta de la
+plataforma.
+
+**Método.** Cada área crítica se **verificó en el código antes de tocarla**, y
+en tres casos la verificación cambió el trabajo: la Oleada 2.2 ya estaba
+implementada y lo que faltaba era el contrato que la vigila; `AU8` describía dos
+endpoints que eran scripts de un solo uso, no features; y `src/lib/audit.ts`
+—que se iba a *unificar*— resultó ser el único escritor de dos eventos, así que
+retirarlo sin trasplantarlos habría perdido traza. **El plan se escribió contra
+el diagnóstico y se corrigió contra el código.**
+
+**Oleada 0 — cerrar los agujeros de la puerta de admin.** Se retiraron
+`/api/admin/seed-products` y `/api/admin/update-images`, dos endpoints que se
+protegían con un token de entorno en vez de `requireAdmin()` y llevaban datos
+hardcodeados de un solo uso: violaban el invariante #1 de `docs/agents/admin.md`
+y no eran features, eran scripts que se quedaron a vivir dentro del panel. Se
+unificó la bitácora: `src/lib/audit.ts` espejaba cuatro acciones en
+`notifications` mientras `admin_audit_log` guardaba el resto, así que la misma
+acción se registraba en dos libros y `/api/admin/audit-log` leía el libro
+equivocado. Retirarlo destapó **dos huecos que solo el legado cubría** —la
+asignación de repartidor no tenía equivalente en el catálogo nuevo— y **dos
+acciones muertas** que quedaron sin escritor al retirar los endpoints de arriba.
+
+**Oleada 1 — el dinero.** No existía **ni una sola llamada a `refunds.create`**
+en todo el repositorio: un restaurantero no podía devolver un cobro ni desde la
+UI ni por API. La restricción que decidió el diseño es de Stripe, no nuestra:
+`reverse_transfer` y `refund_application_fee` **solo se pueden pasar al crear**
+el reembolso, así que en el webhook ya es tarde. Por eso el camino normal es una
+ruta admin que crea el reembolso y el webhook queda como **reconciliador**. Y una
+trampa que se vio a tiempo: reutilizar `refunded` para un reembolso parcial
+habría devuelto el **cashback completo**, porque `reverse_cashback_on_cancel()`
+(00135) y `reversible_payment_confirmation` (00146) leen ese valor como reversión
+total. De ahí el valor nuevo `partially_refunded`, que **no** se añadió a esas
+listas. En la misma oleada, `platform_fee_percent` se **leía en cuatro sitios y
+no se escribía en ninguno**: la comisión de la plataforma solo se podía cambiar
+por SQL. Ahora es administrable, con **0 por defecto**, para cerrar el hueco sin
+tomar la decisión de negocio en nombre de nadie.
+
+**Oleada 2 — la escalera de niveles y el modo prueba.** Punto de venta nativo y
+comandero bajaron de Diamante a Oro. El criterio no fue "abrir más" sino
+**separar lo que hace cobrar de lo que hace escaparate**: un restaurante que no
+puede cobrar no aprovecha ninguna otra capacidad, y las dos que se bajaron son
+justo las de operar el día. `pos_integraciones` —conectar un punto de venta
+**ajeno**— se quedó en Diamante a propósito. El modo prueba ya existía y
+funcionaba: el hueco real era que `preview-gates.contract.test.ts` vigilaba el
+aviso de bloqueo pero **no** el host del demo, así que un `ToolPreviewNotice` sin
+`ToolGuideHost` habría sido un botón muerto —poder *ver* lo que no se puede
+*probar*— sin que ningún test lo notara. La landing no necesitó cambios de
+código: `PUBLIC_TIER_LADDER` se deriva de `TIER_LADDER` + `FEATURE_MIN_TIER`, y
+lo que sí se corrigió fueron **cuatro afirmaciones** que ya mentían sobre qué
+incluye cada nivel.
+
+**Oleada 3 — el CRM y los permisos de admin.** `CRM2` se separó en medición y
+presentación, siguiendo el patrón que el propio repo ya tenía (`readCrmPipelineValue`):
+tres estados, no dos —sin datos, medido y medido a medias—, con `≥` cuando el
+historial no cabe en la ventana. Y se cerró `AU4` con **un eje nuevo**: la
+columna `admin_permissions` recorta dentro de la puerta de admin sin tocar
+`role`, `is_admin()`, las tres policies RLS ni `admin_users`. Se eligió columna
+anulable y **no** tabla de concesiones porque `NULL` (sin restringir) y `'{}'`
+(restringido a nada) son **distinguibles**, y una tabla con cero filas no lo es:
+borrar filas de permisos por error **asciende** al usuario a admin completo,
+mientras que un valor ilegible en la columna lo **degrada**. El default de todo
+el eje es el lado que niega.
+
+| # | Entrega | Estado |
+|---|---|---|
+| OE1 | **Endpoints con token retirados** (`AU8`). `seed-products` y `update-images` borrados: eran scripts de un solo uso con datos hardcodeados y 0 consumidores en código | ✅ |
+| OE2 | **Una sola bitácora** (`AU7`). Retirado `src/lib/audit.ts`; el feed lee `admin_audit_log`; `order_driver_assigned` / `order_driver_unassigned` trasplantadas al catálogo nuevo con test; acciones muertas eliminadas | ✅ |
+| OE3 | **Camino de reembolso.** `src/lib/refund.ts`, `buildRefundParams()`, `POST /api/admin/orders/[id]/refund`, webhook reconciliador, `partially_refunded` en las cuatro listas de paridad del enum, UI en `/admin/pedidos` | ✅ |
+| OE4 | **Comisión de plataforma administrable.** `PATCH /api/admin/foodos/restaurants/[id]/platform-fee` + editor en `/admin/foodos/dispersiones`; 0 por defecto | ✅ |
+| OE5 | **Escalera de niveles** (`AU3`). `pos_mostrador` y `comandero` a Oro; contrato del producto y landing actualizados | ✅ |
+| OE6 | **Modo prueba vigilado.** Cuarto chequeo en `preview-gates.contract.test.ts`: toda página con aviso de bloqueo monta el host del demo y no lo esconde | ✅ |
+| OE7 | **`CRM2` reparado** (`AU9`). `scanPaidRevenue` + `formatMeasuredAmount`; el `≥` distingue "medido" de "medido a medias" | ✅ |
+| OE8 | **Permisos granulares de admin** (`AU4`). `admin-permissions.ts` puro, `00188_admin_permissions.sql`, `requireAdminPage()`, 18 guards de sección, 52 rutas de API con dominio, editor en `/admin/usuarios` y contrato del árbol | ✅ |
+| OE9 | **Connect encendido** (`AU1`). Decidido, no ejecutado: exige credenciales y una cuenta piloto real | 🔜 |
+| OE10 | **e2e autenticado, CFDI, ESC/POS, wallet y a11y** (`AU2`, `AU6`, `AU10`). Depende de hardware, de un PAC contratado y de credenciales de prueba. Los **tests de superficie del panel** que esta ronda dejó fuera se cerraron en la Ronda 21 (`AU5`) | 🔜 |
+
+**Lo que esta ronda desmintió.** Cuatro afirmaciones del plan, no del código:
+que el modo prueba faltaba (estaba, y lo que faltaba era su guardia), que los dos
+endpoints de `AU8` eran features (eran scripts), que `src/lib/audit.ts` era
+duplicado puro (era el único escritor de dos eventos) y que `admin-roles.test.ts`
+no existía (existía, con ocho tests en verde). **Ninguna de las cuatro habría
+hecho fallar un test**: las cuatro se detectaron leyendo el código antes de
+tocarlo, que es exactamente el motivo por el que esta ronda no se ejecutó contra
+el diagnóstico.
+
+**Lección:** *un diagnóstico se escribe una vez y se cree para siempre.* La
+Ronda 19 midió honestamente y aun así cuatro de sus consecuencias operativas
+eran falsas al llegar al código. La auditoría no se equivocó en lo que vio; se
+equivocó en lo que **supuso** que faltaba. Por eso cada oleada empezó leyendo el
+archivo que iba a cambiar, y por eso dos de las entregas de esta ronda —`OE6` y
+la mitad de `OE2`— terminaron siendo **contratos que vigilan** algo que ya
+funcionaba, en vez de código nuevo. En un repo que se auto-vigila, la diferencia
+entre "está roto" y "nadie lo está mirando" es toda la diferencia.
+
+**Cierre medido.** `npm run verify` en verde al terminar: typecheck, lint,
+**355 archivos de test / 6,229 tests**, `knip` exit 0 — desde los 349 / 6,080 de
+la Ronda 19. Dos migraciones nuevas aplicadas y verificadas por SQL (`00187`
+reembolsos, `00188` permisos de admin), ambas **puramente aditivas**.
+
+### Ronda 21 — La regla que solo estaba escrita
+
+**Origen.** `AU5` decía que el panel del restaurante —la pantalla donde el
+restaurantero pasa su día— tenía **cero tests de superficie**, mientras que la
+lógica de negocio sí estaba testeada. La formulación de la auditoría era
+tentadora: "es la superficie de uso diario y la menos vigilada", que suena a
+tarea de cobertura. No lo fue. Al escribir los tests aparecieron **dos defectos
+de dinero** que llevaban ahí sin que nada fallara, precisamente porque no había
+nada que pudiera fallar.
+
+**Método.** Antes de escribir un test se midió **el entorno**, porque es el que
+decide qué test es posible: `vitest.config.ts` corre en `environment: "node"` y
+su `include` es `src/**/*.test.ts` —**solo `.ts`, no `.tsx`**—, y las
+dependencias de testing del `package.json` son exactamente una, `vitest`. **No
+hay jsdom, ni happy-dom, ni Testing Library**, así que **un componente no se
+puede montar**. Quedaban dos caminos honestos y se usaron los dos: unitarios
+puros sobre los módulos `*-shared.ts` (importables en node) y **contratos
+estáticos** que leen el árbol real con `readFileSync`/`readdirSync`. Ninguno de
+los dos simula un clic; el objetivo no era simular al usuario sino **fijar por
+escrito las reglas que el panel aplica al dinero**.
+
+**El invariante que nadie vigilaba.** `docs/agents/panel.md` declara que hay
+**un solo productor de totales del mostrador**: `entryTotal` es la fuente única
+y `hubEntryTotal` **delega** en él. Un grep de `entryTotal|hubEntryTotal|
+counterSummary` devolvía solo archivos de producción: **cero tests**. La regla
+existía únicamente en un docstring. Medido con `node -e` sobre **976 archivos de
+producción**: la fórmula del descuento porcentual aparece en **un** archivo,
+`entryTotal` se declara en **un** archivo, y el cuerpo de `hubEntryTotal` es
+exactamente `return entryTotal(e)`. El docstring del propio `hub-data.ts`
+registra por qué: *el cálculo estaba duplicado y divergía en el descuento
+porcentual —el del hub no recortaba en 0, así que un descuento mayor al 100 %
+daba un total negativo*. La duplicación ya se había arreglado; **lo que faltaba
+era el test que impide que vuelva**.
+
+**Los dos defectos que destaparon los tests.** Ninguno de los dos habría hecho
+fallar un test existente, porque no existía.
+
+El primero es de coma flotante y estaba en la proyección de stock del
+inventario: la regla exige un colchón del 10 % sobre el consumo previsto, pero
+`100 * 1.1` en punto flotante da `110.00000000000001`, así que un inventario de
+**exactamente 110** contra un consumo de 100 quedaba clasificado como "justo"
+cuando el colchón estaba **completo**. La corrección escala la comparación a
+enteros (`stock * 10 >= needed * 11`) y mueve **solo** ese límite exacto: los
+casos de frontera vecinos siguen clasificando igual, que es la única forma
+aceptable de tocar una regla que ya está en uso.
+
+El segundo es una taxonomía incompleta y estaba en el costo ajustado por merma
+del planificador: `getWasteCategory` mapea la categoría de un insumo al grupo de
+merma que le aplica, y le faltaban sinónimos. `"Tortillas"` y `"Base"` —granos—
+caían en `"Otros"` (2 %) en vez de `"Secos"` (3 %), y `"Guarnición"` caía en
+`"Otros"` en vez de `"Verdura"` (12 %) pese a que `"Acompañamiento"` —el mismo
+concepto, la papa que acompaña— **ya estaba mapeado a Verdura**. No es cosmético:
+ese porcentaje entra en el costo estimado que el planificador le muestra al
+restaurantero, así que el error era **una subestimación silenciosa de la
+merma**, y en el caso de la guarnición la diferencia entre grupos era de 2 % a
+12 %.
+
+**El hallazgo más incómodo, y el que no se tocó.** El planificador lee el
+porcentaje con `wastePcts[wc] ?? WASTE_CATEGORIES.find(...)?.defaultPct ?? 8`.
+Como `getWasteCategory` solo devuelve claves declaradas, ese `?? 8` es **código
+muerto**: nunca se dispara. No se eliminó —quitarlo no cambia el comportamiento
+y dejarlo documenta que alguien quiso protegerse— pero **sí se fijó en un test**
+la propiedad que lo vuelve muerto, para que si algún día la función deja de ser
+total, el test lo diga en vez de que el fallback lo tape.
+
+**Un test que se cazó a sí mismo.** El contrato del planificador incluye una
+lista blanca de las categorías que **sí** deben caer en `"Otros"` a propósito
+(salsas, aceites, botanas). Al correrlo falló: la lista decía `"Botanas"` y la
+categoría real del catálogo es `"Botana"`. El detector atrapó la errata de quien
+lo escribió, que es exactamente la prueba de que el detector mira algo.
+
+| # | Entrega | Estado |
+|---|---|---|
+| TP1 | **Totales del mostrador.** `ventas-shared.test.ts`: `entryTotal` (el descuento porcentual se calcula sobre el subtotal y no sobre el unitario, el monto fijo se resta una sola vez, el total se recorta en 0) y `counterSummary` (cuenta ventas, no unidades; excluye otros días) | ✅ |
+| TP2 | **Comanda.** `comanda-shared.test.ts`: `entryTime` prefiere `createdAt` y descifra el id base36 cuando falta, `fmtTime` en 24 h local, paridad de `STATUS_META` con los tres estados y de `CHANNELS` con los cuatro canales | ✅ |
+| TP3 | **Un solo productor de totales.** `panel-money.contract.test.ts`: la fórmula del descuento vive en **un** archivo, `entryTotal` se declara **una** vez y `hubEntryTotal` delega sin aritmética propia. Con detectores probados contra fixtures **antes** de mirar el perímetro y canarios contra el paso en vacío | ✅ |
+| TP4 | **Inventario.** `inventario-shared.test.ts`: `purchaseOrderLine` (objetivo = mínimo × 2, nunca negativo, costo proporcional) y `projectionVerdict` en sus tres estados y sus límites exactos. **Destapó el defecto de coma flotante**, corregido con comparación entera | ✅ |
+| TP5 | **Planificador.** `planificador-shared.test.ts`: taxonomía de merma y coherencia entre catálogo y grupos. **Destapó las dos categorías mal clasificadas**, corregidas | ✅ |
+| TP6 | **Mermas y costeo.** `mermas-shared.test.ts` (unicidad y monotonía del id, causas ordenadas con `otro` al final, ningún consejo huérfano) y `costeo-shared.test.ts` (toda categoría con emoji, todo slug con insumos con precio, toda receta con porciones) | ✅ |
+| TP7 | **Componentes montados y e2e autenticado.** El entorno no tiene jsdom ni Testing Library, y el e2e no tiene semilla ni credenciales (`AU10`) | 🔜 |
+
+**Lo que esta ronda desmintió.** Tres afirmaciones, y la tercera era mía. La
+primera: que `AU5` fuera una tarea de cobertura. No lo era —los tests
+encontraron dos reglas de dinero mal escritas, no dos pantallas rotas— y la
+lección es que **el valor no estuvo en cubrir, estuvo en tener que escribir la
+regla en una forma que no admite ambigüedad**. La segunda: que "la lógica de
+negocio está testeada" bastara. Era cierto y no bastaba, porque la regla del
+dinero del mostrador vive en **el panel** (`ventas-shared.ts`) y lo que estaba
+testeado era la de `src/lib/`. La tercera: que este entorno no permite testear
+el panel. Permite menos de lo que parece —no se monta un componente— y más de lo
+que se supone: contratos estáticos sobre el árbol real, con detectores probados
+por fixtures negativas, vigilan invariantes que ningún test unitario puede
+vigilar.
+
+**Lección:** *una regla que solo vive en un docstring no está vigilada, está
+documentada.* El invariante del productor único de totales estaba escrito,
+explicado y con la historia de su propia ruptura en el comentario del código; y
+nada lo comprobaba. La Ronda 20 ya había aprendido esto por otra vía —dos de sus
+entregas terminaron siendo contratos que vigilan algo que ya funcionaba—, y esta
+ronda lo confirma desde el otro lado: cuando por fin se escribe el test de una
+regla que nadie miraba, lo normal no es que pase, es que **encuentre algo**.
+
+**Cierre medido.** `npm run verify` en verde al terminar: typecheck, lint,
+**362 archivos de test / 6,338 tests**, `knip` exit 0 — desde los 355 / 6,229 de
+la Ronda 20. Siete archivos de test nuevos y **dos correcciones de dinero** en
+código de producción, ninguna de las cuales habría aparecido sin escribir el
+test.
+
+### Ronda 22 — El guard que no era el guard
+
+**Origen.** `AU10` decía dos cosas distintas y las juntaba: la cobertura e2e
+**no alcanza a ~10 secciones del panel admin**, y el e2e **no autentica**, así
+que verifica guardas y render en vez de flujos. La segunda mitad es un problema
+de credenciales —este entorno no tiene semilla ni usuario de prueba— y no se
+puede resolver escribiendo código. La primera mitad sí, y es la que se cerró.
+La distinción importa: una de las dos se podía arreglar hoy y la otra no, y
+tratarlas como un solo bloque habría dejado las dos abiertas.
+
+**Método.** Primero se midió la cobertura real por sección, contando menciones
+en `e2e/`: `/admin/leads` 26, `/admin/productos` 8, `/admin/pedidos` 6,
+`/admin/marketing` 3, `/admin`, `/admin/usuarios` y `/admin/restaurantes` 2,
+`/admin/bitacoras` 1. Y **once secciones con cero menciones**:
+`/admin/proveedores`, `/admin/repartidores`, `/admin/comisiones`,
+`/admin/foodos/dispersiones`, `/admin/seo-ia`, `/admin/whatsapp`,
+`/admin/recompensas`, `/admin/foodos/restaurantes`, `/admin/operar`,
+`/admin/conversion` y `/admin/sistema`. Ocho de diecinueve. Después se midió el
+entorno, porque es el que decide qué test es posible: el calentamiento de
+`e2e/global-setup.ts` recorría 72 rutas en 13 s y `admin-audit.spec.ts` pasaba
+6/6 en 21,4 s, así que el e2e **sí corría** y el problema no era de arranque.
+
+**El barrido que se apoya en el mapa.** En vez de escribir diecinueve pruebas
+con diecinueve URLs escritas a mano —que es lo que se desincroniza en cuanto
+alguien añade una sección—, `e2e/admin-guards.spec.ts` **importa
+`ADMIN_SECTIONS`** de `src/lib/admin-permissions.ts` y recorre el mapa. Ese
+módulo es puro (cero imports), así que un spec de Playwright puede importarlo
+sin arrastrar el servidor. La lista de secciones tiene entonces **una sola
+copia**, y la número veinte se prueba el día que se declara. Un canario exige
+`paths.length >= 19` y que ninguna ruta se repita, para que el barrido no pueda
+pasar en vacío si el mapa se vacía.
+
+**El bug que costó diecinueve fallos.** El deep link estaba roto: un anónimo que
+pedía `/admin/comisiones` acababa en `/auth/login?next=/admin`, y tras entrar
+aterrizaba en el panel, no donde iba. El arreglo natural era
+`requireAdminPage()`, la función que cada `layout.tsx` de sección llama con su
+dominio. Se arregló, se probó, y **el barrido siguió fallando las diecinueve**.
+La razón es de orden de ejecución de Next: **el guard que corta a un anónimo es
+el layout raíz** (`src/app/admin/layout.tsx`), no los layouts de sección —cuando
+el ancestro redirige, los hijos **nunca se ejecutan**— y ese layout escribía
+`next=/admin` en un literal. Arreglar el guard de abajo no podía cambiar nada
+mientras el de arriba siguiera redirigiendo. El diagnóstico se hizo con una
+sonda temporal en el proxy que devolvió `x-debug-pathname: /admin/usuarios`, lo
+que probó que la cabecera **sí** se propagaba y descartó al proxy como culpable;
+después un grep de `/auth/login` en `src/` señaló la línea. La lección es
+general: *cuando un guard vive en varios niveles, el que dispara es el ancestro.*
+
+**Por qué el destino viaja en una cabecera.** `requireAdminPage()` corre desde
+layouts, y **un layout de Next no recibe el pathname** —solo `params` y
+`children`—, así que no puede saber qué sección pidió el visitante. El proxy
+escribe `x-pathname` (con query incluida) en las cabeceras de la petición. El
+**orden importa y no es obvio**: se muta `request.headers` *antes* de
+`updateSession(request)`, porque es su `NextResponse.next({ request })` quien
+las propaga y esa función tiene cuatro salidas tempranas —ruta estática, sin
+Supabase configurado, sin cookie `sb-`, token vigente—; mutar después habría
+dejado esas cuatro sin cabecera. El valor se codifica con `encodeURIComponent`
+en `adminLoginPath`, y eso **no** es un exceso: el formulario de login lee el
+parámetro con `searchParams.get("next")`, que ya descodifica, así que el
+`%2F` se resuelve solo — y sin la codificación, una ruta con `&` partiría el
+query param en dos.
+
+**El contrato que cazó el hueco, y cómo.** Con el arreglo en pie y el barrido en
+verde, `npm run verify` falló en **un solo test**:
+`src/lib/e2e-warmup.contract.test.ts`, el contrato que exige que **todo patrón
+de ruta que visite un spec `@ci` esté calentado** en `e2e/global-setup.ts`.
+Once secciones no lo estaban. La parte incómoda es *cómo* las detectó: no
+entendió el bucle del barrido —un `page.goto(path)` con la ruta en una variable
+no es un literal—, las encontró **por accidente**, porque el docstring del spec
+las enumera entre backticks y la regex de literales del contrato también acepta
+backticks. Es decir: el contrato acertó por un camino que no era el suyo, y el
+día que alguien reformule ese comentario las once se quedan sin calentar **en
+silencio**. Se cerraron las dos cosas a la vez: las once rutas entraron en
+`ROUTES` con un comentario que explica por qué, y el contrato ganó una prueba
+que **deriva la obligación del mapa** —recorre `ADMIN_SECTIONS`, resuelve cada
+ruta a su patrón y exige que esté calentado— con un canario que falla si alguna
+sección no resuelve, para que el test no pueda pasar filtrando lo que no
+entiende. Verificado por falsación: borrando `/admin/whatsapp` de `ROUTES`
+fallan **las dos** pruebas nombrando esa ruta.
+
+| # | Entrega | Estado |
+|---|---|---|
+| EA1 | **Medición de cobertura.** Menciones por sección en `e2e/`: once de diecinueve secciones con **cero** menciones, medido antes de escribir nada | ✅ |
+| EA2 | **Deep link que recuerda la sección.** `adminLoginPath()` en `src/lib/admin-auth.ts` (pura, exportada, testeable) y `ADMIN_PATH_HEADER`; `requireAdminPage()` la usa | ✅ |
+| EA3 | **`x-pathname` en el proxy.** `src/proxy.ts` escribe la ruta con su query para `/admin`, **antes** de `updateSession` para que las cuatro salidas tempranas la propaguen | ✅ |
+| EA4 | **El guard raíz.** `src/app/admin/layout.tsx` deja de escribir `next=/admin` literal. **Es el arreglo que realmente cerró el bug**: los diecinueve fallos venían de aquí, no de `requireAdminPage()` | ✅ |
+| EA5 | **Barrido de guardas.** `e2e/admin-guards.spec.ts`: canario, diecinueve pruebas de guarda anónima, enlace profundo con query, parámetros adversarios, y un bloque autenticado gateado por credenciales | ✅ |
+| EA6 | **Sesión unificada.** `e2e/support/session.ts` con `hasAdminCredentials()` y `signInAsAdmin()`; las dos copias locales que había en `admin-leads.spec.ts` y `admin-productos-modal.spec.ts` se retiraron | ✅ |
+| EA7 | **Candado anti-regresión.** `admin-sections.contract.test.ts` falla si algún layout vuelve a escribir un literal `"/auth/login?next=..."` o `next=/admin`, y exige que el shell use `adminLoginPath` y `ADMIN_PATH_HEADER` | ✅ |
+| EA8 | **Calentamiento y su contrato.** Las once secciones entran en `ROUTES`; el contrato de calentamiento gana una prueba que **deriva** la obligación de `ADMIN_SECTIONS` en vez de depender de un comentario | ✅ |
+| EA9 | **Flujo autenticado de verdad.** Sigue gateado por `E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD`, que **no existen en este entorno**. El bloqueo es de credenciales, no de código: `signInAsAdmin()` está escrito y no lanza, simplemente no tiene con qué entrar | 🔜 |
+
+**Lo que esta ronda desmintió.** Cuatro cosas. La primera: que el deep link se
+arreglara en `requireAdminPage()`. Era la función que *parecía* el guard —la que
+lleva el nombre, la que recibe el dominio, la que está en los diecinueve
+layouts— y no era la que cortaba el paso; arreglarla dejó el fallo intacto las
+diecinueve veces. La segunda: que la cobertura e2e de `AU10` fuera un problema
+de escritura de specs. Once secciones no tenían mención, pero **añadir el
+barrido no bastó**: hizo falta calentarlas, y eso lo dijo un contrato de otro
+archivo, no la prueba nueva. La tercera, y la más incómoda: que un contrato
+detectara el hueco **no prueba que lo vigile**. El de calentamiento acertó por
+un comentario; si ese comentario se reescribe, el contrato vuelve a decir que
+todo está bien. La cuarta: que el e2e autenticado fuera alcanzable desde aquí.
+No lo es, y queda escrito como tal en vez de como pendiente de implementación —
+`siginInAsAdmin` existe; lo que falta es un usuario.
+
+**Lección:** *un contrato que acierta por un camino que no era el suyo está
+diciendo "no sé mirar esto", no "está bien".* El de calentamiento no podía ver
+un `page.goto(path)` con la ruta en una variable, y en vez de callarse acertó
+por el docstring. La reparación no fue añadir las once rutas —eso arregla el
+síntoma— sino **darle al contrato una fuente de verdad que pueda leer**:
+`ADMIN_SECTIONS`. La diferencia se ve en el caso que importa, la sección
+número veinte: con el arreglo del síntoma habría que acordarse de calentarla;
+con la fuente de verdad, el contrato lo exige solo.
+
+**Cierre medido.** `npm run verify` en verde al terminar: typecheck, lint,
+**362 archivos de test / 6,349 tests**, `knip` exit 0 — desde los 362 / 6,338 de
+la Ronda 21. En e2e: **28 passed / 1 skipped** en el barrido más `auth.spec.ts`,
+y la suite `@ci` completa en **443 passed / 122 skipped / 0 failed**, con el
+calentamiento ampliado de 72 a 83 rutas sin tocar su presupuesto (120 s × 5
+sigue por debajo del timeout de 25 min del job). El e2e autenticado queda
+declarado como bloqueado por credenciales.
 
 ## Agentes de mantenimiento por dominio
 

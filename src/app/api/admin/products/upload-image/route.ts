@@ -18,7 +18,7 @@ const ACCEPTED = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]
  */
 export async function POST(request: NextRequest) {
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied } = await requireAdmin({ permission: "productos" })
     if (adminDenied) return adminDenied
 
     const form = await request.formData().catch(() => null)

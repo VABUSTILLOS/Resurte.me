@@ -37,7 +37,7 @@ export interface ImportPlanEntry {
  * viene en el CSV.
  */
 export async function POST(request: NextRequest) {
-  const { response: adminDenied, user: adminUser } = await requireAdmin()
+  const { response: adminDenied, user: adminUser } = await requireAdmin({ permission: "productos" })
   if (adminDenied) return adminDenied
 
   try {

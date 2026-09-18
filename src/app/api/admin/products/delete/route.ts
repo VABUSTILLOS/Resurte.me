@@ -17,7 +17,7 @@ import { NextResponse } from "next/server"
  */
 export async function DELETE(request: Request) {
   try {
-    const { response: adminDenied, user: adminUser } = await requireAdmin()
+    const { response: adminDenied, user: adminUser } = await requireAdmin({ permission: "productos" })
     if (adminDenied) {
       return adminDenied
     }
@@ -77,7 +77,7 @@ export async function DELETE(request: Request) {
 /** Restaura un producto de la papelera (queda despublicado). */
 export async function POST(request: Request) {
   try {
-    const { response: adminDenied, user: adminUser } = await requireAdmin()
+    const { response: adminDenied, user: adminUser } = await requireAdmin({ permission: "productos" })
     if (adminDenied) {
       return adminDenied
     }

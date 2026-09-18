@@ -40,7 +40,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, response } = await requireAdmin()
+    const { user, response } = await requireAdmin({ permission: "pedidos" })
     if (response) return response
 
     const { id } = await params
@@ -154,7 +154,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, response } = await requireAdmin()
+    const { user, response } = await requireAdmin({ permission: "pedidos" })
     if (response) return response
 
     const { id } = await params

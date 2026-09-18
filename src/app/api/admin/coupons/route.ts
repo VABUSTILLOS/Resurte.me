@@ -12,7 +12,7 @@ export const runtime = "nodejs"
  * POST /api/admin/coupons — crea un cupón público (user_id NULL).
  */
 export async function GET() {
-  const { response: adminDenied } = await requireAdmin()
+  const { response: adminDenied } = await requireAdmin({ permission: "marketing" })
   if (adminDenied) return adminDenied
 
   try {
@@ -41,7 +41,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { response: adminDenied, user: adminUser } = await requireAdmin()
+  const { response: adminDenied, user: adminUser } = await requireAdmin({ permission: "marketing" })
   if (adminDenied) return adminDenied
 
   try {

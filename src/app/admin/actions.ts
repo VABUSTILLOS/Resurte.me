@@ -172,6 +172,12 @@ export interface AdminOrder {
   driver_id?: number | null
   /** Ruta del comprobante de entrega en el bucket `entregas` (00154). */
   delivery_proof_path?: string | null
+  /**
+   * Centavos ya devueltos al cliente (00187). `null`/`0` = sin reembolsos.
+   * Con `payment_status === "partially_refunded"` es la cifra a mostrar;
+   * con `"refunded"` el reembolso cubrió el total.
+   */
+  refunded_amount_cents?: number | null
   address: {
     street: string
     number: string
@@ -300,6 +306,7 @@ export async function getAdminOrders(
       coupon: !dropped.has("coupon_code"),
       driver: !dropped.has("driver_id"),
       proof: !dropped.has("delivery_proof_path"),
+      refunded: !dropped.has("refunded_amount_cents"),
     })
 
   // El SELECT se arma en runtime (columnas opcionales), así que supabase-js no
@@ -386,6 +393,7 @@ export async function getAdminOrders(
         created_at: o.created_at,
         driver_id: o.driver_id ?? null,
         delivery_proof_path: o.delivery_proof_path ?? null,
+        refunded_amount_cents: o.refunded_amount_cents ?? null,
         address: addr
           ? {
               street: addr.street,

@@ -14,7 +14,7 @@ const SEARCH_LIMIT = 20
  * Requiere sesión admin.
  */
 export async function GET(request: NextRequest) {
-  const { response: adminDenied } = await requireAdmin()
+  const { response: adminDenied } = await requireAdmin({ permission: "marketing" })
   if (adminDenied) return adminDenied
 
   try {

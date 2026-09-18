@@ -22,7 +22,7 @@ const DEFAULT_ASPECT_RATIO = "16:9"
 export async function POST(request: Request) {
   try {
     // Solo administradores pueden usar el piloto de Kie.ai.
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied } = await requireAdmin({ permission: "productos" })
     if (adminDenied) {
       return adminDenied
     }

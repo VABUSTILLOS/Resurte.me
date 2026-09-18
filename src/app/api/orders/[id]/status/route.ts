@@ -19,7 +19,6 @@ import { logger } from "@/lib/logger"
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
-import { logAdminAction as logAdminAudit } from "@/lib/audit"
 import { onOrderStatusChange } from "@/lib/workflows"
 import { notifyCashbackCredited } from "@/lib/notifications"
 import { logAdminAction } from "@/lib/audit-log"
@@ -251,32 +250,18 @@ export async function PATCH(
       })
     }
 
-    // Bitácora admin (best-effort): qué cambió y quién lo cambió.
-    if (adminUser) {
-      if (status && oldStatus !== status) {
-        void logAdminAudit({
-          actorId: adminUser.id,
-          action: "order_status_changed",
-          orderId,
-          detail: `${oldStatus} → ${status}`,
-        })
-      }
-      if (payment_status === "paid" && oldPaymentStatus !== "paid") {
-        void logAdminAudit({
-          actorId: adminUser.id,
-          action: "order_payment_confirmed",
-          orderId,
-          detail: `${oldPaymentStatus} → paid`,
-        })
-      }
-      if (hasDriverField) {
-        void logAdminAudit({
-          actorId: adminUser.id,
-          action: driverId ? "order_driver_assigned" : "order_driver_unassigned",
-          orderId,
-          detail: driverId ? `driver_id=${driverId}` : "driver_id=null",
-        })
-      }
+    // Asignación de repartidor: el bloque de arriba solo cubre estado y pago.
+    // Se registra aquí porque el módulo legado `audit.ts`, ya retirado, era el
+    // único que dejaba rastro de un cambio de repartidor.
+    if (hasDriverField && adminUser) {
+      await logAdminAction(supabase, {
+        actorId: adminUser.id,
+        actorEmail: adminUser.email ?? null,
+        action: driverId ? "order_driver_assigned" : "order_driver_unassigned",
+        entity: "orders",
+        entityId: orderId,
+        detail: { driver_id: driverId ?? null },
+      })
     }
 
     return NextResponse.json({

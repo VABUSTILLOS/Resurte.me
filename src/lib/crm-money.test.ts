@@ -3,6 +3,7 @@ import {
   asMoneyOrNull,
   estimatedCoverageLabel,
   formatEstimatedTotal,
+  formatMeasuredAmount,
   MONEY_GAP_LABEL,
   NO_ESTIMATE_LABEL,
   prospectMoneyView,
@@ -127,6 +128,22 @@ describe("prospectMoneyView", () => {
     expect(prospectMoneyView(input({ paidOrders: Number.POSITIVE_INFINITY })).paidOrders).toBe(0)
   })
 
+  test("sin decirlo, la ventana de escaneo se da por completa", () => {
+    // El truncamiento es una afirmación fuerte —«esto es un mínimo»— y solo se
+    // hace si la consulta lo dijo; el silencio no puede degradar la cifra.
+    expect(prospectMoneyView(input()).revenueTruncated).toBe(false)
+  })
+
+  test("un truncamiento explícito llega a la vista y no toca las cifras", () => {
+    const view = prospectMoneyView(
+      input({ actualRevenue: 5000, actualCommission: 500, paidOrders: 5000, revenueTruncated: true })
+    )
+
+    expect(view.revenueTruncated).toBe(true)
+    expect(view.actual).toBe(5000)
+    expect(view.paidOrders).toBe(5000)
+  })
+
   test("cada tono tiene etiqueta, y el de la duda dice que es duda", () => {
     expect(MONEY_GAP_LABEL.gain).toContain("encima")
     expect(MONEY_GAP_LABEL.loss).toContain("debajo")
@@ -152,6 +169,23 @@ describe("formatEstimatedTotal", () => {
   test("un cero declarado sí se pinta como cero", () => {
     // El único caso en el que `$0` es una afirmación legítima: alguien valoró.
     expect(formatEstimatedTotal({ total: 0 })).toBe("$0")
+  })
+})
+
+describe("formatMeasuredAmount", () => {
+  test("un importe medido se pinta como dinero", () => {
+    expect(formatMeasuredAmount(1250)).toBe("$1,250")
+  })
+
+  test("una ventana corta se pinta como mínimo, no como total", () => {
+    expect(formatMeasuredAmount(1250, true)).toBe("≥ $1,250")
+  })
+
+  test("un cero medido es un cero y se pinta como cero", () => {
+    // La diferencia con `formatEstimatedTotal`: aquí no hay estado «sin
+    // declarar». Un cliente con cuenta y sin pagos da un cero que es un dato.
+    expect(formatMeasuredAmount(0)).toBe("$0")
+    expect(formatMeasuredAmount(0, true)).toBe("≥ $0")
   })
 })
 

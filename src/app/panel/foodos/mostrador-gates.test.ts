@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 // El mostrador es la primera superficie que cobra dinero en el panel, así que
 // esta suite defiende cuatro invariantes que no se ven en la pantalla:
 //
-//   1. Nivel Diamante verificado en el servidor, antes de la sesión. Las
+//   1. Nivel suficiente verificado en el servidor, antes de la sesión. Las
 //      ESCRITURAS lanzan; las LECTURAS degradan.
 //   2. **Sin turno de caja abierto no hay venta.** Una venta sin turno no tiene
 //      dónde colgarse y desaparece del arqueo del día.
@@ -160,7 +160,7 @@ beforeEach(() => {
   mocks.createFoodosOrder.mockResolvedValue({ ok: true, orderId: "order-1", total: 101, slug: "taqueria-centro" })
 })
 
-describe("mostrador: bloqueado sin nivel Diamante", () => {
+describe("mostrador: bloqueado sin el nivel suficiente", () => {
   beforeEach(() => {
     mocks.requireFoodosFeature.mockRejectedValue(new Error("FOODOS_FEATURE_LOCKED"))
   })

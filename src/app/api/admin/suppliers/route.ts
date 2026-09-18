@@ -17,7 +17,7 @@ export const runtime = "nodejs"
  *
  * Las tablas suppliers/product_suppliers tienen RLS sin políticas
  * públicas (los costos son confidenciales), así que esta ruta lee y
- * escribe con el service client después de validar requireAdmin().
+ * escribe con el service client después de validar requireAdmin({ permission: "productos" }).
  *
  * `GET ?productSearch=<q>` agrega `productMatches`: es el buscador del
  * selector de productos al vincular. Vive aquí, y no en una ruta propia,
@@ -28,7 +28,7 @@ export const runtime = "nodejs"
  */
 export async function GET(request: NextRequest) {
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied } = await requireAdmin({ permission: "productos" })
     if (adminDenied) {
       return adminDenied
     }
@@ -119,7 +119,7 @@ async function searchProducts(
 }
 
 export async function POST(request: NextRequest) {
-  const { user: adminUser, response: adminDenied } = await requireAdmin()
+  const { user: adminUser, response: adminDenied } = await requireAdmin({ permission: "productos" })
   if (adminDenied) return adminDenied
 
   try {

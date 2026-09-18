@@ -162,12 +162,16 @@ export const WASTE_CATEGORIES: WasteCategory[] = [
   { key: "Otros", label: "Otros (salsas, condimentos, bebidas)", defaultPct: 2, color: "gray" },
 ]
 
-// Map product category names to waste super-categories
+// Map product category names to waste super-categories.
+// La búsqueda es por subcadena y en este orden: la primera lista que coincida
+// gana. Ese orden importa —"Fruta" vive en la lista de verduras porque comparte
+// perfil de merma— y por eso las listas deben ser específicas antes que
+// genéricas.
 export function getWasteCategory(productCategory: string): string {
   const proteina = ["Proteína", "Carne"]
-  const verdura = ["Verdura", "Fruta", "Acompañamiento"]
+  const verdura = ["Verdura", "Fruta", "Acompañamiento", "Guarnición"]
   const lacteos = ["Lácteos", "Queso"]
-  const secos = ["Granos", "Harinas", "Endulzantes", "Chocolate", "Pan"]
+  const secos = ["Granos", "Harinas", "Endulzantes", "Chocolate", "Pan", "Tortillas", "Base"]
   if (proteina.some((k) => productCategory.includes(k))) return "Proteína"
   if (verdura.some((k) => productCategory.includes(k))) return "Verdura"
   if (lacteos.some((k) => productCategory.includes(k))) return "Lácteos"

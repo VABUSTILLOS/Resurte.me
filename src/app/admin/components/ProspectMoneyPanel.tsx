@@ -6,6 +6,7 @@ import type { CrmProspectRow } from "@/lib/crm-core"
 import { formatMoney } from "@/lib/money"
 import {
   MONEY_GAP_LABEL,
+  formatMeasuredAmount,
   prospectMoneyView,
   type MoneyGapTone,
 } from "@/lib/crm-money"
@@ -15,6 +16,8 @@ import { getAdminProspectClientOrders } from "../actions"
 interface ClientOrders {
   revenue: number
   commission: number
+  paidOrders: number
+  revenueTruncated: boolean
   orders: Array<{ id: number; payment_status: string; status: string }>
 }
 
@@ -91,9 +94,10 @@ export function ProspectMoneyPanel({ prospect }: { prospect: CrmProspectRow }) {
     estimatedValue: prospect.estimated_value,
     actualRevenue: orders?.revenue ?? null,
     actualCommission: orders?.commission ?? null,
-    paidOrders: (orders?.orders ?? []).filter(
-      (o) => o.payment_status === "paid" && o.status !== "cancelled"
-    ).length,
+    // El conteo sale del escaneo, no de la lista: contar `orders` daría como
+    // mucho 50 aunque el cliente tenga 500 pedidos pagados.
+    paidOrders: orders?.paidOrders ?? 0,
+    revenueTruncated: orders?.revenueTruncated ?? false,
   })
 
   return (
@@ -120,7 +124,7 @@ export function ProspectMoneyPanel({ prospect }: { prospect: CrmProspectRow }) {
           >
             {state === "loading" || state === "error" || view.actual === null
               ? "—"
-              : formatMoney(view.actual)}
+              : formatMeasuredAmount(view.actual, view.revenueTruncated)}
           </p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-2.5">
@@ -138,11 +142,18 @@ export function ProspectMoneyPanel({ prospect }: { prospect: CrmProspectRow }) {
           ? MONEY_GAP_LABEL.unknown
           : MONEY_GAP_LABEL[view.gapTone]}
         {view.comparable
-          ? ` · ${view.paidOrders} pedido${view.paidOrders === 1 ? "" : "s"} pagado${
+          ? ` · ${view.revenueTruncated ? "≥ " : ""}${view.paidOrders} pedido${
               view.paidOrders === 1 ? "" : "s"
-            }`
+            } pagado${view.paidOrders === 1 ? "" : "s"}`
           : ""}
       </p>
+
+      {measured && view.revenueTruncated && (
+        <p className="mt-1.5 text-[11px] text-gray-500">
+          El cliente tiene más pedidos de los que caben en el escaneo: las ventas son
+          un mínimo, no el histórico completo.
+        </p>
+      )}
 
       {!linked && (
         <p className="mt-1.5 text-[11px] text-gray-500">

@@ -582,7 +582,7 @@ async function tagsInJs(supabase: ServiceClient, withDeletedAt: boolean): Promis
  * pageSize (máx 1000), idsOnly=1 (solo ids, para select-all/export).
  */
 export async function GET(request: NextRequest) {
-  const { response: adminDenied } = await requireAdmin()
+  const { response: adminDenied } = await requireAdmin({ permission: "productos" })
   if (adminDenied) return adminDenied
 
   try {

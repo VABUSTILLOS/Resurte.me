@@ -38,6 +38,12 @@ export interface ProspectMoneyInput {
   actualCommission: number | null
   /** Cuántos pedidos pagados sostienen los ingresos reales. */
   paidOrders: number
+  /**
+   * `true` si el historial no cupo en la ventana de escaneo del vínculo. Los
+   * ingresos son entonces un **mínimo** (`≥`) y `paidOrders` un conteo parcial:
+   * el pedido 5001 existe y no está sumado.
+   */
+  revenueTruncated?: boolean
 }
 
 /**
@@ -58,6 +64,8 @@ export interface ProspectMoneyView {
   /** `true` cuando hay con qué comparar. */
   comparable: boolean
   paidOrders: number
+  /** `true` si `actual` es un mínimo porque la ventana de escaneo se quedó corta. */
+  revenueTruncated: boolean
 }
 
 /** Texto del tono, para que la superficie no reinterprete el signo por su cuenta. */
@@ -92,6 +100,7 @@ export function prospectMoneyView(input: ProspectMoneyInput): ProspectMoneyView 
     gapTone,
     comparable,
     paidOrders: Number.isFinite(input.paidOrders) ? input.paidOrders : 0,
+    revenueTruncated: input.revenueTruncated === true,
   }
 }
 
@@ -127,6 +136,19 @@ export function formatEstimatedTotal(
   if (sum.total === null) return NO_ESTIMATE_LABEL
   const amount = formatMoney(sum.total)
   return truncated ? `≥ ${amount}` : amount
+}
+
+/**
+ * Etiqueta de un importe **medido** que puede quedarse corto.
+ *
+ * Mismo criterio que `formatEstimatedTotal` y por el mismo motivo, con una
+ * diferencia: aquí no existe el estado «sin valor declarado». Un cero medido es
+ * un cero y se pinta como cero —es justo el caso útil, «hay cuenta y no pagó»—.
+ * Lo único que cambia la lectura es el truncamiento, y lo hace con `≥`.
+ */
+export function formatMeasuredAmount(amount: number, truncated = false): string {
+  const text = formatMoney(amount)
+  return truncated ? `≥ ${text}` : text
 }
 
 /**

@@ -237,14 +237,15 @@ flujos de escritura reales (`admin-productos.spec.ts`,
 3. **Huecos de auditoría.** El repo ya tiene un contrato que vigila esto
    (`src/lib/admin-audit.contract.test.ts`: toda ruta mutante debe llamar a
    `logAdminAction` o estar exenta **con motivo escrito**). Las 10 exenciones
-   están justificadas, salvo `bump-affinity`: su motivo solo cubre el campo
+   estaban justificadas salvo `bump-affinity`: su motivo solo cubría el campo
    `weight` ("solo desempata entre sugerencias; no cambia precio"), pero POST y
    DELETE **crean y borran el par**, que sí es merchandising atribuible a una
-   persona. Es el único caso donde la excepción es más estrecha que la ruta.
-   Queda además **duplicidad de bitácoras**: `/api/admin/audit-log` lee
-   `notifications` (vía el `audit.ts` legado, que solo conoce 4 acciones y tiene
-   un único consumidor, `/api/orders/[id]/status`) mientras la pestaña de
-   `/admin/bitacoras` lee `admin_audit_log`.
+   persona. Era el único caso donde la excepción era más estrecha que la ruta.
+   ✅ **Resuelto (Ronda 20).** La **duplicidad de bitácoras** también quedó
+   cerrada: `/api/admin/audit-log` leía `notifications` a través del `audit.ts`
+   legado (4 acciones, un único consumidor) mientras `/admin/bitacoras` leía
+   `admin_audit_log`; ahora ambos leen el mismo libro y el módulo legado se
+   retiró.
 4. **Dos endpoints admin no usaban `requireAdmin()`.** ✅ **Resuelto (Ronda 20):**
    `seed-products` y `update-images` se protegían con token de entorno
    (`SEED_API_TOKEN` / `ADMIN_API_SECRET`, fail-closed) y llevaban datos
@@ -303,7 +304,7 @@ flujos de escritura reales (`admin-productos.spec.ts`,
 | 5 | **El panel del restaurante no tiene tests de superficie** | La pantalla de uso diario es la menos vigilada | 0 tests en `src/components/panel/**` y hooks |
 | 6 | **Facturación CFDI no existe** | Bloquea al restaurantero que necesita factura | grep sin resultados; `invoice_submissions` son créditos |
 | 7 | **CRM con ciclo de retroalimentación roto** | El CRM no puede atribuir ni aprender | `CRM1`–`CRM6` de la Ronda 18 |
-| 8 | **Huecos y duplicidad de auditoría admin** | La bitácora no es un registro completo | excepción de `bump-affinity` más estrecha que la ruta; dos feeds paralelos |
+| 8 | **Huecos de auditoría admin** | ✅ **Resuelto (Ronda 20)**: un solo libro, `admin_audit_log` | excepción de `bump-affinity` más estrecha que la ruta; dos feeds paralelos |
 | 9 | **Accesibilidad incompleta fuera de rutas públicas** | Riesgo legal y de uso en el móvil | `CX1`–`CX9`, `A14`–`A17` de la Ronda 13 |
 | 10 | **Repartidores parcial + Wallet sin certificados** | Dos superficies que prometen más de lo que entregan | `repartidores/page.tsx` (180), Apple 501 |
 
@@ -322,7 +323,7 @@ Las diez debilidades están declaradas como filas `AU1`–`AU10` en la Ronda 19 
 
 | Prioridad | Acción | Esfuerzo |
 |---|---|---|
-| **P0** | Unificar la bitácora admin en `admin_audit_log` ✅ `bump-affinity` ya audita (hecho); queda retirar `audit.ts` legado | Bajo |
+| **P0** | Unificar la bitácora admin en `admin_audit_log` ✅ hecho (Ronda 20): `bump-affinity` audita y `audit.ts` legado retirado | Bajo |
 | **P0** | Borrar `seed-products` y `update-images` ✅ hechos (Ronda 20) | Bajo |
 | **P1** | Encender Stripe Connect, o quitar el cobro a la plataforma y dejar solo comprobante manual | Medio |
 | **P1** | Abrir la escalera de niveles (`pos_mostrador` y `comandero` a Oro) + modo prueba | Bajo |

@@ -38,6 +38,7 @@ const PAYMENT_STATUS_LABEL: Record<string, string> = {
   failed: "Pago fallido",
   expired: "Pago expirado",
   refunded: "Reembolsado",
+  partially_refunded: "Reembolso parcial",
 }
 
 const FULFILLMENT_LABEL: Record<string, string> = {

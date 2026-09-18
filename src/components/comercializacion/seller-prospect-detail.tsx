@@ -48,6 +48,10 @@ export interface SellerClientOrders {
   }>
   revenue: number
   commission: number
+  /** Pedidos pagados contados sobre el historial, no sobre `orders` (que es una página). */
+  paidOrders: number
+  /** `true` si el historial no cupo en el escaneo: `revenue` es un mínimo. */
+  revenueTruncated: boolean
 }
 
 export interface SellerProspectDetailProps {
@@ -232,6 +236,9 @@ function ClientAccountPanel({ clientOrders }: { clientOrders: SellerClientOrders
           <div className="rounded-xl bg-gray-50 px-3 py-2">
             <p className="text-xs text-gray-500">Ventas pagadas (histórico)</p>
             <p className="text-lg font-bold text-gray-900">
+              {/* El `≥` va con el formato local de dinero (2 decimales), que es
+                  distinto del de `/admin`; por eso no se reusa el helper. */}
+              {clientOrders.revenueTruncated ? "≥ " : ""}
               {formatMoney(clientOrders.revenue)}
             </p>
           </div>
@@ -240,10 +247,17 @@ function ClientAccountPanel({ clientOrders }: { clientOrders: SellerClientOrders
               <Wallet className="w-3 h-3" /> Comisión estimada
             </p>
             <p className="text-lg font-bold text-[#0E7A0E]">
+              {clientOrders.revenueTruncated ? "≥ " : ""}
               {formatMoney(clientOrders.commission)}
             </p>
           </div>
         </div>
+      ) : null}
+      {clientOrders?.revenueTruncated ? (
+        <p className="mt-2 text-xs text-gray-500">
+          Este cliente tiene más pedidos de los que caben en el escaneo: el importe es un
+          mínimo, no el histórico completo.
+        </p>
       ) : null}
       {clientOrders && clientOrders.orders.length > 0 ? (
         <ul className="mt-4 divide-y divide-gray-50">
@@ -266,8 +280,15 @@ function ClientAccountPanel({ clientOrders }: { clientOrders: SellerClientOrders
             </li>
           ))}
         </ul>
-      ) : (
+      ) : clientOrders ? (
         <p className="mt-3 text-sm text-gray-500">Este cliente aún no tiene pedidos.</p>
+      ) : (
+        // `clientOrders` solo llega nulo aquí si la medición falló —el panel se
+        // monta únicamente con cuenta vinculada—, así que decir "no tiene
+        // pedidos" sería afirmar un cero que nadie midió.
+        <p className="mt-3 text-sm text-gray-500">
+          No se pudieron cargar los pedidos de este cliente.
+        </p>
       )}
     </section>
   )

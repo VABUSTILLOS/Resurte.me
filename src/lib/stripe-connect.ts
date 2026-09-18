@@ -100,6 +100,39 @@ export function isConnectRoutingEnabled(): boolean {
   return raw === "true" || raw === "1"
 }
 
+/** Parámetros de `refunds.create` para un cargo enrutado a una cuenta conectada. */
+export interface RefundParams {
+  reverse_transfer?: boolean
+  refund_application_fee?: boolean
+}
+
+/**
+ * Reembolso de un *destination charge*: el dinero tiene que salir de donde
+ * entró.
+ *
+ * Sin `reverse_transfer`, Stripe le devuelve el dinero al cliente **con fondos
+ * de la plataforma** y el restaurante conserva lo que ya se le liquidó: la
+ * plataforma paga el reembolso de su bolsillo y el restaurante se queda el
+ * cobro de un pedido que ya no existe. Sin `refund_application_fee`, la
+ * plataforma además se queda la comisión de ese mismo pedido.
+ *
+ * Con Connect apagado el cargo vive contra la cuenta de la plataforma y no hay
+ * transferencia que revertir: se devuelve `{}` para no pedirle a Stripe un
+ * parámetro que ese cargo no admite.
+ */
+export function buildRefundParams(params: {
+  routed: boolean
+  applicationFeeAmount?: number | null
+}): RefundParams {
+  if (!params.routed) return {}
+  const fee = params.applicationFeeAmount
+  return {
+    reverse_transfer: true,
+    // Stripe rechaza `refund_application_fee` si el cargo no llevaba comisión.
+    ...(typeof fee === "number" && fee > 0 ? { refund_application_fee: true } : {}),
+  }
+}
+
 /**
  * Comisión que retiene la plataforma, en centavos.
  *
@@ -117,6 +150,54 @@ export function computeApplicationFee(
   const fee = Math.round((amountCents * feePercent) / 100)
   if (fee <= 0 || fee >= amountCents) return 0
   return fee
+}
+
+/** Tope de la comisión que un admin puede fijar a un restaurante. */
+export const MAX_PLATFORM_FEE_PERCENT = 99.99
+
+/**
+ * Valida la comisión que un admin teclea para un restaurante.
+ *
+ * El rango es `0 ≤ x < 100` y no `≤ 100` a propósito: con 100 %,
+ * `computeApplicationFee` devuelve 0 y la plataforma no cobra nada **pero
+ * tampoco cobra el restaurante**, que es lo contrario de lo que el admin
+ * quiso decir. Rechazarlo aquí es más honesto que aceptarlo y aplicar otra
+ * cosa en silencio.
+ *
+ * Se aceptan cadenas porque el valor llega de un `<input type="text">`; el
+ * límite de dos decimales evita guardar `2.4999999` y que la comisión
+ * aplicada no coincida con la mostrada.
+ */
+export function parsePlatformFeePercent(
+  input: unknown
+): { ok: true; value: number } | { ok: false; error: string } {
+  // Solo `string` y `number`: `Number([3])` y `Number(true)` dan 3 y 1, así que
+  // aceptar "cualquier cosa que Number() entienda" dejaría entrar un arreglo o
+  // un booleano desde el JSON del cuerpo.
+  if (typeof input !== "string" && typeof input !== "number") {
+    return { ok: false, error: "Escribe una comisión entre 0 y 99.99" }
+  }
+  const raw = typeof input === "string" ? input.trim().replace(",", ".") : input
+  if (raw === "") {
+    return { ok: false, error: "Escribe una comisión entre 0 y 99.99" }
+  }
+  const value = Number(raw)
+  if (!Number.isFinite(value)) {
+    return { ok: false, error: "La comisión debe ser un número" }
+  }
+  if (value < 0) {
+    return { ok: false, error: "La comisión no puede ser negativa" }
+  }
+  if (value > MAX_PLATFORM_FEE_PERCENT) {
+    return {
+      ok: false,
+      error: `La comisión debe ser menor que 100 (máximo ${MAX_PLATFORM_FEE_PERCENT})`,
+    }
+  }
+  if (Math.abs(value * 100 - Math.round(value * 100)) > 1e-9) {
+    return { ok: false, error: "La comisión admite como máximo dos decimales" }
+  }
+  return { ok: true, value }
 }
 
 function deriveConnectState(snapshot: {

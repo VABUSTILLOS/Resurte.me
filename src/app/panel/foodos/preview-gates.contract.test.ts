@@ -78,6 +78,13 @@ describe("contrato de vista previa de herramientas premium", () => {
 
       // 3. Sin muro de contenido: el nivel no esconde campos.
       expect(src).not.toMatch(/<NivelGate[\s/>]/)
+
+      // 4. El host del modo demo está montado y no lo silencia. El aviso
+      //    ofrece "ver con datos de ejemplo", pero quien pinta el overlay es
+      //    `ToolGuideHost`; sin él el botón enciende un flag que no renderiza
+      //    nada y el restaurantero no puede *probar* lo que sí puede ver.
+      expect(src).toContain("<ToolGuideHost")
+      expect(src).not.toMatch(/hideDemo\b/)
     })
   }
 

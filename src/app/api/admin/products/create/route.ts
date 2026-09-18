@@ -58,7 +58,7 @@ async function uniqueSlug(
  */
 export async function POST(request: Request) {
   try {
-    const { response: adminDenied, user: adminUser } = await requireAdmin()
+    const { response: adminDenied, user: adminUser } = await requireAdmin({ permission: "productos" })
     if (adminDenied) {
       return adminDenied
     }

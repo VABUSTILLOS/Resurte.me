@@ -22,7 +22,7 @@ const MAX_IDS = 1000
  */
 export async function GET(request: Request) {
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied } = await requireAdmin({ permission: "productos" })
     if (adminDenied) {
       return adminDenied
     }
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
  */
 export async function PATCH(request: Request) {
   try {
-    const { response: adminDenied, user: adminUser } = await requireAdmin()
+    const { response: adminDenied, user: adminUser } = await requireAdmin({ permission: "productos" })
     if (adminDenied) {
       return adminDenied
     }

@@ -20,6 +20,7 @@ import { toCsv, downloadCsv } from "@/lib/csv"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import { useToast } from "@/components/toast"
 import { RecordPayoutDialog } from "./payout-forms"
+import { PlatformFeeEditor } from "./fee-editor"
 
 /**
  * /admin/foodos/dispersiones — cuánto se le debe a cada restaurante FoodOS y
@@ -273,6 +274,14 @@ export default function AdminFoodosPayoutsPage() {
                           </td>
                           <td className="px-5 py-3 text-right text-gray-500">
                             {formatPayoutAmount(r.feeTotal)}
+                            <span className="block mt-1">
+                              <PlatformFeeEditor
+                                restaurantId={r.restaurantId}
+                                restaurantName={r.restaurantName}
+                                feePercent={r.platformFeePercent}
+                                onSaved={() => void reload()}
+                              />
+                            </span>
                           </td>
                           <td className="px-5 py-3 text-right">
                             <span

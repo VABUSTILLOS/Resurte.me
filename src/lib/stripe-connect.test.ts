@@ -24,6 +24,7 @@ vi.mock("@/lib/logger", () => ({
 import {
   CONNECT_COUNTRY,
   buildDestinationChargeParams,
+  buildRefundParams,
   computeApplicationFee,
   connectSnapshotFromAccount,
   connectStatusFromAccount,
@@ -35,6 +36,7 @@ import {
   getRestaurantConnectStatus,
   handleConnectAccountUpdated,
   isConnectRoutingEnabled,
+  parsePlatformFeePercent,
   syncConnectAccount,
   type ConnectAccountLike,
 } from "./stripe-connect"
@@ -185,6 +187,81 @@ describe("computeApplicationFee", () => {
     expect(computeApplicationFee(Number.NaN, 10)).toBe(0)
     expect(computeApplicationFee(10_000, -5)).toBe(0)
     expect(computeApplicationFee(10_000, Number.NaN)).toBe(0)
+  })
+})
+
+describe("parsePlatformFeePercent", () => {
+  it("acepta 0 y los decimales con dos cifras", () => {
+    expect(parsePlatformFeePercent(0)).toEqual({ ok: true, value: 0 })
+    expect(parsePlatformFeePercent(2.5)).toEqual({ ok: true, value: 2.5 })
+    expect(parsePlatformFeePercent(2.55)).toEqual({ ok: true, value: 2.55 })
+    expect(parsePlatformFeePercent(99.99)).toEqual({ ok: true, value: 99.99 })
+  })
+
+  it("acepta lo que teclea un humano en un input de texto", () => {
+    expect(parsePlatformFeePercent(" 3 ")).toEqual({ ok: true, value: 3 })
+    expect(parsePlatformFeePercent("2,5")).toEqual({ ok: true, value: 2.5 })
+  })
+
+  it("rechaza 100 porque dejaría al restaurante sin nada", () => {
+    // `computeApplicationFee(_, 100)` devuelve 0: el admin creería haber
+    // fijado una comisión del 100 % y en realidad no cobraría nada.
+    const result = parsePlatformFeePercent(100)
+    expect(result.ok).toBe(false)
+    expect(parsePlatformFeePercent(150).ok).toBe(false)
+  })
+
+  it("rechaza negativos, vacíos y no numéricos", () => {
+    expect(parsePlatformFeePercent(-1).ok).toBe(false)
+    expect(parsePlatformFeePercent("").ok).toBe(false)
+    expect(parsePlatformFeePercent(null).ok).toBe(false)
+    expect(parsePlatformFeePercent(undefined).ok).toBe(false)
+    expect(parsePlatformFeePercent("dos").ok).toBe(false)
+  })
+
+  it("rechaza más de dos decimales para que lo guardado sea lo aplicado", () => {
+    expect(parsePlatformFeePercent(1.005).ok).toBe(false)
+    expect(parsePlatformFeePercent("2.4999").ok).toBe(false)
+  })
+
+  it("sobrevive a un objeto o un arreglo en vez de un número", () => {
+    expect(parsePlatformFeePercent({ percent: 3 }).ok).toBe(false)
+    expect(parsePlatformFeePercent([3]).ok).toBe(false)
+  })
+})
+
+// ------------------------------------------------------------
+// Reembolso
+// ------------------------------------------------------------
+
+describe("buildRefundParams", () => {
+  it("revierte la transferencia cuando el cargo se enrutó al restaurante", () => {
+    // Sin reverse_transfer, Stripe reembolsa al cliente con fondos de la
+    // plataforma y el restaurante conserva su liquidación.
+    expect(buildRefundParams({ routed: true, applicationFeeAmount: 0 })).toEqual({
+      reverse_transfer: true,
+    })
+  })
+
+  it("devuelve también la comisión cuando el cargo la llevaba", () => {
+    expect(buildRefundParams({ routed: true, applicationFeeAmount: 1_500 })).toEqual({
+      reverse_transfer: true,
+      refund_application_fee: true,
+    })
+  })
+
+  it("omite refund_application_fee si no había comisión", () => {
+    // Stripe rechaza `refund_application_fee` en un cargo sin comisión.
+    for (const fee of [0, null, undefined]) {
+      const params = buildRefundParams({ routed: true, applicationFeeAmount: fee })
+      expect(params.refund_application_fee).toBeUndefined()
+    }
+  })
+
+  it("no pide nada cuando el cargo vive contra la cuenta de la plataforma", () => {
+    // Connect apagado: no hay transferencia que revertir ni comisión que
+    // devolver, y mandar las banderas haría fallar el reembolso.
+    expect(buildRefundParams({ routed: false, applicationFeeAmount: 1_500 })).toEqual({})
   })
 })
 

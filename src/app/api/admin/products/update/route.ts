@@ -26,7 +26,7 @@ import { NextResponse } from "next/server"
 export async function PATCH(request: Request) {
   try {
     // Solo administradores pueden modificar el catálogo.
-    const { response: adminDenied, user: adminUser } = await requireAdmin()
+    const { response: adminDenied, user: adminUser } = await requireAdmin({ permission: "productos" })
     if (adminDenied) {
       return adminDenied
     }

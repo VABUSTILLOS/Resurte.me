@@ -21,7 +21,7 @@ const VALID_CATEGORIES = ["presencia", "trafico", "infraestructura"]
 
 export async function GET() {
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied } = await requireAdmin({ permission: "clientes" })
     if (adminDenied) return adminDenied
 
     const supabase = await createServiceClient()
@@ -43,7 +43,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { user: adminUser, response: adminDenied } = await requireAdmin()
+    const { user: adminUser, response: adminDenied } = await requireAdmin({ permission: "clientes" })
     if (adminDenied) return adminDenied
 
     const body = await request.json().catch(() => null)

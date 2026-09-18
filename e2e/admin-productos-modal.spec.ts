@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test"
+import { hasAdminCredentials, signInAsAdmin } from "./support/session"
 
 /**
  * E2E del modal de producto (ronda 9 — B13).
@@ -26,26 +27,6 @@ import { test, expect, type Page } from "@playwright/test"
  * productos reales. El de conflicto (ronda 12) sí escribe, pero solo sobre un
  * producto existente y **restaura** sus dos campos en el `finally`.
  */
-
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD
-
-/** Inicia sesión con las credenciales de entorno. `false` si no se pudo. */
-async function signInAsAdmin(page: Page): Promise<boolean> {
-  await page.goto("/auth/login")
-  const email = page.locator("#email")
-  const password = page.locator("#password")
-  if ((await email.count()) === 0 || (await password.count()) === 0) return false
-  await email.fill(ADMIN_EMAIL ?? "")
-  await password.fill(ADMIN_PASSWORD ?? "")
-  await page.getByRole("button", { name: /Iniciar Sesión/ }).click()
-  try {
-    await page.waitForURL((url) => !url.pathname.startsWith("/auth/login"), { timeout: 20_000 })
-  } catch {
-    return false
-  }
-  return true
-}
 
 /**
  * Abre el modal de alta. Devuelve null cuando el botón no existe (sin sesión el
@@ -117,7 +98,7 @@ test.describe("modal de producto — guardas sin sesión", { tag: "@ci" }, () =>
 
 test.describe("modal de producto — comportamiento", { tag: "@ci" }, () => {
   test.beforeEach(async ({ page }) => {
-    test.skip(!ADMIN_EMAIL || !ADMIN_PASSWORD, "requiere E2E_ADMIN_EMAIL y E2E_ADMIN_PASSWORD")
+    test.skip(!hasAdminCredentials(), "requiere E2E_ADMIN_EMAIL y E2E_ADMIN_PASSWORD")
     test.skip(!(await signInAsAdmin(page)), "no se pudo iniciar sesión como admin")
   })
 

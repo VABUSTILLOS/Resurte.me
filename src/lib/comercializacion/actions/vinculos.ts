@@ -4,17 +4,72 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { requireSellerOrAdminAction } from "@/lib/roles"
 import { logger } from "@/lib/logger"
 import { getCommissionRate } from "../commissions"
+import {
+  CRM_REVENUE_SCAN_LIMIT,
+  REVENUE_LIST_LIMIT,
+  foldPaidRevenueWindow,
+  toAmount,
+  type PaidRevenue,
+} from "../revenue-scan"
 import { escapeOrTerm } from "./helpers"
 
 // ============================================================
 // VINCULACIÓN DE CUENTA
 // ============================================================
 
-/** Pedidos pagados del usuario vinculado a un prospecto (para comisión). */
+type ServiceClient = Awaited<ReturnType<typeof createServiceClient>>
+
+/**
+ * Suma las ventas pagadas de **todo** el historial del usuario.
+ *
+ * Pide la ventana con una fila de más para poder decir si se quedó corta
+ * (ver `revenue-scan.ts`), y por eso no lleva `order`: un `SUM` no depende del
+ * orden, y ordenar solo encarecería la consulta.
+ *
+ * `payment_status = 'paid'` deja fuera también `partially_refunded` y
+ * `refunded`, que es lo correcto para una comisión —no se comisiona dinero que
+ * se devolvió— y es la misma semántica que tenía el filtro en memoria.
+ *
+ * Si `00187` no estuviera aplicada esto seguiría funcionando: `total` y
+ * `payment_status` son columnas de `00001`, no del camino de reembolso.
+ */
+async function scanPaidRevenue(
+  supabase: ServiceClient,
+  userId: string
+): Promise<PaidRevenue> {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("total")
+    .eq("user_id", userId)
+    .eq("payment_status", "paid")
+    .neq("status", "cancelled")
+    .limit(CRM_REVENUE_SCAN_LIMIT + 1)
+
+  if (error) {
+    logger.error("[CRM] scanPaidRevenue error:", error)
+    throw new Error("Error al calcular las ventas del cliente")
+  }
+
+  return foldPaidRevenueWindow((data ?? []) as { total: unknown }[])
+}
+
+/**
+ * Pedidos pagados del usuario vinculado a un prospecto (para comisión).
+ *
+ * La lista y el total se calculan por separado **a propósito**: la lista trae
+ * los `REVENUE_LIST_LIMIT` pedidos más recientes para mostrar en la ficha, y el
+ * total se escanea sobre el historial con una ventana alta. Antes eran la misma
+ * consulta, así que el total se truncaba al tamaño de la lista y el ingreso
+ * quedaba corto a partir del pedido 51 sin decirlo.
+ */
 export async function getProspectClientOrders(prospectId: number): Promise<{
   orders: Array<{ id: number; total: number; status: string; payment_status: string; created_at: string }>
   revenue: number
   commission: number
+  /** Pedidos pagados que sostienen `revenue`, contados sobre el historial, no sobre la lista. */
+  paidOrders: number
+  /** true si el historial no cupo en la ventana de escaneo y `revenue` es un mínimo. */
+  revenueTruncated: boolean
 }> {
   const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
@@ -26,7 +81,13 @@ export async function getProspectClientOrders(prospectId: number): Promise<{
   if (role !== "admin") prospectQuery.eq("seller_id", userId)
   const { data: prospect, error } = await prospectQuery.maybeSingle()
   if (error || !prospect || !prospect.user_id) {
-    return { orders: [], revenue: 0, commission: 0 }
+    return {
+      orders: [],
+      revenue: 0,
+      commission: 0,
+      paidOrders: 0,
+      revenueTruncated: false,
+    }
   }
 
   const { data: orders } = await supabase
@@ -34,22 +95,21 @@ export async function getProspectClientOrders(prospectId: number): Promise<{
     .select("id, total, status, payment_status, created_at")
     .eq("user_id", prospect.user_id)
     .order("created_at", { ascending: false })
-    .limit(50)
+    .limit(REVENUE_LIST_LIMIT)
 
-  const paid = (orders ?? []).filter(
-    (o) => o.payment_status === "paid" && o.status !== "cancelled"
-  )
-  const revenue = paid.reduce((s, o) => s + Number(o.total), 0)
+  const paid = await scanPaidRevenue(supabase, prospect.user_id)
   return {
     orders: (orders ?? []).map((o) => ({
       id: Number(o.id),
-      total: Number(o.total),
+      total: toAmount(o.total),
       status: String(o.status),
       payment_status: String(o.payment_status),
       created_at: String(o.created_at),
     })),
-    revenue,
-    commission: revenue * getCommissionRate(),
+    revenue: paid.revenue,
+    commission: paid.revenue * getCommissionRate(),
+    paidOrders: paid.paidOrders,
+    revenueTruncated: paid.truncated,
   }
 }
 

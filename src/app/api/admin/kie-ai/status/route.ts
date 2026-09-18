@@ -10,7 +10,7 @@ import { KieAiError, getTaskStatus, isKieAiConfigured } from "@/lib/ai/kie-ai"
 export async function GET(request: Request) {
   try {
     // Solo administradores pueden usar el piloto de Kie.ai.
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied } = await requireAdmin({ permission: "productos" })
     if (adminDenied) {
       return adminDenied
     }

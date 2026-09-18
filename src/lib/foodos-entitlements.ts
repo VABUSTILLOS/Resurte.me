@@ -54,17 +54,26 @@ export const TIER_LABEL_KEY: Record<CashbackTier, string> = {
 /**
  * Nivel mínimo que desbloquea cada capacidad.
  *
- * Regla del producto: Plata abre marketing, Oro abre Flotilla, Diamante abre
- * Mesero IA y todo lo demás.
+ * Regla del producto: Plata abre marketing; Oro abre lo que hace que el
+ * restaurante **cobre y opere** (Flotilla, POS de mostrador y comandero);
+ * Diamante abre lo que se apoya en volumen ya probado (Mesero IA, wallet,
+ * app de marca, sitio IA, integraciones POS ajenas y catering).
+ *
+ * Por qué POS y comandero bajaron de Diamante a Oro: son el valor que
+ * convence —el restaurantero los usa cada día en el salón y en la caja— y
+ * dejarlos en el tope significaba que nadie podía comprobarlos antes de
+ * comprometer una recompra. Lo caro de operar (Mesero IA, sitio IA,
+ * integraciones) sigue arriba, que es donde está el costo real.
  */
 export const FEATURE_MIN_TIER: Record<FoodosFeature, CashbackTier> = {
   marketing_ia: "Plata",
   flotilla: "Oro",
   mesero_ia: "Diamante",
   // POS nativo y comandero: el restaurantero cobra y opera el salón aquí mismo.
-  // Ojo: `pos_integraciones` es lo OPUESTO — conectar un punto de venta ajeno.
-  pos_mostrador: "Diamante",
-  comandero: "Diamante",
+  // Ojo: `pos_integraciones` es lo OPUESTO — conectar un punto de venta ajeno,
+  // y eso sí sigue en Diamante.
+  pos_mostrador: "Oro",
+  comandero: "Oro",
   wallet_passes: "Diamante",
   app_marca: "Diamante",
   sitio_ia: "Diamante",
@@ -105,13 +114,13 @@ export const FOODOS_FEATURES: Record<FoodosFeature, FoodosFeatureInfo> = {
     feature: "pos_mostrador",
     labelKey: "foodos.entitlements.featurePosMostrador",
     descriptionKey: "foodos.entitlements.featurePosMostradorDesc",
-    minTier: "Diamante",
+    minTier: "Oro",
   },
   comandero: {
     feature: "comandero",
     labelKey: "foodos.entitlements.featureComandero",
     descriptionKey: "foodos.entitlements.featureComanderoDesc",
-    minTier: "Diamante",
+    minTier: "Oro",
   },
   wallet_passes: {
     feature: "wallet_passes",
@@ -154,10 +163,10 @@ const FEATURE_ORDER_BY_TIER: FoodosFeature[] = [
   "marketing_ia",
   // Oro
   "flotilla",
-  // Diamante
-  "mesero_ia",
   "pos_mostrador",
   "comandero",
+  // Diamante
+  "mesero_ia",
   "wallet_passes",
   "app_marca",
   "sitio_ia",

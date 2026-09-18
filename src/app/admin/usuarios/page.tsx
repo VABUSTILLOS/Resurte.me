@@ -7,9 +7,12 @@ import { MANAGED_ROLES } from "@/lib/admin-roles"
 import {
   listUsers,
   setUserRole,
+  setAdminPermissions,
   type ManagedUser,
   type ManagedUserRole,
 } from "./actions"
+import type { AdminScope } from "@/lib/admin-permissions"
+import ScopeEditor from "./scope-editor"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 const ROLE_META: Record<
@@ -102,6 +105,36 @@ export default function AdminUsuariosPage() {
       setNotice(`Rol de ${user.email ?? "usuario"} actualizado a ${to}.`)
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cambiar el rol")
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  async function handleScopeChange(user: ManagedUser, scope: AdminScope) {
+    const label = scope === null ? "sin restringir" : `${scope.length} sección(es)`
+    if (
+      !window.confirm(
+        `¿Dejar los permisos de ${user.email ?? user.id} en ${label}?`
+      )
+    ) {
+      return
+    }
+
+    setUpdating(user.id)
+    setError(null)
+    setNotice(null)
+    try {
+      await setAdminPermissions(user.id, scope)
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, adminScope: scope } : u))
+      )
+      setNotice(
+        `Permisos de ${user.email ?? "usuario"} actualizados: ${label}.`
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "No se pudieron cambiar los permisos"
+      )
     } finally {
       setUpdating(null)
     }
@@ -223,6 +256,14 @@ export default function AdminUsuariosPage() {
                           <Loader2 className="h-4 w-4 animate-spin text-gray-600" />
                         )}
                       </div>
+                      {user.role === "admin" && (
+                        <ScopeEditor
+                          userEmail={user.email}
+                          scope={user.adminScope}
+                          busy={updating === user.id}
+                          onSave={(scope) => handleScopeChange(user, scope)}
+                        />
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
                       {new Date(user.created_at).toLocaleDateString("es-MX")}

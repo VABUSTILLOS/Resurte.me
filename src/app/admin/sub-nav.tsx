@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ShieldCheck } from "lucide-react"
+import { type AdminScope, canAccessAdminPath } from "@/lib/admin-permissions"
 import { PendingOrdersBadge } from "./components/PendingOrdersBadge"
 import { AdminNotificationCenter } from "./components/AdminNotificationCenter"
 
@@ -86,11 +87,23 @@ const ADMIN_NAV_GROUPS = [
  *
  * En móvil la fila hace scroll horizontal; los separadores de grupo son
  * decorativos (`aria-hidden`) para no inflar el árbol de accesibilidad.
+ *
+ * `permissions` llega del layout: es el ámbito de /admin de la cuenta. Un admin
+ * restringido no debe ver la pestaña de una sección que le va a responder 403,
+ * porque una pestaña que lleva a un rebote es peor que una pestaña ausente. Los
+ * grupos que se quedan sin pestañas desaparecen enteros para no dejar un
+ * separador huérfano. Solo se renderiza para administradores (el layout ya lo
+ * garantiza), por eso el rol se pasa literal.
  */
-export function AdminSubNav() {
+export function AdminSubNav({ permissions }: { permissions: AdminScope }) {
   const pathname = usePathname()
   const isActive = (href: string, exact: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
+
+  const visibleGroups = ADMIN_NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => canAccessAdminPath("admin", permissions, item.href)),
+  })).filter((group) => group.items.length > 0)
 
   const navRef = useRef<HTMLDivElement>(null)
 
@@ -125,7 +138,7 @@ export function AdminSubNav() {
           Administración
         </span>
         <nav aria-label="Secciones de administración" className="flex items-center gap-1.5 min-w-max">
-          {ADMIN_NAV_GROUPS.map((group, groupIndex) => (
+          {visibleGroups.map((group, groupIndex) => (
             <div key={group.label} className="flex items-center gap-1.5">
               {groupIndex > 0 && (
                 <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-gray-200 shrink-0" />

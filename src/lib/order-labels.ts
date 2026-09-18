@@ -23,6 +23,7 @@ export const PAYMENT_STATUS_LABEL: Record<string, string> = {
   failed: "Fallido",
   expired: "Expirado",
   refunded: "Reembolsado",
+  partially_refunded: "Reembolso parcial",
   disputed: "En disputa",
   amount_mismatch: "Monto incorrecto",
 }

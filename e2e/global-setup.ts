@@ -96,6 +96,24 @@ const ROUTES = [
   "/comercializacion/pedidos",
   "/auth/callback",
   "/api/admin/products/audit",
+  // --- Auditoría de rutas (ronda 22) ---
+  // El barrido de guardas (`e2e/admin-guards.spec.ts`) recorre **todas** las
+  // secciones de `ADMIN_SECTIONS`, no solo las que algún spec nombraba. Once de
+  // ellas no aparecían en ningún spec, así que el calentamiento tampoco las
+  // cubría: cada una habría pagado su compilación en frío dentro del timeout
+  // de su propia prueba, que es justo el flake que este archivo existe para
+  // evitar. El barrido visita las 19; estas 11 completan la lista.
+  "/admin/comisiones",
+  "/admin/conversion",
+  "/admin/foodos/dispersiones",
+  "/admin/foodos/restaurantes",
+  "/admin/operar",
+  "/admin/proveedores",
+  "/admin/recompensas",
+  "/admin/repartidores",
+  "/admin/seo-ia",
+  "/admin/sistema",
+  "/admin/whatsapp",
 ]
 
 const ATTEMPTS = 3

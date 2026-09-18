@@ -58,6 +58,7 @@ import {
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import { orderCustomerLabel } from "@/lib/admin/order-selects"
 import { ProofSection } from "./proof-section"
+import { RefundSection } from "./refund-section"
 
 function formatAdminAddress(a: NonNullable<AdminOrder["address"]>): string {
   const parts = [
@@ -1186,6 +1187,14 @@ function AdminOrdersContent() {
                 orderId={selectedOrder.id}
                 proofPath={selectedOrder.delivery_proof_path ?? null}
                 status={selectedOrder.status}
+                onChanged={refresh}
+              />
+
+              {/* Reembolso (migración 00187) */}
+              <RefundSection
+                orderId={selectedOrder.id}
+                paymentStatus={selectedOrder.payment_status}
+                refundedAmountCents={selectedOrder.refunded_amount_cents ?? null}
                 onChanged={refresh}
               />
 

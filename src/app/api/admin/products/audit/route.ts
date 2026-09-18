@@ -19,7 +19,7 @@ const MAX_ROWS = 50
  * cliente de Supabase no se pudo crear).
  */
 export async function GET(request: NextRequest) {
-  const { response: adminDenied } = await requireAdmin()
+  const { response: adminDenied } = await requireAdmin({ permission: "productos" })
   if (adminDenied) return adminDenied
 
   try {

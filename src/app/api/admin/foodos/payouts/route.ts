@@ -27,7 +27,7 @@ export const runtime = "nodejs"
  *         reference, notes? }
  */
 export async function POST(request: NextRequest) {
-  const { user: adminUser, response: adminDenied } = await requireAdmin()
+  const { user: adminUser, response: adminDenied } = await requireAdmin({ permission: "comisiones" })
   if (adminDenied) return adminDenied
 
   try {

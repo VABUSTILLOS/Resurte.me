@@ -29,7 +29,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; linkId: string }> }
 ) {
-  const { user: adminUser, response: adminDenied } = await requireAdmin()
+  const { user: adminUser, response: adminDenied } = await requireAdmin({ permission: "productos" })
   if (adminDenied) return adminDenied
 
   try {
@@ -130,7 +130,7 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string; linkId: string }> }
 ) {
-  const { user: adminUser, response: adminDenied } = await requireAdmin()
+  const { user: adminUser, response: adminDenied } = await requireAdmin({ permission: "productos" })
   if (adminDenied) return adminDenied
 
   try {

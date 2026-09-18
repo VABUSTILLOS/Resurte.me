@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 // proceso largo y con varios dispositivos tocando la misma mesa, así que esta
 // suite defiende los invariantes que no se ven en la pantalla:
 //
-//   1. Nivel Diamante verificado en el servidor, antes de la sesión. Las
+//   1. Nivel suficiente verificado en el servidor, antes de la sesión. Las
 //      ESCRITURAS lanzan; las LECTURAS degradan.
 //   2. **Una fila por ronda enviada a cocina, una sola al cobrar.** Mandar
 //      platillos no es una venta: la comanda va sin folio y pendiente de pago.
@@ -281,7 +281,7 @@ beforeEach(() => {
   })
 })
 
-describe("mesas: bloqueado sin nivel Diamante", () => {
+describe("mesas: bloqueado sin el nivel suficiente", () => {
   beforeEach(() => {
     mocks.requireFoodosFeature.mockRejectedValue(new Error("FOODOS_FEATURE_LOCKED"))
   })

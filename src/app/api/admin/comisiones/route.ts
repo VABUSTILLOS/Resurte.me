@@ -22,12 +22,12 @@ export const runtime = "nodejs"
  * ya consume /admin/comisiones. Una sola ruta de lectura, no dos.
  *
  * `commission_periods` tiene RLS sin políticas: es dinero de terceros y el
- * único canal son estas rutas, con el service client, tras `requireAdmin()`.
+ * único canal son estas rutas, con el service client, tras `requireAdmin({ permission: "comisiones" })`.
  *
  * Body: { sellerId: uuid, month: "AAAA-MM", rate?: number }
  */
 export async function POST(request: NextRequest) {
-  const { user: adminUser, response: adminDenied } = await requireAdmin()
+  const { user: adminUser, response: adminDenied } = await requireAdmin({ permission: "comisiones" })
   if (adminDenied) return adminDenied
 
   try {

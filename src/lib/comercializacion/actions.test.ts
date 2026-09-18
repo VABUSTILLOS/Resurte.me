@@ -16,7 +16,12 @@ import {
   deleteCrmTask,
   listProspectTasks,
   getTaskAgenda,
+  getProspectClientOrders,
 } from "./actions"
+import {
+  CRM_REVENUE_SCAN_LIMIT,
+  REVENUE_LIST_LIMIT,
+} from "./revenue-scan"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireSellerOrAdminAction } from "@/lib/roles"
 
@@ -806,5 +811,117 @@ describe("agenda de tareas", () => {
 
     expect(entries[0]?.prospect).toBeNull()
     expect(entries[0]?.task.id).toBe(3)
+  })
+})
+
+/**
+ * El total de ventas de un cliente vinculado se calcula sobre el historial, no
+ * sobre la lista de la ficha.
+ *
+ * Estas pruebas existen por un bug real: las dos cifras salían de la **misma**
+ * consulta de 50 filas, así que a partir del pedido 51 el ingreso —y la comisión
+ * derivada— quedaba corto mientras la etiqueta prometía «histórico».
+ */
+describe("getProspectClientOrders", () => {
+  const orderRow = (total: string) => ({
+    id: 1,
+    total,
+    status: "delivered",
+    payment_status: "paid",
+    created_at: "2026-01-01T00:00:00Z",
+  })
+
+  it("no trunca las ventas al tamaño de la lista que se muestra", async () => {
+    const list = Array.from({ length: REVENUE_LIST_LIMIT }, () => orderRow("100"))
+    const scan = Array.from({ length: 120 }, () => ({ total: "100" }))
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 7, user_id: "user-1" }, error: null }],
+      orders: [{ data: list, error: null }, { data: scan, error: null }],
+    })
+
+    const result = await getProspectClientOrders(7)
+
+    expect(result.orders).toHaveLength(REVENUE_LIST_LIMIT)
+    expect(result.paidOrders).toBe(120)
+    expect(result.revenue).toBe(12_000)
+    expect(result.revenueTruncated).toBe(false)
+    // La ventana pide una fila de más: es la que delata el corte.
+    const limit = builders.orders?.limit as ReturnType<typeof vi.fn>
+    expect(limit).toHaveBeenCalledWith(CRM_REVENUE_SCAN_LIMIT + 1)
+  })
+
+  it("pide solo las columnas del importe y filtra el pago en SQL", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 7, user_id: "user-1" }, error: null }],
+      orders: [{ data: [orderRow("100")], error: null }, { data: [{ total: "100" }], error: null }],
+    })
+
+    await getProspectClientOrders(7)
+
+    const select = builders.orders?.select as ReturnType<typeof vi.fn>
+    expect(select).toHaveBeenCalledWith("total")
+    const eq = builders.orders?.eq as ReturnType<typeof vi.fn>
+    expect(eq).toHaveBeenCalledWith("payment_status", "paid")
+    // Un pedido cancelado no se comisiona aunque su pago haya entrado.
+    const neq = builders.orders?.neq as ReturnType<typeof vi.fn>
+    expect(neq).toHaveBeenCalledWith("status", "cancelled")
+  })
+
+  it("marca el importe como mínimo cuando el historial no cabe en la ventana", async () => {
+    const scan = Array.from({ length: CRM_REVENUE_SCAN_LIMIT + 1 }, () => ({ total: "10" }))
+    serviceWith({
+      crm_prospects: [{ data: { id: 7, user_id: "user-1" }, error: null }],
+      orders: [{ data: [], error: null }, { data: scan, error: null }],
+    })
+
+    const result = await getProspectClientOrders(7)
+
+    expect(result.revenueTruncated).toBe(true)
+    expect(result.revenue).toBe(CRM_REVENUE_SCAN_LIMIT * 10)
+    expect(result.paidOrders).toBe(CRM_REVENUE_SCAN_LIMIT)
+  })
+
+  it("un cliente con cuenta y sin pagos da un cero medido, no un truncamiento", async () => {
+    serviceWith({
+      crm_prospects: [{ data: { id: 7, user_id: "user-1" }, error: null }],
+      orders: [{ data: [], error: null }, { data: [], error: null }],
+    })
+
+    const result = await getProspectClientOrders(7)
+
+    expect(result).toMatchObject({
+      revenue: 0,
+      paidOrders: 0,
+      revenueTruncated: false,
+      orders: [],
+    })
+  })
+
+  it("un prospecto sin cuenta vinculada no se mide en absoluto", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 7, user_id: null }, error: null }],
+      orders: [{ data: [], error: null }],
+    })
+
+    const result = await getProspectClientOrders(7)
+
+    expect(result).toMatchObject({ revenue: 0, paidOrders: 0, orders: [] })
+    // Sin vínculo no hay cliente que medir: no se consulta `orders` siquiera.
+    const limit = builders.orders?.limit as ReturnType<typeof vi.fn>
+    expect(limit).not.toHaveBeenCalled()
+  })
+
+  it("un fallo del escaneo no se degrada a cero: propaga", async () => {
+    serviceWith({
+      crm_prospects: [{ data: { id: 7, user_id: "user-1" }, error: null }],
+      orders: [
+        { data: [], error: null },
+        { data: null, error: { message: "boom" } },
+      ],
+    })
+
+    await expect(getProspectClientOrders(7)).rejects.toThrow(
+      "Error al calcular las ventas del cliente"
+    )
   })
 })

@@ -32,7 +32,7 @@ export const runtime = "nodejs"
  * Body: { restaurantId, decision: "approve" | "reject" | "pause", reason? }
  */
 export async function POST(request: NextRequest) {
-  const { user: adminUser, response: adminDenied } = await requireAdmin()
+  const { user: adminUser, response: adminDenied } = await requireAdmin({ permission: "clientes" })
   if (adminDenied) return adminDenied
 
   try {

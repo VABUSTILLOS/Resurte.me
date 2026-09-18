@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { readFileSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
+import { ADMIN_SECTIONS } from "@/lib/admin-permissions"
 
 /**
  * Contrato del calentamiento en frío de e2e (`e2e/global-setup.ts`).
@@ -311,5 +312,39 @@ describe("contrato del calentamiento e2e", () => {
     // Y que las excepciones declaradas sigan teniendo motivo.
     const stale = EXCEPTED_PATTERNS.filter((pattern) => warmed.has(pattern) || !VISITED.has(pattern))
     expect(stale, "Estas excepciones ya no hacen falta: bórralas.").toEqual([])
+  })
+
+  it("las 19 secciones de /admin están calentadas, aunque el barrido las visite en bucle", () => {
+    // `admin-guards.spec.ts` recorre `ADMIN_SECTIONS` con `page.goto(path)`, así
+    // que **no contiene ni un literal** de sección y el escáner de arriba no
+    // puede verlas. Se comprobó de la peor manera: el contrato las detectó por
+    // accidente porque un comentario las nombraba entre backticks — y la regex
+    // de literales también acepta backticks. Es decir, el día que alguien
+    // reformule ese comentario, once secciones se quedan sin calentar en
+    // silencio y el flake vuelve sin que nadie lo relacione.
+    //
+    // La dependencia se declara aquí en vez de dejar que la descubra un
+    // comentario: añadir una sección al mapa obliga a calentarla.
+    const warmed = new Set(
+      WARMED.map((route) => resolve(route)).filter((pattern): pattern is string => pattern !== null)
+    )
+
+    // Canario: si `resolve` no reconociera una sección, se caería del filtro y
+    // el test pasaría sin revisarla. Se exige que las 19 resuelvan.
+    const secciones = ADMIN_SECTIONS.map((section) => section.path)
+    expect(secciones.length).toBeGreaterThanOrEqual(19)
+    expect(secciones.filter((path) => resolve(path) === null)).toEqual([])
+
+    const sinCalentar = secciones
+      .map((path) => resolve(path) as string)
+      .filter((pattern) => !warmed.has(pattern))
+      .sort()
+
+    expect(
+      sinCalentar,
+      "El barrido de guardas visita estas secciones y el calentamiento no las cubre: " +
+        "cada una pagaría su compilación en frío dentro del timeout de su prueba. " +
+        "Añádelas a ROUTES en e2e/global-setup.ts."
+    ).toEqual([])
   })
 })

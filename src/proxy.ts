@@ -138,6 +138,21 @@ export async function proxy(request: NextRequest) {
   )
   const applyCsp = !isPrefetch && !isAsset
 
+  // ── /admin: el destino del guard viaja en la request ──
+  // `requireAdminPage()` redirige al login sin sesión, y para devolver al
+  // usuario **a donde iba** necesita saber qué ruta pidió. Un layout de Next
+  // no recibe el pathname, así que se lo pasa el proxy por cabecera de
+  // request. Viaja con la query: los avisos del dashboard enlazan al recurso
+  // concreto (`/admin/pedidos?status=pending`) y sin ella el admin volvería a
+  // la lista sin filtrar, que es justo lo que el enlace evitaba.
+  // Se muta `request.headers` **antes** de `updateSession` porque es
+  // `NextResponse.next({ request })` quien las propaga, y `updateSession`
+  // tiene varias salidas tempranas: mutar después dejaría algunas sin la
+  // cabecera. Solo para /admin, que ya es dinámico por el propio guard.
+  if (pathname.startsWith("/admin")) {
+    request.headers.set("x-pathname", pathname + request.nextUrl.search)
+  }
+
   // ── Supabase session refresh (delegado a updateSession) ──
   const { supabaseResponse } = await updateSession(request)
 

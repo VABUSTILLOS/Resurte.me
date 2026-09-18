@@ -14,7 +14,7 @@ import {
  */
 export async function GET(request: Request) {
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied } = await requireAdmin({ permission: "pedidos" })
     if (adminDenied) {
       return adminDenied
     }

@@ -116,22 +116,22 @@ const TIER_COPY: Record<string, { name: string; requirement: string; note: strin
   Verde: {
     name: "Verde",
     requirement: "Desde tu primera compra",
-    note: "FoodOS completo: menú digital, pedidos, cocina y clientes.",
+    note: "FoodOS completo para operar el día a día: menú, pedidos y cocina.",
   },
   Plata: {
     name: "Plata",
     requirement: `2 semanas de ${formatMxn(QUALIFYING_WEEK_MIN)}`,
-    note: "Se abre el marketing que trabaja solo.",
+    note: "Se abre el marketing que trabaja solo, con tus clientes ya segmentados.",
   },
   Oro: {
     name: "Oro",
     requirement: `3 semanas de ${formatMxn(QUALIFYING_WEEK_MIN)}`,
-    note: "Se abre la logística de reparto.",
+    note: "Se abre lo que hace cobrar y operar el piso: punto de venta, comandero y reparto.",
   },
   Diamante: {
     name: "Diamante",
     requirement: `4 semanas de ${formatMxn(QUALIFYING_WEEK_MIN)}`,
-    note: "Se abre todo: IA, lealtad, app, sitio, caja y catering.",
+    note: "Se abre lo que atiende el volumen: IA, lealtad, app de tu marca, sitio propio, integraciones y catering.",
   },
 }
 
@@ -466,7 +466,7 @@ function TierCard({ step }: { step: PublicTierInfo }) {
         </ul>
       ) : (
         <p className="mt-3 text-xs text-gray-400">
-          Todavía sin funciones premium: el nivel base ya incluye menú, pedidos, cocina y clientes.
+          Todavía sin funciones premium: el nivel base ya incluye menú, pedidos y cocina.
         </p>
       )}
     </li>

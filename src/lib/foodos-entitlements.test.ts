@@ -34,11 +34,28 @@ describe("FEATURE_MIN_TIER", () => {
     }
   })
 
-  it("respeta la regla del producto: Plata marketing, Oro flotilla, Diamante el resto", () => {
+  it("respeta la regla del producto: Plata marketing, Oro cobrar y operar, Diamante el resto", () => {
     expect(FEATURE_MIN_TIER.marketing_ia).toBe("Plata")
+    // Oro es "el restaurante cobra y opera": flotilla, POS de mostrador y comandero.
     expect(FEATURE_MIN_TIER.flotilla).toBe("Oro")
+    expect(FEATURE_MIN_TIER.pos_mostrador).toBe("Oro")
+    expect(FEATURE_MIN_TIER.comandero).toBe("Oro")
     for (const feature of ALL_FEATURES) {
-      if (feature === "marketing_ia" || feature === "flotilla") continue
+      if (
+        feature === "marketing_ia" ||
+        feature === "flotilla" ||
+        feature === "pos_mostrador" ||
+        feature === "comandero"
+      ) {
+        continue
+      }
+      expect(FEATURE_MIN_TIER[feature]).toBe("Diamante")
+    }
+  })
+
+  it("lo caro de operar no se desbloquea antes de Diamante", () => {
+    // El costo real (IA de salón, sitio, integraciones ajenas) sigue arriba.
+    for (const feature of ["mesero_ia", "sitio_ia", "pos_integraciones"] as FoodosFeature[]) {
       expect(FEATURE_MIN_TIER[feature]).toBe("Diamante")
     }
   })
@@ -108,9 +125,13 @@ describe("hasFeature", () => {
     expect(hasFeature("Plata", "mesero_ia")).toBe(false)
   })
 
-  it("Oro abre flotilla pero no mesero IA", () => {
+  it("Oro abre flotilla, POS de mostrador y comandero, pero no mesero IA", () => {
     expect(hasFeature("Oro", "flotilla")).toBe(true)
+    expect(hasFeature("Oro", "pos_mostrador")).toBe(true)
+    expect(hasFeature("Oro", "comandero")).toBe(true)
     expect(hasFeature("Oro", "mesero_ia")).toBe(false)
+    // Lo que se apoya en volumen ya probado sigue en Diamante.
+    expect(hasFeature("Oro", "sitio_ia")).toBe(false)
   })
 })
 
@@ -139,8 +160,12 @@ describe("featuresUnlockedByNextTier", () => {
     expect(featuresUnlockedByNextTier("Verde")).toEqual(["marketing_ia"])
   })
 
-  it("Plata→Oro abre solo flotilla", () => {
-    expect(featuresUnlockedByNextTier("Plata")).toEqual(["flotilla"])
+  it("Plata→Oro abre lo que hace cobrar y operar", () => {
+    expect(featuresUnlockedByNextTier("Plata")).toEqual([
+      "flotilla",
+      "pos_mostrador",
+      "comandero",
+    ])
   })
 
   it("Oro→Diamante abre todo lo que queda", () => {
@@ -148,6 +173,8 @@ describe("featuresUnlockedByNextTier", () => {
     expect(unlocked).toEqual(lockedFeatures("Oro"))
     expect(unlocked).not.toContain("marketing_ia")
     expect(unlocked).not.toContain("flotilla")
+    expect(unlocked).not.toContain("pos_mostrador")
+    expect(unlocked).not.toContain("comandero")
     expect(unlocked).toContain("mesero_ia")
   })
 
@@ -381,8 +408,10 @@ describe("canUseFeature / lockedTierFor", () => {
   })
 
   it("lockedTierFor devuelve el nivel que falta", () => {
-    expect(lockedTierFor("Verde", "comandero")).toBe("Diamante")
+    expect(lockedTierFor("Verde", "comandero")).toBe("Oro")
+    expect(lockedTierFor("Verde", "pos_mostrador")).toBe("Oro")
     expect(lockedTierFor("Verde", "flotilla")).toBe("Oro")
+    expect(lockedTierFor("Verde", "mesero_ia")).toBe("Diamante")
     expect(lockedTierFor("Plata", "marketing_ia")).toBeNull()
   })
 

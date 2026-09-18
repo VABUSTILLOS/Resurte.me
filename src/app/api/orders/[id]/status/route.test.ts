@@ -8,7 +8,7 @@ vi.mock("@/lib/admin-auth", () => ({
     response: null,
   })),
 }))
-vi.mock("@/lib/audit", () => ({ logAdminAction: vi.fn().mockResolvedValue(undefined) }))
+vi.mock("@/lib/audit-log", () => ({ logAdminAction: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/lib/workflows", () => ({ onOrderStatusChange: vi.fn().mockResolvedValue([]) }))
 vi.mock("@/lib/notifications", () => ({
   notifyUser: vi.fn().mockResolvedValue(undefined),
@@ -19,7 +19,7 @@ vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: 
 import { PATCH } from "./route"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
-import { logAdminAction } from "@/lib/audit"
+import { logAdminAction } from "@/lib/audit-log"
 import { onOrderStatusChange } from "@/lib/workflows"
 import { notifyCashbackCredited } from "@/lib/notifications"
 
@@ -214,11 +214,13 @@ describe("PATCH /api/orders/[id]/status", () => {
     expect(ordersBuilder.update.mock.calls[0]![0]).not.toHaveProperty("payment_status")
     // Bitácora admin del cambio de estado
     expect(logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         actorId: "admin-1",
-        action: "order_status_changed",
-        orderId: 7,
-        detail: "pending → confirmed",
+        action: "order_status",
+        entity: "orders",
+        entityId: 7,
+        detail: { from: "pending", to: "confirmed" },
       })
     )
   })
@@ -313,7 +315,59 @@ describe("PATCH /api/orders/[id]/status", () => {
     // El aviso lo emite el helper compartido (lee el monto real del monedero)
     expect(notifyCashbackCredited).toHaveBeenCalledWith(7)
     expect(logAdminAction).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "order_payment_confirmed", orderId: 7 })
+      expect.anything(),
+      expect.objectContaining({
+        action: "order_payment",
+        entity: "orders",
+        entityId: 7,
+        detail: { from: "pending", to: "paid" },
+      })
+    )
+  })
+
+  it("asignación de repartidor queda en la bitácora", async () => {
+    const updated = { id: 7, status: "pending", user_id: null, cashback_credits: 0, driver_id: 12 }
+    mockSupabase({
+      orders: ordersTable({ data: CURRENT_ORDER, error: null }, { data: updated, error: null }),
+      delivery_drivers: tableBuilder({ data: { id: 12, is_active: true }, error: null }),
+    })
+
+    const res = await PATCH(req({ driver_id: 12 }), { params: params7 })
+
+    expect(res.status).toBe(200)
+    // El cambio de repartidor no dispara workflow de estado
+    expect(onOrderStatusChange).not.toHaveBeenCalled()
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        actorId: "admin-1",
+        action: "order_driver_assigned",
+        entity: "orders",
+        entityId: 7,
+        detail: { driver_id: 12 },
+      })
+    )
+  })
+
+  it("desasignar repartidor (null) también queda en la bitácora", async () => {
+    const updated = { id: 7, status: "pending", user_id: null, cashback_credits: 0, driver_id: null }
+    mockSupabase({
+      orders: ordersTable(
+        { data: { ...CURRENT_ORDER, driver_id: 12 }, error: null },
+        { data: updated, error: null }
+      ),
+    })
+
+    const res = await PATCH(req({ driver_id: null }), { params: params7 })
+
+    expect(res.status).toBe(200)
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "order_driver_unassigned",
+        entityId: 7,
+        detail: { driver_id: null },
+      })
     )
   })
 

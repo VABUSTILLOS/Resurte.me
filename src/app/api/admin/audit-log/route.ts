@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { AUDIT_ACTION_LABEL, type AuditAction } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
 
 export const runtime = "nodejs"
@@ -9,15 +10,25 @@ export interface AuditLogEntry {
   id: number
   title: string
   body: string | null
-  action_url: string | null
+  created_at: string
+}
+
+/** Fila cruda de `admin_audit_log` tal como la devuelve PostgREST. */
+interface AuditRow {
+  id: number
+  actor_email: string | null
+  action: string
+  entity: string
+  entity_id: string | null
   created_at: string
 }
 
 /**
- * GET /api/admin/audit-log — feed de la bitácora administrativa.
+ * GET /api/admin/audit-log — feed corto de la bitácora administrativa.
  *
- * Devuelve las últimas 20 acciones admin registradas (type = 'admin_audit'
- * en notifications) para el admin autenticado. Solo administradores.
+ * Lee `admin_audit_log` (el libro real, migración 00072) y lo aplana al
+ * formato que pinta el dashboard: `title` es la etiqueta legible de la acción
+ * y `body` el sujeto afectado más quién lo hizo. Solo administradores.
  */
 export async function GET() {
   try {
@@ -26,10 +37,8 @@ export async function GET() {
 
     const supabase = await createServiceClient()
     const { data, error } = await supabase
-      .from("notifications")
-      .select("id, title, body, action_url, created_at")
-      .eq("type", "admin_audit")
-      .eq("user_id", user.id)
+      .from("admin_audit_log")
+      .select("id, actor_email, action, entity, entity_id, created_at")
       .order("created_at", { ascending: false })
       .limit(20)
 
@@ -38,10 +47,16 @@ export async function GET() {
       return NextResponse.json({ error: "No se pudo cargar la bitácora" }, { status: 500 })
     }
 
-    return NextResponse.json(
-      { entries: (data ?? []) as AuditLogEntry[] },
-      { headers: { "Cache-Control": "no-store" } }
-    )
+    const entries: AuditLogEntry[] = ((data ?? []) as AuditRow[]).map((row) => ({
+      id: row.id,
+      title: AUDIT_ACTION_LABEL[row.action as AuditAction] ?? row.action,
+      body: [row.entity_id ? `#${row.entity_id}` : row.entity, row.actor_email]
+        .filter(Boolean)
+        .join(" · "),
+      created_at: row.created_at,
+    }))
+
+    return NextResponse.json({ entries }, { headers: { "Cache-Control": "no-store" } })
   } catch (err) {
     logger.error("[AUDIT] feed unexpected:", err)
     return NextResponse.json({ error: "Error interno" }, { status: 500 })

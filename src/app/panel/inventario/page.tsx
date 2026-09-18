@@ -11,7 +11,8 @@ import { uid } from "@/lib/ids"
 import { convertQty, ManualQty, readManualQtys } from "@/lib/panel-units"
 import { isLowStock, isOutOfStock } from "@/lib/panel-utils"
 import { Package } from "lucide-react"
-import type { InventoryItem, Proveedor, StockMovement, SortField } from "@/components/panel/inventario/inventario-shared"
+import type { InventoryItem, Proveedor, StockMovement, SortField, ProjectionRow } from "@/components/panel/inventario/inventario-shared"
+import { projectionVerdict, purchaseOrderLine } from "@/components/panel/inventario/inventario-shared"
 import InventarioHeader from "@/components/panel/inventario/InventarioHeader"
 import StatsRow from "@/components/panel/inventario/StatsRow"
 import ValueCards from "@/components/panel/inventario/ValueCards"
@@ -114,9 +115,8 @@ export default function InventarioPage() {
 
   const purchaseOrder = useMemo(() => {
     return lowStock.concat(outOfStock).map((item) => {
-      const target = item.minStock * 2
-      const toBuy = Math.max(0, target - item.stock)
-      return { ...item, toBuy, cost: toBuy * item.pricePerUnit }
+      const { toBuy, cost } = purchaseOrderLine(item)
+      return { ...item, toBuy, cost }
     })
   }, [lowStock, outOfStock])
 
@@ -146,19 +146,7 @@ export default function InventarioPage() {
 
   const projection = useMemo(() => {
     if (ingredientNeeds.size === 0) return []
-    const rows: {
-      key: string
-      name: string
-      neededQty: number
-      neededUnit: string
-      stockQty: number | null
-      stockUnit: string | null
-      shortfallQty: number
-      itemId: string | null
-      status: "ok" | "justo" | "falta"
-      label: string
-      icon: string
-    }[] = []
+    const rows: ProjectionRow[] = []
     ingredientNeeds.forEach((need, key) => {
       const match = items.find((i) => normalizeName(i.name) === key)
       // Convert the recipe need into the inventory item's unit when dimensions match
@@ -172,22 +160,7 @@ export default function InventarioPage() {
         }
       }
       const stockQty = match ? match.stock : null
-      let status: "ok" | "justo" | "falta"
-      let label: string
-      if (stockQty === null) {
-        status = "falta"
-        label = "No registrado en inventario"
-      } else if (stockQty >= neededQty * 1.1) {
-        status = "ok"
-        label = "Suficiente"
-      } else if (stockQty >= neededQty) {
-        status = "justo"
-        label = "Justo (mínimo)"
-      } else {
-        status = "falta"
-        label = "Falta pedir"
-      }
-      const icon = status === "ok" ? "🟢" : status === "justo" ? "🟡" : "🔴"
+      const { status, label, icon, shortfallQty } = projectionVerdict(stockQty, neededQty)
       rows.push({
         key,
         name: match?.name ?? key.charAt(0).toUpperCase() + key.slice(1),
@@ -195,7 +168,7 @@ export default function InventarioPage() {
         neededUnit,
         stockQty,
         stockUnit: match?.unit ?? null,
-        shortfallQty: stockQty === null ? neededQty : Math.max(0, neededQty - stockQty),
+        shortfallQty,
         itemId: match?.id || null,
         status,
         label,

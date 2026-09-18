@@ -1,7 +1,17 @@
 import { NextResponse } from "next/server"
+import { headers } from "next/headers"
+import { redirect } from "next/navigation"
+import { safeNextPath } from "@/lib/safe-next"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
+import {
+  type AdminPermission,
+  type AdminScope,
+  ADMIN_PERMISSION_LABEL,
+  hasAdminPermission,
+  parseAdminScope,
+} from "@/lib/admin-permissions"
 
 /**
  * Verifica que el request tenga una sesión de usuario admin.
@@ -40,6 +50,15 @@ export type AdminAccess = {
   mirrored: boolean
   /** Motivo por el que las dos capas NO coinciden. `null` = todo bien. */
   warning: string | null
+  /**
+   * Dominios de /admin que puede usar. `null` = sin restringir (todos).
+   *
+   * Viene de `profiles.admin_permissions` y solo recorta dentro de la puerta:
+   * un no-admin lo recibe igualmente, y quien lo consulte debe comprobar
+   * `isAdmin` primero. La lectura es la misma consulta que ya traía el rol, así
+   * que esto no añade ningún viaje a la base.
+   */
+  permissions: AdminScope
 }
 
 const NOT_ADMIN: AdminAccess = {
@@ -47,6 +66,7 @@ const NOT_ADMIN: AdminAccess = {
   source: null,
   mirrored: false,
   warning: null,
+  permissions: null,
 }
 
 /** Emails del bootstrap de emergencia, normalizados. */
@@ -109,18 +129,22 @@ export async function resolveAdminAccess(user: {
   const fromEnv = isAdminEmail(user.email)
 
   let profileRole: string | null = null
+  let profileScope: AdminScope = null
   let readError: string | null = null
 
   try {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, admin_permissions")
       .eq("id", user.id)
       .maybeSingle()
 
     if (error) readError = error.message
-    else profileRole = data?.role ?? null
+    else {
+      profileRole = data?.role ?? null
+      profileScope = parseAdminScope(data?.admin_permissions)
+    }
   } catch (err) {
     readError = describeError(err)
   }
@@ -132,6 +156,7 @@ export async function resolveAdminAccess(user: {
       source: fromEnv ? "env" : "profile",
       mirrored: true,
       warning: null,
+      permissions: profileScope,
     }
   }
 
@@ -144,11 +169,16 @@ export async function resolveAdminAccess(user: {
         source: "env",
         mirrored: false,
         warning: `No se pudo leer profiles.role (${readError}); el acceso no está respaldado por RLS`,
+        // No se pudo leer el ámbito. Conceder sin restringir es coherente con
+        // esta rama: es el bootstrap de emergencia, que ya concede a ciegas.
+        permissions: null,
       }
     }
     const warning = await mirrorRoleToProfile(user.id)
     if (warning) logger.warn("admin_auth.mirror_failed", { source: "env", error: warning })
-    return { isAdmin: true, source: "env", mirrored: !warning, warning }
+    // La fila existe (la lectura fue bien), así que su ámbito se respeta aunque
+    // el rol viniera de ADMIN_EMAILS: recortar aquí no impide el rescate.
+    return { isAdmin: true, source: "env", mirrored: !warning, warning, permissions: profileScope }
   }
 
   if (readError) {
@@ -170,7 +200,13 @@ export async function resolveAdminAccess(user: {
 
     const warning = await mirrorRoleToProfile(user.id)
     if (warning) logger.warn("admin_auth.mirror_failed", { source: "legacy", error: warning })
-    return { isAdmin: true, source: "legacy", mirrored: !warning, warning }
+    return {
+      isAdmin: true,
+      source: "legacy",
+      mirrored: !warning,
+      warning,
+      permissions: profileScope,
+    }
   } catch {
     return NOT_ADMIN
   }
@@ -184,7 +220,30 @@ export async function isAdminUser(user: {
   return (await resolveAdminAccess(user)).isAdmin
 }
 
-export async function requireAdmin() {
+/**
+ * Guard de las rutas y páginas de /admin.
+ *
+ * El parámetro es **opcional y añadido hacia atrás**: `requireAdmin()` sin
+ * argumentos se comporta exactamente como antes (401 sin sesión, 403 si no es
+ * admin), que es lo que hacen las 139 llamadas existentes y lo que simulan los
+ * ~20 archivos de test que lo mockean con `vi.fn()`. Pasar `{ permission }`
+ * añade una comprobación **encima** de la puerta, nunca en lugar de ella.
+ *
+ * Devuelve también el `permissions` del llamante para que las acciones que
+ * **delegan** (cambiar rol o ámbito en /admin/usuarios) puedan exigir un admin
+ * sin restringir sin volver a leer `profiles`.
+ */
+export async function requireAdmin(options?: { permission?: AdminPermission }): Promise<{
+  user: { id: string; email?: string | null } | null
+  response: NextResponse | null
+  /**
+   * Ámbito del llamante. `undefined` = el llamante no lo declaró (mocks
+   * antiguos) y se trata como **restringido**, no como sin restringir: las dos
+   * acciones que lo leen conceden poder, así que el default tiene que ser el
+   * lado que niega.
+   */
+  permissions?: AdminScope | null
+}> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -198,20 +257,97 @@ export async function requireAdmin() {
         { error: "No autenticado" },
         { status: 401 }
       ),
+      permissions: null,
     }
   }
 
-  if (await isAdminUser(user)) {
-    return { user, response: null }
+  const access = await resolveAdminAccess(user)
+
+  if (!access.isAdmin) {
+    return {
+      user: null,
+      response: NextResponse.json(
+        { error: "Acceso restringido a administradores" },
+        { status: 403 }
+      ),
+      permissions: null,
+    }
   }
 
-  return {
-    user: null,
-    response: NextResponse.json(
-      { error: "Acceso restringido a administradores" },
-      { status: 403 }
-    ),
+  const needed = options?.permission
+  if (needed && !hasAdminPermission("admin", access.permissions, needed)) {
+    // El mensaje nombra el dominio para que el 403 sea diagnosticable sin
+    // acceso a la base: quien lo lea sabe qué pedir, no solo que no puede.
+    return {
+      user: null,
+      response: NextResponse.json(
+        { error: `Tu cuenta no tiene acceso a ${ADMIN_PERMISSION_LABEL[needed]}` },
+        { status: 403 }
+      ),
+      permissions: null,
+    }
   }
+
+  return { user, response: null, permissions: access.permissions }
+}
+
+/**
+ * Cabecera donde `src/proxy.ts` deja el pathname que pidió el visitante.
+ *
+ * Un layout de Next **no recibe la ruta**: `requireAdminPage()` corre desde
+ * los layouts de `src/app/admin` y no tiene forma de saber si el usuario venía
+ * de `/admin/comisiones` o de `/admin/productos`. Sin ese dato el guard solo
+ * podía recordar un destino fijo, y **perdía el deep link**: quien abría una
+ * sección concreta sin sesión iniciaba sesión y aterrizaba en el dashboard.
+ */
+export const ADMIN_PATH_HEADER = "x-pathname"
+
+/**
+ * URL de login recordando a dónde iba el usuario.
+ *
+ * Puro a propósito (sin `headers()`), para poder probar la construcción del
+ * destino sin montar un request. `safeNextPath` sanea el valor aunque lo
+ * escriba nuestro propio proxy: la cabecera viaja por la request y una
+ * redirección abierta en el guard de `/admin` sería explotable.
+ */
+export function adminLoginPath(requested: string | null | undefined): string {
+  return `/auth/login?next=${encodeURIComponent(safeNextPath(requested, "/admin"))}`
+}
+
+/**
+ * Guard de las **páginas** de /admin (el de `requireAdmin()` es para las rutas
+ * de API, que responden con un `NextResponse` en vez de redirigir).
+ *
+ * Mismo criterio que `requireAdmin`, distinta salida: un layout o una página no
+ * puede devolver un 403, así que redirige. Sin sesión → login; sin el dominio
+ * → el dashboard con un aviso, porque rebotar en silencio deja al usuario sin
+ * saber si la sección no existe, si está rota o si no le corresponde.
+ */
+export async function requireAdminPage(options?: { permission?: AdminPermission }): Promise<{
+  userId: string
+  email: string
+  permissions: AdminScope
+}> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user || !user.email) {
+    const requested = (await headers()).get(ADMIN_PATH_HEADER)
+    redirect(adminLoginPath(requested))
+  }
+
+  const access = await resolveAdminAccess(user)
+  if (!access.isAdmin) redirect("/")
+
+  const needed = options?.permission
+  if (needed && !hasAdminPermission("admin", access.permissions, needed)) {
+    redirect(`/admin?sin-acceso=${needed}`)
+  }
+
+  return { userId: user.id, email: user.email, permissions: access.permissions }
 }
 
 /** Una fila de `admin_access_report()` (00145), lista para la UI. */

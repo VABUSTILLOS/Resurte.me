@@ -16,12 +16,13 @@
  *
  * ## Columnas opcionales
  *
- * `coupon_code`, `driver_id` y `delivery_proof_path` se leen como best-effort:
+ * `coupon_code`, `driver_id`, `delivery_proof_path` y
+ * `refunded_amount_cents` se leen como best-effort:
  * si el esquema desplegado aún no las tiene, PostgREST responde `42703` y el
  * consumidor reintenta sin ellas en lugar de romper la superficie (ver
  * `missingOptionalOrderColumn`). El esquema de referencia las define en
  * `supabase/migrations/` (driver_id en 00076, coupon_code en 00114,
- * delivery_proof_path en 00154).
+ * delivery_proof_path en 00154, refunded_amount_cents en 00187).
  */
 
 /** FK que desambigua el embed `orders → profiles` (cliente, no vendedor). */
@@ -41,6 +42,7 @@ export const ADMIN_ORDER_OPTIONAL_COLUMNS = [
   "coupon_code",
   "driver_id",
   "delivery_proof_path",
+  "refunded_amount_cents",
 ] as const
 
 export type AdminOrderOptionalColumn = (typeof ADMIN_ORDER_OPTIONAL_COLUMNS)[number]
@@ -58,6 +60,8 @@ export type AdminOrdersSelectOptions = {
   driver?: boolean
   /** Incluir `delivery_proof_path` (omitir cuando la columna no existe). */
   proof?: boolean
+  /** Incluir `refunded_amount_cents` (omitir cuando la columna no existe). */
+  refunded?: boolean
 }
 
 /**
@@ -73,6 +77,7 @@ export function buildAdminOrdersSelect({
   coupon = true,
   driver = true,
   proof = true,
+  refunded = true,
 }: AdminOrdersSelectOptions = {}): string {
   return [
     "id",
@@ -91,6 +96,7 @@ export function buildAdminOrdersSelect({
     `addresses(${ORDERS_ADDRESS_COLUMNS})`,
     ...(driver ? ["driver_id"] : []),
     ...(proof ? ["delivery_proof_path"] : []),
+    ...(refunded ? ["refunded_amount_cents"] : []),
   ].join(", ")
 }
 
@@ -184,6 +190,8 @@ export interface AdminOrderRow {
   driver_id?: number | null
   /** Ausente cuando la columna no existe en el esquema desplegado (00154). */
   delivery_proof_path?: string | null
+  /** Ausente cuando la columna no existe en el esquema desplegado (00187). */
+  refunded_amount_cents?: number | null
   profiles: { full_name: string | null } | { full_name: string | null }[] | null
   addresses: AdminOrderAddressRow | AdminOrderAddressRow[] | null
 }

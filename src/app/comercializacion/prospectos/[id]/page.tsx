@@ -23,9 +23,17 @@ export default async function ProspectoDetailPage({
     notFound()
   }
 
-  const clientOrders = detail.prospect.user_id
-    ? await getProspectClientOrders(prospectId)
-    : null
+  // Un fallo al medir las ventas no debe tumbar la ficha entera: la lista de
+  // pedidos y el dinero son un extra de la ficha, no su contenido. El panel
+  // recibe `null` y lo dice; nunca lo pinta como cero.
+  let clientOrders = null
+  if (detail.prospect.user_id) {
+    try {
+      clientOrders = await getProspectClientOrders(prospectId)
+    } catch {
+      clientOrders = null
+    }
+  }
   const cities = await getCities()
 
   return (

@@ -212,9 +212,12 @@ requieren revisar todos los playbooks que dependen de esa superficie.
    * Las excepciones están en `src/lib/admin-audit.contract.test.ts` con motivo
      escrito, y ese contrato **falla** si aparece una ruta mutante nueva sin
      auditar o si una exención queda obsoleta. `orders/[id]/status` **no** es una
-     excepción: escribe en `admin_audit_log` (`:204`, `:214`) **y** en
-     `notifications` (`:279`, `:287`) a propósito — libro de admin y espejo del
-     cliente son audiencias distintas.
+     excepción: audita en `admin_audit_log` los tres campos que puede tocar —
+     estado (`order_status`), pago (`order_payment`) y repartidor
+     (`order_driver_assigned` / `order_driver_unassigned`). Un solo libro: el
+     espejo en `notifications` y el módulo `src/lib/audit.ts` se retiraron en la
+     Ronda 20, porque un feed que solo conocía 4 de las 76 acciones no era una
+     audiencia distinta, era una copia incompleta.
 
 15. **El ciclo de vida de un canje lo mueve `advance_redemption()` y nadie más.**
    Un canje gasta créditos reales, así que el estado y el dinero tienen que

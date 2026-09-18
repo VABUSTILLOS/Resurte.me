@@ -136,6 +136,7 @@ export type OrderPaymentStatusFilter =
   | "failed"
   | "expired"
   | "refunded"
+  | "partially_refunded"
   | "disputed"
   | "amount_mismatch"
   | "all"
@@ -154,6 +155,7 @@ export const ORDER_PAYMENT_STATUS_VALUES: readonly OrderPaymentStatusFilter[] = 
   "failed",
   "expired",
   "refunded",
+  "partially_refunded",
   "disputed",
   "amount_mismatch",
 ]

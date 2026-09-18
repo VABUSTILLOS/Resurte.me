@@ -23,7 +23,7 @@ const MAX_UNDO_IDS = 100
 
 export async function POST(request: Request) {
   try {
-    const { response: adminDenied, user: adminUser } = await requireAdmin()
+    const { response: adminDenied, user: adminUser } = await requireAdmin({ permission: "pedidos" })
     if (adminDenied) {
       return adminDenied
     }

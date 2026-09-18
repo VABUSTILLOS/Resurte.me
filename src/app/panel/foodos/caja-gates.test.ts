@@ -156,7 +156,7 @@ beforeEach(() => {
   mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 })
 
-describe("caja: bloqueada sin nivel Diamante", () => {
+describe("caja: bloqueada sin el nivel suficiente", () => {
   beforeEach(() => {
     mocks.requireFoodosFeature.mockRejectedValue(new Error("FOODOS_FEATURE_LOCKED"))
   })

@@ -16,7 +16,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { response: adminDenied, user: adminUser } = await requireAdmin()
+  const { response: adminDenied, user: adminUser } = await requireAdmin({ permission: "marketing" })
   if (adminDenied) return adminDenied
 
   try {
@@ -57,7 +57,7 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { response: adminDenied, user: adminUser } = await requireAdmin()
+  const { response: adminDenied, user: adminUser } = await requireAdmin({ permission: "marketing" })
   if (adminDenied) return adminDenied
 
   try {

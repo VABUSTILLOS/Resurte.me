@@ -95,8 +95,13 @@ test.describe("autenticación", { tag: "@ci" }, () => {
     await expect(page).toHaveURL(/\/auth\/login\?next=/)
   })
 
-  test("/admin/usuarios sin sesión también queda tras el guard", async ({ page }) => {
+  test("/admin/usuarios sin sesión vuelve al login recordando la sección", async ({ page }) => {
     await page.goto("/admin/usuarios")
-    await expect(page).toHaveURL(/\/auth\/login/)
+    // Antes esta prueba solo exigía `/auth/login`: pasaba igual con el destino
+    // perdido. El guard mandaba `next=/admin` fijo, así que quien abría una
+    // sección concreta iniciaba sesión y aterrizaba en el dashboard. El
+    // `next` que se exige aquí es el que el proxy deja en `x-pathname`.
+    await expect(page).toHaveURL(/\/auth\/login\?next=%2Fadmin%2Fusuarios$/)
+    expect(new URL(page.url()).searchParams.get("next")).toBe("/admin/usuarios")
   })
 })

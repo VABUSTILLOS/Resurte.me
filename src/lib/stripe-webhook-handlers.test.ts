@@ -389,6 +389,113 @@ describe("stripe-webhook-handlers", () => {
     )
   })
 
+  it("charge.refunded parcial NO marca `refunded`: conserva el cashback", async () => {
+    // El bug que este cambio cierra: `refunded` se lee en todo el esquema como
+    // "este cobro ya no existe" y el trigger 00135 devuelve el cashback
+    // COMPLETO. Un reembolso de $50 sobre $800 no puede destruir el cashback
+    // de una compra que el cliente pagó casi entera.
+    const orders = tableBuilder()
+    const foodos = tableBuilder()
+    const supabase = mockSupabase({ orders, foodos_orders: foodos })
+
+    await handleChargeRefunded(supabase, {
+      id: "ch_1",
+      payment_intent: "pi_ref",
+      amount: 80_000,
+      amount_refunded: 5_000,
+      refunded: false,
+    })
+
+    expect(orders.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_status: "partially_refunded",
+        refunded_amount_cents: 5_000,
+      })
+    )
+    expect(foodos.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_status: "partially_refunded",
+        refunded_amount_cents: 5_000,
+      })
+    )
+  })
+
+  it("charge.refunded por el total completo sí marca `refunded`", async () => {
+    const orders = tableBuilder()
+    const supabase = mockSupabase({ orders })
+
+    await handleChargeRefunded(supabase, {
+      id: "ch_1",
+      payment_intent: "pi_ref",
+      amount: 80_000,
+      amount_refunded: 80_000,
+      refunded: true,
+    })
+
+    expect(orders.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_status: "refunded",
+        refunded_amount_cents: 80_000,
+      })
+    )
+  })
+
+  it("un reenvío del mismo evento no infla el acumulado", async () => {
+    // `amount_refunded` es acumulativo y Stripe puede reentregar el evento;
+    // sumarlo otra vez daría 160,000 centavos sobre un cobro de 80,000.
+    const orders = tableBuilder()
+    const supabase = mockSupabase({ orders })
+
+    await handleChargeRefunded(supabase, {
+      id: "ch_1",
+      payment_intent: "pi_ref",
+      amount: 80_000,
+      amount_refunded: 80_000,
+      refunded: true,
+    })
+
+    expect(orders.update).toHaveBeenCalledWith(
+      expect.objectContaining({ refunded_amount_cents: 80_000 })
+    )
+  })
+
+  it("charge.refunded con refunded:false y sin importes no toca la base", async () => {
+    const orders = tableBuilder()
+    const supabase = mockSupabase({ orders })
+
+    await handleChargeRefunded(supabase, {
+      id: "ch_3",
+      payment_intent: "pi_ref",
+      refunded: false,
+    })
+
+    expect(orders.update).not.toHaveBeenCalled()
+  })
+
+  it("charge.dispute.created deja constancia de que la pérdida es de la plataforma", async () => {
+    // En destination charges la cuenta conectada recibe los fondos pero quien
+    // responde ante el banco es la plataforma; sin este rastro no hay con qué
+    // cuadrar la disputa a mano.
+    const orders = tableBuilder()
+    const supabase = mockSupabase({ orders })
+
+    await handleChargeDisputeCreated(supabase, {
+      id: "dp_2",
+      payment_intent: "pi_paid",
+      amount: 50_000,
+      reason: "product_not_received",
+    })
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "stripe.dispute.created",
+      expect.objectContaining({
+        amount: 50_000,
+        platform_liability: true,
+        resolution_pending: true,
+      })
+    )
+  })
+
   it("payment_failed libera el cupón reservado por la orden", async () => {
     const orders = tableBuilder({
       data: { id: 7, coupon_code: "VOLVI10" },

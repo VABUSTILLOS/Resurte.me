@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test"
+import { test, expect } from "@playwright/test"
+import { hasAdminCredentials, signInAsAdmin } from "./support/session"
 
 /**
  * E2E de la bandeja de leads y el CRM del panel (`/admin/leads`).
@@ -171,29 +172,6 @@ test.describe("leads CRM — bandeja de conversaciones", { tag: "@ci" }, () => {
  *   E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=... npm run test:e2e
  */
 
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD
-
-/** Inicia sesión con las credenciales de entorno. `false` si no se pudo. */
-async function signInAsAdmin(page: Page): Promise<boolean> {
-  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) return false
-  await page.goto("/auth/login")
-  const email = page.locator("#email")
-  const password = page.locator("#password")
-  if ((await email.count()) === 0 || (await password.count()) === 0) return false
-  await email.fill(ADMIN_EMAIL)
-  await password.fill(ADMIN_PASSWORD)
-  await page.getByRole("button", { name: /Iniciar Sesión/ }).click()
-  try {
-    // Ceñido a propósito: un login que no cuaja debe devolver `false` y dejar
-    // que el test se salte, no consumir el timeout de 30 s del test.
-    await page.waitForURL((url) => !url.pathname.startsWith("/auth/login"), { timeout: 12_000 })
-  } catch {
-    return false
-  }
-  return true
-}
-
 test.describe("leads CRM — escritura del admin (Ronda 18)", { tag: "@ci" }, () => {
   test("?nuevo=1 no abre el alta: escribir es un acto explícito", async ({ page }) => {
     // Un enlace no puede dejar un formulario de alta abierto y listo para
@@ -223,7 +201,7 @@ test.describe("leads CRM — comportamiento con sesión admin (Ronda 18)", { tag
     // Sin credenciales se salta al instante: esperar a que falle el login
     // consume el tiempo del test y lo hace fallar por timeout en vez de
     // saltarse, que es lo que se quiere en CI.
-    test.skip(!ADMIN_EMAIL || !ADMIN_PASSWORD, "faltan E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD")
+    test.skip(!hasAdminCredentials(), "faltan E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD")
     test.skip(!(await signInAsAdmin(page)), "no se pudo iniciar sesión como admin")
   })
 

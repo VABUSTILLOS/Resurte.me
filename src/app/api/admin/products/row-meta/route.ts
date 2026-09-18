@@ -24,7 +24,7 @@ import { NextResponse, type NextRequest } from "next/server"
  * y el escaneo completo de `order_items` en cada página.
  */
 export async function GET(request: NextRequest) {
-  const { response: adminDenied } = await requireAdmin()
+  const { response: adminDenied } = await requireAdmin({ permission: "productos" })
   if (adminDenied) return adminDenied
 
   try {

@@ -3,6 +3,7 @@ import { confirmPaymentToCustomer, notifyCustomerStatusUpdate } from "@/lib/work
 import { sendOrderStatusEmail } from "@/lib/order-emails"
 import { notifyCashbackCredited } from "@/lib/notifications"
 import { isAmountSufficient, toCents } from "@/lib/payment-validation"
+import { resolveRefundOutcome } from "@/lib/refund"
 import { logger } from "@/lib/logger"
 import { missingOptionalOrderColumn, type OrderQueryResult } from "@/lib/admin/order-selects"
 import type { createServiceClient } from "@/lib/supabase/service"
@@ -417,24 +418,91 @@ export async function handleFoodosPaymentIntentExpired(
 
 /**
  * charge.refunded: Stripe no emite payment_intent.refunded — los reembolsos
- * llegan por esta vía. Marca orders y foodos_orders como refunded; el trigger
- * reverse_cashback_on_cancel() (00065) revierte el cashback abonado.
+ * llegan por esta vía. Marca orders y foodos_orders con el estado que
+ * corresponde; el trigger reverse_cashback_on_cancel() (00065) revierte el
+ * cashback **sólo** cuando el reembolso es total.
+ *
+ * ── Qué cambió y por qué ──
+ *
+ * Antes marcaba `refunded` sin mirar el importe, aunque recibía
+ * `amount_refunded`. Un reembolso parcial de $50 sobre un pedido de $800
+ * quedaba como `refunded`, y `refunded` se lee en todo el esquema como "este
+ * cobro ya no existe": el trigger 00135 devolvía el cashback **completo** de
+ * una compra que el cliente pagó casi entera. El importe se recibía y se
+ * tiraba a la basura.
+ *
+ * Ahora el estado lo decide `resolveRefundOutcome` —la misma función que usa
+ * `POST /api/admin/orders/[id]/refund`— y el importe acumulado se guarda en
+ * `refunded_amount_cents`, que es lo que hace auditable un reembolso parcial.
+ *
+ * ── Lo que este webhook NO puede arreglar ──
+ *
+ * `reverse_transfer` y `refund_application_fee` se deciden al **crear** el
+ * reembolso; aquí ya es tarde. Un reembolso hecho a mano desde el Dashboard de
+ * Stripe sin esas banderas le devuelve el dinero al cliente con fondos de la
+ * plataforma mientras el restaurante conserva su liquidación: el webhook lo
+ * registra, no lo revierte. Por eso el camino normal es
+ * `POST /api/admin/orders/[id]/refund`, que sí las aplica
+ * (`buildRefundParams`). Si el log muestra `charge.refunded` sin un
+ * `admin.refund.created` correspondiente, el reembolso se hizo por fuera y hay
+ * que revisar la transferencia a mano.
+ *
+ * `amount_refunded` es **acumulativo** y el evento puede reentregarse, así que
+ * `resolveRefundOutcome` satura el acumulado en el total en vez de sumarlo: un
+ * reenvío no infla la cifra.
  */
 export async function handleChargeRefunded(
   supabase: ServiceClient,
-  charge: { id: string; payment_intent?: string | null; amount_refunded?: number }
+  charge: {
+    id: string
+    payment_intent?: string | null
+    amount?: number
+    amount_refunded?: number
+    refunded?: boolean
+  }
 ): Promise<void> {
   const piId = typeof charge.payment_intent === "string" ? charge.payment_intent : null
-  logger.info("stripe.charge.refunded", { charge: charge.id, paymentIntent: piId })
+  logger.info("stripe.charge.refunded", {
+    charge: charge.id,
+    paymentIntent: piId,
+    amountRefunded: charge.amount_refunded,
+    fullyRefunded: charge.refunded,
+  })
   if (!piId) return
 
-  await supabase
-    .from("orders")
-    .update({ payment_status: "refunded", updated_at: new Date().toISOString() })
-    .eq("stripe_payment_intent_id", piId)
+  // `amount` es el cobrado; `amount_refunded` el devuelto. Si Stripe no manda
+  // `amount` (cargo de otro tipo), se cae a `refunded` como única señal, que
+  // es lo que hacía el código anterior.
+  const chargedCents = typeof charge.amount === "number" ? charge.amount : null
+  const refundedCents =
+    typeof charge.amount_refunded === "number" ? charge.amount_refunded : null
+
+  let status: string = "refunded"
+  if (chargedCents !== null && refundedCents !== null) {
+    status = resolveRefundOutcome({
+      totalCents: chargedCents,
+      // El evento ya trae el acumulado: se pasa 0 para no sumarlo dos veces.
+      alreadyRefundedCents: 0,
+      refundAmountCents: refundedCents,
+    }).status
+  } else if (charge.refunded === false) {
+    // Sin importes y con `refunded: false`, no hay reembolso que registrar.
+    return
+  }
+
+  const patch: Record<string, unknown> = {
+    payment_status: status,
+    updated_at: new Date().toISOString(),
+  }
+  if (refundedCents !== null) patch.refunded_amount_cents = refundedCents
+
+  await supabase.from("orders").update(patch).eq("stripe_payment_intent_id", piId)
+
+  const foodosPatch: Record<string, unknown> = { payment_status: status }
+  if (refundedCents !== null) foodosPatch.refunded_amount_cents = refundedCents
   await supabase
     .from("foodos_orders")
-    .update({ payment_status: "refunded", updated_at: new Date().toISOString() })
+    .update(foodosPatch)
     .eq("stripe_payment_intent_id", piId)
 }
 
@@ -442,6 +510,35 @@ export async function handleChargeRefunded(
  * charge.dispute.created: contracargo — el banco retira los fondos. Se marca
  * la orden como disputed (solo si estaba pagada; el trigger 00065 revierte
  * el cashback) y queda el rastro en el log para seguimiento operativo.
+ *
+ * ── Quién pierde el dinero en un contracargo, según cómo se cobró ──
+ *
+ * En un *destination charge* la cuenta conectada es la que **recibe** los
+ * fondos, pero la responsable del contracargo ante Stripe es **la plataforma**:
+ * el banco retira el importe de la cuenta de la plataforma, no de la del
+ * restaurante. Eso deja dos agujeros que este webhook no puede cerrar por sí
+ * solo y que conviene tener escritos:
+ *
+ *  1. **El restaurante se queda su liquidación.** Si ya se le transfirió y el
+ *     contracargo prospera, la plataforma absorbe el importe completo. Nada en
+ *     el esquema descuenta esa pérdida del saldo del restaurante ni la resta de
+ *     `foodos_payout_balances()` (00157). Mientras no exista ese asiento, el
+ *     reporte de dispersiones sobreestima lo que se le debe.
+ *
+ *  2. **`payment_status = 'disputed'` es una foto, no un saldo.** El estado no
+ *     distingue "en revisión" de "perdido": Stripe resuelve semanas después con
+ *     `charge.dispute.closed`, que hoy **no tiene handler**. Una disputa
+ *     ganada deja la orden marcada para siempre y el dinero nunca vuelve a
+ *     contarse.
+ *
+ * Por eso el importe y el motivo se registran aquí en lugar de descartarse:
+ * son el único rastro con el que se puede cuadrar una disputa a mano mientras
+ * `charge.dispute.closed` no esté implementado.
+ *
+ * La actualización exige `payment_status = 'paid'` para no pisar un estado
+ * posterior (un `refunded` o un `partially_refunded` ganados por un webhook
+ * fuera de orden). El `updated_at` se escribe explícitamente porque el trigger
+ * 00135 no lo toca.
  */
 export async function handleChargeDisputeCreated(
   supabase: ServiceClient,
@@ -453,6 +550,10 @@ export async function handleChargeDisputeCreated(
     paymentIntent: piId,
     amount: dispute.amount,
     reason: dispute.reason,
+    // Marca para el seguimiento: en destination charges la pérdida es de la
+    // plataforma, no del restaurante que recibió la transferencia.
+    platform_liability: true,
+    resolution_pending: true,
   })
   if (!piId) return
 

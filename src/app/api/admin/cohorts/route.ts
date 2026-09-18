@@ -8,7 +8,7 @@ export const runtime = "nodejs"
 
 export async function GET(request: Request) {
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied } = await requireAdmin({ permission: "sistema" })
     if (adminDenied) return adminDenied
 
     const { searchParams } = new URL(request.url)

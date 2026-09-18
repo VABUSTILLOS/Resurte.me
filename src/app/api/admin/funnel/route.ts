@@ -182,7 +182,7 @@ export async function GET(request: Request) {
   const degraded: DegradedSection[] = []
 
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied } = await requireAdmin({ permission: "sistema" })
     if (adminDenied) return adminDenied
 
     const { searchParams } = new URL(request.url)

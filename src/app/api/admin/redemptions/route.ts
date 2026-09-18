@@ -21,7 +21,7 @@ import { logger } from "@/lib/logger"
 const OPEN_STATUSES = ["requested", "in_progress"] as const
 
 export async function GET(request: NextRequest) {
-  const { response } = await requireAdmin()
+  const { response } = await requireAdmin({ permission: "clientes" })
   if (response) return response
 
   try {
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { user, response } = await requireAdmin()
+  const { user, response } = await requireAdmin({ permission: "clientes" })
   if (response) return response
 
   try {

@@ -12,7 +12,7 @@ import { NextResponse, type NextRequest } from "next/server"
  * lista de tiendas activas para armar el modal del panel.
  */
 export async function GET(request: NextRequest) {
-  const { response: adminDenied } = await requireAdmin()
+  const { response: adminDenied } = await requireAdmin({ permission: "productos" })
   if (adminDenied) return adminDenied
 
   try {
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: Request) {
   try {
-    const { response: adminDenied, user: adminUser } = await requireAdmin()
+    const { response: adminDenied, user: adminUser } = await requireAdmin({ permission: "productos" })
     if (adminDenied) return adminDenied
 
     const parsed = await readJsonBody<{ productId?: number; prices?: unknown }>(request)

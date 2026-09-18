@@ -124,7 +124,7 @@ function uniformPatchOf(patchById: Map<number, ProductPatch>): ProductPatch | nu
 
 export async function POST(request: Request) {
   try {
-    const { response: adminDenied, user: adminUser } = await requireAdmin()
+    const { response: adminDenied, user: adminUser } = await requireAdmin({ permission: "productos" })
     if (adminDenied) return adminDenied
 
     const bodyResult = await readJsonBody<{

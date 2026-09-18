@@ -13,7 +13,7 @@ export const runtime = "nodejs"
  * Requiere sesión admin; escribe con service_role.
  */
 export async function GET() {
-  const { response: adminDenied } = await requireAdmin()
+  const { response: adminDenied } = await requireAdmin({ permission: "marketing" })
   if (adminDenied) return adminDenied
 
   try {
@@ -31,7 +31,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { user: adminUser, response: adminDenied } = await requireAdmin()
+  const { user: adminUser, response: adminDenied } = await requireAdmin({ permission: "marketing" })
   if (adminDenied) return adminDenied
 
   try {
