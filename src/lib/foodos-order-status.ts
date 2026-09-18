@@ -18,10 +18,12 @@ import type { FoodosOrderStatus, FoodosPaymentStatus } from "@/types/foodos"
  * `preparing`. `foodos-order-status.test.ts` recorre esas transiciones para
  * que este módulo no pueda dejar al panel sin un botón que ya tenía.
  *
- * Lo que la máquina NO hace: no impide saltar hacia adelante. Cocina pasa de
- * `confirmed` a `preparing` y de `preparing` a `out_for_delivery`/`delivered`;
- * prohibir saltos sería inventar una regla que nadie pidió. Lo que prohíbe es
- * retroceder y resucitar, que es el defecto que existía.
+ * La tabla es una **lista blanca**, y no pretende ordenar los avances por su
+ * cuenta: `preparing` → `delivered` es legal porque cocina cierra pedidos para
+ * recoger sin pasar por reparto, y `pending` → `preparing` no lo es porque
+ * nadie lo ofrece. Declarar sólo lo que el panel ya muestra es lo que evita
+ * inventar reglas; lo que la tabla prohíbe de verdad es **retroceder y
+ * resucitar**, que es el defecto que existía.
  */
 export const FOODOS_OWNER_TRANSITIONS: Record<
   FoodosOrderStatus,
