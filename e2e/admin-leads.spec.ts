@@ -217,6 +217,10 @@ test.describe("leads CRM — escritura del admin (Ronda 16)", { tag: "@ci" }, ()
 
 test.describe("leads CRM — comportamiento con sesión admin (Ronda 16)", { tag: "@ci" }, () => {
   test.beforeEach(async ({ page }) => {
+    // Sin credenciales se salta al instante: esperar a que falle el login
+    // consume el tiempo del test y lo hace fallar por timeout en vez de
+    // saltarse, que es lo que se quiere en CI.
+    test.skip(!ADMIN_EMAIL || !ADMIN_PASSWORD, "faltan E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD")
     test.skip(!(await signInAsAdmin(page)), "no se pudo iniciar sesión como admin")
   })
 
