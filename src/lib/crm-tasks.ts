@@ -85,10 +85,6 @@ function asStringOrNull(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null
 }
 
-function asNumberOrNull(value: unknown): number | null {
-  return value != null ? Number(value) : null
-}
-
 /**
  * Mapea una fila cruda de PostgREST al contrato.
  *
@@ -347,26 +343,39 @@ export function taskBucket(task: CrmTask, now: Date = new Date()): CrmTaskBucket
 }
 
 /**
- * Reparte las tareas en los horizontes de la agenda, cada cajón ya ordenado por
- * `sortTasks`.
+ * Reparte elementos que envuelven una tarea en los horizontes de la agenda,
+ * cada cajón ya ordenado por `sortTasks`.
+ *
+ * `taskOf` existe para que la agenda pueda agrupar **tareas con su cliente** sin
+ * descomponerlas y recomponerlas: la vista pinta el nombre del prospecto junto a
+ * la tarea, y perder el par al agrupar obligaría a una segunda pasada por `id`.
  *
  * El orden lo decide `sortTasks` y **no** la consulta a la base: la agenda se
  * corta por fecha en la zona del usuario, y PostgREST solo sabe de `TIMESTAMPTZ`.
  * Ordenar en SQL daría una lista que discrepa de los cajones en cuanto un
  * vencimiento cae cerca de la medianoche.
  */
+export function groupTaskEntries<T>(
+  entries: readonly T[],
+  taskOf: (entry: T) => CrmTask,
+  now: Date = new Date(),
+): Record<CrmTaskBucket, T[]> {
+  const groups = Object.fromEntries(CRM_TASK_BUCKETS.map((b) => [b, [] as T[]])) as Record<
+    CrmTaskBucket,
+    T[]
+  >
+  for (const entry of [...entries].sort((a, b) => compareTasks(taskOf(a), taskOf(b), now))) {
+    groups[taskBucket(taskOf(entry), now)].push(entry)
+  }
+  return groups
+}
+
+/** El caso común de `groupTaskEntries`: una lista de tareas sueltas. */
 export function groupTasks(
   tasks: readonly CrmTask[],
   now: Date = new Date(),
 ): Record<CrmTaskBucket, CrmTask[]> {
-  const groups = Object.fromEntries(CRM_TASK_BUCKETS.map((b) => [b, [] as CrmTask[]])) as Record<
-    CrmTaskBucket,
-    CrmTask[]
-  >
-  for (const task of sortTasks(tasks, now)) {
-    groups[taskBucket(task, now)].push(task)
-  }
-  return groups
+  return groupTaskEntries(tasks, (task) => task, now)
 }
 
 // ─────────────────────────────────────────────────────────────

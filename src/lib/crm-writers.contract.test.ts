@@ -82,15 +82,20 @@ const CRM_WRITERS: { name: string; consumer: string }[] = [
  * test exige editar la lista y justificarla.
  */
 const LOGGED_ADMIN_ACTIONS = [
+  "crm_activity_delete",
+  "crm_activity_update",
   "crm_prospect_activity",
   "crm_prospect_assign",
   "crm_prospect_bulk_assign",
   "crm_prospect_close",
+  "crm_prospect_create",
   "crm_prospect_follow_up",
+  "crm_prospect_import",
   "crm_prospect_message",
   "crm_prospect_notes",
   "crm_prospect_status",
   "crm_prospect_tags",
+  "crm_prospect_update",
   "crm_quick_reply_delete",
   "crm_quick_reply_save",
   "crm_sequence_cancel",

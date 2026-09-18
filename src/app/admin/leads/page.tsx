@@ -22,6 +22,7 @@ import {
   RotateCcw,
   Search,
   Trash2,
+  Upload,
   UserRound,
   UserRoundCheck,
   Users,
@@ -31,12 +32,15 @@ import {
   assignCrmProspect,
   bulkTagProspects,
   convertLeadToProspect,
+  createCrmProspect,
   discardLead,
+  getAdminCities,
   getAdminCrmBoard,
   getAdminCrmSla,
   getAdminLeadBoardCounts,
   getAdminLeads,
   getAdminSellers,
+  importCrmProspects,
   restoreLead,
   updateCrmProspectStatus,
   type AdminCrmSla,
@@ -58,6 +62,25 @@ import {
   type LeadStatus,
 } from "@/lib/crm-pipeline"
 import { estimatedCoverageLabel, formatEstimatedTotal } from "@/lib/crm-money"
+import { ProspectFormModal } from "@/components/crm/ProspectFormModal"
+import { ImportCsvModal } from "@/components/crm/ImportCsvModal"
+import { findDuplicatesByPhone } from "@/lib/comercializacion/actions"
+
+/**
+ * Comandos del alta de prospecto en el panel.
+ *
+ * Sin `seller_id`: quien crea es el admin y el prospecto cae en el pozo sin
+ * asignar, que es justo lo que `resolveNewProspectSeller` resuelve en el
+ * servidor. El selector del formulario permite elegir vendedor, y esa elección
+ * sí viaja.
+ */
+const NEW_PROSPECT_ACTIONS = { create: createCrmProspect }
+
+/** Comandos de la importación: pasan por el envoltorio con bitácora. */
+const IMPORT_ACTIONS = {
+  import: importCrmProspects,
+  findDuplicates: findDuplicatesByPhone,
+}
 import {
   buildFunnelBySegment,
   buildFunnelBySource,
@@ -87,6 +110,7 @@ import { formatRelativeTime } from "@/lib/relative-time"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import { ToastProvider, useToast } from "@/components/toast"
 import { LeadDetailDrawer } from "../components/LeadDetailDrawer"
+import { LeadAgenda } from "../components/LeadAgenda"
 import { LeadConversations } from "../components/LeadConversations"
 import { LeadDistribution } from "../components/LeadDistribution"
 import { LeadQuickReplies } from "../components/LeadQuickReplies"
@@ -183,6 +207,9 @@ function AdminLeadsContent() {
   const [error, setError] = useState<string | null>(null)
   const [workingId, setWorkingId] = useState<number | null>(null)
   const [drawerId, setDrawerId] = useState<number | null>(null)
+  const [showNewProspect, setShowNewProspect] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [cities, setCities] = useState<{ id: number; name: string; state: string }[]>([])
   const [reloadKey, setReloadKey] = useState(0)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [bulkTagDraft, setBulkTagDraft] = useState("")
@@ -276,6 +303,25 @@ function AdminLeadsContent() {
       .then(setSellers)
       .catch(() => setSellers([]))
   }, [])
+
+  // Las ciudades se cargan la primera vez que se abre el alta: quien solo mira
+  // el listado no paga la consulta. `/admin/leads` es client, así que no puede
+  // importar `@/lib/data` sin arrastrar el cliente público al bundle.
+  useEffect(() => {
+    if (!showNewProspect || cities.length > 0) return
+    let cancelled = false
+    void Promise.resolve()
+      .then(getAdminCities)
+      .then((rows) => {
+        if (!cancelled) setCities(rows)
+      })
+      .catch(() => {
+        // El selector de ciudad se queda vacío; el resto del formulario sirve.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [showNewProspect, cities.length])
 
   const refresh = useCallback(() => setReloadKey((k) => k + 1), [])
 
@@ -595,14 +641,32 @@ function AdminLeadsContent() {
             {unassignedCount > 0 && ` · ${unassignedCount} sin asignar`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={exportCsv}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-        >
-          <Download className="h-3.5 w-3.5" />
-          Exportar CSV
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowNewProspect(true)}
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[#0E7A0E] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0A610A]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nuevo prospecto
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowImport(true)}
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            Importar CSV
+          </button>
+          <button
+            type="button"
+            onClick={exportCsv}
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Exportar CSV
+          </button>
+        </div>
       </div>
 
       <div
@@ -1094,7 +1158,7 @@ function AdminLeadsContent() {
           aria-labelledby="crm-tab-agenda"
           className="space-y-4"
         >
-          <AgendaView onOpenProspect={setDrawerId} />
+          <LeadAgenda onOpenProspect={setDrawerId} />
         </div>
       )}
 
@@ -1156,6 +1220,27 @@ function AdminLeadsContent() {
           onChanged={refresh}
         />
       )}
+
+      <ProspectFormModal
+        open={showNewProspect}
+        onClose={() => setShowNewProspect(false)}
+        cities={cities}
+        actions={NEW_PROSPECT_ACTIONS}
+        sellers={sellers}
+        onSaved={() => {
+          toast("Prospecto creado")
+          refresh()
+        }}
+      />
+
+      <ImportCsvModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        actions={IMPORT_ACTIONS}
+        onImported={() => {
+          refresh()
+        }}
+      />
     </div>
   )
 }

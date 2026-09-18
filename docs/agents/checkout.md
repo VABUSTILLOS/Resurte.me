@@ -152,6 +152,41 @@
   no participa: su paso es estado local de una sola sesión de montaje. Los datos
   personales siguen sin persistirse: solo el nombre del paso.
 
+- **Cancelar un pedido es una cascada, y vive en un solo módulo**:
+  `src/lib/order-cancellation.ts`. Cancelar no es escribir `status = 'cancelled'`:
+  además hay que **devolver el inventario apartado** (`release_order_stock`) y
+  **liberar el cupón** (`used_count - 1` con compare-and-swap). El reverso del
+  cashback lo hace el trigger `trg_reverse_cashback` de la base, así que no se
+  toca desde aquí. Las **tres puertas** al estado `cancelled` —
+  `PATCH /api/orders/[id]/status` (admin), `POST /api/orders/[id]/cancel`
+  (cliente con sesión o con el `restore_token`) y el cron
+  `src/lib/workflows.ts`— llaman a `applyOrderCancellationEffects`, y
+  `src/lib/order-cancellation.contract.test.ts` lo verifica. **No copies la
+  cascada dentro de una ruta nueva**: dos copias de una cascada de dinero
+  divergen en el primer arreglo, y la que se queda atrás deja inventario
+  fantasma o cupones que no se liberan.
+  La función es **idempotente** (`oldStatus === "cancelled"` sale sin tocar
+  nada) y **nunca lanza**: un fallo de infraestructura (RPC sin desplegar,
+  timeout, permisos) se registra y la cancelación sigue, porque dejar el pedido
+  a medias entre dos estados es peor que un inventario que se ajusta a mano.
+- **Quién puede cancelar es una regla de producto, no de UI**:
+  `customerCancelRefusal(status, paymentStatus)` en el mismo módulo devuelve
+  `already_cancelled | dispatched | charged | null`, y las dos superficies del
+  cliente (`/pedido/[orderId]?t=`, `/mis-pedidos/[orderId]`) y la API la
+  consultan **al mismo módulo**. Un pedido **despachado** (`out_for_delivery`,
+  `delivered`) no se cancela, y uno **cobrado o en vuelo** (`paid`,
+  `processing`, `disputed`, `amount_mismatch`) tampoco: **este repo no tiene
+  maquinaria de reembolso para pedidos**, así que cancelar un pedido cobrado
+  sería quitarle el pedido al cliente y quedarse con el dinero. La UI **explica
+  el motivo** en vez de esconder el botón. Si algún día se añade reembolso, es
+  una decisión de producto, no un `if` suelto.
+- **La cancelación del cliente no filtra qué pedidos existen**: un id ajeno y
+  un id inexistente devuelven **el mismo 404**. Distinguirlos convertiría la
+  ruta en un oráculo. La autorización son dos caminos, los mismos que ya tiene
+  el seguimiento: el `restore_token` del pedido o la sesión cuyo `id` es
+  `orders.user_id`. Como la ruta escribe, su tope es más estrecho que el del
+  seguimiento (10/60 s contra 30/60 s).
+
 ## Verificación
 `npm test` (payments, checkout-config, order-bumps, ingredient-affinity,
 checkout-bdd-regression) + `npx playwright test e2e/checkout-drawer.spec.ts` y un
@@ -161,3 +196,10 @@ Para la reanudación del paso: `npx vitest run src/lib/checkout-resume.test.ts`
 (cubre `payment` → `review`, pasos corruptos y un `sessionStorage` hostil) y, a
 mano, recargar en `payment` para comprobar que vuelve a `review` con los datos
 intactos.
+
+Para la cancelación: `npx vitest run src/lib/order-cancellation.test.ts
+src/lib/order-cancellation.contract.test.ts "src/app/api/orders/[id]/cancel/route.test.ts"
+"src/app/api/orders/[id]/status/route.test.ts" src/lib/order-stock.test.ts` y, a
+mano, cancelar un pedido `pending` sin cobro desde `/mis-pedidos/[orderId]`
+(sesión) y desde `/pedido/[orderId]?t=` (invitado), comprobando que el inventario
+vuelve y que el cupón se libera.

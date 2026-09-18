@@ -23,7 +23,7 @@ import {
   EmptyState,
   StatusBadge,
 } from "./ui"
-import { ActivityFormModal } from "./activity-form"
+import { ActivityFormModal } from "@/components/crm/ActivityFormModal"
 import type {
   DashboardKpis,
   FollowUp,
@@ -36,7 +36,10 @@ import { formatMoney } from "@/lib/comercializacion/commissions"
 import { toCsv, downloadCsv } from "@/lib/comercializacion/csv"
 import { formatDateTime, getTodayBounds } from "@/lib/comercializacion/dates"
 import { weeklyReminderMessage, reorderSuggestionMessage, buildWhatsappLink } from "@/lib/comercializacion/whatsapp"
-import { addActivity } from "@/lib/comercializacion/actions"
+import { addActivity, updateActivity } from "@/lib/comercializacion/actions"
+
+/** Comandos del formulario de actividad; el vendedor escribe lo suyo. */
+const ACTIVITY_ACTIONS = { create: addActivity, update: updateActivity }
 import { useToast } from "@/components/toast"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
@@ -524,6 +527,7 @@ export function DashboardPage({
         open={!!activityFor}
         onClose={() => setActivityFor(null)}
         prospectId={activityFor?.id ?? 0}
+        actions={ACTIVITY_ACTIONS}
         onSaved={() => {
           toast("Actividad registrada ✅")
           router.refresh()

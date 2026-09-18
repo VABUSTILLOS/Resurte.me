@@ -10,7 +10,7 @@ import {
 } from "../types"
 import { scopeForRole, crmStatusPatch, type ProspectFilters as CoreProspectFilters } from "@/lib/crm-core"
 import { readCrmProspects } from "@/lib/crm-prospects"
-import { digitsOf, validateProspectContact, mapProspect } from "./helpers"
+import { digitsOf, validateProspectContact, validateProspectSegmentation, mapProspect } from "./helpers"
 
 export type DuplicateMatch = {
   /** Dígitos del teléfono buscado que coincidió. */
@@ -119,17 +119,54 @@ export interface ProspectInput {
   status?: ProspectStatus
   next_follow_up_at?: string | null
   notes?: string | null
+  /** 00184. `null` = nadie lo ha valorado; no es cero. */
+  estimated_value?: number | null
+  /**
+   * Los cuatro campos de segmentación de 00059. Se leían en `CrmProspectRow`
+   * desde la Ronda 7 y el agente IA razonaba con ellos, pero ninguna superficie
+   * podía escribirlos: el agente leía `null` permanentes.
+   */
+  employees?: number | null
+  instagram?: string | null
+  weekly_volume_min?: number | null
+  weekly_volume_max?: number | null
+  /**
+   * **Solo se honra en el alta, y solo para el admin.** El vendedor siempre es
+   * dueño de lo que crea. La reasignación de un trato existente tiene su propia
+   * puerta (`assignCrmProspect`), que además mueve las tareas abiertas; escribir
+   * `seller_id` desde `updateProspect` crearía una segunda ruta que no las mueve.
+   */
+  seller_id?: string | null
+}
+
+/**
+ * Quién es el dueño de un prospecto recién creado.
+ *
+ * El vendedor siempre es dueño de lo que crea: `requested` no puede desviar un
+ * prospecto a otro vendedor. El admin sí elige, y si no elige el prospecto queda
+ * **sin asignar** — es el pozo, el estado del que `distributeCrmProspects` lo
+ * reparte. Antes se guardaba el `userId` de quien creaba, así que un prospecto
+ * dado de alta por el admin nacía con un dueño que no lo iba a trabajar.
+ */
+function resolveNewProspectSeller(
+  role: string,
+  userId: string,
+  requested?: string | null
+): string | null {
+  if (role !== "admin") return userId
+  return requested ?? null
 }
 
 export async function createProspect(input: ProspectInput): Promise<Prospect> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   validateProspectContact(input)
+  validateProspectSegmentation(input)
 
   const supabase = await createServiceClient()
   const { data, error } = await supabase
     .from("crm_prospects")
     .insert({
-      seller_id: userId,
+      seller_id: resolveNewProspectSeller(role, userId, input.seller_id),
       name: input.name.trim(),
       restaurant_name: input.restaurant_name?.trim() || null,
       phone: input.phone?.trim() || null,
@@ -141,6 +178,11 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
       status: input.status ?? "nuevo",
       next_follow_up_at: input.next_follow_up_at || null,
       notes: input.notes?.trim() || null,
+      estimated_value: input.estimated_value ?? null,
+      employees: input.employees ?? null,
+      instagram: input.instagram?.trim() || null,
+      weekly_volume_min: input.weekly_volume_min ?? null,
+      weekly_volume_max: input.weekly_volume_max ?? null,
     })
     .select("*")
     .single()
@@ -158,6 +200,7 @@ export async function updateProspect(
 ): Promise<Prospect> {
   const { userId, role } = await requireSellerOrAdminAction()
   validateProspectContact(input)
+  validateProspectSegmentation(input)
   if (input.status !== undefined && !PROSPECT_STATUSES.includes(input.status)) {
     throw new Error("Estado de prospecto inválido")
   }
@@ -184,6 +227,16 @@ export async function updateProspect(
   if (input.next_follow_up_at !== undefined)
     patch.next_follow_up_at = input.next_follow_up_at || null
   if (input.notes !== undefined) patch.notes = input.notes?.trim() || null
+  if (input.estimated_value !== undefined)
+    patch.estimated_value = input.estimated_value ?? null
+  if (input.employees !== undefined) patch.employees = input.employees ?? null
+  if (input.instagram !== undefined)
+    patch.instagram = input.instagram?.trim() || null
+  if (input.weekly_volume_min !== undefined)
+    patch.weekly_volume_min = input.weekly_volume_min ?? null
+  if (input.weekly_volume_max !== undefined)
+    patch.weekly_volume_max = input.weekly_volume_max ?? null
+  // `seller_id` NO se escribe aquí a propósito: ver `ProspectInput.seller_id`.
 
   const query = supabase
     .from("crm_prospects")
@@ -231,7 +284,7 @@ export async function bulkCreateProspects(rows: BulkProspectRow[]): Promise<{
   created: number
   errors: { row: number; message: string }[]
 }> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new Error("No hay filas para importar")
   }
@@ -267,7 +320,9 @@ export async function bulkCreateProspects(rows: BulkProspectRow[]): Promise<{
       }
     }
     return {
-      seller_id: userId,
+      // La misma regla que el alta: el vendedor importa para sí mismo; el admin
+      // importa al pozo, porque su `userId` no es un vendedor que lo trabaje.
+      seller_id: resolveNewProspectSeller(role, userId),
       name: row.name.trim(),
       restaurant_name: row.restaurant_name?.trim() || null,
       phone: row.phone?.trim() || null,

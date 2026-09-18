@@ -10,6 +10,12 @@ import {
   updateProspect,
   addActivity,
   createAssistedOrder,
+  createTask,
+  completeCrmTask,
+  reopenCrmTask,
+  deleteCrmTask,
+  listProspectTasks,
+  getTaskAgenda,
 } from "./actions"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireSellerOrAdminAction } from "@/lib/roles"
@@ -46,9 +52,25 @@ function serviceWith(tables: Record<string, Result[]>) {
   return builders
 }
 
+const ADMIN_ID = "admin-1"
+
+/**
+ * Cambia el rol que ve `requireSellerOrAdminAction`.
+ *
+ * Por defecto la sesión es de vendedor; las pruebas del pozo lo suben a admin.
+ * El rol importa desde F5: `createProspect` decide con él si el prospecto nace
+ * asignado a quien escribe o sin asignar en el pozo.
+ */
+function asRole(role: "seller" | "admin") {
+  vi.mocked(requireSellerOrAdminAction).mockResolvedValue({
+    userId: role === "admin" ? ADMIN_ID : SELLER_ID,
+    role,
+  } as never)
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(requireSellerOrAdminAction).mockResolvedValue({ userId: SELLER_ID } as never)
+  asRole("seller")
 })
 
 describe("createProspect", () => {
@@ -108,6 +130,79 @@ describe("createProspect", () => {
     const insert = builders.crm_prospects?.insert as ReturnType<typeof vi.fn>
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({ seller_id: SELLER_ID, name: "Ana López", status: "nuevo" })
+    )
+  })
+
+  it("el admin que crea sin elegir vendedor deja el prospecto en el pozo", async () => {
+    asRole("admin")
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 3, seller_id: null, status: "nuevo" }, error: null }],
+    })
+
+    await createProspect({ name: "Ana" })
+
+    const insert = builders.crm_prospects?.insert as ReturnType<typeof vi.fn>
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ seller_id: null }))
+  })
+
+  it("el admin puede asignar el prospecto a un vendedor concreto", async () => {
+    asRole("admin")
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 3, seller_id: SELLER_ID, status: "nuevo" }, error: null }],
+    })
+
+    await createProspect({ name: "Ana", seller_id: SELLER_ID })
+
+    const insert = builders.crm_prospects?.insert as ReturnType<typeof vi.fn>
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ seller_id: SELLER_ID }))
+  })
+
+  it("el vendedor no puede regalar su prospecto a otro", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 3, seller_id: SELLER_ID, status: "nuevo" }, error: null }],
+    })
+
+    await createProspect({ name: "Ana", seller_id: "otro-vendedor" })
+
+    const insert = builders.crm_prospects?.insert as ReturnType<typeof vi.fn>
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ seller_id: SELLER_ID }))
+  })
+
+  it("rechaza segmentación imposible o negativa", async () => {
+    await expect(
+      createProspect({ name: "Ana", weekly_volume_min: 500, weekly_volume_max: 100 })
+    ).rejects.toThrow("El volumen semanal mínimo no puede superar al máximo")
+    await expect(createProspect({ name: "Ana", estimated_value: -1 })).rejects.toThrow(
+      "El valor previsto no puede ser negativo"
+    )
+    await expect(createProspect({ name: "Ana", employees: -3 })).rejects.toThrow(
+      "El número de empleados no puede ser negativo"
+    )
+  })
+
+  it("guarda los campos de segmentación declarados", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 3, status: "nuevo" }, error: null }],
+    })
+
+    await createProspect({
+      name: "Ana",
+      estimated_value: 4500.5,
+      employees: 12,
+      instagram: "  @tacoselnorte  ",
+      weekly_volume_min: 100,
+      weekly_volume_max: 300,
+    })
+
+    const insert = builders.crm_prospects?.insert as ReturnType<typeof vi.fn>
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        estimated_value: 4500.5,
+        employees: 12,
+        instagram: "@tacoselnorte",
+        weekly_volume_min: 100,
+        weekly_volume_max: 300,
+      })
     )
   })
 
@@ -211,6 +306,61 @@ describe("updateProspect", () => {
     await expect(updateProspect(7, { status: "ganado" as never })).rejects.toThrow(
       "Estado de prospecto inválido"
     )
+  })
+
+  it("escribe los campos de segmentación", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 7, status: "nuevo", cities: null }, error: null }],
+    })
+
+    await updateProspect(7, {
+      estimated_value: 900,
+      employees: 4,
+      instagram: "@norte",
+      weekly_volume_min: 10,
+      weekly_volume_max: 20,
+    })
+
+    const patch = (builders.crm_prospects?.update as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as Record<string, unknown>
+    expect(patch).toEqual({
+      estimated_value: 900,
+      employees: 4,
+      instagram: "@norte",
+      weekly_volume_min: 10,
+      weekly_volume_max: 20,
+    })
+  })
+
+  it("un campo numérico vacío se guarda como no declarado, no como cero", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 7, status: "nuevo", cities: null }, error: null }],
+    })
+
+    await updateProspect(7, { estimated_value: null, instagram: "   " })
+
+    const patch = (builders.crm_prospects?.update as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as Record<string, unknown>
+    expect(patch).toEqual({ estimated_value: null, instagram: null })
+  })
+
+  it("rechaza un rango invertido en la edición", async () => {
+    serviceWith({ crm_prospects: [{ data: null, error: null }] })
+    await expect(
+      updateProspect(7, { weekly_volume_min: 90, weekly_volume_max: 10 })
+    ).rejects.toThrow("El volumen semanal mínimo no puede superar al máximo")
+  })
+
+  it("no escribe seller_id: la reasignación tiene su propia puerta", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 7, status: "nuevo", cities: null }, error: null }],
+    })
+
+    await updateProspect(7, { notes: "hola", seller_id: "otro" } as never)
+
+    const patch = (builders.crm_prospects?.update as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as Record<string, unknown>
+    expect("seller_id" in patch).toBe(false)
   })
 })
 
@@ -381,5 +531,280 @@ describe("createAssistedOrder", () => {
     expect(activityInsert).toHaveBeenCalledWith(
       expect.objectContaining({ prospect_id: 1, type: "pedido", outcome: "pedido_confirmado" })
     )
+  })
+})
+
+describe("tareas del CRM", () => {
+  // El módulo compartido con el panel. Aquí se fijan las tres reglas que hacen
+  // que las tareas sean del CRM y no una lista suelta de recordatorios:
+  //
+  //  1. **El alcance se decide sobre el prospecto.** Toda tarea cuelga de un
+  //     trato, y quien no puede ver el trato no puede tocar su trabajo. La
+  //     prueba que importa es la negativa: borrar una tarea de un prospecto
+  //     ajeno **no emite ningún `delete`**.
+  //  2. **El responsable es el vendedor del prospecto, no quien escribe.** Un
+  //     admin repartiendo carga no se queda con el trabajo.
+  //  3. **Completar y reabrir son un par, no dos asignaciones de campo.** El
+  //     `CHECK` bicondicional de 00185 no admite "completada sin fecha".
+
+  const PROSPECT_ROW = { id: 10, seller_id: "owner-999" }
+
+  it("el alcance del vendedor viaja como filtro en la consulta", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: PROSPECT_ROW, error: null }],
+      crm_tasks: [{ data: null, error: null }],
+    })
+
+    await createTask(10, { title: "Llamar" })
+
+    const eq = builders.crm_prospects?.eq as ReturnType<typeof vi.fn>
+    expect(eq).toHaveBeenCalledWith("seller_id", SELLER_ID)
+  })
+
+  it("el responsable nace siendo el vendedor del prospecto, no quien escribe", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: PROSPECT_ROW, error: null }],
+      crm_tasks: [{ data: null, error: null }],
+    })
+
+    await createTask(10, { title: "  Llamar a Juan  " })
+
+    const insert = builders.crm_tasks?.insert as ReturnType<typeof vi.fn>
+    expect(insert).toHaveBeenCalledWith({
+      prospect_id: 10,
+      seller_id: "owner-999",
+      title: "Llamar a Juan",
+      due_at: null,
+      priority: "media",
+      created_by: SELLER_ID,
+    })
+  })
+
+  it("un prospecto en el pozo deja la tarea sin responsable", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 10, seller_id: null }, error: null }],
+      crm_tasks: [{ data: null, error: null }],
+    })
+
+    await createTask(10, { title: "Repartir" })
+
+    const insert = builders.crm_tasks?.insert as ReturnType<typeof vi.fn>
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ seller_id: null }))
+  })
+
+  it("una fecha ilegible no se guarda como fecha", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: PROSPECT_ROW, error: null }],
+      crm_tasks: [{ data: null, error: null }],
+    })
+
+    await createTask(10, { title: "Revisar", due_at: "el jueves" })
+
+    const insert = builders.crm_tasks?.insert as ReturnType<typeof vi.fn>
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ due_at: null }))
+  })
+
+  it("rechaza el alta antes de tocar la base si el título o la prioridad no valen", async () => {
+    serviceWith({ crm_prospects: [{ data: PROSPECT_ROW, error: null }] })
+
+    await expect(createTask(10, { title: "   " })).rejects.toThrow(/obligatorio/i)
+    await expect(createTask(10, { title: "Ok", priority: "urgente" })).rejects.toThrow(
+      /Prioridad/i
+    )
+    expect(vi.mocked(createServiceClient)).not.toHaveBeenCalled()
+  })
+
+  it("no se puede crear una tarea sobre un prospecto fuera de alcance", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: null, error: null }],
+      crm_tasks: [{ data: null, error: null }],
+    })
+
+    await expect(createTask(999, { title: "Colarse" })).rejects.toThrow(
+      "Prospecto no encontrado"
+    )
+    expect(builders.crm_tasks?.insert as ReturnType<typeof vi.fn>).not.toHaveBeenCalled()
+  })
+
+  it("completar escribe estado y fecha de cierre en el MISMO update", async () => {
+    const builders = serviceWith({
+      crm_tasks: [{ data: { id: 3, prospect_id: 10 }, error: null }, { data: null, error: null }],
+      crm_prospects: [{ data: PROSPECT_ROW, error: null }],
+    })
+
+    await completeCrmTask(3)
+
+    const update = builders.crm_tasks?.update as ReturnType<typeof vi.fn>
+    expect(update).toHaveBeenCalledTimes(1)
+    const patch = update.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(patch.status).toBe("completada")
+    expect(typeof patch.completed_at).toBe("string")
+  })
+
+  it("reabrir limpia la fecha de cierre", async () => {
+    const builders = serviceWith({
+      crm_tasks: [{ data: { id: 3, prospect_id: 10 }, error: null }, { data: null, error: null }],
+      crm_prospects: [{ data: PROSPECT_ROW, error: null }],
+    })
+
+    await reopenCrmTask(3)
+
+    const patch = (builders.crm_tasks?.update as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as Record<string, unknown>
+    expect(patch).toEqual({ status: "pendiente", completed_at: null })
+  })
+
+  it("una tarea que no existe no se completa", async () => {
+    const builders = serviceWith({ crm_tasks: [{ data: null, error: null }] })
+
+    await expect(completeCrmTask(404)).rejects.toThrow("Tarea no encontrada")
+    expect(builders.crm_tasks?.update as ReturnType<typeof vi.fn>).not.toHaveBeenCalled()
+  })
+
+  it("BORRAR una tarea de un prospecto fuera de alcance no emite ningún delete", async () => {
+    // La propiedad central del módulo: la barrera no es la UI, es esta consulta.
+    const builders = serviceWith({
+      crm_tasks: [{ data: { id: 3, prospect_id: 999 }, error: null }, { data: null, error: null }],
+      crm_prospects: [{ data: null, error: null }],
+    })
+
+    await expect(deleteCrmTask(3)).rejects.toThrow("Prospecto no encontrado")
+
+    expect(builders.crm_tasks?.delete as ReturnType<typeof vi.fn>).not.toHaveBeenCalled()
+  })
+
+  it("dentro del alcance, el borrado sí se emite", async () => {
+    const builders = serviceWith({
+      crm_tasks: [{ data: { id: 3, prospect_id: 10 }, error: null }, { data: null, error: null }],
+      crm_prospects: [{ data: PROSPECT_ROW, error: null }],
+    })
+
+    await deleteCrmTask(3)
+
+    const remove = builders.crm_tasks?.delete as ReturnType<typeof vi.fn>
+    expect(remove).toHaveBeenCalledTimes(1)
+    const eq = builders.crm_tasks?.eq as ReturnType<typeof vi.fn>
+    expect(eq).toHaveBeenCalledWith("id", 3)
+  })
+
+  it("listar las tareas de un prospecto ajeno no lee la tabla de tareas", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: null, error: null }],
+      crm_tasks: [{ data: [], error: null }],
+    })
+
+    await expect(listProspectTasks(999)).rejects.toThrow("Prospecto no encontrado")
+    expect(builders.crm_tasks?.select as ReturnType<typeof vi.fn>).not.toHaveBeenCalled()
+  })
+
+  it("la lista vuelve en orden de trabajo, no en orden de llegada", async () => {
+    const row = (over: Record<string, unknown>) => ({
+      id: 1,
+      prospect_id: 10,
+      seller_id: null,
+      title: "t",
+      due_at: null,
+      priority: "media",
+      status: "pendiente",
+      completed_at: null,
+      created_by: null,
+      created_at: "2026-09-01T00:00:00.000Z",
+      updated_at: "2026-09-01T00:00:00.000Z",
+      ...over,
+    })
+    serviceWith({
+      crm_prospects: [{ data: PROSPECT_ROW, error: null }],
+      crm_tasks: [
+        {
+          data: [
+            row({ id: 1, due_at: null }),
+            row({ id: 2, due_at: "2020-01-01T09:00:00.000Z" }),
+          ],
+          error: null,
+        },
+      ],
+    })
+
+    const tasks = await listProspectTasks(10)
+
+    // La vencida primero; la sin fecha nunca se adelanta por no tener fecha.
+    expect(tasks.map((t) => t.id)).toEqual([2, 1])
+  })
+})
+
+describe("agenda de tareas", () => {
+  // La agenda es la única lectura del módulo que filtra por el vendedor del
+  // **prospecto** y no por `crm_tasks.seller_id`: es la regla del módulo, y
+  // además la única que no se desfasa cuando un trato cambia de manos por una
+  // ruta que no toca las tareas.
+
+  const AGENDA_ROW = {
+    id: 3,
+    prospect_id: 10,
+    seller_id: "owner-999",
+    title: "Llamar a Juan",
+    due_at: "2026-09-14T09:00:00.000Z",
+    priority: "alta",
+    status: "pendiente",
+    completed_at: null,
+    created_by: null,
+    created_at: "2026-09-01T00:00:00.000Z",
+    updated_at: "2026-09-01T00:00:00.000Z",
+    crm_prospects: { id: 10, name: "Juan Pérez", restaurant_name: "Tacos El Norte", phone: "5512345678" },
+  }
+
+  it("el vendedor acota por el dueño del prospecto, no por el de la tarea", async () => {
+    const builders = serviceWith({ crm_tasks: [{ data: [AGENDA_ROW], error: null }] })
+
+    await getTaskAgenda()
+
+    const select = builders.crm_tasks?.select as ReturnType<typeof vi.fn>
+    // `!inner` no es decorativo: sin él PostgREST deja la fila padre y anula el
+    // embebido, que es lo contrario de acotar.
+    expect(select).toHaveBeenCalledWith(expect.stringContaining("crm_prospects!inner("))
+    const eq = builders.crm_tasks?.eq as ReturnType<typeof vi.fn>
+    expect(eq).toHaveBeenCalledWith("crm_prospects.seller_id", SELLER_ID)
+    expect(eq).toHaveBeenCalledWith("status", "pendiente")
+  })
+
+  it("el admin no filtra por vendedor y ve la agenda entera", async () => {
+    vi.mocked(requireSellerOrAdminAction).mockResolvedValue({
+      userId: SELLER_ID,
+      role: "admin",
+    } as never)
+    const builders = serviceWith({ crm_tasks: [{ data: [AGENDA_ROW], error: null }] })
+
+    await getTaskAgenda()
+
+    const select = builders.crm_tasks?.select as ReturnType<typeof vi.fn>
+    expect(select).toHaveBeenCalledWith(expect.not.stringContaining("!inner"))
+    const eq = builders.crm_tasks?.eq as ReturnType<typeof vi.fn>
+    expect(eq).not.toHaveBeenCalledWith("crm_prospects.seller_id", expect.anything())
+  })
+
+  it("cada tarea viaja con el cliente al que pertenece", async () => {
+    serviceWith({ crm_tasks: [{ data: [AGENDA_ROW], error: null }] })
+
+    const entries = await getTaskAgenda()
+
+    expect(entries).toHaveLength(1)
+    expect(entries[0]?.task.title).toBe("Llamar a Juan")
+    expect(entries[0]?.prospect).toEqual({
+      id: 10,
+      name: "Juan Pérez",
+      restaurant_name: "Tacos El Norte",
+      phone: "5512345678",
+    })
+  })
+
+  it("un prospecto sin nombre no deja la agenda sin tarea", async () => {
+    serviceWith({
+      crm_tasks: [{ data: [{ ...AGENDA_ROW, crm_prospects: null }], error: null }],
+    })
+
+    const entries = await getTaskAgenda()
+
+    expect(entries[0]?.prospect).toBeNull()
+    expect(entries[0]?.task.id).toBe(3)
   })
 })

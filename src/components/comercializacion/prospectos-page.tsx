@@ -26,19 +26,25 @@ import {
   Spinner,
   ConfirmDialog,
 } from "./ui"
-import { ProspectFormModal } from "./prospect-form"
-import { ActivityFormModal } from "./activity-form"
+import { ProspectFormModal } from "@/components/crm/ProspectFormModal"
+import { ActivityFormModal } from "@/components/crm/ActivityFormModal"
 import { PipelineView } from "./pipeline-view"
-import { ImportCsvModal } from "./import-csv-modal"
+import { ImportCsvModal } from "@/components/crm/ImportCsvModal"
 import { useToast } from "@/components/toast"
 import type { Prospect, ProspectStatus } from "@/lib/comercializacion/types"
 import { PROSPECT_STATUS_LABEL } from "@/lib/comercializacion/types"
 import { formatDateTime } from "@/lib/comercializacion/dates"
 import { WhatsappTemplateMenu } from "./whatsapp-templates"
 import {
+  addActivity,
+  bulkCreateProspects,
   bulkTagProspects,
+  createProspect,
   deleteProspect,
+  findDuplicatesByPhone,
   getProspects,
+  updateActivity,
+  updateProspect,
 } from "@/lib/comercializacion/actions"
 import { toCsv, downloadCsv } from "@/lib/comercializacion/csv"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
@@ -51,6 +57,24 @@ import { parseTagInput, tagLabel, tagMatches } from "@/lib/crm-tags"
  * paginar igual para que "Cargar más" signifique lo mismo en las dos.
  */
 export const PAGE_SIZE = CRM_PAGE_SIZE
+
+/**
+ * Los comandos del formulario compartido, en una constante de módulo para que la
+ * identidad de `findDuplicates` no cambie en cada render: el modal la usa como
+ * dependencia de efecto y una función nueva por render dispararía la consulta de
+ * duplicados en bucle.
+ */
+const FORM_ACTIONS = {
+  create: createProspect,
+  update: updateProspect,
+  findDuplicates: findDuplicatesByPhone,
+}
+
+/** Comandos del formulario de actividad del vendedor. */
+const ACTIVITY_ACTIONS = { create: addActivity, update: updateActivity }
+
+/** Comandos de la importación CSV del vendedor. */
+const IMPORT_ACTIONS = { import: bulkCreateProspects, findDuplicates: findDuplicatesByPhone }
 
 interface CityOption {
   id: number
@@ -653,6 +677,7 @@ export function ProspectosPage({
         }}
         prospect={editing}
         cities={cities}
+        actions={FORM_ACTIONS}
         onSaved={() => {
           toast(editing ? "Prospecto actualizado" : "Prospecto creado 🎉")
           reload()
@@ -663,6 +688,7 @@ export function ProspectosPage({
         open={!!activityFor}
         onClose={() => setActivityFor(null)}
         prospectId={activityFor?.id ?? 0}
+        actions={ACTIVITY_ACTIONS}
         onSaved={() => {
           toast("Actividad registrada ✅")
           reload()
@@ -671,6 +697,7 @@ export function ProspectosPage({
 
       <ImportCsvModal
         open={showImport}
+        actions={IMPORT_ACTIONS}
         onClose={() => setShowImport(false)}
         onImported={reload}
       />

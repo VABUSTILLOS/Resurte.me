@@ -210,16 +210,26 @@ export interface PipelineValue extends EstimatedValueSum {
  * Si `00184` no está aplicada, `estimated_value` no existe: se degrada a «nadie
  * ha declarado valor» en vez de reventar el panel, igual que la escalera de
  * columnas del lector de listas. Un error de otro tipo sí se propaga.
+ *
+ * `openOnly` deja fuera los tratos cerrados (`CRM_CLOSED_STATUSES`, espejo del
+ * índice parcial `idx_crm_prospects_open_pipeline` de `00184`). El panel quiere
+ * el alcance entero —lo ganado y lo perdido también se valoró—, pero el
+ * briefing del agente habla de lo que queda por cerrar, y ahí sumar un trato
+ * ganado sería inflar la cifra que el vendedor usa para planear su semana.
  */
 export async function readCrmPipelineValue(
   supabase: SupabaseClient,
   scope: CrmScope,
   limit: number = CRM_VALUE_SCAN_LIMIT,
+  openOnly = false,
 ): Promise<PipelineValue> {
-  const { data, error } = await applyCrmScope(
-    supabase.from("crm_prospects").select("estimated_value").not("estimated_value", "is", null),
-    scope,
-  ).limit(limit + 1)
+  const base = supabase
+    .from("crm_prospects")
+    .select("estimated_value")
+    .not("estimated_value", "is", null)
+  const query = openOnly ? base.not("status", "in", `(${CRM_CLOSED_STATUSES.join(",")})`) : base
+
+  const { data, error } = await applyCrmScope(query, scope).limit(limit + 1)
 
   if (error) {
     if (isMissingColumnError(error)) {

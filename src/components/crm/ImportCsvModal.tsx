@@ -1,10 +1,25 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Modal, Button, Spinner, Badge } from "./ui"
+import { Modal, Button, Spinner, Badge } from "@/components/comercializacion/ui"
 import { useToast } from "@/components/toast"
-import { bulkCreateProspects } from "@/lib/comercializacion/actions"
 import { parseCsv } from "@/lib/comercializacion/csv-import"
+import type { DuplicateMatch, BulkProspectRow } from "@/lib/comercializacion/actions"
+
+/**
+ * Los comandos de la importación, inyectados.
+ *
+ * Mismo movimiento que en `ProspectFormModal`: el vendedor importa con el módulo
+ * del vendedor y el panel con el envoltorio de `admin/actions`, que además deja
+ * bitácora. Sin esto, una importación desde el panel no aparecería en la
+ * auditoría.
+ */
+export interface ImportCsvActions {
+  /** Obligatoria. Alta masiva; devuelve cuántas entraron y por qué falló el resto. */
+  import: (rows: BulkProspectRow[]) => Promise<{ created: number; errors: { row: number; message: string }[] }>
+  /** Aviso de duplicado contra la base. Si falta, no se avisa. */
+  findDuplicates?: (phones: string[]) => Promise<DuplicateMatch[]>
+}
 
 function digitsOnly(v: string | null | undefined): string {
   return (v ?? "").replace(/\D/g, "")
@@ -16,10 +31,12 @@ Ana López,Tacos El Norte,5512345678,5512345678,ana@tacos.mx,Ciudad de México,I
 export function ImportCsvModal({
   open,
   onClose,
+  actions,
   onImported,
 }: {
   open: boolean
   onClose: () => void
+  actions: ImportCsvActions
   onImported: () => void
 }) {
   const { toast } = useToast()
@@ -58,10 +75,14 @@ export function ImportCsvModal({
         setDbDups(new Map())
         return
       }
+      const findDuplicates = actions.findDuplicates
+      if (!findDuplicates) {
+        setDbDups(new Map())
+        return
+      }
       try {
-        const { findDuplicatesByPhone } = await import("@/lib/comercializacion/actions")
         const phones = validRows.flatMap((r) => [r.phone, r.whatsapp].filter(Boolean) as string[])
-        const matches = await findDuplicatesByPhone(phones)
+        const matches = await findDuplicates(phones)
         const byTail = new Map(matches.map((m) => [m.phone.length > 10 ? m.phone.slice(-10) : m.phone, m.prospectName]))
         const map = new Map<number, string>()
         for (const r of validRows) {
@@ -80,7 +101,7 @@ export function ImportCsvModal({
       }
     }, 400)
     return () => clearTimeout(timeout)
-  }, [validRows])
+  }, [validRows, actions.findDuplicates])
 
   function reset() {
     setText("")
@@ -92,7 +113,7 @@ export function ImportCsvModal({
     setImporting(true)
     setServerErrors([])
     try {
-      const result = await bulkCreateProspects(validRows)
+      const result = await actions.import(validRows)
       if (result.errors.length > 0) {
         setServerErrors(result.errors)
         toast("Algunas filas tienen errores; no se importó nada", "error")

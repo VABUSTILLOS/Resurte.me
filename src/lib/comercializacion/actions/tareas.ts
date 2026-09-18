@@ -171,6 +171,10 @@ export async function reopenCrmTask(id: number): Promise<void> {
   await patchTask(id, reopenTask(), "Error al reabrir la tarea")
 }
 
+/**
+ * Borra una tarea. No hay vuelta atrás: el panel lee el título antes de llamar
+ * aquí para poder dejarlo en la bitácora.
+ */
 export async function deleteCrmTask(id: number): Promise<void> {
   const { userId, role } = await requireSellerOrAdminAction()
   const scope = scopeForRole(role, userId)
@@ -187,11 +191,10 @@ export async function deleteCrmTask(id: number): Promise<void> {
 /**
  * Las tareas abiertas del alcance, para la agenda.
  *
- * Se acota con `applyCrmScope` sobre `crm_tasks.seller_id` y se pide solo lo
- * pendiente: el cajón de completadas de la ficha no es trabajo, y traerlo haría
- * que el límite se gastara en archivo. El `order` de SQL solo decide **qué**
- * filas entran cuando hay más que el límite; el orden que se pinta lo pone
- * `sortTasks` en `groupTasks`.
+ * Se pide solo lo pendiente: el cajón de completadas no es trabajo, y traerlo
+ * haría que el límite se gastara en archivo. El `order` de SQL solo decide
+ * **qué** filas entran cuando hay más que el límite; el orden que se pinta lo
+ * pone `groupTaskEntries` en la vista.
  */
 /** El prospecto al que pertenece una tarea de la agenda, reducido a su etiqueta. */
 export interface TaskAgendaProspect {

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { CalendarClock, Check, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react"
 import {
-  CRM_TASK_BUCKETS,
   CRM_TASK_BUCKET_LABEL,
   CRM_TASK_PRIORITIES,
   CRM_TASK_PRIORITY_LABEL,

@@ -62,3 +62,39 @@ export function validateProspectContact(input: {
     }
   }
 }
+
+/**
+ * Valida los números del prospecto antes de tocar la base.
+ *
+ * La base ya tiene `CHECK (estimated_value >= 0)` (00184), pero un error de
+ * constraint llega al usuario como «Error al crear el prospecto», sin decir qué
+ * campo está mal. Y el rango de volumen invertido **no lo rechaza la base**: lo
+ * rechaza aquí, porque el agente IA razona sobre ese intervalo y uno invertido
+ * es un intervalo vacío — el agente leería «entre 500 y 200» como una ficha sin
+ * mercado.
+ *
+ * En una edición parcial la comparación del rango solo se aplica cuando llegan
+ * los dos extremos; el formulario compartido siempre los manda juntos.
+ */
+export function validateProspectSegmentation(input: {
+  estimated_value?: number | null
+  employees?: number | null
+  weekly_volume_min?: number | null
+  weekly_volume_max?: number | null
+}) {
+  for (const [label, value] of [
+    ["El valor previsto", input.estimated_value],
+    ["El número de empleados", input.employees],
+    ["El volumen semanal mínimo", input.weekly_volume_min],
+    ["El volumen semanal máximo", input.weekly_volume_max],
+  ] as const) {
+    if (value === undefined || value === null) continue
+    if (!Number.isFinite(value)) throw new Error(`${label} no es un número válido`)
+    if (value < 0) throw new Error(`${label} no puede ser negativo`)
+  }
+  const min = input.weekly_volume_min
+  const max = input.weekly_volume_max
+  if (min != null && max != null && min > max) {
+    throw new Error("El volumen semanal mínimo no puede superar al máximo")
+  }
+}

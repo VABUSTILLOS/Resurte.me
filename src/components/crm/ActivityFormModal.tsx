@@ -1,7 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Modal, Button, Input, Select, TextArea, FieldLabel, Spinner } from "./ui"
+import {
+  Modal,
+  Button,
+  Input,
+  Select,
+  TextArea,
+  FieldLabel,
+} from "@/components/comercializacion/ui"
 import {
   ACTIVITY_TYPES,
   ACTIVITY_TYPE_LABEL,
@@ -12,12 +19,36 @@ import {
   type ActivityDirection,
 } from "@/lib/comercializacion/types"
 
+/**
+ * Los comandos del formulario, inyectados.
+ *
+ * Mismo movimiento que en `ProspectFormModal`: cada superficie tiene su módulo
+ * de acciones —el vendedor el suyo, el panel los envoltorios de `admin/actions`
+ * que además dejan bitácora—, así que el formulario no importa ninguna. Antes
+ * importaba el barrel del vendedor, y usarlo desde el panel habría escrito la
+ * actividad sin dejar rastro en la auditoría.
+ */
+export interface ActivityFormActions {
+  create?: (prospectId: number, input: ActivityDraft) => Promise<unknown>
+  update?: (activityId: number, input: Partial<ActivityDraft>) => Promise<unknown>
+}
+
+/** El borrador tal y como lo manda el formulario; espeja `ActivityInput`. */
+export interface ActivityDraft {
+  type: ActivityType
+  direction: ActivityDirection
+  outcome: string | null
+  summary: string | null
+  duration_seconds: number | null
+}
+
 export function ActivityFormModal({
   open,
   onClose,
   prospectId,
   defaultType,
   activity,
+  actions,
   onSaved,
 }: {
   open: boolean
@@ -26,6 +57,7 @@ export function ActivityFormModal({
   defaultType?: ActivityType
   /** Si se pasa, el modal edita esa actividad en lugar de crear una nueva. */
   activity?: Activity | null
+  actions: ActivityFormActions
   onSaved: () => void
 }) {
   const [type, setType] = useState<ActivityType>(defaultType ?? "llamada")
@@ -53,22 +85,26 @@ export function ActivityFormModal({
     return () => clearTimeout(timeout)
   }, [open, defaultType, activity])
 
+  // En edición el comando es obligatorio; en alta solo si no hay `activity`.
+  const canSave = activity ? Boolean(actions.update) : Boolean(actions.create)
+
   async function handleSubmit() {
     setSaving(true)
     setError(null)
     try {
-      const payload = {
+      const payload: ActivityDraft = {
         type,
         direction,
         outcome: outcome || null,
         duration_seconds: duration ? Math.max(1, Math.round(Number(duration) * 60)) : null,
         summary: summary || null,
       }
-      const actions = await import("@/lib/comercializacion/actions")
       if (activity) {
-        await actions.updateActivity(activity.id, payload)
+        if (!actions.update) throw new Error("Esta superficie no puede editar actividades")
+        await actions.update(activity.id, payload)
       } else {
-        await actions.addActivity(prospectId, payload)
+        if (!actions.create) throw new Error("Esta superficie no puede registrar actividades")
+        await actions.create(prospectId, payload)
       }
       onSaved()
       onClose()
@@ -95,10 +131,7 @@ export function ActivityFormModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <FieldLabel>Tipo</FieldLabel>
-            <Select
-              value={type}
-              onChange={(e) => setType(e.target.value as ActivityType)}
-            >
+            <Select value={type} onChange={(e) => setType(e.target.value as ActivityType)}>
               {ACTIVITY_TYPES.map((t) => (
                 <option key={t} value={t}>
                   {ACTIVITY_TYPE_LABEL[t]}
@@ -157,9 +190,8 @@ export function ActivityFormModal({
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={saving}>
-            {saving ? <Spinner className="!w-4 !h-4 !border-white" /> : null}
-            Guardar
+          <Button onClick={handleSubmit} disabled={saving || !canSave}>
+            {saving ? "Guardando…" : "Guardar"}
           </Button>
         </div>
       </div>

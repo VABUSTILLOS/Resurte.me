@@ -9,8 +9,8 @@ import {
   type ProspectDetailActions,
 } from "@/components/crm/ProspectDetailDrawer"
 import { Badge, Button, ConfirmDialog, Input, Modal, Spinner } from "./ui"
-import { ActivityFormModal } from "./activity-form"
-import { ProspectFormModal } from "./prospect-form"
+import { ActivityFormModal } from "@/components/crm/ActivityFormModal"
+import { ProspectFormModal } from "@/components/crm/ProspectFormModal"
 import { WhatsappTemplateMenu } from "./whatsapp-templates"
 import { useToast } from "@/components/toast"
 import { formatDate } from "@/lib/comercializacion/dates"
@@ -28,6 +28,7 @@ import {
   reopenCrmTask,
   searchUsersForLinking,
   setProspectTags,
+  updateActivity,
   updateProspect,
 } from "@/lib/comercializacion/actions"
 import {
@@ -98,6 +99,20 @@ const ACTIONS: ProspectDetailActions = {
   reopenTask: reopenCrmTask,
   deleteTask: deleteCrmTask,
 }
+
+/**
+ * Comandos del formulario compartido. Sin `create` y sin `findDuplicates`: en
+ * esta superficie el formulario solo se abre con un prospecto ya cargado (el
+ * alta del vendedor vive en la lista), así que la rama de alta no se alcanza y
+ * el aviso de duplicado no tiene nada que advertir.
+ */
+const FORM_ACTIONS = { update: updateProspect }
+
+/**
+ * Comandos del formulario de actividad. Los dos modales —alta y edición— usan el
+ * mismo objeto: el formulario decide cuál de los dos comandos llamar.
+ */
+const ACTIVITY_ACTIONS = { create: addActivity, update: updateActivity }
 
 /**
  * Bandeja del vendedor: **solo lectura**.
@@ -415,6 +430,7 @@ export function SellerProspectDetail({
         onClose={() => setShowEdit(false)}
         prospect={prospect}
         cities={cities}
+        actions={FORM_ACTIONS}
         onSaved={reload}
       />
 
@@ -422,6 +438,7 @@ export function SellerProspectDetail({
         open={showActivity}
         onClose={() => setShowActivity(false)}
         prospectId={prospect.id}
+        actions={ACTIVITY_ACTIONS}
         onSaved={reload}
       />
 
@@ -430,6 +447,7 @@ export function SellerProspectDetail({
         onClose={() => setEditingActivity(null)}
         prospectId={prospect.id}
         activity={editingActivity}
+        actions={ACTIVITY_ACTIONS}
         onSaved={reload}
       />
 

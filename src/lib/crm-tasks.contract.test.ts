@@ -2,15 +2,21 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import {
+  CRM_TASK_BUCKET_LABEL,
+  CRM_TASK_BUCKETS,
   CRM_TASK_PRIORITIES,
   CRM_TASK_PRIORITY_LABEL,
   CRM_TASK_STATUSES,
   CRM_TASK_STATUS_LABEL,
   DEFAULT_TASK_PRIORITY,
   MAX_TASK_TITLE_LENGTH,
+  TASK_WEEK_DAYS,
+  compareTasks,
   completeTask,
   daysUntilDue,
   formatTaskDue,
+  groupTaskEntries,
+  groupTasks,
   isCrmTaskPriority,
   isCrmTaskStatus,
   isTaskOpen,
@@ -25,8 +31,10 @@ import {
   requireTaskTitle,
   sortTasks,
   taskAgeDays,
+  taskBucket,
   taskUrgency,
   type CrmTask,
+  type CrmTaskBucket,
 } from "@/lib/crm-tasks"
 
 /**
@@ -355,5 +363,106 @@ describe("presentación del vencimiento", () => {
   it("taskAgeDays mide días completos y devuelve null si no se puede medir", () => {
     expect(taskAgeDays(task({ created_at: "2026-09-01T00:00:00.000Z" }), NOW)).toBe(14)
     expect(taskAgeDays(task({ created_at: "no es fecha" }), NOW)).toBeNull()
+  })
+})
+
+describe("agenda por horizonte", () => {
+  it("los cajones y sus etiquetas son los mismos, sin huecos", () => {
+    expect([...CRM_TASK_BUCKETS].sort()).toEqual(Object.keys(CRM_TASK_BUCKET_LABEL).sort())
+    for (const bucket of CRM_TASK_BUCKETS) {
+      expect(CRM_TASK_BUCKET_LABEL[bucket].length, bucket).toBeGreaterThan(0)
+    }
+  })
+
+  it("cada tarea cae en un solo cajón y `taskBucket` es total", () => {
+    const casos: Array<[string, CrmTask, CrmTaskBucket]> = [
+      ["vencida ayer", task({ due_at: "2026-09-14T09:00:00.000Z" }), "vencidas"],
+      ["vence hoy", task({ due_at: "2026-09-15T23:00:00.000Z" }), "hoy"],
+      ["vence en 7 días", task({ due_at: "2026-09-22T09:00:00.000Z" }), "semana"],
+      ["vence en 8 días", task({ due_at: "2026-09-23T09:00:00.000Z" }), "despues"],
+      ["sin fecha", task({ due_at: null }), "sin_fecha"],
+    ]
+    for (const [nombre, t, esperado] of casos) {
+      expect(taskBucket(t, NOW), nombre).toBe(esperado)
+    }
+  })
+
+  it("una completada cae en `completadas` aunque su fecha ya pasara", () => {
+    const hecha = task({
+      status: "completada",
+      completed_at: NOW.toISOString(),
+      due_at: "2026-09-01T09:00:00.000Z",
+    })
+    expect(taskBucket(hecha, NOW)).toBe("completadas")
+  })
+
+  it("el borde de la semana es TASK_WEEK_DAYS días, ni uno más", () => {
+    const justo = new Date(NOW.getTime() + TASK_WEEK_DAYS * 24 * 60 * 60 * 1000)
+    expect(taskBucket(task({ due_at: justo.toISOString() }), NOW)).toBe("semana")
+    const fuera = new Date(NOW.getTime() + (TASK_WEEK_DAYS + 1) * 24 * 60 * 60 * 1000)
+    expect(taskBucket(task({ due_at: fuera.toISOString() }), NOW)).toBe("despues")
+  })
+
+  it("una tarea sin fecha nunca aparece como vencida", () => {
+    const sinFecha = task({ due_at: null })
+    expect(isTaskOverdue(sinFecha, NOW)).toBe(false)
+    expect(taskBucket(sinFecha, NOW)).toBe("sin_fecha")
+  })
+
+  it("groupTasks reparte todas las tareas, sin perder ninguna", () => {
+    const lista = [
+      task({ id: 1, due_at: "2026-09-14T09:00:00.000Z" }),
+      task({ id: 2, due_at: "2026-09-15T23:00:00.000Z" }),
+      task({ id: 3, due_at: "2026-09-18T09:00:00.000Z" }),
+      task({ id: 4, due_at: "2026-10-30T09:00:00.000Z" }),
+      task({ id: 5, due_at: null }),
+      task({ id: 6, status: "completada", completed_at: NOW.toISOString() }),
+    ]
+    const grupos = groupTasks(lista, NOW)
+    expect(grupos.vencidas.map((t) => t.id)).toEqual([1])
+    expect(grupos.hoy.map((t) => t.id)).toEqual([2])
+    expect(grupos.semana.map((t) => t.id)).toEqual([3])
+    expect(grupos.despues.map((t) => t.id)).toEqual([4])
+    expect(grupos.sin_fecha.map((t) => t.id)).toEqual([5])
+    expect(grupos.completadas.map((t) => t.id)).toEqual([6])
+    expect(CRM_TASK_BUCKETS.flatMap((b) => grupos[b]).length).toBe(lista.length)
+  })
+
+  it("dentro de un cajón el orden es el de trabajo, no el de entrada", () => {
+    const grupos = groupTasks(
+      [
+        task({ id: 1, due_at: "2026-09-20T09:00:00.000Z", priority: "baja" }),
+        task({ id: 2, due_at: "2026-09-20T09:00:00.000Z", priority: "alta" }),
+      ],
+      NOW,
+    )
+    expect(grupos.semana.map((t) => t.id)).toEqual([2, 1])
+  })
+
+  it("groupTaskEntries conserva el contexto que envuelve a la tarea", () => {
+    const conCliente = [
+      { task: task({ id: 1, due_at: "2026-09-14T09:00:00.000Z" }), cliente: "Bar Pepe" },
+      { task: task({ id: 2, due_at: null }), cliente: "Café Sol" },
+    ]
+    const grupos = groupTaskEntries(conCliente, (e) => e.task, NOW)
+    expect(grupos.vencidas.map((e) => e.cliente)).toEqual(["Bar Pepe"])
+    expect(grupos.sin_fecha.map((e) => e.cliente)).toEqual(["Café Sol"])
+  })
+
+  it("los cajones vacíos existen: la vista no tiene que comprobar antes de pintar", () => {
+    const grupos = groupTaskEntries<{ task: CrmTask }>([], (e) => e.task, NOW)
+    for (const bucket of CRM_TASK_BUCKETS) {
+      expect(grupos[bucket], bucket).toEqual([])
+    }
+  })
+
+  it("compareTasks es el mismo orden que sortTasks, expuesto", () => {
+    const lista = [
+      task({ id: 1, due_at: null, created_at: "2026-09-10T00:00:00.000Z" }),
+      task({ id: 2, due_at: "2026-09-10T09:00:00.000Z" }),
+      task({ id: 3, status: "completada", completed_at: "2026-09-02T00:00:00.000Z" }),
+    ]
+    const ordenados = [...lista].sort((a, b) => compareTasks(a, b, NOW))
+    expect(ordenados.map((t) => t.id)).toEqual(sortTasks(lista, NOW).map((t) => t.id))
   })
 })

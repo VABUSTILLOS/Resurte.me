@@ -58,6 +58,9 @@ import {
   type CrmLossReason,
 } from "@/lib/crm-core"
 import { readCrmProspects, readCrmPipelineValue, type PipelineValue } from "@/lib/crm-prospects"
+import type { ProspectInput, BulkProspectRow } from "@/lib/comercializacion/actions"
+import type { Prospect } from "@/lib/comercializacion/types"
+import type { ActivityInput } from "@/lib/comercializacion/actions/actividades"
 import { CRM_PAGE_SIZE } from "@/lib/crm-filters"
 import {
   fetchConversationMessages,
@@ -2186,6 +2189,201 @@ export async function deleteCrmTask(id: number): Promise<void> {
     detail: { title: doomed?.title ?? null, prospect_id: doomed?.prospect_id ?? null },
   })
   revalidatePath("/admin/leads")
+}
+
+// ============================================================
+// RONDA 16 — ESCRITURA DEL ADMIN EN EL CRM
+//
+// Estas acciones envuelven al módulo del vendedor
+// (`@/lib/comercializacion/actions/*`) en vez de reimplementarlo: el alcance por
+// rol y las validaciones son las mismas, y duplicarlas aquí sería la segunda
+// copia que se desincroniza. El envoltorio aporta lo único que el vendedor no
+// tiene: `requireAdmin()` y la bitácora.
+// ============================================================
+
+/**
+ * Alta de prospecto desde el panel.
+ *
+ * A diferencia del vendedor —que siempre es dueño de lo que crea—, aquí
+ * `seller_id` es un dato de entrada y `null` es válido: es el pozo, el estado
+ * del que `distributeCrmProspects` reparte. Ver `resolveNewProspectSeller`.
+ */
+export async function createCrmProspect(input: ProspectInput): Promise<Prospect> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const { createProspect } = await import("@/lib/comercializacion/actions/prospectos")
+  const created = await createProspect(input)
+
+  const supabase = await createServiceClient()
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_prospect_create",
+    entity: "crm_prospects",
+    entityId: created.id,
+    detail: { name: created.name, seller_id: created.seller_id ?? null },
+  })
+  revalidatePath("/admin/leads")
+  return created
+}
+
+/**
+ * Edición del prospecto desde el panel: contacto, segmentación y valor.
+ *
+ * No acepta `status` ni `seller_id`: el estado tiene sus dos puertas propias
+ * (`updateCrmProspectStatus` y `closeCrmProspect`, que escriben la coherencia de
+ * 00184) y la reasignación la tiene en `assignCrmProspect`, que además mueve las
+ * tareas abiertas. Dejar que este formulario los escribiera crearía rutas que no
+ * mantienen esos invariantes.
+ */
+export async function updateCrmProspect(
+  id: number,
+  input: Partial<ProspectInput>,
+): Promise<Prospect> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  // El tipo admite cualquier campo, pero dos se descartan en tiempo de
+  // ejecución: el estado tiene sus dos puertas (`updateCrmProspectStatus` y
+  // `closeCrmProspect`), que son las únicas que escriben la coherencia de 00184,
+  // y el vendedor se mueve con `assignCrmProspect`, que además arrastra las
+  // tareas abiertas. Dejarlos pasar aquí abriría una tercera puerta incoherente.
+  const { status: _status, seller_id: _sellerId, ...safe } = input
+
+  const { updateProspect } = await import("@/lib/comercializacion/actions/prospectos")
+  const updated = await updateProspect(id, safe)
+
+  const supabase = await createServiceClient()
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_prospect_update",
+    entity: "crm_prospects",
+    entityId: id,
+    // Los nombres de los campos tocados, no los valores: la bitácora registra
+    // que hubo edición sin copiar teléfonos y correos a una segunda tabla.
+    detail: { fields: Object.keys(safe).sort().join(",") },
+  })
+  revalidatePath("/admin/leads")
+  return updated
+}
+
+/** Importación CSV desde el panel. Las filas caen en el pozo, no en el admin. */
+export async function importCrmProspects(
+  rows: BulkProspectRow[],
+): Promise<{ created: number; errors: { row: number; message: string }[] }> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const { bulkCreateProspects } = await import("@/lib/comercializacion/actions/prospectos")
+  const result = await bulkCreateProspects(rows)
+
+  if (result.created > 0) {
+    const supabase = await createServiceClient()
+    await logAdminAction(supabase, {
+      actorId: user?.id ?? null,
+      actorEmail: user?.email ?? null,
+      action: "crm_prospect_import",
+      entity: "crm_prospects",
+      entityId: null,
+      detail: { created: result.created, rejected: result.errors.length },
+    })
+    revalidatePath("/admin/leads")
+  }
+  return result
+}
+
+/** Edita una actividad del historial. El alcance lo resuelve el módulo delegado. */
+export async function updateCrmActivity(
+  id: number,
+  input: Partial<ActivityInput>,
+): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const { updateActivity } = await import("@/lib/comercializacion/actions/actividades")
+  await updateActivity(id, input)
+
+  const supabase = await createServiceClient()
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_activity_update",
+    entity: "crm_activities",
+    entityId: id,
+    detail: { fields: Object.keys(input).sort().join(",") },
+  })
+  revalidatePath("/admin/leads")
+}
+
+/** Borra una actividad. La bitácora guarda de qué prospecto era. */
+export async function deleteCrmActivity(id: number): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  // Se lee antes de borrar: después no hay de dónde sacar a qué trato pertenecía.
+  const { data: doomed } = await supabase
+    .from("crm_activities")
+    .select("prospect_id, type, summary")
+    .eq("id", id)
+    .maybeSingle()
+
+  const { deleteActivity } = await import("@/lib/comercializacion/actions/actividades")
+  await deleteActivity(id)
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_activity_delete",
+    entity: "crm_activities",
+    entityId: id,
+    detail: {
+      prospect_id: doomed?.prospect_id ?? null,
+      type: doomed?.type ?? null,
+      summary: doomed?.summary ?? null,
+    },
+  })
+  revalidatePath("/admin/leads")
+}
+
+/**
+ * Ciudades activas para el selector del formulario.
+ *
+ * El vendedor las recibe como prop desde su server page (`getCities` de
+ * `@/lib/data`), pero `/admin/leads` es un componente de cliente: importar
+ * `data.ts` desde aquí arrastraría el cliente público de Supabase y el catálogo
+ * entero al bundle del navegador. Esta acción lee solo lo que el selector pinta.
+ */
+export async function getAdminCities(): Promise<
+  { id: number; name: string; state: string }[]
+> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+  const supabase = await createServiceClient()
+  const { data, error } = await supabase
+    .from("cities")
+    .select("id, name, state")
+    .eq("is_active", true)
+    .order("name", { ascending: true })
+  if (error) {
+    logger.error("[ADMIN-CRM] Error fetching cities:", error)
+    throw new Error("Error al cargar las ciudades")
+  }
+  return (data ?? []) as { id: number; name: string; state: string }[]
 }
 
 // ============================================================
