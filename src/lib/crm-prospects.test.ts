@@ -1,7 +1,12 @@
 import { describe, expect, test } from "vitest"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { ADMIN_SCOPE, sellerScope, CRM_PROSPECT_COLUMN_SETS, withCityJoin } from "./crm-core"
-import { CRM_SEARCH_SCAN_LIMIT, readCrmPipelineValue, readCrmProspects } from "./crm-prospects"
+import { ADMIN_SCOPE, sellerScope, CRM_CLOSED_STATUSES, CRM_PROSPECT_COLUMN_SETS, withCityJoin } from "./crm-core"
+import {
+  CRM_SEARCH_SCAN_LIMIT,
+  readCrmPipelineValue,
+  readCrmProspects,
+  readOpenCrmPipelineValue,
+} from "./crm-prospects"
 
 /**
  * Pruebas de comportamiento del lector único de `crm_prospects`.
@@ -423,5 +428,46 @@ describe("readCrmPipelineValue — valor previsto del alcance", () => {
     await expect(readCrmPipelineValue(client, ADMIN_SCOPE)).rejects.toThrow(
       "Error al calcular el valor del pipeline",
     )
+  })
+})
+
+describe("readOpenCrmPipelineValue — lo que queda por cerrar", () => {
+  test("deja fuera los tratos cerrados en la consulta, no en memoria", async () => {
+    const { client, calls } = stubClient(() => ({
+      data: [{ estimated_value: 400 }],
+      error: null,
+    }))
+
+    const value = await readOpenCrmPipelineValue(client, ADMIN_SCOPE)
+
+    expect(value).toEqual({ total: 400, declared: 1, truncated: false })
+    // El filtro va al `where`: traer las filas cerradas para descartarlas en
+    // memoria gastaría la ventana de escaneo en filas que no cuentan, y con un
+    // pipeline grande el total saldría truncado por culpa de lo que se ignora.
+    expect(last(calls, "not")).toEqual({
+      op: "not",
+      args: ["status", "in", "(cliente_activo,perdido)"],
+    })
+    // La lista de estados cerrados es el espejo de `CRM_CLOSED_STATUSES`, que a
+    // su vez lo es del índice parcial de `00184`.
+    expect(CRM_CLOSED_STATUSES).toEqual(["cliente_activo", "perdido"])
+  })
+
+  test("sin ningún valor declarado sigue siendo null, no cero", async () => {
+    const { client } = stubClient(() => ({ data: [], error: null }))
+
+    expect(await readOpenCrmPipelineValue(client, ADMIN_SCOPE)).toEqual({
+      total: null,
+      declared: 0,
+      truncated: false,
+    })
+  })
+
+  test("el alcance del vendedor se sigue aplicando", async () => {
+    const { client, calls } = stubClient(() => ({ data: [], error: null }))
+
+    await readOpenCrmPipelineValue(client, sellerScope("seller-9"))
+
+    expect(last(calls, "eq")).toEqual({ op: "eq", args: ["seller_id", "seller-9"] })
   })
 })
