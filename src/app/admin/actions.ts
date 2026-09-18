@@ -55,7 +55,7 @@ import { filterLeads } from "@/lib/crm-funnel"
 import {
   ADMIN_SCOPE,
 } from "@/lib/crm-core"
-import { readCrmProspects } from "@/lib/crm-prospects"
+import { readCrmProspects, readCrmPipelineValue, type PipelineValue } from "@/lib/crm-prospects"
 import { CRM_PAGE_SIZE } from "@/lib/crm-filters"
 import {
   fetchConversationMessages,
@@ -988,6 +988,15 @@ export interface AdminLeadsSummary {
   crmFollowUpsDue: number
   /** Prospectos sin vendedor asignado (leads web convertidos sin repartir). */
   crmUnassigned: number
+  /**
+   * Valor previsto del pipeline (`estimated_value`, migración 00184).
+   *
+   * `total` es `null` cuando ningún prospecto tiene valor declarado: un `$0`
+   * afirmaría que el pipeline no vale nada, y lo que pasa es que nadie lo ha
+   * valorado. `truncated` avisa si la ventana de escaneo se quedó corta, en cuyo
+   * caso `total` es un mínimo.
+   */
+  crmPipelineValue: PipelineValue
   /** Bandeja de entrada web (migración 00139). */
   leadsBoard: AdminLeadBoardCounts
   recentLeads: Array<{ id: number; email: string | null; source: string | null; created_at: string }>
@@ -1005,7 +1014,7 @@ export async function getAdminLeadsSummary(): Promise<AdminLeadsSummary> {
   const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   const nowIso = new Date().toISOString()
 
-  const [todayRes, weekRes, recentRes, prospectsRes, followUpsRes, unassignedRes, leadsBoard] =
+  const [todayRes, weekRes, recentRes, prospectsRes, followUpsRes, unassignedRes, leadsBoard, pipelineValue] =
     await Promise.all([
       supabase
         .from("leads")
@@ -1031,6 +1040,7 @@ export async function getAdminLeadsSummary(): Promise<AdminLeadsSummary> {
         .select("*", { count: "exact", head: true })
         .is("seller_id", null),
       loadLeadBoardCounts(supabase),
+      readCrmPipelineValue(supabase, ADMIN_SCOPE),
     ])
 
   return {
@@ -1039,6 +1049,7 @@ export async function getAdminLeadsSummary(): Promise<AdminLeadsSummary> {
     crmProspects: prospectsRes.count ?? 0,
     crmFollowUpsDue: followUpsRes.count ?? 0,
     crmUnassigned: unassignedRes.count ?? 0,
+    crmPipelineValue: pipelineValue,
     leadsBoard,
     recentLeads: (recentRes.data ?? []).map((l) => ({
       id: l.id,
@@ -1586,6 +1597,35 @@ export async function getAdminProspectDetail(prospectId: number): Promise<{
   }
 
   return { ...detail, seller, lead, tags }
+}
+
+/**
+ * Ingresos y comisión reales del cliente vinculado a un prospecto.
+ *
+ * Delega en `getProspectClientOrders` (`comercializacion/actions/vinculos`) en
+ * lugar de repetir la consulta, por dos razones distintas:
+ *
+ *  - **Corrección:** `crm_prospects.user_id → orders.user_id` es el único camino
+ *    que existe hacia el dinero. `orders.seller_id` está declarada pero ninguna
+ *    ruta la escribe, así que atribuir por vendedor daría cero siempre.
+ *  - **Contrato:** `crm-reader.contract.test.ts` fija los módulos autorizados a
+ *    consultar `crm_prospects`. Añadir aquí un lector propio obligaría a ampliar
+ *    esa lista, y la lista es precisamente lo que impide que vuelvan a convivir
+ *    tres definiciones de "prospecto".
+ *
+ * `requireAdmin()` ya está en la acción delegada (`requireSellerOrAdminAction`),
+ * pero un vendedor también pasa ese filtro: la comprobación de admin va aquí
+ * para que esta superficie sea solo del panel.
+ */
+export async function getAdminProspectClientOrders(prospectId: number) {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+  const { getProspectClientOrders } = await import(
+    "@/lib/comercializacion/actions/vinculos"
+  )
+  return getProspectClientOrders(prospectId)
 }
 
 

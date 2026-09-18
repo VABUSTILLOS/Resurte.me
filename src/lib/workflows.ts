@@ -23,7 +23,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/order-emails"
 import type { OrderStatus, PaymentStatus } from "@/types"
 import { logger } from "@/lib/logger"
-import { callStockRpc } from "@/lib/order-stock"
+import { applyOrderCancellationEffects } from "@/lib/order-cancellation"
 import type { WorkflowType } from "@/lib/workflow-types"
 
 // ============================================================
@@ -558,6 +558,18 @@ export async function notifyFulfillmentUpdate(
 // ============================================================
 
 /**
+ * Fila mínima que consume el barrido de recordatorios de pago. `coupon_code`
+ * es opcional porque el select completo se reintenta sin ella si la migración
+ * 00114 no está aplicada (ver `checkAndSendPaymentReminders`).
+ */
+interface PendingPaymentOrder {
+  id: number
+  created_at: string
+  status: OrderStatus
+  coupon_code?: string | null
+}
+
+/**
  * Check all pending-payment orders and send reminders at the right intervals.
  * Called by Vercel Cron every hour.
  * WC1: respeta whatsapp_automations (is_active + config.levels persistidos).
@@ -587,16 +599,35 @@ export async function checkAndSendPaymentReminders(): Promise<{
 
   // Get pending payment orders (bounded: select only what the loop uses and
   // cap the batch so an unbounded `select("*")` can't grow without limit).
-  const { data: orders, error } = await supabase
+  // `coupon_code` es opcional: se reintenta sin ella si la migración 00114 no
+  // está aplicada, para que un desfase de esquema no tumbe los recordatorios.
+  let orders: PendingPaymentOrder[] | null = null
+  let fetchError: { message: string } | null = null
+
+  const fullPending = await supabase
     .from("orders")
-    .select("id, created_at")
+    .select("id, created_at, status, coupon_code")
     .eq("payment_status", "pending")
     .neq("status", "cancelled")
     .limit(500)
 
-  if (error) {
-    logger.error("[Workflow] Failed to fetch pending orders:", error)
-    return { checked: 0, reminded: 0, cancelled: 0, errors: [error.message] }
+  if (fullPending.error?.code === "42703") {
+    const retry = await supabase
+      .from("orders")
+      .select("id, created_at, status")
+      .eq("payment_status", "pending")
+      .neq("status", "cancelled")
+      .limit(500)
+    orders = (retry.data as PendingPaymentOrder[] | null) ?? null
+    fetchError = retry.error ? { message: retry.error.message } : null
+  } else {
+    orders = (fullPending.data as PendingPaymentOrder[] | null) ?? null
+    fetchError = fullPending.error ? { message: fullPending.error.message } : null
+  }
+
+  if (fetchError) {
+    logger.error("[Workflow] Failed to fetch pending orders:", fetchError)
+    return { checked: 0, reminded: 0, cancelled: 0, errors: [fetchError.message] }
   }
 
   const now = new Date()
@@ -608,15 +639,29 @@ export async function checkAndSendPaymentReminders(): Promise<{
     // Check if we should cancel very old unpaid orders (>72 hours)
     if (hoursSinceCreation >= 72) {
       try {
-        await supabase
+        // El estado se escribe condicionalmente sobre el que se leyó: si dos
+        // ejecuciones del cron se solapan, solo una gana y la cascada no se
+        // aplica dos veces.
+        const { data: cancelledRows, error: cancelError } = await supabase
           .from("orders")
           .update({ status: "cancelled", updated_at: now.toISOString() })
           .eq("id", order.id)
+          .eq("status", order.status)
+          .select("id")
 
-        // Devolver el inventario reservado (migración 00143). Esta ruta no
-        // pasa por /api/orders/[id]/status, así que sin esta llamada el stock
-        // de un pedido abandonado quedaría descontado para siempre.
-        await callStockRpc(supabase, "release_order_stock", order.id)
+        if (cancelError) throw new Error(cancelError.message)
+        if (!cancelledRows || cancelledRows.length === 0) continue
+
+        // Misma cascada que usan la cancelación del admin y la del cliente:
+        // devuelve el inventario reservado (migración 00143) y el uso del
+        // cupón. Antes esta ruta liberaba el stock a mano y se saltaba el
+        // cupón, así que un pedido abandonado consumía una unidad del cupón
+        // para siempre aunque nunca se hubiera cobrado.
+        await applyOrderCancellationEffects(supabase, {
+          orderId: order.id,
+          oldStatus: order.status,
+          couponCode: order.coupon_code,
+        })
 
         // Notify customer about cancellation
         await notifyCustomerStatusUpdate(order.id, "cancelled")

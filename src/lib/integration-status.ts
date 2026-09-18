@@ -85,7 +85,7 @@ const SPECS: {
     label: "Notificaciones push (VAPID)",
     requires: ["NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"],
     impact:
-      "El opt-in de push no puede suscribir a nadie y el aviso al dueño de FoodOS no llega.",
+      "El opt-in de push no puede suscribir a nadie, así que el dueño de FoodOS no recibe el aviso en el teléfono: solo lo ve en la campana del panel.",
   },
   {
     id: "stripe_connect",

@@ -28,6 +28,7 @@ import { sendTextMessage } from "@/lib/whatsapp"
 import { sendEmail, escapeHtml } from "@/lib/email"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
+import { claimFoodosNotification, settleFoodosNotification } from "@/lib/foodos-notification-claim"
 import type { FoodosOrderStatus } from "@/types/foodos"
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://resurte.me").replace(/\/$/, "")
@@ -208,67 +209,6 @@ function buildEmailHtml(copy: NotificationCopy, ctx: NotificationContext): strin
   `.trim()
 }
 
-type Claim = { proceed: true; id: number | null } | { proceed: false }
-
-/**
- * Toma el derecho de envío de un (pedido, evento, canal).
- *
- * `proceed: false` sólo significa "ya se avisó" (violación 23505 del
- * índice único parcial). Cualquier otro fallo de BD deja pasar el envío
- * sin dedupe: perder un aviso es peor que repetirlo.
- */
-async function claimNotification(
-  orderId: string,
-  restaurantId: string,
-  event: FoodosNotificationEvent,
-  channel: "whatsapp" | "email",
-  recipient: string
-): Promise<Claim> {
-  try {
-    const supabase = await createServiceClient()
-    const { data, error } = await supabase
-      .from("foodos_order_notifications")
-      .insert({
-        order_id: orderId,
-        restaurant_id: restaurantId,
-        event,
-        channel,
-        recipient,
-        status: "pending",
-      })
-      .select("id")
-      .maybeSingle()
-
-    if (error) {
-      if (error.code === "23505") return { proceed: false }
-      logger.warn("foodos_notifications.claim", { event, channel, message: error.message })
-      return { proceed: true, id: null }
-    }
-    const id = (data as { id: number } | null)?.id
-    return { proceed: true, id: typeof id === "number" ? id : null }
-  } catch (err) {
-    logger.warn("foodos_notifications.claim_error", { event, channel, err })
-    return { proceed: true, id: null }
-  }
-}
-
-/** Cierra el claim con el resultado real del envío. */
-async function settleNotification(
-  id: number | null,
-  status: "sent" | "failed",
-  error?: string
-): Promise<void> {
-  if (id === null) return
-  try {
-    const supabase = await createServiceClient()
-    await supabase
-      .from("foodos_order_notifications")
-      .update({ status, error: error ?? null, updated_at: new Date().toISOString() })
-      .eq("id", id)
-  } catch (err) {
-    logger.error("foodos_notifications.settle", err)
-  }
-}
 
 /**
  * Avisa al comensal de un cambio en su pedido FoodOS por WhatsApp y, en
@@ -340,17 +280,26 @@ export async function notifyFoodosCustomer(
   if (!phone) {
     outcome.whatsapp = "skipped"
   } else {
-    const claim = await claimNotification(order.id, order.restaurant_id, event, "whatsapp", phone)
+    const claim = await claimFoodosNotification({
+      orderId: order.id,
+      restaurantId: order.restaurant_id,
+      // La audiencia es explícita a propósito: es parte de la clave de dedupe
+      // y dejarla implícita en el DEFAULT la volvería invisible otra vez.
+      audience: "customer",
+      event,
+      channel: "whatsapp",
+      recipient: phone,
+    })
     if (!claim.proceed) {
       outcome.whatsapp = "skipped"
     } else {
       try {
         await sendTextMessage({ to: phone, text: buildWhatsAppText(copy, ctx) })
-        await settleNotification(claim.id, "sent")
+        await settleFoodosNotification(claim.id, "sent")
         outcome.whatsapp = "sent"
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error"
-        await settleNotification(claim.id, "failed", message)
+        await settleFoodosNotification(claim.id, "failed", message)
         logger.error("foodos_notifications.whatsapp_failed", { orderId, event, message })
         outcome.whatsapp = "failed"
       }
@@ -361,13 +310,14 @@ export async function notifyFoodosCustomer(
   if (!EMAIL_EVENTS.includes(event) || !customerEmail) {
     outcome.email = "skipped"
   } else {
-    const claim = await claimNotification(
-      order.id,
-      order.restaurant_id,
+    const claim = await claimFoodosNotification({
+      orderId: order.id,
+      restaurantId: order.restaurant_id,
+      audience: "customer",
       event,
-      "email",
-      customerEmail
-    )
+      channel: "email",
+      recipient: customerEmail,
+    })
     if (!claim.proceed) {
       outcome.email = "skipped"
     } else {
@@ -379,11 +329,11 @@ export async function notifyFoodosCustomer(
           tag: "foodos_order_update",
         })
         if (!result.ok) throw new Error(result.error ?? "send failed")
-        await settleNotification(claim.id, "sent")
+        await settleFoodosNotification(claim.id, "sent")
         outcome.email = "sent"
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error"
-        await settleNotification(claim.id, "failed", message)
+        await settleFoodosNotification(claim.id, "failed", message)
         logger.error("foodos_notifications.email_failed", { orderId, event, message })
         outcome.email = "failed"
       }

@@ -7,6 +7,7 @@ import { RestaurantProvider, useRestaurant } from "@/contexts/restaurant-context
 import { ToastProvider } from "@/components/toast"
 import ThemeToggle from "@/components/panel/ThemeToggle"
 import { SyncStatusBadge } from "@/components/panel/sync-status-badge"
+import { FoodosAlertsBell } from "./_components/foodos-alerts-bell"
 import { LanguageToggle } from "@/components/panel/language-toggle"
 import { useLocale } from "@/lib/i18n/use-locale"
 import { usePanelRealtimeSync } from "@/hooks/use-panel-realtime-sync"
@@ -143,6 +144,7 @@ function PanelContent({
                 <span className="hidden sm:inline">{t("panel.buy")}</span>
               </Link>
               <SyncStatusBadge />
+              <FoodosAlertsBell />
               {viaMember && (
                 <span className="hidden sm:inline-flex items-center px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-medium">
                   {t(`personal.role_${role}`)}

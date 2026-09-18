@@ -1,6 +1,7 @@
-import { NextResponse, type NextRequest } from "next/server"
+import { NextResponse, type NextRequest, after } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { createFoodosOrder, type FoodosOrderBody } from "@/lib/foodos-order-create"
+import { notifyFoodosOwner } from "@/lib/foodos-owner-notifications"
 import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 
@@ -52,6 +53,14 @@ export async function POST(request: NextRequest) {
     // El PaymentIntent de Stripe para tarjeta lo crea el storefront llamando a
     // POST /api/payments/stripe/create-intent con type: "foodos" y el order_id
     // devuelto aquí (separación de responsabilidades: esta ruta solo registra).
+
+    // Aviso al dueño: este es el único punto donde un pedido FoodOS entra desde
+    // fuera. Los flujos de mostrador y mesas no avisan porque los abre el propio
+    // dueño. Va en `after()` para no meter tres round-trips en la respuesta que
+    // espera el comensal; `notifyFoodosOwner` nunca lanza.
+    after(() => {
+      void notifyFoodosOwner(result.orderId, "status:pending")
+    })
 
     return NextResponse.json({
       orderId: result.orderId,

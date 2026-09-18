@@ -13,8 +13,8 @@
  * - El **alcance** se aplica siempre, y para el vendedor es un filtro de código
  *   (`seller_id = userId`), no la política RLS: estas consultas usan
  *   `createServiceClient()`, que salta RLS por completo.
- * - La **escalera de columnas** degrada una migración a la vez (00140 → 00139 →
- *   00059 → 00052) para que un entorno sin aplicar siga pintando la lista.
+ * - La **escalera de columnas** degrada una migración a la vez (00184 → 00140 →
+ *   00139 → 00059 → 00052) para que un entorno sin aplicar siga pintando la lista.
  * - La **búsqueda** es una sola: en memoria y sin acentos, igual para todos.
  * - El **orden** es `created_at` descendente, el mismo que tenían las dos
  *   lecturas. El orden por urgencia vive en la vista de pipeline, que es la
@@ -34,6 +34,7 @@ import {
   type CrmScope,
   type ProspectFilters,
 } from "./crm-core"
+import { sumEstimatedValue, type EstimatedValueSum } from "./crm-pipeline"
 
 /**
  * Techo de filas que se escanean cuando hay texto de búsqueda.
@@ -56,12 +57,6 @@ export interface CrmProspectQuery {
   ids?: readonly number[]
   /** Presencia de vendedor, para el reparto. `any` no filtra nada. */
   sellerPresence?: "any" | "assigned" | "unassigned"
-  /**
-   * Columnas adicionales fuera del contrato compartido (p. ej. `employees`,
-   * `instagram` y el volumen semanal, que solo usa el módulo `agente`).
-   * Se leen pero no se mapean: el llamador las toma de la fila cruda.
-   */
-  extraColumns?: readonly string[]
 }
 
 /**
@@ -81,7 +76,6 @@ export async function readCrmProspects(
     offset = 0,
     ids,
     sellerPresence = "any",
-    extraColumns = [],
   } = query
 
   const search = filters.q?.trim() ?? ""
@@ -95,7 +89,6 @@ export async function readCrmProspects(
     scanOffset,
     ids,
     sellerPresence,
-    extraColumns,
   })
 
   // `filterProspects` vuelve a aplicar `status`/`due`/`unassigned` (ya venían
@@ -103,29 +96,9 @@ export async function readCrmProspects(
   // son los dos que no se pueden delegar a PostgREST.
   // `mapRow` primero (rescata `city_name` del join) y `mapCrmProspect` después,
   // que es quien aplica los valores por omisión del contrato.
-  const mapped = rows.map((row) =>
-    withExtras(mapCrmProspect(mapRow(row)), row, extraColumns),
-  )
+  const mapped = rows.map((row) => mapCrmProspect(mapRow(row)))
   const matched = filterProspects(mapped, filters)
   return search ? matched.slice(offset, offset + limit) : matched
-}
-
-/**
- * Cuelga las columnas fuera del contrato en `extra`.
- *
- * `mapCrmProspect` no las conoce —no son parte del contrato compartido—, así
- * que se adjuntan después de mapear. Sin `extraColumns` la fila sale intacta:
- * las superficies del CRM no cargan un objeto vacío por cada prospecto.
- */
-function withExtras(
-  prospect: CrmProspectRow,
-  raw: Record<string, unknown>,
-  extraColumns: readonly string[],
-): CrmProspectRow {
-  if (extraColumns.length === 0) return prospect
-  const extra: Record<string, unknown> = {}
-  for (const column of extraColumns) extra[column] = raw[column] ?? null
-  return { ...prospect, extra }
 }
 
 interface RawQuery {
@@ -135,7 +108,6 @@ interface RawQuery {
   scanOffset: number
   ids?: readonly number[]
   sellerPresence: "any" | "assigned" | "unassigned"
-  extraColumns: readonly string[]
 }
 
 /**
@@ -175,11 +147,10 @@ async function loadRawRows(
   supabase: SupabaseClient,
   raw: RawQuery,
 ): Promise<Record<string, unknown>[]> {
-  const extra = raw.extraColumns.join(", ")
   let lastError: unknown = null
 
   for (const set of CRM_PROSPECT_COLUMN_SETS) {
-    const columns = withCityJoin(extra ? [...set, extra] : set)
+    const columns = withCityJoin(set)
     const { data, error } = await buildQuery(supabase, columns, raw)
     if (!error) {
       // `.select()` recibe una cadena calculada, así que el cliente no puede
@@ -210,4 +181,59 @@ async function loadRawRows(
 function mapRow(row: Record<string, unknown>): Record<string, unknown> {
   const cities = row.cities as { name?: string | null } | null | undefined
   return { ...row, city_name: cities?.name ?? null }
+}
+
+/**
+ * Techo de filas que se escanean para sumar el valor previsto del pipeline.
+ *
+ * Alto a propósito: el pipeline completo de un CRM de leads de restaurantes
+ * cabe de sobra. Si algún día no cupiera, la consulta pide **una fila de más**
+ * y `truncated` lo dice: el total se presenta entonces como mínimo, nunca como
+ * el total. Un techo silencioso sería peor que no tener total.
+ */
+export const CRM_VALUE_SCAN_LIMIT = 5000
+
+export interface PipelineValue extends EstimatedValueSum {
+  /** `true` si la ventana de escaneo se quedó corta y `total` es un mínimo. */
+  truncated: boolean
+}
+
+/**
+ * Valor previsto de todo el alcance: suma de `estimated_value`.
+ *
+ * No pasa por `readCrmProspects` por una razón de exactitud, no de comodidad:
+ * el lector de listas devuelve una **página** (200 filas por omisión) y sumar
+ * una página daría un total que parece completo y no lo es. Aquí se pide solo
+ * la columna —sin `join`, sin mapear filas— con la ventana alta y la fila
+ * extra que delata el corte.
+ *
+ * Si `00184` no está aplicada, `estimated_value` no existe: se degrada a «nadie
+ * ha declarado valor» en vez de reventar el panel, igual que la escalera de
+ * columnas del lector de listas. Un error de otro tipo sí se propaga.
+ */
+export async function readCrmPipelineValue(
+  supabase: SupabaseClient,
+  scope: CrmScope,
+  limit: number = CRM_VALUE_SCAN_LIMIT,
+): Promise<PipelineValue> {
+  const { data, error } = await applyCrmScope(
+    supabase.from("crm_prospects").select("estimated_value").not("estimated_value", "is", null),
+    scope,
+  ).limit(limit + 1)
+
+  if (error) {
+    if (isMissingColumnError(error)) {
+      logger.warn("[CRM] Sin columna estimated_value; el valor previsto se omite", {
+        message: error.message,
+      })
+      return { total: null, declared: 0, truncated: false }
+    }
+    logger.error("[CRM] Error al sumar el valor previsto:", error)
+    throw new Error("Error al calcular el valor del pipeline")
+  }
+
+  const rows = (data ?? []) as unknown as { estimated_value?: unknown }[]
+  const truncated = rows.length > limit
+  const counted = truncated ? rows.slice(0, limit) : rows
+  return { ...sumEstimatedValue(counted), truncated }
 }

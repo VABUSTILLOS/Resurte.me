@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { after } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { notifyFoodosCustomer } from "@/lib/foodos-notifications"
+import { notifyFoodosOwner } from "@/lib/foodos-owner-notifications"
 import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import type { FoodosPaymentProofMethod } from "@/types/foodos"
@@ -166,6 +167,13 @@ export async function POST(
     // mensajes repetidos.
     after(() => {
       void notifyFoodosCustomer(id, "payment:proof_pending")
+    })
+
+    // Y aviso al dueño: un comprobante por revisar es trabajo suyo. Este sí
+    // exige acción (aprobar o rechazar), a diferencia del resto del ciclo de
+    // cocina, que el dueño ya sigue en el panel.
+    after(() => {
+      void notifyFoodosOwner(id, "payment:proof_pending")
     })
 
     return NextResponse.json({ payment: inserted }, { status: 201 })

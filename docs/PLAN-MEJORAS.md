@@ -1420,6 +1420,248 @@ declarada, en cambio, mintió en tres de cuatro entradas — incluida una que
 apuntaba al archivo equivocado por seis líneas. **Antes de arreglar el backlog,
 mídelo; y antes de creerte tu propia medición, mutílala.**
 
+### Ronda 16 — El calentamiento que no cabía
+
+**Punto de partida medido.** El job `e2e` acumulaba **28 rojos en 100 corridas**,
+y su paso `E2E smoke tests` moría con `##[error]The operation was canceled.` a los
+**67,3 s** sin imprimir una sola línea. La serie cronológica de 40 corridas tiene
+una frontera nítida: `797238aa` (14:52:56Z) es el **último verde** y `f9d83339`
+(15:02:21Z) el **primer rojo**, seguido de **16 rojas consecutivas**. El diff entre
+ambos es **un solo commit y tres archivos**: `docs/foodos-paridad-maspedidos.md`,
+`e2e/redeem.spec.ts` (−102/+51) y `src/components/layout/footer.tsx`. **El cuarto
+archivo que mi primera versión de esta acta señalaba como causa raíz no está en el
+diff.**
+
+**La cronología se midió por SHA, y desmintió mi propia narración.** Contar rutas
+con `git show <sha>:e2e/global-setup.ts | grep -oE '"/[^"]*"' | sort -u | wc -l`
+da: `797238aa` → **21** · `f9d83339` → **21** · `c6e31c48` (15:49:02Z) → **46** ·
+`eb48e688` (16:08:30Z) → **64**. **El calentamiento era idéntico en el último verde
+y en el primer rojo**: creció *después*, y por tanto **no originó la regresión**,
+solo la agravó. Leer el `--stat` entre los extremos y atribuirle causalidad fue un
+error de esta acta, corregido aquí: un diff acotado **no prueba causalidad**, hay
+que medir el archivo **en cada commit**.
+
+**Y el primer rojo tampoco fue un cancel.** El log del job `e2e` de `f9d83339`
+(4m19s, 1 040 líneas) dice: `[e2e] Calentamiento de 21 rutas en 17s` a los 70 s
+—el calentamiento **funcionó**—, luego un **test real en rojo**
+(`checkout-drawer.spec.ts:166`, "No se pudo abrir el cart drawer"), y **solo al
+final**, a los **4m17s**, el `##[error]The runner has received a shutdown signal`.
+El primer rojo tiene **dos** causas encadenadas —un test que falla y una muerte
+externa— y **ninguna de las dos es el calentamiento**.
+
+**El rojo *prolongado* sí era aritmética, y no cabía.** El calentamiento usaba
+`ATTEMPTS = 3` y `ROUTE_TIMEOUT_MS = 60_000` por ruta: **64 × 3 × 60 s = 3,2 h**,
+**ocho veces** los **1 500 s** (`timeout-minutes: 25`) que el job concede a *todo*
+el pipeline. Ninguna corrida podía terminar. Y la evidencia se perdía porque el
+reporter `github` (`playwright.config.ts:16`) **bufferiza**: un job muerto por
+cancelación nunca vuelca su propio log. **Cómo agravó, medido**: a 46 rutas el
+calentamiento tardó **33 s** (`Calentamiento de 46 rutas en 33s`, 15:50:32Z) y el
+shutdown llegó **57 s después**, siendo el **primer `##[error]` del log** —no hubo
+ningún test rojo antes—; a **64 rutas el calentamiento no llegó a imprimir**, y la
+duración del job colapsó de 4m19s a 2m26s y a **1m32s**. El calentamiento se comía
+el presupuesto antes de que los tests empezaran. **El presupuesto del paso, medido
+desde su propio `##[group]Run npm run test:e2e`**:
+
+| SHA | rutas | el paso arranca | calentamiento listo | shutdown | presupuesto del paso |
+|---|---|---|---|---|---|
+| `f9d83339` | 21 | 15:03:10 | 15:03:34 (+24 s) | 15:06:41 | **3m31s** |
+| `c6e31c48` | 46 | 15:49:51 | 15:50:32 (+41 s) | 15:51:29 | **1m38s** |
+| `eb48e688` | 64 | 16:09:09 | **nunca** | 16:10:03 | **54 s** |
+
+El presupuesto del paso **se encoge a medida que el calentamiento crece**, y a 64
+rutas quedó por debajo de lo que el calentamiento necesita (≈50 s en frío, más
+reintentos por ruta): **la ausencia de la línea `Calentamiento` deja de ser un
+misterio y pasa a ser lo esperado**. Con una advertencia medida: los logs de Actions
+**se vacían con retraso** —el propio banner de npm (`> playwright test --grep @ci`)
+aparece con la marca del cancel, **54 s después** de que el paso arrancara—, así que
+**la ausencia de una línea es evidencia débil**.
+
+**E1 — un presupuesto declarado, no un timeout heredado.** `WARM_BUDGET_MS =
+120_000` acota el peor caso del calentamiento a una fracción explícita del job;
+`ROUTE_TIMEOUT_MS` bajó de 60 s a **15 s** y `ATTEMPTS` sigue en 3, así que el
+peor caso por ruta (45 s) **cabe dentro del presupuesto** en vez de desbordarlo.
+El deadline se comprueba **antes de cada intento**, no después.
+
+**La medición desmintió a mi propia hipótesis.** Había supuesto que el
+secuencialismo era el problema y que la concurrencia era la cura. Medido sobre el
+dev server real, con 66 rutas y dos corridas por nivel: **1 → 2 892 ms · 2 → 2 640
+· 4 → 2 450 · 8 → 2 341 · 16 → 2 572**. La concurrencia **apenas aporta** y
+**empeora a 16**; los 12,0 s del primer sondeo eran *"primer toque tras reposo"*,
+no el precio de ir en serie. **La cura es el deadline, no el paralelismo**, y
+`CONCURRENCY = 4` se quedó por ser el mínimo del valle, no por ser el remedio.
+
+**E2 — el presupuesto se degrada, no aborta.** El setup corre por lotes y, al
+agotarse el deadline, imprime `Presupuesto de Xs agotado: N rutas sin calentar`
+con la lista completa y **deja correr los tests**. No hay `process.exit` ni
+`throw`: un calentamiento incompleto es peor que uno lento, pero mucho mejor que
+un pipeline que no corre. Se verificó **mutando el presupuesto a 1,5 s**: paró en
+24 de 66, nombró las 42 pendientes y los 16 tests corrieron igual. Además imprime
+progreso cada 8 rutas — que es también **la sonda de la incógnita**: si el cancel
+lo provoca el silencio de stdout, esa línea lo delatará en la próxima corrida.
+
+**Lo que NO está determinado, y no lo finjo.** *Qué* mata el paso a los ~67 s
+sigue sin saberse. Descartados con evidencia: **`concurrency`** —el bloque
+`cancel-in-progress` **no existía** en ninguna de las cuatro corridas medidas:
+entró en `feaddd7f` a las 18:22:49Z, horas *después* de los hechos, y además
+**ninguna** de ellas tiene una corrida más nueva solapada (`f9d83339` murió a las
+15:06:43Z y la siguiente corrida nace a las 15:16:44Z)—, minutos de Actions (el
+repo es **público** ⇒ ilimitados), OOM y disco (el log no tiene ni una marca de
+sistema), `timeout-minutes` (el job duró 92–257 s), y un test que falle (en
+`c6e31c48` y `eb48e688` el shutdown es el **primer `##[error]`** del log, sin
+ningún rojo de test antes). La hipótesis viva es **muerte por inactividad de
+stdout**. El diseño **no depende** de resolverlo: un peor caso ocho veces mayor que
+el presupuesto está roto por construcción, y el presupuesto ya no puede
+desbordarlo. **Nota de coherencia**: tras `feaddd7f` la primera corrida
+(`35258472216`, +5 s) quedó **`cancelled`**, no `failure` — la firma de que el
+bloque hace lo que dice, y de que las muertes de esta serie son **otra cosa**.
+
+**El deadline no se ajustó al cancel.** La tentación era poner 45 s, la medida del
+silencio observado. Se descartó: en frío 64 rutas tardan ≈50 s (17 s × 64/21), así
+que **45 s habría truncado el calentamiento en todas las corridas**. Se fijó en
+120 s por ser una fracción declarada del presupuesto del job, no por imitar el
+síntoma.
+
+**E3 — la cobertura se mide contra el filesystem, no contra una lista.** El
+calentamiento enumeraba rutas a mano, así que cualquier ruta nueva nacía fría. La
+auditoría construye los **patrones reales** recorriendo `src/app/**/page.tsx` y
+`route.ts` (ignorando grupos `(...)`, rutas paralelas `@x` y privadas `_x`, y
+añadiendo `manifest`/`robots`/`sitemap`), resuelve cada ruta visitada por los
+specs `@ci` a su patrón y compara: **238 patrones**, **55 visitados**, **6 sin
+calentar**.
+
+**Dos instrumentos míos mintieron, y el tercero los corrigió.** El primer sondeo
+agrupaba por "prefijos de dos segmentos" y **sobre-reportaba** — trataba
+`/chihuahua` y `/cdmx` como rutas distintas cuando ambas resuelven al mismo patrón
+`/[ciudad]`. El segundo resolvía la ruta eligiendo el patrón **lexicográficamente
+menor**, y como `[` ordena antes que `c`, `/comercializacion` se resolvía contra
+`/[ciudad]`: **ocultaba un hueco**. El contrato nuevo desempata por **número de
+segmentos dinámicos** —prefiere el más estático, que es lo correcto— y fue **él**
+quien cazó `/comercializacion`, no mi sonda. Los seis huecos reales:
+`/api/admin/products/audit`, `/auth/callback`, `/comercializacion`,
+`/comercializacion/agente`, `/comercializacion/pedidos`,
+`/comercializacion/prospectos/[id]`. **`/chihuahua/*` no era hueco**, y declararlo
+como tal habría sido trabajo inventado. `ROUTES` pasó de 46 a 54; el total con
+`API_ROUTES`, de 64 a **72**.
+
+**E4 — el contrato.** `src/lib/e2e-warmup.contract.test.ts`, 8 pruebas: canario de
+que el archivo se lee; presupuesto ≤ 1/5 del job (leído de `ci.yml`, no copiado);
+`ROUTE_TIMEOUT_MS × ATTEMPTS < WARM_BUDGET_MS`; deadline comprobado antes de cada
+intento; que degrade **sin** `process.exit` ni `throw`; que imprima progreso;
+rutas absolutas y únicas con lotes acotados; y la cobertura con
+`EXCEPTED_PATTERNS` vacío. La batería de mutación dio **20 de 20 detectadas** con
+baseline limpio. Su primera corrida fue **7/8**: falló la prueba de cobertura
+porque el contrato resolvía `/comercializacion` correctamente y mi sonda no. Un
+defecto de construcción propio —una `const` usada dentro del `describe` y
+declarada al final del archivo, TDZ— se corrigió antes de dar la prueba por buena.
+
+**E5 — la atribución de los 22 fallos.** La corrida completa dio **395 passed ·
+115 skipped · 22 failed (13.7m)** con `Calentamiento de 72 rutas en 7s`. Los 22 se
+reparten exactamente así:
+
+| Spec:línea | N | Veredicto medido |
+|---|---|---|
+| `keyboard.spec.ts:12`, `:34` | 8 | **Flake de contención.** Aislados: 28 passed · 2 skipped · exit 0 |
+| `auth.spec.ts:25` | 1 | **Flake de contención.** Misma corrida aislada, exit 0 |
+| `mobile.spec.ts:241`, `:250`, `:1061`, `:1111`, `:1269`, `:1574`, `:1947` | 7 | **Flake de contención.** En serie (`--workers=1`): 7 passed |
+| `admin-productos.spec.ts:132` | 1 | **Flake de contención.** En serie: passed |
+| `checkout-drawer.spec.ts:750` | 1 | **Flake de contención.** En serie: passed |
+| `checkout.spec.ts:39` | 1 | **Flake de contención.** En serie: passed |
+| `mobile-chrome.spec.ts:28` | 1 | **Determinista y ajeno.** Ver abajo |
+| `redeem.spec.ts:35` | 2 | **Determinista — era mío de ronda, y arreglado.** Ver abajo |
+
+**19 de 22 son flakes por contención, y eso no es una excusa: es una medición.**
+El proyecto corre `fullyParallel: true` contra **un solo dev server compartido**,
+así que un spec que espera 5 s compite con otros diez que compilan rutas en frío.
+La prueba es la repetición en serie: los mismos tests que fallan en paralelo pasan
+con `--workers=1`. En CI los absorbe `retries: CI ? 2 : 0`; en local **enmascaran
+regresiones reales**, que es exactamente lo que estuvo a punto de pasarme con
+`redeem.spec.ts`.
+
+**El determinista ajeno — un `ASIDE` que se come el tap.** `mobile-chrome.spec.ts:28`
+falla con `locator.tap: Test timeout of 30000ms exceeded` **aunque el locator
+resuelve** al botón "Aceptar todas". Sondeado en navegador real con viewport Pixel
+7: el botón está en `rect {x:210, y:728, w:165, h:44}`, con `pointerEvents: auto`,
+`opacity: 1` y `visibility: visible`, pero `document.elementFromPoint(210,728)`
+devuelve un `DIV`, no el botón. La cadena de contención es
+`DIV.flex-1.overflow-y-auto` → `ASIDE.fixed.top-0.right-0` → … y ese `ASIDE` es el
+panel de la Guía (`src/components/panel/guide/tool-guide.tsx:88`, `z-[90]`). Una
+sonda temporal de tres instantes lo cerró: a **t=1 000 ms** el `ASIDE` tiene
+`transform: matrix(1,0,0,1,364,0)` — **desplazado fuera de pantalla** — y a
+**t=3 000 ms** ya tiene `transform: none`, encima del banner de cookies (`z-[60]`).
+El guard del propio spec (`closeGuide.isVisible({ timeout: 3000 })`) **compite con
+esa animación**: mira demasiado pronto, no ve la guía, no la cierra, y su `tap()`
+nunca aterriza. **No es mío**: esta ronda solo tocó `e2e/global-setup.ts`, que no
+puede cambiar el DOM ni la animación de un `ASIDE`.
+
+**El determinista que sí era del perímetro — y la decisión que tomé.**
+`redeem.spec.ts:35` ("service_id desconocido → 404") fallaba en **ambos proyectos
+y también en serie**, con `Expected: 404, Received: 400`. La cadena causal está
+medida: `src/app/api/redeem/route.ts` valida el *brief* (400) **antes** de buscar
+en el catálogo (404), y ese orden es **deliberado y está comentado en el código**
+—*"rechazarlo después de cobrar dejaría al cliente sin créditos y sin servicio"*—;
+el spec envía solo `{ service_id }`, así que se detiene en el 400 y **nunca
+alcanza la rama que su nombre promete**. `route.ts` **no** figura en el diff de la
+frontera: el bloque de test es nuevo. Comprobado con `curl`: con
+`brief: { restaurant_name }` la ruta devuelve **404 "Servicio no encontrado"**.
+
+Había dos arreglos defendibles —completar el payload del spec, o invertir el orden
+de la ruta para que un `service_id` desconocido sea 404 aunque el body esté mal— y
+**elegí el primero**: el orden actual es una garantía de negocio documentada
+(validar antes de debitar), y cambiarlo alteraría el contrato de la API y saltaría
+la validación de entrada para un recurso inexistente. El arreglo es de una línea,
+**no cambia el comportamiento de la aplicación**, y de paso **aumenta** la
+cobertura real: antes ese test no ejercitaba el 404 en absoluto. Añadí además la
+**cara complementaria** —`brief` inválido con `service_id` desconocido → 400— para
+que el orden quede **fijado por una prueba** y no solo por un comentario: si
+alguien lo invierte para "arreglar" el 404, ahora se entera. El archivo pasó de 4
+a 5 pruebas y `e2e/redeem.spec.ts` corre **8 de 8 en verde** (ambos proyectos).
+
+**Verificación final medida.** `npm run typecheck` → **0** · `npx eslint
+--max-warnings 0` sobre `e2e/global-setup.ts`, `e2e/redeem.spec.ts` y
+`src/lib/e2e-warmup.contract.test.ts` → **0** · `npm run knip` → **exit 0** ·
+`npm run build` → **exit 0** · **`npm run verify` → exit 0** con **333 archivos /
+5 688 pruebas, 0 en rojo** · los cuatro contratos de la superficie →
+**28 pruebas, 0 en rojo** · mutación del calentamiento → **20 de 20** ·
+`e2e` completo → **395 passed · 115 skipped · 22 failed**, los 22 atribuidos.
+
+**Confirmación final, ya con E5/E6 aplicado.** Corrida completa de cierre
+(`--grep @ci`, mismo dev server): **`Calentamiento de 72 rutas en 4s`** ·
+**393 passed · 114 skipped · 27 failed (13.5m)**. **Ninguno de los 27 es un fallo
+real**: `e2e/redeem.spec.ts` aparece **8 veces** (4 pruebas × 2 proyectos) y **0 en
+la lista de fallos** —los dos tests nuevos, `:35` y `:56`, verdes en ambos
+proyectos—, así que **los 2 deterministas que abrí están cerrados**. Los 27 son
+**26 flakes de contención + el determinista ajeno `mobile-chrome.spec.ts:28`**;
+el recuento sube de 22 a 27 porque la contención sobre el dev server compartido
+creció en esa ventana, no porque apareciera un defecto nuevo. Reparto:
+**6 en `chromium` · 21 en `mobile-chromium`**; por spec: `mobile` 9, `keyboard` 8,
+`checkout` 3, `admin-productos` 3, `checkout-drawer` 2, `auth` 1, `mobile-chrome` 1.
+
+**Lección.** El rojo no era un misterio ni un flake, pero tampoco **una** causa:
+eran **dos encadenadas** —un test real que falla y un job que muere por fuera—
+sobre las que se montó **aritmética que no cabía en el presupuesto**, escondida
+detrás de un reporter **cuyas líneas se vuelcan con retraso** (el banner de npm del
+paso apareció con la marca del cancel, 54 s después de arrancar). El camino obligó a refutar **cuatro** cosas
+propias: que la concurrencia fuera la cura (medido: aporta 2 % y empeora a 16), que
+el deadline debiera imitar el síntoma (45 s lo habría truncado siempre), que mi
+propia sonda de cobertura fuera fiable (el contrato que escribí la corrigió y cazó
+un hueco que ella no veía), y —la más incómoda— que el archivo del diff que yo
+señalaba como causa raíz **ni siquiera cambiara** entre el verde y el rojo. **Un
+instrumento que no se audita a sí mismo mide la mitad de lo que cree**, y un diff
+acotado **no prueba causalidad**: hay que medir el archivo en cada commit. La
+atribución de los 22 fallos dejó la misma enseñanza en otra forma: 19 eran ruido
+del entorno compartido y **1 era un bug real del perímetro**, indistinguibles hasta
+que se corrieron en serie.
+
+**Deuda declarada, no arreglada** — con el prefijo `E`, que estaba libre:
+
+| # | Deuda | Estado |
+|---|---|---|
+| E7 | **El panel de la Guía tapa el banner de cookies en `/panel` móvil.** `tool-guide.tsx` (`z-[90]`) termina su animación de entrada a los ~3 s y queda encima del banner (`z-[60]`): el tap nunca aterriza. Es un bug real de UX y la causa del fallo determinista de `mobile-chrome.spec.ts:28` | 🔜 |
+| E8 | **El guard de `mobile-chrome.spec.ts:28` es una carrera.** `isVisible({ timeout: 3000 })` compite con la autoapertura de la guía; un guard que espere a que la guía esté *o* a que no aparezca lo haría insensible al tiempo | 🔜 |
+| E9 | **Los fallos del `e2e` local son contención**, no lógica: `fullyParallel: true` contra un único dev server. Medido dos veces — **19 de 22** en la línea base y **26 de 27** en la corrida de cierre (el 27.º es el determinista ajeno `mobile-chrome.spec.ts:28`). En CI los absorbe `retries: 2`; en local **enmascaran regresiones reales** — el caso de `redeem.spec.ts` pasó desapercibido por esto. Mitigación propuesta: `workers` acotado o un dev server por proyecto | 🔜 |
+| E10 | **La incógnita del cancel sigue abierta.** *Qué* mata el paso `E2E smoke tests` no está determinado —muere a 92 s, 152 s, 144 s y 257 s en cuatro corridas, siempre con `The runner has received a shutdown signal`, sin marca de sistema y **sin corrida solapada**—; la hipótesis viva es muerte por inactividad de stdout, y la línea de progreso de E2 es la sonda que lo responderá en la próxima corrida de CI | 🔜 |
+| E11 | **Qué originó el primer rojo, si el calentamiento no cambió.** `f9d83339` trae tres archivos y `e2e/global-setup.ts` **no** es uno de ellos: quedan `e2e/redeem.spec.ts` (−102/+51) —que ya explica su propio 404— y `src/components/layout/footer.tsx` (+/−14) como candidatos del fallo que **no** es el cancel. Falta aislar `footer.tsx` contra `checkout-drawer.spec.ts:166`, el test que falló en esa corrida | 🔜 |
+
 ## Agentes de mantenimiento por dominio
 
 Ver `docs/agents/` — perímetro, invariantes y verificación por feature.

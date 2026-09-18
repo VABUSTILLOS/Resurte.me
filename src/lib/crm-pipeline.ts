@@ -26,6 +26,8 @@
 
 import { isFollowUpDue, normalizeForSearch, phoneKey } from "./crm-core"
 import type { CrmProspectRow, CrmStatus } from "./crm-core"
+import { round2 } from "./money"
+import { asMoneyOrNull } from "./crm-money"
 
 export {
   CRM_STATUSES,
@@ -116,6 +118,37 @@ export function compareByUrgency(a: CrmProspect, b: CrmProspect, now: Date = new
 
 /** Un seguimiento está vencido si tiene fecha y ya pasó. */
 // `isFollowUpDue` se reexporta desde `./crm-core` (arriba).
+
+/**
+ * Suma del valor previsto de un conjunto de prospectos.
+ *
+ * `total` es `null` —nunca `0`— cuando **ninguno** de los prospectos trae
+ * `estimated_value`: es la misma regla que ya rige el embudo («una tasa sin
+ * denominador no es `0%`, es «No medido»»). Un `$0` diría «este pipeline no
+ * vale nada», y lo que pasa es que nadie lo ha valorado. `declared` es cuántos
+ * sí lo traen, para que la superficie pueda decir sobre cuántos se midió.
+ *
+ * Un valor ilegible (`NaN`) se ignora igual que un `null`: cuenta como no
+ * declarado, no como cero.
+ */
+export interface EstimatedValueSum {
+  total: number | null
+  declared: number
+}
+
+export function sumEstimatedValue(
+  prospects: readonly { estimated_value: unknown }[],
+): EstimatedValueSum {
+  let total = 0
+  let declared = 0
+  for (const p of prospects) {
+    const value = asMoneyOrNull(p.estimated_value)
+    if (value === null) continue
+    total += value
+    declared += 1
+  }
+  return { total: declared === 0 ? null : round2(total), declared }
+}
 
 // ─────────────────────────────────────────────────────────────
 // Bandeja de leads web (leads.status)

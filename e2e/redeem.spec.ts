@@ -33,12 +33,35 @@ test.describe("API /api/redeem — validación de dinero", { tag: "@ci" }, () =>
   })
 
   test("service_id desconocido → 404, nunca 200 ni 500", async ({ request }) => {
+    // El brief va completo a propósito. La ruta lo valida ANTES de buscar en el
+    // catálogo (rechazarlo después de cobrar dejaría al cliente sin créditos y
+    // sin servicio), así que una petición sin brief se detiene en el 400 y este
+    // test nunca llegaría a ejercitar el 404 que su nombre promete.
     const response = await request.post("/api/redeem", {
-      data: { service_id: "servicio-que-no-existe-xyz" },
+      data: {
+        service_id: "servicio-que-no-existe-xyz",
+        brief: { restaurant_name: "Resurte Test" },
+      },
     })
 
     expect(response.status()).toBe(404)
     const data = await response.json()
     expect(data.error).toBe("Servicio no encontrado")
+  })
+
+  // La cara complementaria del test anterior: el orden de validación de la ruta
+  // (body → catálogo) es una decisión, no un accidente. Sin esta prueba, alguien
+  // podría invertirlo para "arreglar" el 404 y nadie se enteraría de que se
+  // perdió la garantía de no debitar con un brief inválido.
+  test("brief inválido + service_id desconocido → 400, el body se valida antes del catálogo", async ({
+    request,
+  }) => {
+    const response = await request.post("/api/redeem", {
+      data: { service_id: "servicio-que-no-existe-xyz" },
+    })
+
+    expect(response.status()).toBe(400)
+    const data = await response.json()
+    expect(data.error).toBe("El nombre de tu restaurante es obligatorio")
   })
 })

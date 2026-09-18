@@ -1771,6 +1771,9 @@ const en: Dictionary = {
     selectKitchen: "Select your kitchen",
     openTool: "Open tool",
     locked: "Locked",
+    alertsTitle: "Order alerts",
+    alertsMarkAll: "Mark all read",
+    alertsEmpty: "No order alerts",
   },
 }
 

@@ -24,7 +24,7 @@ import { onOrderStatusChange } from "@/lib/workflows"
 import { notifyCashbackCredited } from "@/lib/notifications"
 import { logAdminAction } from "@/lib/audit-log"
 import { missingOptionalOrderColumn, type OrderQueryResult } from "@/lib/admin/order-selects"
-import { callStockRpc } from "@/lib/order-stock"
+import { applyOrderCancellationEffects } from "@/lib/order-cancellation"
 import type { OrderStatus, PaymentStatus } from "@/types"
 
 const VALID_STATUSES: OrderStatus[] = [
@@ -238,37 +238,17 @@ export async function PATCH(
       void notifyCashbackCredited(orderId)
     }
 
-    // Devolver el inventario que el pedido reservó al crearse (migración
-    // 00143). Va aquí, junto a la liberación del cupón, porque ambos son
-    // recursos que el pedido tomó y que una cancelación debe devolver.
-    // Es un no-op si el pedido nunca reservó (o si la RPC aún no existe).
-    if (status === "cancelled" && oldStatus !== "cancelled") {
-      const released = await callStockRpc(supabase, "release_order_stock", orderId)
-      if (released?.ok === false && released.reason !== "not_reserved") {
-        logger.warn("[API] No se pudo devolver el inventario del pedido cancelado", {
-          orderId,
-          reason: released.reason,
-        })
-      }
-    }
-
-    // Revertir la reserva del cupón si la orden se cancela.
-    // El cupón incrementó used_count al crearse la orden; cancelarla
-    // debe liberarlo para que otro pedido pueda usarlo.
-    if (status === "cancelled" && oldStatus !== "cancelled" && currentOrder.coupon_code) {
-      const { data: coupon } = await supabase
-        .from("coupons")
-        .select("id, used_count")
-        .ilike("code", currentOrder.coupon_code)
-        .maybeSingle()
-
-      if (coupon && coupon.used_count > 0) {
-        await supabase
-          .from("coupons")
-          .update({ used_count: coupon.used_count - 1 })
-          .eq("id", coupon.id)
-          .eq("used_count", coupon.used_count)
-      }
+    // Devolver el inventario reservado (00143) y liberar el cupón consumido.
+    // La cascada vive en `@/lib/order-cancellation` para que el admin y el
+    // cliente que cancela su propio pedido ejecuten exactamente lo mismo:
+    // dos copias de esta lógica divergen y una de las dos deja de devolver
+    // recursos sin que nadie se entere.
+    if (status === "cancelled") {
+      await applyOrderCancellationEffects(supabase, {
+        orderId,
+        oldStatus,
+        couponCode: currentOrder.coupon_code,
+      })
     }
 
     // Bitácora admin (best-effort): qué cambió y quién lo cambió.

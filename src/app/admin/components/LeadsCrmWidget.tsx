@@ -4,6 +4,7 @@ import { UserPlus, Users, CalendarClock, Inbox, UserRoundX } from "lucide-react"
 import type { AdminLeadsSummary } from "../actions"
 import { formatRelativeTime } from "@/lib/relative-time"
 import { crmHref } from "@/lib/crm-filters"
+import { formatEstimatedTotal } from "@/lib/crm-money"
 
 /**
  * Fase 8 — Widget de leads y CRM en el dashboard: captación reciente del
@@ -102,6 +103,29 @@ export function LeadsCrmWidget({ summary }: { summary: AdminLeadsSummary }) {
               </p>
             </a>
           </div>
+          <p
+            className="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-500"
+            title={
+              summary.crmPipelineValue.truncated
+                ? "La ventana de escaneo se quedó corta: el valor real es al menos este"
+                : "Suma de estimated_value de todos los prospectos del pipeline"
+            }
+          >
+            Valor previsto:{" "}
+            <span
+              className={`font-semibold ${
+                summary.crmPipelineValue.total === null ? "text-gray-500" : "text-gray-900"
+              }`}
+            >
+              {formatEstimatedTotal(summary.crmPipelineValue, summary.crmPipelineValue.truncated)}
+            </span>
+            {summary.crmPipelineValue.declared > 0 && (
+              <span className="ml-1 text-gray-500">
+                ({summary.crmPipelineValue.declared} valorado
+                {summary.crmPipelineValue.declared === 1 ? "" : "s"})
+              </span>
+            )}
+          </p>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-5">

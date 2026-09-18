@@ -1,10 +1,10 @@
 /**
  * Fábrica de filas de `crm_prospects` para las pruebas del CRM.
  *
- * Ronda 7: el contrato compartido `CrmProspectRow` exige los 24 campos de la
- * tabla. Escribir el literal completo en cada `describe` hacía que añadir una
- * columna rompiera varios archivos de prueba a la vez, así que el valor por
- * defecto vive aquí y cada caso pisa solo lo que le importa.
+ * Ronda 7: el contrato compartido `CrmProspectRow` exige los campos de la tabla.
+ * Escribir el literal completo en cada `describe` hacía que añadir una columna
+ * rompiera varios archivos de prueba a la vez, así que el valor por defecto vive
+ * aquí y cada caso pisa solo lo que le importa.
  *
  * No es código de producción: solo lo importan los `*.test.ts` del CRM.
  */
@@ -36,7 +36,14 @@ export function crmProspect(overrides: CrmProspectOverrides = {}): CrmProspectRo
       city_name: null,
       tier: null,
       zone: null,
+      employees: null,
+      instagram: null,
+      weekly_volume_min: null,
+      weekly_volume_max: null,
       status: "nuevo",
+      estimated_value: null,
+      loss_reason: null,
+      closed_at: null,
       user_id: null,
       referral_code: null,
       last_contact_at: null,

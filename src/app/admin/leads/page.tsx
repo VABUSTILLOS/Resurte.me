@@ -53,9 +53,11 @@ import {
   isCrmStatus,
   isFollowUpDue,
   nextCrmStatus,
+  sumEstimatedValue,
   type CrmProspect,
   type LeadStatus,
 } from "@/lib/crm-pipeline"
+import { estimatedCoverageLabel, formatEstimatedTotal } from "@/lib/crm-money"
 import {
   buildFunnelBySegment,
   buildFunnelBySource,
@@ -118,6 +120,16 @@ const SEGMENT_LABEL: Record<string, string> = {
 const FILTER_FIELD =
   "rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
 const CARD = "rounded-xl border border-gray-200 bg-white p-4"
+
+/**
+ * Tamaño de la ventana del tablero.
+ *
+ * No es una página: el tablero agrupa por estado en cliente, así que pide todo
+ * de golpe. El límite existe para no traer la cartera entera, y por eso la
+ * superficie avisa cuando lo alcanza: las sumas por columna son la suma de las
+ * tarjetas que se ven, y si la ventana se cortó hay más cartera detrás.
+ */
+const CRM_BOARD_LIMIT = 500
 
 export default function AdminLeadsPage() {
   return (
@@ -226,7 +238,7 @@ function AdminLeadsContent() {
           status: prospectStatusForFilter(status),
           due,
           unassigned,
-          limit: 500,
+          limit: CRM_BOARD_LIMIT,
         }),
         getAdminLeads({
           q: debouncedQ,
@@ -872,9 +884,18 @@ function AdminLeadsContent() {
             )}
           </div>
 
+          {prospects.length >= CRM_BOARD_LIMIT && (
+            <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+              Mostrando los primeros {CRM_BOARD_LIMIT} prospectos del filtro actual. Los
+              contadores y las sumas por columna son los de estas tarjetas, no los de la
+              cartera completa: acota con la búsqueda o el estado para ver el resto.
+            </p>
+          )}
+
           <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-5">
             {CRM_BOARD_COLUMNS.map((col) => {
               const cards = [...(board[col.key] ?? [])].sort(compareByUrgency)
+              const value = sumEstimatedValue(cards)
               return (
                 <div
                   key={col.key}
@@ -884,6 +905,14 @@ function AdminLeadsContent() {
                     {col.label}
                     <span className="ml-1 text-gray-600">({cards.length})</span>
                   </h2>
+                  <p
+                    className={`mb-2 text-[11px] font-semibold ${
+                      value.total === null ? "text-gray-500" : "text-gray-700"
+                    }`}
+                    title={estimatedCoverageLabel(value.declared, cards.length)}
+                  >
+                    {formatEstimatedTotal(value)}
+                  </p>
                   <ul className="space-y-2">
                     {cards.map((p) => {
                       const next = isCrmStatus(p.status) ? nextCrmStatus(p.status) : null

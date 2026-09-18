@@ -149,9 +149,14 @@ describe("notifyFoodosCustomer · WhatsApp", () => {
     expect(text).toContain("$250.00 MXN")
     expect(text).toContain(`/r/tacos/pedido/${ORDER_ID}`)
 
+    // `audience` va en el payload a propósito (migración 00182): es parte de la
+    // clave de deduplicación, y si se dejara sólo en el DEFAULT de la columna
+    // el aviso al dueño volvería a chocar con el del comensal sin que nada lo
+    // delatara.
     expect(recorded.foodos_order_notifications!.inserts[0]).toEqual({
       order_id: ORDER_ID,
       restaurant_id: "rest-1",
+      audience: "customer",
       event: "status:confirmed",
       channel: "whatsapp",
       recipient: PHONE,

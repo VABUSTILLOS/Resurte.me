@@ -13,6 +13,7 @@ import {
   Store,
   MessageCircle,
   Camera,
+  XCircle,
 } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import {
@@ -21,6 +22,10 @@ import {
   PAYMENT_STATUS_LABEL,
   isFinalOrderStatus,
 } from "@/lib/order-labels"
+import {
+  CANCEL_REFUSAL_MESSAGE,
+  customerCancelRefusal,
+} from "@/lib/order-cancellation"
 import { usePolling } from "@/hooks/use-polling"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 import type { OrderStatus, PaymentMethod, PaymentStatus } from "@/types"
@@ -80,6 +85,9 @@ export function TrackingClient() {
   const [proof, setProof] = useState<{ url: string; at: string | null; note: string | null } | null>(
     null
   )
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   // El comprobante se pide aparte del tracking: la ruta de track expone a
   // propósito cero datos del pedido más allá del estado, y el comprobante vive
@@ -169,6 +177,45 @@ export function TrackingClient() {
   const currentStep =
     order.status === "cancelled" ? -1 : ORDER_STATUSES.indexOf(order.status)
 
+  // El motivo de rechazo lo decide el mismo módulo que la API: si la UI y el
+  // servidor tuvieran dos reglas, la UI ofrecería un botón que la API rechaza.
+  const cancelRefusal = customerCancelRefusal(order.status, order.payment_status)
+
+  const handleCancel = async () => {
+    if (!token) return
+    setCancelling(true)
+    setCancelError(null)
+    try {
+      const res = await fetch(`/api/orders/${orderId}/cancel`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ t: token }),
+      })
+      const data = (await res.json().catch(() => null)) as {
+        error?: string
+        order?: { payment_status: PaymentStatus | null }
+      } | null
+      if (!res.ok) {
+        setCancelError(data?.error ?? "No pudimos cancelar el pedido. Intenta de nuevo.")
+        return
+      }
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "cancelled",
+              payment_status: data?.order?.payment_status ?? prev.payment_status,
+            }
+          : prev
+      )
+      setConfirmingCancel(false)
+    } catch {
+      setCancelError("No pudimos cancelar el pedido. Revisa tu conexión e intenta de nuevo.")
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
       <div className="mb-6">
@@ -243,6 +290,66 @@ export function TrackingClient() {
           </div>
         )}
       </div>
+
+      {/* Cancelación por el propio cliente. Solo se ofrece mientras el pedido
+          no haya salido a reparto y no haya dinero cobrado o en vuelo; en
+          cualquier otro caso se explica por qué, en vez de esconder el botón. */}
+      {order.status !== "cancelled" && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+          {cancelRefusal ? (
+            <p className="text-xs text-gray-600">{CANCEL_REFUSAL_MESSAGE[cancelRefusal]}</p>
+          ) : confirmingCancel ? (
+            <div>
+              <p className="text-sm font-semibold text-gray-900 mb-1">
+                ¿Cancelar el pedido #{order.id}?
+              </p>
+              <p className="text-xs text-gray-600 mb-3">
+                Liberamos los productos que teníamos apartados para ti. No se puede deshacer.
+              </p>
+              {cancelError && (
+                <p role="alert" className="text-xs text-red-700 mb-2">
+                  {cancelError}
+                </p>
+              )}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="min-h-[44px] px-4 py-3 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-60"
+                >
+                  {cancelling ? "Cancelando…" : "Sí, cancelar el pedido"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmingCancel(false)
+                    setCancelError(null)
+                  }}
+                  disabled={cancelling}
+                  className="min-h-[44px] px-4 py-3 bg-gray-100 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-60"
+                >
+                  Conservar el pedido
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <p className="text-xs text-gray-600">
+                ¿Ya no lo necesitas? Puedes cancelarlo tú mismo mientras no salga a reparto.
+              </p>
+              <button
+                type="button"
+                onClick={() => setConfirmingCancel(true)}
+                className="min-h-[44px] shrink-0 inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                <XCircle className="w-4 h-4" />
+                Cancelar pedido
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Items */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">

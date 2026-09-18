@@ -284,54 +284,50 @@ describe("readCrmProspects — contrato de salida", () => {
   })
 })
 
-describe("readCrmProspects — columnas extra (módulo agente)", () => {
-  test("sin extraColumns la fila no carga el objeto extra", async () => {
+describe("readCrmProspects — segmentación (contrato compartido)", () => {
+  test("las cuatro columnas viajan en el select del escalón más completo", async () => {
     const { client, calls } = stubClient(() => ({ data: [row({ id: 1 })], error: null }))
 
-    const [prospect] = await readCrmProspects(client, { scope: ADMIN_SCOPE })
+    await readCrmProspects(client, { scope: ADMIN_SCOPE })
 
-    expect(prospect?.extra).toBeUndefined()
-    expect(last(calls, "select")?.args[0]).not.toContain("employees")
+    const select = String(last(calls, "select")?.args[0] ?? "")
+    for (const column of ["employees", "instagram", "weekly_volume_min", "weekly_volume_max"]) {
+      expect(select).toContain(column)
+    }
   })
 
-  test("con extraColumns las pide en el select y las deja en extra", async () => {
-    const extraColumns = ["employees", "instagram", "weekly_volume_min"] as const
-    const { client, calls } = stubClient(() => ({
+  test("la segmentación entra al contrato como campo de primera clase, no como pasamanos", async () => {
+    const { client } = stubClient(() => ({
       data: [
         row({
           id: 1,
           employees: 12,
           instagram: "@ana",
           weekly_volume_min: 0,
-          weekly_volume_max: null,
+          weekly_volume_max: 8000,
         }),
       ],
       error: null,
     }))
 
-    const [prospect] = await readCrmProspects(client, {
-      scope: ADMIN_SCOPE,
-      extraColumns: [...extraColumns],
-    })
+    const [prospect] = await readCrmProspects(client, { scope: ADMIN_SCOPE })
 
-    expect(last(calls, "select")?.args[0]).toContain("employees, instagram, weekly_volume_min")
-    expect(prospect?.extra).toEqual({
-      employees: 12,
-      instagram: "@ana",
-      weekly_volume_min: 0,
-    })
-    // `extra` es pasamanos: no entra al contrato, así que el CRM no lo ve.
-    expect(prospect).not.toHaveProperty("employees")
+    expect(prospect?.employees).toBe(12)
+    expect(prospect?.instagram).toBe("@ana")
+    // `0` es un volumen medido, no un hueco: se conserva.
+    expect(prospect?.weekly_volume_min).toBe(0)
+    expect(prospect?.weekly_volume_max).toBe(8000)
+    expect(prospect).not.toHaveProperty("extra")
   })
 
-  test("una columna extra ausente se normaliza a null, no a undefined", async () => {
+  test("una columna de segmentación ausente se normaliza a null, no a undefined", async () => {
     const { client } = stubClient(() => ({ data: [row({ id: 1 })], error: null }))
 
-    const [prospect] = await readCrmProspects(client, {
-      scope: ADMIN_SCOPE,
-      extraColumns: ["employees"],
-    })
+    const [prospect] = await readCrmProspects(client, { scope: ADMIN_SCOPE })
 
-    expect(prospect?.extra).toEqual({ employees: null })
+    expect(prospect?.employees).toBeNull()
+    expect(prospect?.instagram).toBeNull()
+    expect(prospect?.weekly_volume_min).toBeNull()
+    expect(prospect?.weekly_volume_max).toBeNull()
   })
 })

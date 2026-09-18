@@ -16,6 +16,7 @@ import {
   updateCrmProspectStatus,
 } from "../actions"
 import { LeadConversationPanel } from "@/components/crm/ConversationPanel"
+import { ProspectMoneyPanel } from "./ProspectMoneyPanel"
 import { ADMIN_CONVERSATION_ACTIONS } from "./admin-conversation-actions"
 
 /**
@@ -60,6 +61,9 @@ export function LeadDetailDrawer({
       onClose={onClose}
       onChanged={onChanged}
       actions={ACTIONS}
+      slots={{
+        extra: (prospect) => <ProspectMoneyPanel key={prospect.id} prospect={prospect} />,
+      }}
       renderConversation={(id, onSent) => (
         <LeadConversationPanel
           key={id}

@@ -1784,6 +1784,9 @@ export const es = {
     selectKitchen: "Selecciona tu cocina",
     openTool: "Abrir herramienta",
     locked: "Bloqueado",
+    alertsTitle: "Avisos de pedidos",
+    alertsMarkAll: "Marcar todo leído",
+    alertsEmpty: "Sin avisos de pedidos",
   },
 }
 

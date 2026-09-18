@@ -44,17 +44,12 @@ const ACTIVE_STATUSES: readonly CrmStatus[] = [
 ]
 
 /**
- * Columnas fuera del contrato compartido que sí necesita la generación de
- * mensajes: cuántos empleados tiene el restaurante, su Instagram y su volumen
- * de compra semanal alimentan el prompt. No se ensancha el CRM por tres campos
- * que solo lee el agente.
+ * Ronda 16: los cuatro campos de segmentación (`employees`, `instagram`,
+ * `weekly_volume_min`, `weekly_volume_max`) son parte del contrato compartido
+ * `CrmProspectRow`, así que el agente los lee de la fila como cualquier otro.
+ * Antes viajaban como `extraColumns` fuera del contrato, y por eso nadie los
+ * escribía: el formulario no los conocía y el agente razonaba sobre `null`.
  */
-const EXTRA_PROSPECT_COLUMNS = [
-  "employees",
-  "instagram",
-  "weekly_volume_min",
-  "weekly_volume_max",
-] as const
 
 async function getSellerName(supabase: Awaited<ReturnType<typeof createServiceClient>>, userId: string): Promise<string> {
   const { data } = await supabase
@@ -63,11 +58,6 @@ async function getSellerName(supabase: Awaited<ReturnType<typeof createServiceCl
     .eq("id", userId)
     .maybeSingle()
   return (data?.full_name as string | null) || "tu asesor de Resurte.me"
-}
-
-/** `null` ≠ `0`: solo se convierte lo que de verdad llegó como número. */
-function numberOrNull(value: unknown): number | null {
-  return value != null && value !== "" ? Number(value) : null
 }
 
 function suggestedKindFor(status: string, touches: number): MessageKind {
@@ -202,13 +192,10 @@ export async function generateAgentMessage(
     scope: scopeForRole(role, userId),
     ids: [prospectId],
     limit: 1,
-    extraColumns: EXTRA_PROSPECT_COLUMNS,
   })
   if (!p) throw new Error("Prospecto no encontrado")
 
-  const employees = numberOrNull(p.extra?.employees)
-  const volumeMin = numberOrNull(p.extra?.weekly_volume_min)
-  const volumeMax = numberOrNull(p.extra?.weekly_volume_max)
+  const { employees, weekly_volume_min: volumeMin, weekly_volume_max: volumeMax } = p
 
   const sellerName = await getSellerName(supabase, userId)
   const zone = p.zone ? ZONES.find((z) => z.id === p.zone) : null
