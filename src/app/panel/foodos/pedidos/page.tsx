@@ -21,7 +21,7 @@ import {
   rejectPaymentProof,
   type PaymentProofWithOrder,
 } from "../payment-proofs"
-import { channelLabel, FOODOS_ORDER_CHANNELS, formatMoney, modifiersSummary } from "@/lib/foodos"
+import { channelLabel, FOODOS_ORDER_CHANNELS, formatMoney, modifiersSummary, proofMethodLabel } from "@/lib/foodos"
 import { createClient } from "@/lib/supabase/client"
 import type {
   FoodosRestaurant,
@@ -78,13 +78,6 @@ const FULFILLMENT_LABEL: Record<FoodosFulfillment, string> = {
 }
 
 const PAID: FoodosPaymentStatus = "paid"
-
-const METHOD_LABEL: Record<string, string> = {
-  transfer: "Transferencia",
-  oxxo: "OXXO",
-  efectivo: "Efectivo",
-  otro: "Otro",
-}
 
 const CHANNEL_OPTIONS: { id: FoodosOrderChannel | "all"; label: string }[] = [
   { id: "all", label: t("foodos.common.allChannels") },
@@ -396,7 +389,7 @@ export default function PedidosPage() {
                     <div className="flex gap-2">
                       <dt>{t("foodos.pedidos.proofsMethod")}:</dt>
                       <dd className="font-semibold text-stone-700">
-                        {METHOD_LABEL[proof.method] ?? proof.method}
+                        {proofMethodLabel(proof.method)}
                       </dd>
                     </div>
                     {proof.amount != null && (

@@ -5,6 +5,7 @@ import {
   cartLineKey,
   modifiersSummary,
   normalizeSearchText,
+  proofMethodLabel,
   resolveOrderChannel,
   unitPriceWithModifiers,
   validateOptionSelection,
@@ -278,5 +279,27 @@ describe("resolveOrderChannel", () => {
   it("una mesa vacía no cuenta como qr", () => {
     expect(resolveOrderChannel({ origin: "storefront", tableNumber: "   " })).toBe("web")
     expect(resolveOrderChannel({})).toBe("web")
+  })
+})
+
+describe("proofMethodLabel: el vocabulario del comprobante de pago", () => {
+  it("etiqueta las cuatro formas que el comensal puede declarar", () => {
+    expect(proofMethodLabel("transfer")).toBe("Transferencia")
+    expect(proofMethodLabel("oxxo")).toBe("OXXO")
+    expect(proofMethodLabel("efectivo")).toBe("Efectivo")
+    expect(proofMethodLabel("otro")).toBe("Otro")
+  })
+
+  it("un slug desconocido se pinta tal cual, nunca como hueco", () => {
+    expect(proofMethodLabel("bitcoin")).toBe("bitcoin")
+    expect(proofMethodLabel("")).toBe("")
+  })
+
+  it("no confunde el vocabulario del comprobante con el del cobro", () => {
+    // `cash` y `card` son formas de cobro (`FOODOS_PAYMENT_METHODS`), no formas
+    // declaradas por el comensal: aquí caen al fallback y se ven crudas. Si
+    // alguien unifica las dos tablas, este caso se pone rojo a propósito.
+    expect(proofMethodLabel("cash")).toBe("cash")
+    expect(proofMethodLabel("card")).toBe("card")
   })
 })

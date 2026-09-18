@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Upload, Loader2, CheckCircle2, AlertCircle, Clock } from "lucide-react"
 import { sf, type StorefrontLang } from "@/lib/foodos-i18n"
+import { PROOF_METHOD_LABELS } from "@/lib/foodos"
 import type { FoodosPaymentProofMethod, FoodosPaymentProofStatus } from "@/types/foodos"
 
 interface ProofRow {
@@ -12,13 +13,6 @@ interface ProofRow {
   status: FoodosPaymentProofStatus
   notes: string | null
   created_at: string
-}
-
-const METHOD_LABEL: Record<FoodosPaymentProofMethod, string> = {
-  transfer: "Transferencia",
-  oxxo: "OXXO",
-  efectivo: "Efectivo",
-  otro: "Otro",
 }
 
 /**
@@ -120,7 +114,7 @@ export function PaymentProofUpload({
         <div className="text-sm text-amber-900">
           <p className="font-bold">{sf(lang, "proofPending")}</p>
           <p className="text-amber-800 mt-1">
-            {METHOD_LABEL[latest.method]}
+            {PROOF_METHOD_LABELS[latest.method]}
             {latest.amount != null && ` · $${latest.amount.toFixed(2)}`}
           </p>
         </div>
@@ -197,9 +191,9 @@ export function PaymentProofUpload({
         className="mt-3 w-full rounded-lg border border-stone-300 px-2 py-1.5 text-sm"
         aria-label="Método de pago"
       >
-        {(Object.keys(METHOD_LABEL) as FoodosPaymentProofMethod[]).map((m) => (
+        {(Object.keys(PROOF_METHOD_LABELS) as FoodosPaymentProofMethod[]).map((m) => (
           <option key={m} value={m}>
-            {METHOD_LABEL[m]}
+            {PROOF_METHOD_LABELS[m]}
           </option>
         ))}
       </select>

@@ -15,13 +15,20 @@
 >
 > **Actualización (Ronda 23).** La medición de arriba es la del día de la
 > auditoría y se conserva como línea base. Al cerrar las oleadas A, C y D el
-> árbol mide **370 archivos / 6,445 tests**, `knip` exit 0. Lo que cambió no fue
+> árbol mide **373 archivos / 6,498 tests**, `knip` exit 0. Lo que cambió no fue
 > el diagnóstico —**sigue sin haber humo**: ninguna de las 54 superficies está
 > rota— sino la **fiabilidad de la medición**: la ronda encontró y corrigió
 > cinco instrumentos que decían estar midiendo y no medían (ver §8), cerró
 > `c1`/`c2`/`c3` de la Oleada C, que eran tres silencios del esquema (ver §9), y
 > sacó la única capacidad que se anunciaba como beneficio de un nivel donde no
 > existía (§10).
+>
+> **Actualización (Ronda 24).** El árbol sigue en **373 archivos / 6 498
+> tests**, `knip` exit 0. La ronda cerró la debilidad #7 —las tres bitácoras de
+> `/admin/bitacoras` se cortaban en silencio— y el detalle está en **§11**. El
+> diagnóstico de fondo no se movió: **sigue sin haber humo en ninguna de las 54
+> superficies**; lo que se arregló fue que la lista de eventos **dijera cuánto
+> callaba**.
 >
 > **Advertencia sobre `git log`:** los commits de este árbol son autocommits
 > `"Save uncommitted changes"` de la app. No atribuyen trabajo ni expresan
@@ -161,9 +168,11 @@ test**:
 
 1. **`pos` es un stub deliberado.** Los 6 proveedores están declarados con
    `implemented:false` (`src/lib/pos/registry.ts`) y el webhook entrante responde
-   **503**. No es un fallo silencioso —está documentado— pero la superficie
-   aparece en el panel con nivel Diamante y no hace nada. El camino real hoy es
-   la importación CSV.
+   **503**. No es un fallo silencioso —está documentado— pero la superficie no
+   hace nada. El camino real hoy es la importación CSV.
+   ✅ **Corregido (Ronda 23).** La auditoría decía que la superficie "aparece en
+   el panel con nivel **Diamante**". Ya no: `pos_integraciones` no se cobra en
+   ningún nivel y la superficie abre en **Verde, sin candado**. Ver §10.
 2. **No hay ESC/POS.** La impresión es HTML imprimible + `window.print()`
    (`src/lib/foodos-printing/types.ts:9-13`). Sin impresora térmica real, un POS de
    mostrador no sobrevive en un restaurante de verdad.
@@ -175,17 +184,32 @@ test**:
    `src/app/api/admin/foodos/payouts/route.ts:14`). Hoy la dispersión es **manual**
    desde `/admin/foodos/dispersiones`. Lo que sí funciona completo es el
    comprobante de pago manual.
-4. **La escalera de niveles concentra el valor en la cima.** De 10 capacidades
-   premium, **8 exigen Diamante** (`src/lib/foodos-entitlements.ts`): POS,
-   comandero, wallet, app de marca, sitio IA, catering, mesero IA e integraciones
-   POS. Solo `marketing_ia` abre en Plata y `flotilla` en Oro.
+4. **La escalera de niveles concentra el valor en la cima.** De **10 capacidades
+   premium**, **5 exigen Diamante** (`src/lib/foodos-entitlements.ts`):
+   `mesero_ia`, `wallet_passes`, `app_marca`, `sitio_ia` y `catering`. **3 abren
+   en Oro** (`flotilla`, `pos_mostrador`, `comandero`), **1 en Plata**
+   (`marketing_ia`) y **1 es línea base** (`pos_integraciones`, en todos los
+   niveles sin candado).
+   ✅ **Re-medido y corregido (Ronda 23).** La auditoría decía "8 exigen
+   Diamante" y listaba POS, comandero e integraciones POS entre ellas. Ya no:
+   `pos_integraciones` salió del candado y POS y comandero bajaron a Oro. El
+   sesgo de la escalera sigue ahí —el escalón más caro es el único que añade
+   cinco capacidades de golpe—, pero el peso cambió. Ver §10.
 5. **Wallet sin certificados reales:** Apple Wallet responde 501 sin certificados;
    Google Wallet redirige. La superficie es sólida, el último tramo no.
 6. **Deudas declaradas y acotadas:** `FULFILLMENT_LABELS` y
    `PAYMENT_METHOD_LABELS` de `foodos-reportes.ts` están en español fijo (en `en`
-   se ven en español; `CHANNEL_LABELS` sí es compartida), y `METHOD_LABEL` de
-   `pedidos/page.tsx` no es el conjunto canónico de métodos — la clave `efectivo`
-   no corresponde a ningún slug real.
+   se ven en español; `CHANNEL_LABELS` sí es compartida). **Medido: el módulo no
+   importa `t()` ni `sf()` —cero coincidencias—, así que la afirmación se
+   sostiene.** Y `METHOD_LABEL` de `pedidos/page.tsx` no era "el conjunto no
+   canónico": era una **copia** de la tabla de formas del comprobante, con la
+   clave `efectivo` —que **sí** es un slug real de `FoodosPaymentProofMethod`— y
+   con el tipo degradado a `Record<string, string>`, de modo que añadir una forma
+   nueva pintaba el slug crudo en el panel sin fallar. ✅ **Resuelto (Ronda 24):**
+   una sola tabla, `PROOF_METHOD_LABELS` en `src/lib/foodos.ts`, y las dos
+   superficies la importan (ver §11). Queda **sin arreglar** que esas etiquetas
+   sean español fijo, también en el micrositio, que sí tiene `sf()` para el resto
+   de sus textos.
 
 **Lo que sí está bien y conviene no romper:** multi-sucursal real
 (`foodos_branches`, overrides y horarios por sucursal, filtros `branch_id` en el
@@ -239,6 +263,11 @@ flujos de escritura reales (`admin-productos.spec.ts`,
    roles granulares** de ops/marketing/finanzas: cualquier admin puede tocar
    productos, dinero, usuarios y CRM. Lo más cercano es el rol `vendedor`, que
    solo alcanza `/comercializacion`.
+   ✅ **Resuelto (Ronda 20).** `supabase/migrations/00188_admin_permissions.sql`
+   añade la columna `profiles.admin_permissions` (`TEXT[]`) —permisos por sección
+   y por persona— y `src/lib/admin-permissions.ts` (`ADMIN_SECTIONS`, `:184`) es
+   la única fuente que decide qué secciones ve y puede tocar cada admin. El rol
+   sigue siendo todo-o-nada; la **autorización por sección** ya no.
 2. **Facturación CFDI no existe.** Grep de `cfdi/timbrado/facturapi/sat/rfc` en
    `src/` sin resultados. Lo que el panel llama "facturas" son **tickets subidos
    por usuarios para ganar créditos** (`invoice_submissions`): aprobarlos acredita
@@ -270,8 +299,52 @@ flujos de escritura reales (`admin-productos.spec.ts`,
    atribución por grep, `estimated_value` es foto y no histórico, motivo de
    pérdida no retroactivo, límite de 50 pedidos y `crm_tasks` con **0 políticas
    RLS** (**declarada en la Oleada C**, ver §9).
-7. **Retención limitada en bitácoras:** 100 filas (auditoría) y 200 (errores),
-   sin export.
+7. **Retención limitada en bitácoras: las tres pestañas se cortaban en silencio.**
+   ✅ **Resuelto (Ronda 24).** Ver §11. Lo medido antes de tocar nada:
+
+   | Pestaña | Tabla | Tope | Orden | Índice que lo respalda | Export | ¿Declaraba el corte? |
+   |---|---|---|---|---|---|---|
+   | `auditoria` | `admin_audit_log` | **100** (`AUDIT_LOG_PAGE_SIZE`) | `created_at DESC` | `idx_admin_audit_log_created` ✅ | ❌ | ❌ |
+   | `errores` | `error_logs` | **200** (`ERROR_LOG_CAP`) | `created_at DESC` | `error_logs_created_at_idx` ✅ | ✅ CSV | ❌ |
+   | `emails` | `email_logs` | **200** (`EMAIL_LOG_CAP`) | `sent_at DESC` | **ninguno** ❌ | ❌ | ❌ |
+
+   Cuatro defectos medidos, no supuestos:
+   - **`report.total = entries.length`** (`src/lib/admin-errors.ts:76` antes de la
+     ronda): un campo llamado `total` que significaba "mostradas".
+   - **`bySeverity` / `bySource`** se calculaban sobre **las filas devueltas** y se
+     pintaban como tarjetas grandes del periodo (`errores-tab.tsx:97-118`).
+   - **Dos números para un solo tope** (`src/lib/admin-errors.ts`): la
+     constante declaraba `200` y la expresión que la aplicaba llevaba un `100`
+     suelto. El tope efectivo era el menor, y la pestaña nunca pide un número, así
+     que el valor aplicado no se veía en ninguna parte de la UI.
+   - **Los topes vivían en un módulo que no puede declararlos**
+     (`src/lib/admin-errors.ts`, que empieza por `"use server"`): un valor
+     exportado **invalida el módulo entero** y el síntoma aparece a dos archivos
+     de distancia, en el bundler. Lo cazó
+     `src/lib/use-server.contract.test.ts`.
+
+   **Por qué esto se prueba por construcción y no por observación.** El 18 de
+   septiembre la base tenía `audit_total = 2`, `errors_total = 2`,
+   `emails_total = 0`. Con esos volúmenes el corte **es inmedible**: no hay forma
+   de reproducirlo mirando la pantalla. Eso no lo vuelve teórico — lo vuelve
+   **probable por construcción**, porque el `LIMIT` está en el código y el aviso
+   no. De ahí que el arreglo sea estructural y la prueba un contrato.
+
+   **El índice ausente, con evidencia.** `email_logs` tenía
+   `idx_email_logs_user_type (user_id, email_type, sent_at)`, pero el `user_id`
+   delante lo descalifica para un `ORDER BY sent_at DESC LIMIT 200`. Medido con
+   una tabla temporal de 200 000 filas y `EXPLAIN (ANALYZE, BUFFERS)`:
+
+   ```
+   sin índice:  Limit (rows=200)  Buffers: read=2858
+                  -> Sort (Sort Key: sent_at DESC; top-N heapsort)
+                       -> Seq Scan on m_email_logs (rows=200000)
+   con índice:  Limit (rows=200)  Buffers: read=6
+                  -> Index Scan using m2_sent on m2
+   ```
+
+   **2858 → 6 buffers (~476×).** Resuelto en
+   `supabase/migrations/00190_email_logs_sent_at_index.sql`.
 
 ---
 
@@ -534,3 +607,120 @@ vista desde tres lados: un instrumento de prueba que no dice lo que no ve, un
 esquema que calla, y un **nombre que hace dos trabajos**. En los tres casos la
 reparación fue la misma y ninguna cambió el comportamiento visible de las 54
 superficies: **escribir la decisión donde se pueda verificar**.
+
+---
+
+## 11. Estado tras la Ronda 24 — la bitácora que no decía cuánto callaba
+
+**La debilidad era la #7 de la sección 4, y su forma es la más engañosa del
+sitio:** una lista truncada no se ve truncada. Se ve como una lista.
+
+### Las tres pestañas, medidas antes de tocarlas
+
+| Pestaña | Tabla | Tope | Orden | Índice que lo respalda | Export | ¿Declaraba el corte? |
+|---|---|---|---|---|---|---|
+| `auditoria` | `admin_audit_log` | **100** (`AUDIT_LOG_PAGE_SIZE`) | `created_at DESC` | `idx_admin_audit_log_created` ✅ | ❌ → ✅ CSV | ❌ → ✅ |
+| `errores` | `error_logs` | **200** (`ERROR_LOG_CAP`) | `created_at DESC` | `error_logs_created_at_idx` ✅ | ✅ CSV | ❌ → ✅ |
+| `emails` | `email_logs` | **200** (`EMAIL_LOG_CAP`) | `sent_at DESC` | **ninguno** → `00190` | ❌ → ✅ CSV | ❌ → ✅ |
+
+Las tres pedían un `LIMIT` duro y **ninguna decía que se había cortado**. La
+pestaña hermana de la que sí importa legalmente (`errores`) ya exportaba CSV; la
+que registra **quién tocó el dinero, el catálogo y los permisos** (`auditoría`)
+no.
+
+### Los cuatro defectos que aparecieron al medir
+
+1. **`report.total = entries.length`** (`src/lib/admin-errors.ts`). Un campo
+   llamado `total` que significaba «las que mostré». Es la misma mentira que el
+   `LIMIT` mudo, pero **con nombre de dato duro**: quien lo leyera en el JSON no
+   tenía forma de saber que era el largo de una página.
+2. **`bySeverity` y `bySource` se calculaban sobre las filas devueltas** y se
+   pintaban como tarjetas grandes del periodo. Con 2 filas en la base coincidía
+   por casualidad; con 2 000 el desglose habría sido el de las 200 primeras.
+3. **Dos números para un solo tope.** `getErrorLogs` declaraba
+   `ERROR_LOG_CAP = 200` y a la vez llevaba un `100` suelto dentro de su propio
+   `Math.max(...)`. El tope **efectivo** era el menor —`100`—, y la constante
+   decía `200`. Peor: la pestaña nunca pide un número, así que el valor aplicado
+   no aparecía en ninguna parte de la UI. **Corregido nombrando los dos**
+   (`ERROR_LOG_PAGE_DEFAULT`), y con una regla en el contrato: en las líneas que
+   calculan un tope no puede haber literales de tres dígitos.
+4. **Los topes vivían donde no pueden vivir.** Los dos números anteriores se
+   declararon dentro de `src/lib/admin-errors.ts`, que empieza por
+   `"use server"` — y un módulo `"use server"` **sólo puede exportar funciones
+   asíncronas y tipos**: un valor exportado **invalida el módulo entero**, y el
+   síntoma aparece a dos archivos de distancia, en el bundler, no en `tsc` ni en
+   ESLint. Lo cazó `src/lib/use-server.contract.test.ts`, que ya existía y que
+   **`npm run verify` corrió después de escribir los topes**, no antes. Los tres
+   topes viven ahora en `src/lib/bitacora.ts`, y una regla nueva impide que
+   vuelvan: se busca la declaración en **todo `src/`** y se exige que sea
+   **exactamente una** y que su archivo no sea un módulo `"use server"` ni un
+   `route.ts`.
+
+### Por qué la prueba se hace por construcción y no con datos
+
+La base tenía, al medir: `admin_audit_log` **2** filas, `error_logs` **2**,
+`email_logs` **0**. Ninguna llega al tope, así que **ningún caso con datos reales
+puede distinguir una lista cortada de una completa**. La ronda se prueba leyendo
+el código y saboteándolo, no esperando a que la tabla crezca.
+
+### La decisión que hace que esto no vuelva a pasar
+
+- **`cap + 1` filas pedidas a propósito.** La fila de más es la **sonda** que
+  responde «¿hay más?» sin un `count(*)` que recorra la tabla. Sin ella la UI no
+  puede distinguir una bitácora de 100 filas de una cortada en 100.
+- **`count: "exact"`** se pide **además**, para el total real. Con el índice ya
+  presente cuesta poco; sin él, la ronda anterior no lo habría pedido.
+- **`total` es `number | null` y nunca se rellena con `shown`.** Ese fue el
+  pecado original de `getErrorLogs`; el tipo ahora lo impide. La auditoría no pide
+  `count`, así que su `total` viaja como `null` —que significa «no se preguntó»—
+  y la UI lo dice.
+- **`resumenDeCorte` se pinta siempre**, no sólo cuando `truncated`: un límite
+  que no se nombra se lee como «esto es todo».
+- **Las tres exportan CSV**, así que el dato completo es alcanzable aunque la
+  pantalla siga capada.
+
+### El índice que faltaba, y la prueba de que hacía falta
+
+`email_logs` ordenaba por `sent_at DESC` sin índice que lo cubriera.
+`idx_email_logs_user_type (user_id, email_type, sent_at)` no servía: el `user_id`
+delante descalifica el orden. Medido sobre una tabla temporal de **200 000
+filas** con `EXPLAIN (ANALYZE, BUFFERS)`:
+
+```
+sin índice:  Limit (rows=200)  Buffers: local read=2858
+               -> Sort (Sort Key: sent_at DESC; top-N heapsort Memory: 51kB)
+                    -> Seq Scan on m_email_logs (rows=200000)
+con índice:  Limit (rows=200)  Buffers: local read=6
+               -> Index Scan using m2_sent on m2
+```
+
+**2 858 → 6 buffers (~476×).** `00190_email_logs_sent_at_index.sql` añade
+`email_logs_sent_at_idx (sent_at DESC)`.
+
+### Cómo se congela
+
+`src/lib/bitacora.ts` es el vocabulario compartido (`paginaCapada`,
+`resumenDeCorte`); `src/lib/bitacora.test.ts` (13) prueba su comportamiento y
+`src/lib/bitacora-limites.contract.test.ts` (31) congela cinco cosas por
+pestaña: el tope es una constante con nombre, **no hay un segundo tope sin
+nombre**, el tope se declara **una sola vez y en un archivo que puede
+declararlo**, la consulta pide `cap + 1`, y la pestaña declara el corte y ofrece
+export. **El perímetro se descubre del disco**, así que una cuarta bitácora sin
+declarar pone el contrato rojo.
+
+### El mismo patrón, encontrado de paso
+
+Al corregir el prose obsoleto de la sección 3 apareció una copia con la misma
+forma que la bitácora muda: la tabla de formas del comprobante de pago estaba
+declarada **dos veces** —en el micrositio y en el panel de pedidos— con tipos
+distintos, `Record<FoodosPaymentProofMethod, string>` y `Record<string, string>`.
+La copia sin tipo no fallaba al añadir una forma nueva: **pintaba el slug crudo**.
+Ahora vive una sola vez, en `PROOF_METHOD_LABELS` (`src/lib/foodos.ts`), y
+`src/lib/foodos-labels.contract.test.ts` (6) impide que vuelva a copiarse.
+
+**Lo que la Ronda 24 deja como método.** Las cuatro rondas de este tramo tienen
+la misma forma: un instrumento que no dice lo que no ve (Ronda 23), un esquema
+que calla (Oleada C), un nombre que hace dos trabajos (Oleada D) y ahora **una
+lista que no declara su borde**. La reparación es la misma en las cuatro y
+ninguna cambió el comportamiento visible de las 54 superficies: **escribir el
+límite donde se pueda verificar.**

@@ -6,6 +6,7 @@ import type * as WaCatalogs from "@/lib/whatsapp-catalogs"
 import { logger } from "@/lib/logger"
 import { requireAdmin } from "@/lib/admin-auth"
 import { logAdminAction } from "@/lib/audit-log"
+import { paginaCapada, type PaginaCapada } from "@/lib/bitacora"
 import { isMissingColumnError, isMissingRelationError } from "@/lib/sale-window"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import {
@@ -4249,7 +4250,7 @@ export async function getAdminAuditLog(filters?: {
   action?: string
   from?: string
   to?: string
-}): Promise<AuditLogEntry[]> {
+}): Promise<PaginaCapada<AuditLogEntry>> {
   const { response: adminDenied } = await requireAdmin()
   if (adminDenied) {
     throw new Error("Acceso restringido a administradores")
@@ -4259,11 +4260,14 @@ export async function getAdminAuditLog(filters?: {
   const f = normalizeAuditFilters(filters ?? {})
 
   const supabase = await createServiceClient()
+  // Se piden `cap + 1` filas a propósito: la de más es la sonda que responde
+  // "¿hay más?" sin un count(*) que recorra la tabla. Sin ella, la UI no puede
+  // distinguir una bitácora de 100 filas de una cortada en 100.
   let query = supabase
     .from("admin_audit_log")
     .select("id, actor_email, action, entity, entity_id, detail, created_at")
     .order("created_at", { ascending: false })
-    .limit(AUDIT_LOG_PAGE_SIZE)
+    .limit(AUDIT_LOG_PAGE_SIZE + 1)
 
   if (f.action) query = query.eq("action", f.action)
   if (f.from) query = query.gte("created_at", new Date(`${f.from}T00:00:00`).toISOString())
@@ -4278,7 +4282,7 @@ export async function getAdminAuditLog(filters?: {
     logger.error("[ADMIN-AUDIT] Error fetching audit log:", error)
     throw new Error("Error al cargar la bitácora")
   }
-  return (data ?? []) as AuditLogEntry[]
+  return paginaCapada((data ?? []) as AuditLogEntry[], AUDIT_LOG_PAGE_SIZE)
 }
 
 // ------------------------------------------------------------

@@ -1,0 +1,41 @@
+-- 00190_email_logs_sent_at_index.sql
+--
+-- Índice para el orden propio de la bitácora de correos (Ronda 24).
+--
+-- PROBLEMA: `/admin/bitacoras` → pestaña "Correos" consulta
+-- `email_logs ORDER BY sent_at DESC LIMIT 200`
+-- (`src/app/api/admin/email-logs/route.ts:29`). Las tres tablas de bitácora
+-- tienen índice para su propio orden salvo esta:
+--
+--   admin_audit_log → idx_admin_audit_log_created (created_at DESC)   ✅
+--   error_logs      → error_logs_created_at_idx  (created_at DESC)   ✅
+--   email_logs      → idx_email_logs_user_type   (user_id, email_type, sent_at) ❌
+--
+-- `idx_email_logs_user_type` lleva `user_id` como columna líder, así que **no
+-- sirve** para un `ORDER BY sent_at DESC` sin predicado sobre `user_id`: el
+-- orden se resuelve recorriendo y ordenando la tabla completa. Con `LIMIT 200`
+-- eso significa leer todo para tirar casi todo.
+--
+-- EVIDENCIA (medida con 200,000 filas sintéticas, `EXPLAIN (ANALYZE, BUFFERS)`):
+--
+--   sin el índice →  Buffers: local read=2858
+--                    Sort (top-N heapsort) → Seq Scan on email_logs
+--   con el índice →  Buffers: local read=6
+--                    Index Scan using email_logs_sent_at_idx
+--
+-- 2858 → 6 buffers, **~476×**. Y no es solo lectura: el `Sort` de top-N reserva
+-- memoria en cada consulta y el `Seq Scan` toca cada fila.
+--
+-- SOLUCIÓN: el índice que falta, con el orden declarado `DESC` para que el
+-- planificador no tenga que invertirlo. Es aditivo: no cambia ninguna consulta
+-- ni ningún resultado, solo cómo se resuelve el orden.
+--
+-- ALCANCE: `CREATE INDEX` sin `CONCURRENTLY` toma un `SHARE` sobre la tabla, que
+-- bloquea escrituras pero no lecturas. La tabla hoy tiene 0 filas, así que el
+-- bloqueo es instantáneo; se deja en su propia sentencia para no alargar una
+-- transacción.
+--
+-- Idempotente: `IF NOT EXISTS`.
+
+CREATE INDEX IF NOT EXISTS email_logs_sent_at_idx
+  ON public.email_logs (sent_at DESC);

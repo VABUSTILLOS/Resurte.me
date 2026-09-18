@@ -1674,9 +1674,9 @@ que se corrieron en serie.
 
 | # | Deuda | Estado |
 |---|---|---|
-| E7 | **El panel de la Guía tapa el banner de cookies en `/panel` móvil.** `tool-guide.tsx` (`z-[90]`) termina su animación de entrada a los ~3 s y queda encima del banner (`z-[60]`): el tap nunca aterriza. Es un bug real de UX y la causa del fallo determinista de `mobile-chrome.spec.ts:28` | 🔜 |
-| E8 | **El guard de `mobile-chrome.spec.ts:28` es una carrera.** `isVisible({ timeout: 3000 })` compite con la autoapertura de la guía; un guard que espere a que la guía esté *o* a que no aparezca lo haría insensible al tiempo | 🔜 |
-| E9 | **Los fallos del `e2e` local son contención**, no lógica: `fullyParallel: true` contra un único dev server. Medido dos veces — **19 de 22** en la línea base y **26 de 27** en la corrida de cierre (el 27.º es el determinista ajeno `mobile-chrome.spec.ts:28`). En CI los absorbe `retries: 2`; en local **enmascaran regresiones reales** — el caso de `redeem.spec.ts` pasó desapercibido por esto. Mitigación propuesta: `workers` acotado o un dev server por proyecto | 🔜 |
+| E7 | **El panel de la Guía tapaba el banner de cookies en `/panel` móvil.** `tool-guide.tsx` (`z-[90]`) terminaba su animación de entrada a los ~3 s y quedaba encima del banner (`z-[60]`): el tap nunca aterrizaba. Era la causa del fallo determinista de `mobile-chrome.spec.ts:28` | ✅ **Ronda 23** — la guía ya no se auto-abre mientras no haya decisión de cookies, así que su drawer (`z-[90]`) y su backdrop (`z-[85]`) no pueden ganarle el primer tap al banner. El orden de capas quedó documentado en `tool-guide.tsx:32-33` |
+| E8 | **El guard de `mobile-chrome.spec.ts:28` era una carrera.** `isVisible({ timeout: 3000 })` competía con la autoapertura de la guía | ✅ **Ronda 23** — el guard ahora espera a que el banner esté: `await expect(acceptCookies).toBeVisible({ timeout: 8000 })`, más `toHaveCount(0)` sobre el botón de cerrar la guía y `not.toBeVisible()` tras el tap. Es insensible al tiempo de la animación en vez de competir con él |
+| E9 | **Los fallos del `e2e` local eran contención**, no lógica: `fullyParallel: true` contra un único dev server. Medido dos veces — **19 de 22** en la línea base y **26 de 27** en la corrida de cierre. En CI los absorbía `retries: 2`; en local **enmascaraban regresiones reales** | ✅ **Ronda 23** — `WORKERS = 2` (`playwright.config.ts:62`) con la medición escrita al lado (`:46-61`: 1 worker verde en 1.0 min, 2 en 1.8 min, 4 rojo), `E2E_WORKERS` para ajustarlo y `reuseExistingServer: false`. Y la causa de fondo, que no era la contención sino la memoria: local ya no corre `next dev` sino `next build` + `next start` (`E2E_SERVER`, `:84`), porque el `next-server` del e2e crecía ~7 MB/s hasta agotar los 16 GB |
 | E10 | **La incógnita del cancel sigue abierta.** *Qué* mata el paso `E2E smoke tests` no está determinado —muere a 92 s, 152 s, 144 s y 257 s en cuatro corridas, siempre con `The runner has received a shutdown signal`, sin marca de sistema y **sin corrida solapada**—; la hipótesis viva es muerte por inactividad de stdout, y la línea de progreso de E2 es la sonda que lo responderá en la próxima corrida de CI | 🔜 |
 | E11 | **Qué originó el primer rojo, si el calentamiento no cambió.** `f9d83339` trae tres archivos y `e2e/global-setup.ts` **no** es uno de ellos: quedan `e2e/redeem.spec.ts` (−102/+51) —que ya explica su propio 404— y `src/components/layout/footer.tsx` (+/−14) como candidatos del fallo que **no** es el cancel. Falta aislar `footer.tsx` contra `checkout-drawer.spec.ts:166`, el test que falló en esa corrida | 🔜 |
 
@@ -2563,6 +2563,130 @@ los 362 / 6,349 de la Ronda 22. Siete contratos nuevos
 sobre `next build` + `next start`, desde los 10 rojos en 5m32s del primer
 intento. La Ronda 23 queda **cerrada**: `d1` era lo último pendiente de las
 oleadas A–D.
+
+### Ronda 24 — La bitácora que no decía cuánto callaba
+
+**Origen.** La debilidad #7 de [`docs/AUDITORIA-ESTATUS.md`](AUDITORIA-ESTATUS.md):
+las tres pestañas de `/admin/bitacoras` consultaban con un `LIMIT` duro y
+**ninguna declaraba que se había cortado**. Una lista truncada en silencio se lee
+como una lista completa: el admin ve 100 filas y concluye «eso es todo lo que
+pasó». En `admin_audit_log` —el registro de quién tocó el dinero, el catálogo y
+los permisos— eso es perder evidencia, no una imprecisión de UI. La pestaña
+hermana de la que sí importa legalmente (`errores`) ya exportaba CSV; la de
+auditoría, no.
+
+**Oleada A — medir el corte antes de tocarlo (`ba1`–`ba3`).**
+- **`ba1` — el estado real de las tres.** La tabla de topes quedó escrita en la
+  auditoría antes de cambiar una línea: `auditoria` 100
+  (`AUDIT_LOG_PAGE_SIZE`), `errores` 200 (`ERROR_LOG_CAP`), `emails` 200
+  (`EMAIL_LOG_CAP`), las tres ordenando por fecha descendente y ninguna
+  declarando el borde.
+- **`ba2` — los tres defectos que sólo aparecen midiendo.** `getErrorLogs`
+  devolvía `total: entries.length` —un campo llamado `total` que significaba
+  «mostradas»—; `bySeverity`/`bySource` se calculaban sobre **las filas
+  devueltas** y se pintaban como tarjetas grandes del periodo; y el tope estaba
+  escrito **dos veces**, con `200` en la constante y `100` suelto en la expresión
+  que lo aplicaba.
+- **`ba3` — el índice ausente, con `EXPLAIN`.** `email_logs` ordenaba por
+  `sent_at DESC` sin índice que lo cubriera; `idx_email_logs_user_type
+  (user_id, email_type, sent_at)` no servía porque el `user_id` delante
+  descalifica el orden. Sobre 200 000 filas: **2 858 → 6 buffers (~476×)**.
+
+**Oleada B — que cada bitácora diga lo que no muestra (`bb1`–`bb4`).**
+- **`bb1` — `cap + 1` filas, pedidas a propósito.** La fila de más es la
+  **sonda** que responde «¿hay más?» sin un `count(*)` que recorra la tabla. Sin
+  ella, la UI no puede distinguir una bitácora de 100 filas de una cortada en
+  100.
+- **`bb2` — `total` deja de ser un sinónimo de `shown`.** Pasa a `number | null`
+  y **nunca** se rellena con el largo de la página; el tipo lo impide. Donde no
+  se pregunta el total, viaja `null`, que significa «no se preguntó».
+- **`bb3` — `resumenDeCorte` se pinta siempre**, no sólo cuando `truncated`. Y
+  las tres pestañas exportan CSV, así que el dato completo es alcanzable aunque
+  la pantalla siga capada.
+- **`bb4` — el tope aplicado es el que la UI declara.** El `100` suelto se
+  convirtió en `ERROR_LOG_PAGE_DEFAULT`, con nombre y docstring.
+
+**Oleada C — congelarlo (`bc1`–`bc2`).**
+- **`bc1` — `src/lib/bitacora.ts`**, el vocabulario compartido: `PaginaCapada<T>`,
+  `paginaCapada()`, `resumenDeCorte()`. Su comportamiento lo prueba
+  `src/lib/bitacora.test.ts` (13).
+- **`bc2` — `src/lib/bitacora-limites.contract.test.ts` (31)** congela cinco
+  cosas por pestaña: el tope es una constante con nombre; **no hay un segundo
+  tope sin nombre**; el tope se declara **una sola vez y en un archivo que puede
+  declararlo**; la consulta pide `cap + 1`; y la pestaña declara el corte y
+  ofrece export. **El perímetro se descubre del disco**, así que una cuarta
+  bitácora sin declarar pone el contrato rojo.
+
+**Oleada D — el backlog que envejeció (`bd1`–`bd2`).**
+- **`bd1` — las filas `E7`, `E8` y `E9` ya estaban resueltas** por la Ronda 23.
+  Reescritas a ✅ con la evidencia verificada en el código
+  (`tool-guide.tsx:32-33`, `mobile-chrome.spec.ts:44-52`,
+  `playwright.config.ts:46-62`) en vez de dejarlas en 🔜.
+- **`bd2` — el prose obsoleto de la auditoría, corregido contra el código.** Tres
+  afirmaciones de §3 estaban fuera de fecha: `pos` «nivel Diamante» (no se cobra
+  en ningún nivel y la superficie abre en **Verde** sin candado); «de 10
+  capacidades premium, 8 exigen Diamante» (re-medido: **5 Diamante / 3 Oro / 1
+  Plata / 1 línea base**); y el `METHOD_LABEL` de `pedidos/page.tsx`.
+
+**Lo que esta ronda desmintió.**
+
+- **La nota del plan que decía que `foodos-reportes.ts` usa `t()` 35 veces era
+  falsa.** `grep -c "\bt("` da **0**: no traduce nada. La afirmación «está en
+  español fijo» **se sostiene** — y `src/lib/foodos.ts` tampoco importa i18n,
+  porque sus `CHANNEL_LABELS` son literales.
+- **«La clave `efectivo` no corresponde a ningún slug real» era falsa.**
+  `efectivo` **sí** es un slug de `FoodosPaymentProofMethod`. El defecto real era
+  otro y peor: la tabla estaba declarada **dos veces** —`Record<string, string>`
+  en el panel, `Record<FoodosPaymentProofMethod, string>` en el micrositio—, así
+  que añadir una forma nueva rompía el micrositio con un error de tipo y **no**
+  el panel, que pintaba el slug crudo. Unificada en `PROOF_METHOD_LABELS`.
+- **«El tope se aplicaba después del filtro» era falso, y lo escribí yo.** La
+  `.limit()` se aplica antes de que la consulta se resuelva: el `LIMIT` es del
+  SQL y el filtro también, así que «filtrar y cortar» ≡ «cortar y filtrar». El
+  defecto inventado se sustituyó por **el real**, que apareció midiendo: **dos
+  números para un solo tope**.
+- **Las filas `E7`–`E9` del backlog ya estaban resueltas** y seguían listadas
+  como 🔜. Un backlog que no se poda miente igual que una lista que no declara su
+  borde.
+- **Y un defecto que no era de datos sino de módulo:** los topes nuevos se
+  declararon dentro de `src/lib/admin-errors.ts`, que empieza por `"use server"`
+  — y un módulo `"use server"` **sólo puede exportar funciones asíncronas y
+  tipos**. Lo cazó `src/lib/use-server.contract.test.ts`, no `tsc` ni ESLint.
+  Ahora viven en `src/lib/bitacora.ts` y una regla impide que vuelvan.
+
+| # | Entrega | Estado |
+|---|---|---|
+| BA1 | Estado real de las tres bitácoras medido y tabulado antes de tocar código | ✅ |
+| BA2 | Los cuatro defectos de `getErrorLogs` identificados midiendo, no supuestos | ✅ |
+| BA3 | Índice ausente de `email_logs` probado con `EXPLAIN (ANALYZE, BUFFERS)` (2858 → 6 buffers) | ✅ |
+| BB1 | `cap + 1` filas en las tres consultas: la sonda que responde «¿hay más?» | ✅ |
+| BB2 | `total` pasa a `number \| null` y deja de rellenarse con el largo de la página | ✅ |
+| BB3 | `resumenDeCorte` en las tres pestañas y export CSV en las tres | ✅ |
+| BB4 | El `100` suelto se convierte en `ERROR_LOG_PAGE_DEFAULT` con docstring | ✅ |
+| BC1 | `src/lib/bitacora.ts` como vocabulario compartido, con test de comportamiento (13) | ✅ |
+| BC2 | `bitacora-limites.contract.test.ts` (31) congela el borde y descubre el perímetro del disco | ✅ |
+| BD1 | Filas `E7`–`E9` del backlog reescritas a ✅ con evidencia verificada | ✅ |
+| BD2 | Prose obsoleto de §3 de la auditoría corregido contra el código | ✅ |
+
+**Lección:** la misma que las tres rondas anteriores, un escalón más abajo. La
+Ronda 23 encontró instrumentos que decían estar midiendo y no medían; la Oleada
+C, un esquema que calla; la Oleada D, un nombre que hacía dos trabajos. Aquí es
+**una lista que no declara su borde** — y la reparación volvió a ser la misma:
+**escribir lo que no se ve**, no cambiar lo que se ve. La ronda no alteró una
+sola pantalla en su comportamiento visible; cambió lo que las pantallas
+**dicen**. Y dejó dos defectos autoinfligidos como recordatorio de por qué la
+regla es medir antes de afirmar: un defecto inventado («el tope se aplica después
+del filtro») que hubo que retirar, y dos constantes declaradas en un módulo que
+no puede contenerlas.
+
+**Cierre medido.** `npm run verify` en verde al cerrar las cuatro oleadas:
+typecheck, lint, **373 archivos de test / 6,498 pruebas**, `knip` exit 0 — desde
+los 370 / 6,445 de la Ronda 23 —53 pruebas más—. Dos contratos nuevos
+(`bitacora-limites`, 31, y `foodos-labels`, 6), el de comportamiento
+(`bitacora`, 13) y 3 pruebas añadidas a `foodos.test.ts` por la unificación de
+`PROOF_METHOD_LABELS`. La migración
+`00190_email_logs_sent_at_index.sql` quedó aplicada. La Ronda 24 queda
+**cerrada**: las 11 filas `BA1`–`BD2` en ✅.
 
 ## Agentes de mantenimiento por dominio
 

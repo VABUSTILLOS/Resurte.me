@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { isIntegrationConfigured } from "@/lib/integration-status"
 import { logger } from "@/lib/logger"
+import { EMAIL_LOG_CAP, paginaCapada } from "@/lib/bitacora"
 
 export const runtime = "nodejs"
 
@@ -21,19 +22,26 @@ export async function GET() {
     if (adminDenied) return adminDenied
 
     const supabase = await createServiceClient()
-    const { data, error } = await supabase
+    // `cap + 1` filas: la de más es la sonda de "¿hay más?". `count: "exact"`
+    // da el total real del filtro para que la UI pueda decir "de N" en vez de
+    // presentar la página como si fuera el universo.
+    const { data, error, count } = await supabase
       .from("email_logs")
-      .select("id, email_to, email_type, order_id, sent_at, status, error")
+      .select("id, email_to, email_type, order_id, sent_at, status, error", { count: "exact" })
       .order("sent_at", { ascending: false })
-      .limit(200)
+      .limit(EMAIL_LOG_CAP + 1)
 
     if (error) {
       logger.error("[ADMIN EMAIL-LOGS] list error:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+    const pagina = paginaCapada(data ?? [], EMAIL_LOG_CAP, count ?? null)
     return NextResponse.json({
-      logs: data ?? [],
+      logs: pagina.entries,
       configured: isIntegrationConfigured("email"),
+      cap: pagina.cap,
+      truncated: pagina.truncated,
+      total: pagina.total,
     })
   } catch (err) {
     logger.error("[ADMIN EMAIL-LOGS] unexpected:", err)

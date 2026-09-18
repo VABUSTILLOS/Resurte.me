@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Download, RefreshCw, Loader2 } from "lucide-react"
 import { getErrorLogs, type ErrorLogsReport } from "@/lib/admin-errors"
+import { resumenDeCorte } from "@/lib/bitacora"
 import { toCsv, downloadCsv } from "@/lib/csv"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
@@ -90,28 +91,51 @@ export function ErroresTab() {
         </button>
       </div>
 
-      {/* Conteos por severidad */}
+      {/* El corte se declara antes de los contadores: son las cifras que el
+          admin lee como "salud de la app", y solo valen para lo que se ve. */}
+      {report && !loading && (
+        <p className="text-xs text-gray-500 mb-4">
+          {resumenDeCorte({
+            shown: report.entries.length,
+            cap: report.cap,
+            truncated: report.truncated,
+            total: report.total,
+          })}
+          {report.truncated && (
+            <span className="text-gray-600">
+              {" "}· la consulta se corta en {report.cap} filas; acota con los filtros para ver el resto
+            </span>
+          )}
+        </p>
+      )}
+
+      {/* Conteos por severidad. Son de la vista, no del periodo: se dice. */}
       {report && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          {(["fatal", "error", "warn", "info"] as const).map((sev) => (
-            <button
-              key={sev}
-              type="button"
-              onClick={() => setSeverity(severity === sev ? "all" : sev)}
-              aria-pressed={severity === sev}
-              className={`rounded-xl border p-4 text-left transition-colors ${
-                severity === sev
-                  ? "border-gray-900 bg-gray-900 text-white"
-                  : "bg-white border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              <p className="text-2xl font-bold">{report.bySeverity[sev] ?? 0}</p>
-              <p className={`text-xs ${severity === sev ? "text-gray-300" : "text-gray-500"}`}>
-                {sev}
-              </p>
-            </button>
-          ))}
-        </div>
+        <>
+          <p className="text-xs text-gray-500 mb-2">
+            Desglose de las {report.entries.length} filas mostradas — no del periodo
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            {(["fatal", "error", "warn", "info"] as const).map((sev) => (
+              <button
+                key={sev}
+                type="button"
+                onClick={() => setSeverity(severity === sev ? "all" : sev)}
+                aria-pressed={severity === sev}
+                className={`rounded-xl border p-4 text-left transition-colors ${
+                  severity === sev
+                    ? "border-gray-900 bg-gray-900 text-white"
+                    : "bg-white border border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                <p className="text-2xl font-bold">{report.bySeverity[sev] ?? 0}</p>
+                <p className={`text-xs ${severity === sev ? "text-gray-300" : "text-gray-500"}`}>
+                  {sev}
+                </p>
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Filtro por fuente */}

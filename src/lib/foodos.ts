@@ -14,6 +14,7 @@ import type {
   FoodosOrderChannel,
   FoodosOrderItem,
   FoodosOrderItemModifier,
+  FoodosPaymentProofMethod,
   FoodosUpsellRule,
 } from "@/types/foodos"
 
@@ -408,6 +409,28 @@ export const FOODOS_ORDER_CHANNELS: FoodosOrderChannel[] = [
 /** Etiqueta de un canal desconocido: el canal tal cual, nunca un hueco. */
 export function channelLabel(channel: string): string {
   return CHANNEL_LABELS[channel as FoodosOrderChannel] ?? channel
+}
+
+/**
+ * Etiquetas de la forma de pago que el comensal declara al subir un comprobante.
+ *
+ * Es un vocabulario **distinto** al de `FOODOS_PAYMENT_METHODS` (que describe
+ * cómo se cobró el pedido, no cómo lo pagó el comensal): aquí manda la unión
+ * `FoodosPaymentProofMethod`. Estuvo duplicada en el micrositio y en el panel
+ * con dos tipos distintos —`Record<FoodosPaymentProofMethod, string>` contra
+ * `Record<string, string>`—, así que el panel no fallaba al añadir una forma
+ * nueva: simplemente pintaba el slug crudo. Una sola tabla evita eso.
+ */
+export const PROOF_METHOD_LABELS: Record<FoodosPaymentProofMethod, string> = {
+  transfer: "Transferencia",
+  oxxo: "OXXO",
+  efectivo: "Efectivo",
+  otro: "Otro",
+}
+
+/** Etiqueta de un comprobante desconocido: el slug tal cual, nunca un hueco. */
+export function proofMethodLabel(method: string): string {
+  return PROOF_METHOD_LABELS[method as FoodosPaymentProofMethod] ?? method
 }
 
 export function normalizePhone(phone: string): string {

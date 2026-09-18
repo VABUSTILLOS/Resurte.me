@@ -1,10 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ScrollText } from "lucide-react"
+import { Download, ScrollText } from "lucide-react"
 import { getAdminAuditLog, type AuditLogEntry } from "../actions"
 import { AUDIT_ACTION_LABEL, AUDIT_ACTIONS } from "@/lib/audit-log"
 import { formatRelativeTime } from "@/lib/relative-time"
+import { resumenDeCorte, type PaginaCapada } from "@/lib/bitacora"
+import { toCsv, downloadCsv } from "@/lib/csv"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 function detailSummary(detail: Record<string, unknown>): string {
   const parts: string[] = []
@@ -22,7 +25,7 @@ function detailSummary(detail: Record<string, unknown>): string {
 
 /** Bitácora de acciones administrativas (quién, cuándo, qué cambió). */
 export function AuditoriaTab() {
-  const [entries, setEntries] = useState<AuditLogEntry[]>([])
+  const [pagina, setPagina] = useState<PaginaCapada<AuditLogEntry> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [action, setAction] = useState("")
@@ -32,7 +35,9 @@ export function AuditoriaTab() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setEntries(await getAdminAuditLog({ action: action || undefined, from: from || undefined, to: to || undefined }))
+      setPagina(
+        await getAdminAuditLog({ action: action || undefined, from: from || undefined, to: to || undefined })
+      )
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar la bitácora")
@@ -46,9 +51,29 @@ export function AuditoriaTab() {
     void Promise.resolve().then(load)
   }, [load])
 
+  function exportCsv() {
+    if (!pagina) return
+    const csv = toCsv(
+      ["Fecha", "Actor", "Acción", "Entidad", "ID entidad", "Detalle", "Detalle crudo"],
+      pagina.entries.map((e) => [
+        new Date(e.created_at).toLocaleString("es-MX"),
+        e.actor_email ?? "",
+        AUDIT_ACTION_LABEL[e.action as keyof typeof AUDIT_ACTION_LABEL] ?? e.action,
+        e.entity,
+        e.entity_id ?? "",
+        detailSummary(e.detail),
+        JSON.stringify(e.detail),
+      ])
+    )
+    const stamp = dayKeyOf(DEFAULT_TIMEZONE)
+    downloadCsv(`bitacora-auditoria-${stamp}.csv`, csv)
+  }
+
+  const entries = pagina?.entries ?? []
+
   return (
     <div>
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
         <select
           value={action}
           onChange={(e) => setAction(e.target.value)}
@@ -78,7 +103,30 @@ export function AuditoriaTab() {
             className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-600"
           />
         </div>
+        <button
+          type="button"
+          onClick={exportCsv}
+          disabled={!pagina || entries.length === 0}
+          className="sm:ml-auto inline-flex items-center justify-center gap-1.5 rounded-full bg-white border border-gray-200 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Exportar CSV
+        </button>
       </div>
+
+      {/* El corte se declara siempre, no solo cuando ocurre: un límite que no se
+          nombra se lee como "esto es todo". */}
+      {pagina && !loading && !error && (
+        <p className="text-xs text-gray-500 mb-4">
+          {resumenDeCorte(pagina)}
+          {pagina.truncated && (
+            <span className="text-gray-600">
+              {" "}· la consulta se corta en {pagina.cap} filas; acota el rango de fechas o la acción
+              para ver el resto
+            </span>
+          )}
+        </p>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-24 text-gray-600 text-sm">
