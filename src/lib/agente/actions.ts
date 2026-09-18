@@ -47,9 +47,10 @@ const ACTIVE_STATUSES: readonly CrmStatus[] = [
 /**
  * Ronda 16: los cuatro campos de segmentación (`employees`, `instagram`,
  * `weekly_volume_min`, `weekly_volume_max`) son parte del contrato compartido
- * `CrmProspectRow`, así que el agente los lee de la fila como cualquier otro.
- * Antes viajaban como `extraColumns` fuera del contrato, y por eso nadie los
- * escribía: el formulario no los conocía y el agente razonaba sobre `null`.
+ * `CrmProspectRow`, así que el agente los lee de la fila como cualquier otro y
+ * los cuatro llegan al prompt de `generateAgentMessage`. Antes viajaban como
+ * `extraColumns` fuera del contrato, y por eso nadie los escribía: el formulario
+ * no los conocía y el agente razonaba sobre `null` permanente.
  */
 
 async function getSellerName(supabase: Awaited<ReturnType<typeof createServiceClient>>, userId: string): Promise<string> {
