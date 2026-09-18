@@ -66,10 +66,35 @@ describe("updateOrderStatus", () => {
   })
 
   it("propaga el error de escritura y no avisa", async () => {
-    setup({ read: { data: { status: "pending" } }, write: { error: { message: "RLS denegó" } } })
+    // `confirmed -> preparing` es la transición real del panel; el fixture
+    // antes decía `pending` y la máquina de estados lo rechaza antes de
+    // llegar a la escritura, que es justo lo que esta prueba no mide.
+    setup({ read: { data: { status: "confirmed" } }, write: { error: { message: "RLS denegó" } } })
 
     await expect(updateOrderStatus(ORDER_ID, "preparing")).rejects.toThrow("RLS denegó")
     expect(notifyFoodosCustomer).not.toHaveBeenCalled()
+  })
+
+  it("rechaza retroceder un pedido entregado", async () => {
+    const { update } = setup({ read: { data: { status: "delivered" } } })
+
+    await expect(updateOrderStatus(ORDER_ID, "preparing")).rejects.toThrow("ya se entregó")
+    expect(update).not.toHaveBeenCalled()
+    expect(notifyFoodosCustomer).not.toHaveBeenCalled()
+  })
+
+  it("rechaza resucitar un pedido cancelado", async () => {
+    const { update } = setup({ read: { data: { status: "cancelled" } } })
+
+    await expect(updateOrderStatus(ORDER_ID, "confirmed")).rejects.toThrow("ya no se puede mover")
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it("rechaza saltarse un paso hacia atrás", async () => {
+    const { update } = setup({ read: { data: { status: "preparing" } } })
+
+    await expect(updateOrderStatus(ORDER_ID, "confirmed")).rejects.toThrow("sin saltarse un paso")
+    expect(update).not.toHaveBeenCalled()
   })
 
   it("propaga el error de lectura y no escribe", async () => {

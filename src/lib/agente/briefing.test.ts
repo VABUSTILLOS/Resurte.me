@@ -22,7 +22,7 @@ vi.mock("@/lib/logger", () => ({
 }))
 vi.mock("./llm", () => ({ chatCompletion: mocks.chatCompletion }))
 
-import { getDailyBriefing } from "./actions"
+import { generateAgentMessage, getDailyBriefing } from "./actions"
 
 const SELLER = "seller-111"
 
@@ -36,6 +36,8 @@ interface Fixture {
   activities?: unknown[]
   overdue?: number
   drafts?: number
+  /** Fila cruda que devuelve el lector de prospectos, si se pide una. */
+  prospect?: Record<string, unknown>
 }
 
 /**
@@ -79,11 +81,15 @@ function fakeClient(fixture: Fixture) {
         return { data: null, count: fixture.drafts ?? 0, error: null }
       }
       if (table === "crm_prospects") {
-        // El pipeline pide `estimated_value`; el conteo pide `id`.
+        // Tres consultas distintas caen en esta tabla: el pipeline pide
+        // `estimated_value`, los conteos piden `id` con `count`/`head`, y el
+        // lector pide la escalera de columnas.
         if (state.select[0] === "estimated_value") {
           return { data: fixture.pipeline ?? [], error: fixture.pipelineError ?? null }
         }
-        return { data: null, count: fixture.overdue ?? 0, error: null }
+        const head = state.select[1] as { count?: string } | undefined
+        if (head?.count) return { data: null, count: fixture.overdue ?? 0, error: null }
+        return { data: fixture.prospect ? [fixture.prospect] : [], error: null }
       }
       return { data: null, error: null }
     }
@@ -163,5 +169,47 @@ describe("getDailyBriefing — el dinero del pipeline abierto", () => {
     const briefing = await getDailyBriefing()
 
     expect(briefing.fromAI).toBe(false)
+  })
+})
+
+describe("generateAgentMessage — los cuatro campos de segmentación", () => {
+  it("llegan al prompt: el agente deja de razonar sobre null", async () => {
+    const { client } = fakeClient({
+      pipeline: [],
+      prospect: {
+        id: 7,
+        user_id: null,
+        seller_id: SELLER,
+        name: "Ana",
+        phone: "5512345678",
+        restaurant_name: "Tacos Ana",
+        zone: null,
+        tier: null,
+        status: "nuevo",
+        notes: null,
+        tags: null,
+        next_follow_up_at: null,
+        last_contact_at: null,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        employees: 12,
+        instagram: "@tacosana",
+        weekly_volume_min: 3000,
+        weekly_volume_max: 6000,
+        estimated_value: null,
+        loss_reason: null,
+        closed_at: null,
+      },
+    })
+    mocks.createServiceClient.mockResolvedValue(client as never)
+    mocks.chatCompletion.mockResolvedValue({ text: "Hola Ana", model: "test" })
+
+    await generateAgentMessage(7, "primer_contacto")
+
+    const prompt = mocks.chatCompletion.mock.calls[0]?.[1] as string
+    expect(prompt).toContain("Empleados: 12")
+    expect(prompt).toContain("@tacosana")
+    expect(prompt).toContain("3,000")
+    expect(prompt).toContain("6,000")
   })
 })
