@@ -21,12 +21,12 @@ import { test, expect, type Page } from "@playwright/test"
  *    dashboard apuntan a rutas que existen y renderizan.
  */
 
-test.describe("leads CRM — guards", { tag: "@ci" }, () => {
-  // En CI/dev sin env de Supabase las rutas admin fallan con 500 al crear el
-  // cliente (no hay auth disponible); con env configurado deben responder
-  // 401/403. En ambos casos lo importante: NUNCA 200 con datos.
-  const GUARDED_CODES = [401, 403, 500]
+// En CI/dev sin env de Supabase las rutas admin fallan con 500 al crear el
+// cliente (no hay auth disponible); con env configurado deben responder
+// 401/403. En ambos casos lo importante: NUNCA 200 con datos.
+const GUARDED_CODES = [401, 403, 500]
 
+test.describe("leads CRM — guards", { tag: "@ci" }, () => {
   test("la página /admin/leads no sirve la bandeja a anónimos", async ({ page }) => {
     const response = await page.goto("/admin/leads")
     // 200 solo es aceptable tras seguir un redirect al login; si el guard del
