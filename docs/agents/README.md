@@ -205,9 +205,9 @@ requieren revisar todos los playbooks que dependen de esa superficie.
    * Cuando el cambio es de **precio**, la fila registra el **valor anterior**
      (`previous_cost`, `previous_discount_pct`): un `action` sin contexto no sirve
      para reconstruir el cambio.
-   * Las rutas sin sesión de admin (`update-images`, `seed-products`, que
-     autentican por secreto compartido) escriben con `actorId: null` y
-     `detail.via = "script:<nombre>"`. La ausencia de actor es honesta; la
+   * Las rutas que mutan sin sesión de admin —`orders/[id]/cancel`, que
+     autentica por el token del propio pedido— escriben con `actorId: null` y el
+     motivo en `detail.via` (`"token"`). La ausencia de actor es honesta; la
      ausencia de fila no.
    * Las excepciones están en `src/lib/admin-audit.contract.test.ts` con motivo
      escrito, y ese contrato **falla** si aparece una ruta mutante nueva sin

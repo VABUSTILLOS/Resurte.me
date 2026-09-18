@@ -202,7 +202,7 @@ describe("contrato de migraciones en la documentación", () => {
       "Las filas ausentes del ledger son nueve: `00043`, `00082`, `00116` y `00117`.",
       "### ⚠️ Contraseña de Postgres: rotación pendiente (incidente 17-sep-2026)",
       "El pedido queda pendiente de pago y el panel lo mostraría como pendiente de cobro.",
-      "La ruta admin `seed-products` aún hace upsert histórico — pendiente de limpieza.",
+      "La tabla legado `product_stores` quedó pendiente de limpieza tras el seed.",
       "`00154_marketplace_delivery_proof.sql` añade `delivery_proof_path` a `orders`.",
     ].join("\n")
 

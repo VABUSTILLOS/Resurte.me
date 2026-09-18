@@ -4,8 +4,8 @@ import { timingSafeEqual } from "crypto"
  * Comparación de secretos en tiempo constante.
  *
  * `provided === expected` con strings filtra por timing cuántos caracteres
- * iniciales son correctos; para secretos de endpoints (CRON_SECRET,
- * ADMIN_API_SECRET, SEED_API_TOKEN) se compara con timingSafeEqual.
+ * iniciales son correctos; para secretos de endpoints (CRON_SECRET, y el
+ * secreto por conexión de los webhooks de POS) se compara con timingSafeEqual.
  *
  * Fail-closed: cualquier ausencia o diferencia de longitud devuelve false.
  */

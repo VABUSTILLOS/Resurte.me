@@ -49,7 +49,7 @@ Marketplace mayorista B2B de insumos para restaurantes (México) + suite SaaS de
 ## 3. Funciones del ADMIN (`/admin`, noindex)
 
 - **Dashboard**: métricas de revenue, órdenes, AOV y conversión por período (recharts lazy).
-- **Pedidos**: gestión y estados, con acciones masivas (cambio de estado, confirmar pago, asignar repartidor, exportar la selección) y filtros guardados; **Productos**: catálogo, imágenes (`update-images`, `kie-ai`), seed de productos.
+- **Pedidos**: gestión y estados, con acciones masivas (cambio de estado, confirmar pago, asignar repartidor, exportar la selección) y filtros guardados; **Productos**: catálogo, imágenes (galería, `upload-image`, `check-images`, `kie-ai`).
 - **Productos** (6,595 líneas): tabla server-side, bulk con deshacer, papelera 30d, IA SEO, galería, reporte de ventas.
 - **CRM / Leads**, **Comisiones**, **Proveedores**, **Restaurantes**, **Recompensas** (servicios canjeables, cola de canjes y revisión de facturas), **Usuarios**.
 - **Conversión** (funnel + cohortes + UTM); **Marketing** (order-bumps, cupones, afinidades); **Bitácoras** (auditoría, errores, emails); **SEO-IA**; **Sistema**.

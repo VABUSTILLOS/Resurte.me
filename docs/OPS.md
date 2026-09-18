@@ -106,7 +106,7 @@ Si el proyecto Vercel está en plan **Hobby**, el límite es **2 crons** — añ
 | `STRIPE_WEBHOOK_SECRET` | Sí | Validar webhooks Stripe | `whsec_...`. |
 | `STRIPE_CONNECT_ENABLED` | No | Enruta los cargos de tarjeta de FoodOS a la cuenta Connect del restaurante | `true` / `1`. **Por defecto apagado.** Requiere activar Connect antes en el Dashboard de Stripe (ver §11). |
 | `STRIPE_CONNECT_COUNTRY` | No | País de las cuentas Express | ISO-2, por defecto `MX`. |
-| `ADMIN_API_SECRET` | Sí | Endpoints admin (`x-admin-secret` header) | Sin fallback hardcodeado desde Fase 1. |
+| `ADMIN_API_SECRET` | — | **Retirada** | Ya no la consume ningún endpoint: `update-images` se borró en la Ronda 20 de `PLAN-MEJORAS.md`. Se puede eliminar de Vercel. |
 | `VAPID_PUBLIC_KEY` | No | Firma de los push de estado de pedido (W9) | Par VAPID (`npx web-push generate-vapid-keys`). Sin ella el push queda **desactivado** y `/recompensas` no muestra el interruptor; campana y correo siguen igual. |
 | `VAPID_PRIVATE_KEY` | No | Firma de los push (servidor) | **Nunca** exponer al browser. Debe ir en par con la pública: si falta o no es una clave válida, `ensureVapid()` falla y el push se omite en silencio (se loguea `push.vapid.invalid`). |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | No | Clave pública que el navegador usa en `pushManager.subscribe` | Es la **misma** que `VAPID_PUBLIC_KEY`; se duplica porque el navegador necesita el prefijo `NEXT_PUBLIC_`. Si no coinciden, el push se firma con una clave distinta a la suscrita y el navegador lo descarta. |
@@ -446,7 +446,8 @@ dashboard. Eso fue la causa del drift histórico (ver `supabase/ESQUEMA.md`).
    manuales.
 5. El seed (`supabase/seed.sql`) escribe precios/stock directo en `products`;
    la tabla legado `product_stores` ya no se escribe ni se lee (la ruta admin
-   `seed-products` aún hace upsert histórico — pendiente de limpieza).
+   `seed-products`, que aún hacía upsert histórico, se retiró en la Ronda 20 de
+   `PLAN-MEJORAS.md`).
 
 ### ✅ Migración `00114` aplicada (`orders.coupon_code`)
 

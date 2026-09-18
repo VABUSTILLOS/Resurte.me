@@ -245,11 +245,11 @@ flujos de escritura reales (`admin-productos.spec.ts`,
    `notifications` (vía el `audit.ts` legado, que solo conoce 4 acciones y tiene
    un único consumidor, `/api/orders/[id]/status`) mientras la pestaña de
    `/admin/bitacoras` lee `admin_audit_log`.
-4. **Dos endpoints admin no usan `requireAdmin()`.** `seed-products` y
-   `update-images` se protegen con token de entorno (`SEED_API_TOKEN` /
-   `ADMIN_API_SECRET`, fail-closed) y llevan datos hardcodeados de un solo uso.
-   Violan el invariante #1 de `docs/agents/admin.md:11-12`. Son scripts, no
-   features: candidatos a borrado.
+4. **Dos endpoints admin no usaban `requireAdmin()`.** ✅ **Resuelto (Ronda 20):**
+   `seed-products` y `update-images` se protegían con token de entorno
+   (`SEED_API_TOKEN` / `ADMIN_API_SECRET`, fail-closed) y llevaban datos
+   hardcodeados de un solo uso. Violaban el invariante #1 de
+   `docs/agents/admin.md:11-12`. Eran scripts, no features: se retiraron.
 5. **Cobertura e2e desigual.** Sin e2e para ~10 secciones (bitácoras-UI,
    comisiones, conversion, proveedores, recompensas, seo-ia, sistema, whatsapp,
    dispersiones, repartidores). Y el e2e **no autentica** —el repo no tiene seed
@@ -323,7 +323,7 @@ Las diez debilidades están declaradas como filas `AU1`–`AU10` en la Ronda 19 
 | Prioridad | Acción | Esfuerzo |
 |---|---|---|
 | **P0** | Unificar la bitácora admin en `admin_audit_log` ✅ `bump-affinity` ya audita (hecho); queda retirar `audit.ts` legado | Bajo |
-| **P0** | Borrar `seed-products` y `update-images` | Bajo |
+| **P0** | Borrar `seed-products` y `update-images` ✅ hechos (Ronda 20) | Bajo |
 | **P1** | Encender Stripe Connect, o quitar el cobro a la plataforma y dejar solo comprobante manual | Medio |
 | **P1** | Abrir la escalera de niveles (`pos_mostrador` y `comandero` a Oro) + modo prueba | Bajo |
 | **P1** | Tests de superficie del panel (`ventas`, `comanda`, `inventario`) | Medio |
