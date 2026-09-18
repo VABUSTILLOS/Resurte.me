@@ -200,7 +200,7 @@ export default function AdminComisionesPage() {
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+        <div className="flex items-center justify-center py-24 text-gray-600 text-sm">
           <Loader2 className="w-4 h-4 animate-spin mr-2" />
           Cargando comisiones…
         </div>
@@ -255,7 +255,7 @@ export default function AdminComisionesPage() {
                         <tr key={c.sellerId} className="hover:bg-gray-50 transition-colors">
                           <td className="px-5 py-3">
                             <p className="font-medium text-gray-900">{c.sellerName}</p>
-                            {c.sellerPhone && <p className="text-xs text-gray-400">{c.sellerPhone}</p>}
+                            {c.sellerPhone && <p className="text-xs text-gray-600">{c.sellerPhone}</p>}
                           </td>
                           <td className="px-5 py-3 text-right text-gray-500">{c.linkedClients}</td>
                           <td className="px-5 py-3 text-right text-gray-500">{c.monthOrderCount}</td>
@@ -409,7 +409,7 @@ function PeriodRow({
       <tr className="hover:bg-gray-50 transition-colors">
         <td className="px-5 py-3">
           <p className="font-medium text-gray-900">{period.sellerName}</p>
-          {period.sellerPhone && <p className="text-xs text-gray-400">{period.sellerPhone}</p>}
+          {period.sellerPhone && <p className="text-xs text-gray-600">{period.sellerPhone}</p>}
         </td>
         <td className="px-5 py-3">
           <span
@@ -420,7 +420,7 @@ function PeriodRow({
             {STATUS_LABEL[period.status] ?? period.status}
           </span>
           {period.paymentReference && (
-            <p className="text-xs text-gray-400 mt-1">{period.paymentReference}</p>
+            <p className="text-xs text-gray-600 mt-1">{period.paymentReference}</p>
           )}
         </td>
         <td className="px-5 py-3 text-right text-gray-700">{formatMoney(period.revenue)}</td>
@@ -473,7 +473,7 @@ function PeriodRow({
                 </button>
               </>
             ) : (
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-gray-600">
                 {period.status === "pagada" ? "Cerrado" : "Anulado"}
               </span>
             )}
@@ -488,7 +488,7 @@ function PeriodRow({
               {period.movements.map((m) => (
                 <li key={m.id} className="flex items-baseline justify-between gap-3 text-xs">
                   <span className="text-gray-600">{m.reason}</span>
-                  <span className="text-gray-400">
+                  <span className="text-gray-600">
                     {m.createdAt.slice(0, 10)} ·{" "}
                     <strong className={m.amount < 0 ? "text-red-700" : "text-gray-900"}>
                       {m.amount > 0 ? "+" : ""}

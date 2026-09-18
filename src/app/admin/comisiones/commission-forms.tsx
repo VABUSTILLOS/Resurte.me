@@ -29,7 +29,7 @@ import { formatMoney } from "@/lib/comercializacion/commissions"
 type SubmitState = { busy: boolean; error: string | null }
 
 const FIELD =
-  "w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+  "w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
 const LABEL = "block text-xs font-semibold text-gray-600 mb-1.5"
 const SUBMIT =
   "flex-1 inline-flex items-center justify-center gap-1.5 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50"
@@ -199,7 +199,7 @@ export function PayCommissionDialog({
           maxLength={500}
         />
       </div>
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-600">
         Al pagar, el periodo deja de ser editable: para corregir el monto después habrá que
         agregar un ajuste, y quedará el rastro.
       </p>
@@ -270,7 +270,7 @@ export function CancelCommissionDialog({
           placeholder="Duplicado de abril, pedido reembolsado…"
           maxLength={500}
         />
-        <p className="mt-1 text-xs text-gray-400">
+        <p className="mt-1 text-xs text-gray-600">
           Al menos {MIN_ADJUSTMENT_REASON} caracteres. Un periodo cancelado no suma dinero, pero
           queda visible con su motivo.
         </p>
@@ -357,7 +357,7 @@ export function AdjustCommissionDialog({
           placeholder="150 o -150"
           inputMode="decimal"
         />
-        <p className="mt-1 text-xs text-gray-400">
+        <p className="mt-1 text-xs text-gray-600">
           Positivo suma, negativo descuenta. No puede ser cero.
         </p>
       </div>

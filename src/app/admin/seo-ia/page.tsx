@@ -58,9 +58,9 @@ export default async function AdminSeoIaPage() {
           },
         ].map((kpi) => (
           <div key={kpi.label} className="bg-white rounded-xl border border-gray-200 p-4">
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">{kpi.label}</p>
+            <p className="text-xs text-gray-600 font-medium uppercase tracking-wide">{kpi.label}</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">{kpi.value}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{kpi.hint}</p>
+            <p className="text-xs text-gray-600 mt-0.5">{kpi.hint}</p>
           </div>
         ))}
       </div>
@@ -91,7 +91,7 @@ export default async function AdminSeoIaPage() {
                     <td className="px-5 py-3 text-xs text-gray-500">{g.why}</td>
                     <td className="px-5 py-3 text-right">
                       <span className="font-semibold text-gray-900">{g.count}</span>
-                      <span className="block text-xs text-gray-400">{g.unit}</span>
+                      <span className="block text-xs text-gray-600">{g.unit}</span>
                     </td>
                   </tr>
                 ))}
@@ -120,7 +120,7 @@ export default async function AdminSeoIaPage() {
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900 font-mono truncate">{c.token}</p>
-                <p className="text-xs text-gray-400 truncate">{c.owner}</p>
+                <p className="text-xs text-gray-600 truncate">{c.owner}</p>
               </div>
               <span
                 className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full border ${FAMILY_STYLE[c.family]}`}
@@ -150,11 +150,11 @@ export default async function AdminSeoIaPage() {
               className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1.5 text-sm"
             >
               <span className="font-medium text-gray-900">{e.label}</span>
-              <span className="text-xs text-gray-400 font-mono">{e.hosts[0]}</span>
+              <span className="text-xs text-gray-600 font-mono">{e.hosts[0]}</span>
             </span>
           ))}
         </div>
-        <p className="text-xs text-gray-400 mt-3">
+        <p className="text-xs text-gray-600 mt-3">
           Limitación conocida: los AI Overviews de Google no envían un referrer distinguible (llegan
           como <code className="bg-gray-100 px-1 py-0.5 rounded">google.com</code>). Esa parte solo se
           ve en Search Console.
@@ -171,14 +171,14 @@ export default async function AdminSeoIaPage() {
         </p>
 
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+          <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">
             Qué anotar en cada celda
           </p>
           <dl className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
             {GEO_PANEL_FIELDS.map((f) => (
               <div key={f.key} className="flex flex-col">
                 <dt className="text-sm text-gray-900">{f.label}</dt>
-                <dd className="text-xs text-gray-400">{f.values}</dd>
+                <dd className="text-xs text-gray-600">{f.values}</dd>
               </div>
             ))}
           </dl>

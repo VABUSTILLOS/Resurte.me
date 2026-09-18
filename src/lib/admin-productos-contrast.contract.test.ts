@@ -99,6 +99,17 @@ describe("perímetro de productos — contraste (B36)", () => {
     }
   })
 
+  it("no reintroduce los grises de texto que no llegan a 4.5:1", () => {
+    // `text-gray-400` = 2.60:1 sobre blanco y `text-brand-400` = 2.15:1 sobre
+    // `brand-50`. La ronda 15 los barrió a `gray-600` / `brand-600` en todo
+    // `/admin/**`, incluidos estos 6 archivos. El trinquete impide que vuelvan.
+    for (const file of PERIMETRO) {
+      const src = leer(file)
+      expect(src, `${file} usa text-gray-400`).not.toContain("text-gray-400")
+      expect(src, `${file} usa text-brand-400`).not.toContain("text-brand-400")
+    }
+  })
+
   it("no reintroduce el chip translúcido blanco dentro del botón activo", () => {
     for (const file of PERIMETRO) {
       expect(leer(file), `${file} usa bg-white/20 text-white`).not.toContain("bg-white/20 text-white")
@@ -126,9 +137,11 @@ describe("perímetro de productos — contraste (B36)", () => {
   })
 
   it("sube el texto ámbar suelto a 700", () => {
-    expect(page).toContain('? "text-amber-700" : "text-gray-400"')
+    // La rama hermana (contador dentro de límite) era `text-gray-400` = 2.60:1
+    // sobre blanco; la ronda 15 la subió a `text-gray-600` = 7.24:1.
+    expect(page).toContain('? "text-amber-700" : "text-gray-600"')
     expect(page).toContain("font-semibold text-amber-800 bg-amber-50 border border-amber-200")
-    expect(contar(modal, '? "text-amber-700" : "text-gray-400"')).toBe(2)
+    expect(contar(modal, '? "text-amber-700" : "text-gray-600"')).toBe(2)
   })
 
   it("deja legible la afordancia destructiva que estaba en gray-300", () => {

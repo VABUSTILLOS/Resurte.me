@@ -143,13 +143,13 @@ function SequenceEnrollments({
           className={`h-3 w-3 transition-transform motion-reduce:transition-none ${open ? "" : "-rotate-90"}`}
         />
         Inscripciones
-        {summary && <span className="font-normal text-gray-400">· {summaryLabel(summary)}</span>}
+        {summary && <span className="font-normal text-gray-600">· {summaryLabel(summary)}</span>}
       </button>
 
       {open && (
         <div className="mt-1.5">
           {loading && rows === null ? (
-            <p className="flex items-center gap-2 py-2 text-[11px] text-gray-400">
+            <p className="flex items-center gap-2 py-2 text-[11px] text-gray-600">
               <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" /> Cargando...
             </p>
           ) : error ? (
@@ -164,7 +164,7 @@ function SequenceEnrollments({
               </button>
             </div>
           ) : rows !== null && rows.length === 0 ? (
-            <p className="py-2 text-[11px] text-gray-400">
+            <p className="py-2 text-[11px] text-gray-600">
               Nadie inscrito todavía. Selecciona prospectos en el embudo y usa «Inscribir en
               secuencia».
             </p>
@@ -183,7 +183,7 @@ function SequenceEnrollments({
                   <span className="w-20 shrink-0 text-[11px] tabular-nums text-gray-500">
                     {enrollmentStepLabel(enrollment.currentStep, enrollment.totalSteps)}
                   </span>
-                  <span className="w-32 shrink-0 truncate text-[11px] text-gray-400">
+                  <span className="w-32 shrink-0 truncate text-[11px] text-gray-600">
                     {enrollment.nextRunAt
                       ? new Date(enrollment.nextRunAt).toLocaleString("es-MX", {
                           day: "numeric",
@@ -227,7 +227,7 @@ function SequenceEnrollments({
               ))}
             </ul>
           )}
-          <p className="mt-1.5 text-[10px] text-gray-400">
+          <p className="mt-1.5 text-[10px] text-gray-600">
             Cancelar no borra la fila: el prospecto deja de recibir pasos y puede volver a
             inscribirse en esta misma secuencia.
           </p>
@@ -305,7 +305,7 @@ export function LeadSequences({ onChanged }: { onChanged: () => void }) {
 
   if (loading && sequences.length === 0) {
     return (
-      <p className="flex items-center gap-2 py-10 text-sm text-gray-400">
+      <p className="flex items-center gap-2 py-10 text-sm text-gray-600">
         <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> Cargando secuencias...
       </p>
     )
@@ -396,7 +396,7 @@ export function LeadSequences({ onChanged }: { onChanged: () => void }) {
                   {sequence.description && (
                     <p className="mt-0.5 text-xs text-gray-500">{sequence.description}</p>
                   )}
-                  <p className="mt-1 text-[11px] text-gray-400">
+                  <p className="mt-1 text-[11px] text-gray-600">
                     {sequence.steps.length} paso{sequence.steps.length === 1 ? "" : "s"} ·{" "}
                     {sequence.activeEnrollments} en curso
                   </p>
@@ -439,7 +439,7 @@ export function LeadSequences({ onChanged }: { onChanged: () => void }) {
                     <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600">
                       {step.stepOrder}
                     </span>
-                    <Clock className="mt-0.5 h-3 w-3 shrink-0 text-gray-400" />
+                    <Clock className="mt-0.5 h-3 w-3 shrink-0 text-gray-600" />
                     <span className="shrink-0 text-gray-500">{delayLabel(step.delayHours)}</span>
                     <span className="min-w-0 flex-1 truncate">
                       {step.templateName ? (
@@ -565,7 +565,7 @@ function SequenceForm({ sequence, templates, onCancel, onSaved }: SequenceFormPr
                 {index + 1}
               </span>
               <label className="flex items-center gap-1.5 text-[11px] text-gray-600">
-                <Clock className="h-3 w-3 text-gray-400" />
+                <Clock className="h-3 w-3 text-gray-600" />
                 Espera
                 <input
                   type="number"
@@ -577,7 +577,7 @@ function SequenceForm({ sequence, templates, onCancel, onSaved }: SequenceFormPr
                 />
                 h
               </label>
-              <span className="flex-1 text-[11px] text-gray-400">
+              <span className="flex-1 text-[11px] text-gray-600">
                 {delayLabel(step.delayHours)} después del paso anterior
               </span>
               {steps.length > 1 && (
@@ -585,7 +585,7 @@ function SequenceForm({ sequence, templates, onCancel, onSaved }: SequenceFormPr
                   type="button"
                   aria-label={`Quitar el paso ${index + 1}`}
                   onClick={() => setSteps((prev) => prev.filter((_, i) => i !== index))}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-white hover:text-red-700"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-600 hover:bg-white hover:text-red-700"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -638,7 +638,7 @@ function SequenceForm({ sequence, templates, onCancel, onSaved }: SequenceFormPr
         )}
       </div>
 
-      <p className="text-[11px] text-gray-400">
+      <p className="text-[11px] text-gray-600">
         Variables disponibles:{" "}
         {QUICK_REPLY_VARIABLES.map((v) => `{{${v}}}`).join(", ")}. Un paso sin plantilla aprobada
         solo se envía si el prospecto escribió en las últimas 24 h.
@@ -733,13 +733,13 @@ export function SequenceEnrollControl({
         className="inline-flex min-h-[36px] items-center gap-1 rounded-lg border border-gray-200 px-3 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
       >
         <Send className="h-3.5 w-3.5" /> Inscribir en secuencia
-        <ChevronDown className="h-3 w-3 text-gray-400" />
+        <ChevronDown className="h-3 w-3 text-gray-600" />
       </button>
 
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-64 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
           {sequences === null ? (
-            <p className="flex items-center gap-2 px-2 py-3 text-[11px] text-gray-400">
+            <p className="flex items-center gap-2 px-2 py-3 text-[11px] text-gray-600">
               <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> Cargando...
             </p>
           ) : sequences.length === 0 ? (
@@ -767,7 +767,7 @@ export function SequenceEnrollControl({
                       />
                     )}
                     <span className="min-w-0 flex-1 truncate">{sequence.name}</span>
-                    <span className="shrink-0 text-[10px] text-gray-400">
+                    <span className="shrink-0 text-[10px] text-gray-600">
                       {sequence.steps.length} pasos
                     </span>
                   </button>

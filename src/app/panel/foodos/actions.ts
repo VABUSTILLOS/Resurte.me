@@ -66,6 +66,10 @@ import {
   type GoogleBusinessProgress,
   type GoogleBusinessStep,
 } from "@/lib/foodos-seo"
+import {
+  checkOwnerTransition,
+  ownerStatusErrorMessage,
+} from "@/lib/foodos-moderation"
 import { revalidatePath, revalidateTag } from "next/cache"
 import { after } from "next/server"
 import type { LocalMenuItem } from "@/lib/pos/reconcile"
@@ -192,7 +196,6 @@ export async function upsertRestaurant(input: {
   slug: string
   logo_url?: string | null
   description?: string | null
-  status?: FoodosRestaurantStatus
   currency?: string
   collection_id?: number | null
   theme_color?: string | null
@@ -219,12 +222,17 @@ export async function upsertRestaurant(input: {
     throw new Error(`El slug "${slug}" ya está en uso por otro restaurante`)
   }
 
+  // `status` NO viaja aquí. Antes viajaba como `input.status ?? "draft"`, y eso
+  // significaba que **cada guardado del perfil despublicaba el restaurante**:
+  // el formulario no manda `status`, así que un restaurante `active` volvía a
+  // `draft` sin que nadie lo pidiera. El estado se cambia sólo por
+  // `setRestaurantStatus()`, que valida la transición y no puede llegar a
+  // `active`; y la base lo respalda con `foodos_restaurant_moderation_guard`.
   const payload = {
     name: input.name,
     slug,
     logo_url: input.logo_url || null,
     description: input.description || null,
-    status: input.status ?? "draft",
     currency: input.currency || "MXN",
     collection_id: input.collection_id ?? null,
     theme_color: input.theme_color || null,
@@ -245,9 +253,12 @@ export async function upsertRestaurant(input: {
       .select("*")
       .single()
   } else {
+    // Un restaurante nuevo nace en `draft`: primero se arma el menú y después
+    // se solicita la publicación. Nacer en `pending_review` llenaría la cola de
+    // revisión de páginas vacías.
     result = await supabase
       .from("foodos_restaurants")
-      .insert({ ...payload, user_id: user.id })
+      .insert({ ...payload, user_id: user.id, status: "draft" })
       .select("*")
       .single()
   }
@@ -255,22 +266,57 @@ export async function upsertRestaurant(input: {
   if (result.error) throw new Error(result.error.message)
   revalidatePath("/panel/foodos/restaurante")
   revalidatePath(`/r/${slug}`)
+  // La página pública y el marketplace salen del bundle cacheado por slug; sin
+  // esto el comensal vería el nombre o el slug viejo hasta cinco minutos.
+  revalidateTag("foodos-public", "max")
+  revalidateTag("foodos-seo", "max")
   return result.data as FoodosRestaurant
 }
 
+/**
+ * Cambia el estado del restaurante. **Nunca puede llegar a `active`**: publicar
+ * es una decisión de Resurte.me y pasa por `foodos_restaurant_review()`, que
+ * llama la ruta admin.
+ *
+ * Se lee el estado actual antes de escribir porque la tabla de transiciones
+ * necesita saber de dónde se viene — `draft → pending_review` es válido y
+ * `active → pending_review` no. La base sigue siendo la autoridad: el trigger
+ * `foodos_restaurant_moderation_guard` levanta `42501` sobre `active` aunque
+ * esta comprobación se saltara, así que la carrera entre la lectura y la
+ * escritura no es explotable.
+ */
 export async function setRestaurantStatus(
   id: string,
   status: FoodosRestaurantStatus
 ): Promise<void> {
   const { supabase, ownerUserId } = await requireFoodosAuth()
+
+  const { data: actual, error: readError } = await supabase
+    .from("foodos_restaurants")
+    .select("status, slug")
+    .eq("id", id)
+    .eq("user_id", ownerUserId)
+    .maybeSingle()
+  if (readError) throw new Error(readError.message)
+  if (!actual) throw new Error("No encontramos ese restaurante.")
+
+  const permiso = checkOwnerTransition(actual.status as string, status)
+  if (!permiso.ok) throw new Error(ownerStatusErrorMessage(permiso.code))
+
   const { error } = await supabase
     .from("foodos_restaurants")
     .update({ status })
     .eq("id", id)
     .eq("user_id", ownerUserId)
   if (error) throw new Error(error.message)
+
   revalidatePath("/panel/foodos/restaurante")
   revalidatePath("/panel/foodos/tablero")
+  // Entrar o salir de `active` cambia si la página pública existe. Sin esto, un
+  // restaurante pausado seguiría sirviéndose hasta cinco minutos.
+  revalidatePath(`/r/${actual.slug}`)
+  revalidateTag("foodos-public", "max")
+  revalidateTag("foodos-seo", "max")
 }
 
 // ------------------------------------------------------------

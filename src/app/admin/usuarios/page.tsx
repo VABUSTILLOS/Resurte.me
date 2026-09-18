@@ -127,13 +127,13 @@ export default function AdminUsuariosPage() {
             Exportar CSV
           </button>
           <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-600" />
             <input
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar por email o nombre"
-              className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
         </div>
@@ -171,13 +171,13 @@ export default function AdminUsuariosPage() {
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={4} className="px-4 py-10 text-center text-gray-600">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={4} className="px-4 py-10 text-center text-gray-600">
                   No se encontraron usuarios.
                 </td>
               </tr>
@@ -220,7 +220,7 @@ export default function AdminUsuariosPage() {
                           ))}
                         </select>
                         {updating === user.id && (
-                          <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                          <Loader2 className="h-4 w-4 animate-spin text-gray-600" />
                         )}
                       </div>
                     </td>
@@ -243,7 +243,7 @@ export default function AdminUsuariosPage() {
       </div>
 
       {!loading && total > users.length && (
-        <p className="mt-3 text-center text-xs text-gray-400">
+        <p className="mt-3 text-center text-xs text-gray-600">
           Mostrando {users.length} de {total} usuarios. Usa la búsqueda para
           encontrar más.
         </p>

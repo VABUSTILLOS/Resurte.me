@@ -553,7 +553,7 @@ export default function ProveedoresPage() {
                                 <Eye className="w-3.5 h-3.5" /> Visible
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400">
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600">
                                 <EyeOff className="w-3.5 h-3.5" /> Oculto
                               </span>
                             )}
@@ -591,7 +591,7 @@ export default function ProveedoresPage() {
                   </table>
                 </div>
               ) : (
-                <div className="px-5 py-6 text-sm text-gray-400">
+                <div className="px-5 py-6 text-sm text-gray-600">
                   Sin productos vinculados. Usa <strong className="text-gray-600">Vincular producto</strong>{" "}
                   para capturar el primer costo de lista.
                 </div>
@@ -601,7 +601,7 @@ export default function ProveedoresPage() {
         })}
       </div>
 
-      <p className="mt-6 text-xs text-gray-400 leading-relaxed">
+      <p className="mt-6 text-xs text-gray-600 leading-relaxed">
         Los productos vinculados entran ocultos y con precio de venta $0.00: el costo de
         lista es la referencia para definir margen. Actívalos desde /admin/productos
         solo después de capturar el precio de venta.

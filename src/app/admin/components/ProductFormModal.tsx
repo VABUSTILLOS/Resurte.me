@@ -1147,7 +1147,7 @@ export function ProductFormModal({
             type="button"
             onClick={requestClose}
             disabled={saving}
-            className="touch-target p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+            className="touch-target p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
             aria-label="Cerrar"
           >
             <X className="w-4 h-4" />
@@ -1252,7 +1252,7 @@ export function ProductFormModal({
             )}
 
           <fieldset id="pf-sec-identidad" className="scroll-mt-2 space-y-4 border-0 p-0">
-              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-600">
                 Identidad
               </legend>
             <div>
@@ -1340,7 +1340,7 @@ export function ProductFormModal({
                 <FieldError id="pf-err-barcode" message={fieldErrors.barcode} />
               </div>
             </div>
-            <p className="text-[10px] text-gray-400 -mt-2">
+            <p className="text-[10px] text-gray-600 -mt-2">
               El SKU debe ser único en el catálogo; el código de barras acepta 8, 12, 13 o 14
               dígitos.
             </p>
@@ -1351,7 +1351,7 @@ export function ProductFormModal({
               </label>
               <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                 {tags.length === 0 && (
-                  <span className="text-[11px] text-gray-400">Sin etiquetas</span>
+                  <span className="text-[11px] text-gray-600">Sin etiquetas</span>
                 )}
                 {tags.map((t) => (
                   <span
@@ -1409,14 +1409,14 @@ export function ProductFormModal({
                   ))}
                 </div>
               )}
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-[10px] text-gray-600">
                 Las etiquetas alimentan las colecciones de la tienda (p. ej. arranque, limpieza).
               </p>
             </div>
           </fieldset>
 
           <fieldset id="pf-sec-catalogo" className="scroll-mt-2 space-y-4 border-0 p-0">
-              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-600">
                 Catálogo
               </legend>
             <div>
@@ -1425,7 +1425,7 @@ export function ProductFormModal({
               </label>
               <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                 {relatedIds.length === 0 && (
-                  <span className="text-[11px] text-gray-400">
+                  <span className="text-[11px] text-gray-600">
                     Sin relacionados: la tienda sugiere por categoría
                   </span>
                 )}
@@ -1447,7 +1447,7 @@ export function ProductFormModal({
                 ))}
               </div>
               <div className="relative">
-                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-3.5 h-3.5 text-gray-600 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   id="pf-related"
                   value={relatedQuery}
@@ -1457,7 +1457,7 @@ export function ProductFormModal({
                   autoComplete="off"
                 />
                 {relatedActive && relatedSearching && (
-                  <Loader2 className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 text-gray-600 absolute right-3 top-1/2 -translate-y-1/2 animate-spin" />
                 )}
               </div>
               {relatedActive && relatedResults.length > 0 && (
@@ -1479,7 +1479,7 @@ export function ProductFormModal({
                               {r.name}
                             </span>
                             {r.brand && (
-                              <span className="block truncate text-[10px] text-gray-400">
+                              <span className="block truncate text-[10px] text-gray-600">
                                 {r.brand}
                               </span>
                             )}
@@ -1496,9 +1496,9 @@ export function ProductFormModal({
               {relatedActive &&
                 !relatedSearching &&
                 relatedResults.length === 0 && (
-                  <p className="mt-1 text-[10px] text-gray-400">Sin resultados.</p>
+                  <p className="mt-1 text-[10px] text-gray-600">Sin resultados.</p>
                 )}
-              <p className="mt-1 text-[10px] text-gray-400">
+              <p className="mt-1 text-[10px] text-gray-600">
                 Se muestran primero en la ficha del producto; máximo {RELATED_MAX}. Si no hay
                 ninguno, la tienda sugiere por categoría.
               </p>
@@ -1603,7 +1603,7 @@ export function ProductFormModal({
           </fieldset>
 
           <fieldset id="pf-sec-imagenes" className="scroll-mt-2 space-y-4 border-0 p-0">
-              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-600">
                 Imágenes
               </legend>
             {/* Galería de imágenes: la marcada con ★ es la principal (image_url) */}
@@ -1699,7 +1699,7 @@ export function ProductFormModal({
                 </div>
               )}
               {gallery.length === 0 ? (
-                <p className="text-[11px] text-gray-400">Sin imágenes todavía.</p>
+                <p className="text-[11px] text-gray-600">Sin imágenes todavía.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {gallery.map((url) => (
@@ -1741,7 +1741,7 @@ export function ProductFormModal({
           </fieldset>
 
           <fieldset id="pf-sec-precios" className="scroll-mt-2 space-y-4 border-0 p-0">
-              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-600">
                 Precios
               </legend>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1820,7 +1820,7 @@ export function ProductFormModal({
               <span className="font-semibold text-gray-600">
                 Margen:{" "}
                 <span
-                  className={marginTone ? `font-bold ${MARGIN_TONE_CLS[marginTone]}` : "text-gray-400"}
+                  className={marginTone ? `font-bold ${MARGIN_TONE_CLS[marginTone]}` : "text-gray-600"}
                 >
                   {pricing.marginPct === null ? "—" : `${pricing.marginPct}%`}
                 </span>
@@ -1843,7 +1843,7 @@ export function ProductFormModal({
                   <span className="ml-1 text-green-700">(oferta activa)</span>
                 )}
                 {saleOffWindow && (
-                  <span className="ml-1 text-gray-400">
+                  <span className="ml-1 text-gray-600">
                     ({pricing.saleState === "scheduled" ? "oferta programada" : "oferta vencida"})
                   </span>
                 )}
@@ -1913,7 +1913,7 @@ export function ProductFormModal({
               </div>
             </div>
             <FieldError id="pf-err-saleWindow" message={fieldErrors.saleWindow} />
-            <p className="text-[11px] text-gray-400 -mt-2">
+            <p className="text-[11px] text-gray-600 -mt-2">
               {salePrice.trim() === ""
                 ? "Sin precio de oferta no hay ventana que aplicar."
                 : "Fuera de esta ventana la tienda cobra el precio normal; déjala vacía para que la oferta no expire."}
@@ -1921,7 +1921,7 @@ export function ProductFormModal({
           </fieldset>
 
           <fieldset id="pf-sec-inventario" className="scroll-mt-2 space-y-4 border-0 p-0">
-              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-600">
                 Inventario
               </legend>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1944,7 +1944,7 @@ export function ProductFormModal({
                   {...fieldA11y("stockQuantity", "pf-qty-hint")}
                 />
                 <FieldError id="pf-err-stockQuantity" message={fieldErrors.stockQuantity} />
-                <p id="pf-qty-hint" className="mt-1 text-[10px] text-gray-400">
+                <p id="pf-qty-hint" className="mt-1 text-[10px] text-gray-600">
                   Con unidades capturadas el estado se calcula solo.
                 </p>
               </div>
@@ -1971,7 +1971,7 @@ export function ProductFormModal({
                   ))}
                 </select>
                 <FieldError id="pf-err-stockStatus" message={fieldErrors.stockStatus} />
-                <p id="pf-stock-hint" className="mt-1 text-[10px] text-gray-400">
+                <p id="pf-stock-hint" className="mt-1 text-[10px] text-gray-600">
                   {submittedStock.derived
                     ? `Calculado con las unidades capturadas (0 → agotado, ≤${resolveLowStockThreshold(
                         fieldNumber(lowStockThreshold)
@@ -2003,7 +2003,7 @@ export function ProductFormModal({
                   {...fieldA11y("lowStockThreshold", "pf-threshold-hint")}
                 />
                 <FieldError id="pf-err-lowStockThreshold" message={fieldErrors.lowStockThreshold} />
-                <p id="pf-threshold-hint" className="mt-1 text-[10px] text-gray-400">
+                <p id="pf-threshold-hint" className="mt-1 text-[10px] text-gray-600">
                   Vacío = predeterminado ({DEFAULT_LOW_STOCK_THRESHOLD}).
                 </p>
               </div>
@@ -2011,7 +2011,7 @@ export function ProductFormModal({
           </fieldset>
 
           <fieldset id="pf-sec-seo" className="scroll-mt-2 space-y-4 border-0 p-0">
-              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-600">
                 SEO
               </legend>
             <div className="grid grid-cols-1 gap-4">
@@ -2038,7 +2038,7 @@ export function ProductFormModal({
                     SEO: título
                   </label>
                   <span
-                    className={`text-[10px] ${seoTitle.length > 60 ? "text-amber-700" : "text-gray-400"}`}
+                    className={`text-[10px] ${seoTitle.length > 60 ? "text-amber-700" : "text-gray-600"}`}
                   >
                     {seoTitle.length}/60
                   </span>
@@ -2058,7 +2058,7 @@ export function ProductFormModal({
                   </label>
                   <span
                     className={`text-[10px] ${
-                      seoDescription.length > 160 ? "text-amber-700" : "text-gray-400"
+                      seoDescription.length > 160 ? "text-amber-700" : "text-gray-600"
                     }`}
                   >
                     {seoDescription.length}/160
@@ -2077,7 +2077,7 @@ export function ProductFormModal({
           </fieldset>
 
           <fieldset id="pf-sec-publicacion" className="scroll-mt-2 space-y-4 border-0 p-0">
-              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-600">
                 Publicación
               </legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2112,7 +2112,7 @@ export function ProductFormModal({
                 />
               </div>
             </div>
-            <p className="text-[11px] text-gray-400 -mt-2">
+            <p className="text-[11px] text-gray-600 -mt-2">
               Se aplica en la corrida diaria del cron; publicar/despublicar a mano cancela la
               programación.
             </p>

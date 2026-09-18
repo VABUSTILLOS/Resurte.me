@@ -137,12 +137,12 @@ function MetricCard({
 }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">{label}</p>
+      <p className="text-xs text-gray-600 font-medium uppercase tracking-wide">{label}</p>
       <div className="flex items-baseline gap-2 mt-1">
         <p className="text-2xl font-bold text-gray-900">{value}</p>
         {delta && <span className="text-xs font-medium text-gray-500">{delta}</span>}
       </div>
-      {hint && <p className="text-xs text-gray-400 mt-0.5">{hint}</p>}
+      {hint && <p className="text-xs text-gray-600 mt-0.5">{hint}</p>}
     </div>
   )
 }
@@ -210,7 +210,7 @@ function GeoCellEditor({
       >
         <div className="flex items-start justify-between gap-3 px-5 pt-5">
           <div className="min-w-0">
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+            <p className="text-xs text-gray-600 font-medium uppercase tracking-wide">
               {engine?.label} · {monthLabel}
             </p>
             <h2 id="geo-cell-title" className="text-base font-bold text-gray-900 mt-0.5">
@@ -223,7 +223,7 @@ function GeoCellEditor({
             onClick={onCancel}
             disabled={saving}
             aria-label="Cerrar"
-            className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+            className="shrink-0 p-1.5 rounded-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 disabled:opacity-50"
           >
             <X className="w-4 h-4" />
           </button>
@@ -274,7 +274,7 @@ function GeoCellEditor({
                   placeholder="—"
                   className="w-28 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-600 mt-1">
                   El número de la lista. Si no la contaste, déjalo vacío.
                 </p>
               </div>
@@ -292,7 +292,7 @@ function GeoCellEditor({
                   placeholder="Precio, pedido mínimo, plazo…"
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-600 mt-1">
                   {draft.citedFact.length}/{GEO_PANEL_LIMITS.fact}
                 </p>
               </div>
@@ -312,7 +312,7 @@ function GeoCellEditor({
                   <option value="no">No, incorrecto</option>
                   <option value="parcial">Parcialmente</option>
                 </select>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-600 mt-1">
                   Una cita con el precio equivocado es peor que no aparecer.
                 </p>
               </div>
@@ -331,7 +331,7 @@ function GeoCellEditor({
                 placeholder="dominio.com"
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-600 mt-1">
                 Sólo el dominio. Es lo que alimenta el ranking de competidores del mes.
               </p>
             </div>
@@ -350,7 +350,7 @@ function GeoCellEditor({
               placeholder="Lo que no cabe en los campos de arriba."
               className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"
             />
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-gray-600 mt-1">
               {draft.notes.length}/{GEO_PANEL_LIMITS.notes}
             </p>
           </div>
@@ -526,7 +526,7 @@ export function GeoPanelForm({ initialData }: { initialData: GeoPanelMonthData }
             <option value={data.monthKey}>{data.monthLabel} · 0/80 (sin empezar)</option>
           )}
         </select>
-        {loadingMonth && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+        {loadingMonth && <Loader2 className="w-4 h-4 animate-spin text-gray-600" />}
         <div className="flex-1" />
         <button
           type="button"
@@ -612,10 +612,10 @@ export function GeoPanelForm({ initialData }: { initialData: GeoPanelMonthData }
             <tbody className="divide-y divide-gray-100">
               {GEO_QUERIES.map((q, i) => (
                 <tr key={q.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-3 text-xs text-gray-400 font-mono">{i + 1}</td>
+                  <td className="px-5 py-3 text-xs text-gray-600 font-mono">{i + 1}</td>
                   <td className="px-5 py-3">
                     <p className="text-gray-900">{q.prompt}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{q.intent}</p>
+                    <p className="text-xs text-gray-600 mt-0.5">{q.intent}</p>
                   </td>
                   <td className="px-5 py-3">
                     <Link
@@ -650,7 +650,7 @@ export function GeoPanelForm({ initialData }: { initialData: GeoPanelMonthData }
         </div>
       </div>
 
-      <p className="text-xs text-gray-400 mb-10">
+      <p className="text-xs text-gray-600 mb-10">
         Pica cualquier celda para registrarla. {metrics.total} comprobaciones por corrida (
         {GEO_QUERIES.length} preguntas × {GEO_ENGINES.length} motores). Registra también{" "}
         <strong>qué dato se citó</strong> y <strong>si era correcto</strong>: una cita con el precio
@@ -666,7 +666,7 @@ export function GeoPanelForm({ initialData }: { initialData: GeoPanelMonthData }
               <div key={e.engineId} className="bg-white rounded-xl border border-gray-200 p-4">
                 <p className="text-sm font-semibold text-gray-900">{e.label}</p>
                 <p className="text-xl font-bold text-gray-900 mt-1">{formatRate(e.citedRate, 0)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
+                <p className="text-xs text-gray-600 mt-0.5">
                   {e.recorded === 0 ? "sin celdas medidas" : `${e.cited} de ${e.recorded} citaron`}
                 </p>
               </div>
@@ -706,7 +706,7 @@ export function GeoPanelForm({ initialData }: { initialData: GeoPanelMonthData }
           <div className="flex items-start gap-2 text-sm text-gray-500 bg-white rounded-xl border border-gray-200 px-5 py-4">
             {metrics.recorded === 0 ? (
               <>
-                <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-400" />
+                <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-600" />
                 Todavía no hay celdas capturadas, así que no hay brechas que leer.
               </>
             ) : (
@@ -724,7 +724,7 @@ export function GeoPanelForm({ initialData }: { initialData: GeoPanelMonthData }
                   <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-700" />
                   <div className="min-w-0">
                     <p className="text-sm text-gray-900">{g.prompt}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-600 mt-0.5">
                       {g.engineLabel} ·{" "}
                       <Link
                         href={g.targetPath}

@@ -12,7 +12,7 @@ export type TrendUnavailable = "truncated" | "detailError" | null
 const CREATED_COLOR = "#2563eb"
 const PAID_COLOR = "#16a34a"
 
-const TH = "py-1.5 pr-4 text-[11px] font-medium uppercase tracking-wide text-gray-400"
+const TH = "py-1.5 pr-4 text-[11px] font-medium uppercase tracking-wide text-gray-600"
 const TD = "py-1.5 pr-4 text-sm text-gray-700"
 const TD_NUM = "py-1.5 pr-4 text-sm text-gray-700 text-right tabular-nums"
 
@@ -135,7 +135,7 @@ export function FunnelTrendChart({
                   <td className={TD}>
                     {shortDay(point.date)}
                     {point.partial && (
-                      <span className="ml-1 text-gray-400" title="Día incompleto">
+                      <span className="ml-1 text-gray-600" title="Día incompleto">
                         *
                       </span>
                     )}

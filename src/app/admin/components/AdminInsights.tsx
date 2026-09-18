@@ -142,7 +142,7 @@ export function OrdersByStatusChart({
 
 function EmptyNote({ text }: { text: string }) {
   return (
-    <div className="flex h-[220px] items-center justify-center text-sm text-gray-400">
+    <div className="flex h-[220px] items-center justify-center text-sm text-gray-600">
       {text}
     </div>
   )

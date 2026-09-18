@@ -115,7 +115,7 @@ export function PeriodComparisonCard() {
         </div>
       )}
       {data && (
-        <p className="mt-3 text-[11px] text-gray-400">
+        <p className="mt-3 text-[11px] text-gray-600">
           Últimos {data.days} días vs. los {data.days} días anteriores · ingresos y ticket solo cuentan pedidos pagados
         </p>
       )}

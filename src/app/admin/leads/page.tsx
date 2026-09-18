@@ -124,7 +124,7 @@ export default function AdminLeadsPage() {
     <ToastProvider>
       <Suspense
         fallback={
-          <div className="flex items-center justify-center py-24 text-sm text-gray-400">
+          <div className="flex items-center justify-center py-24 text-sm text-gray-600">
             <Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" />
             Cargando leads y pipeline...
           </div>
@@ -545,7 +545,7 @@ function AdminLeadsContent() {
 
   if (loading && leads.length === 0 && prospects.length === 0 && !error) {
     return (
-      <div className="flex items-center justify-center py-24 text-sm text-gray-400">
+      <div className="flex items-center justify-center py-24 text-sm text-gray-600">
         <Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" />
         Cargando leads y pipeline...
       </div>
@@ -626,7 +626,7 @@ function AdminLeadsContent() {
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative min-w-[200px] flex-1">
               <span className="sr-only">Buscar</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-600" />
               <input
                 type="search"
                 value={q}
@@ -882,7 +882,7 @@ function AdminLeadsContent() {
                 >
                   <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">
                     {col.label}
-                    <span className="ml-1 text-gray-400">({cards.length})</span>
+                    <span className="ml-1 text-gray-600">({cards.length})</span>
                   </h2>
                   <ul className="space-y-2">
                     {cards.map((p) => {
@@ -938,7 +938,7 @@ function AdminLeadsContent() {
                             </span>
                           )}
 
-                          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-gray-400">
+                          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
                             {p.whatsapp && (
                               <a
                                 href={`https://wa.me/${p.whatsapp.replace(/\D/g, "")}`}
@@ -962,7 +962,7 @@ function AdminLeadsContent() {
                           {p.next_follow_up_at && (
                             <p
                               className={`mt-1 inline-flex items-center gap-1 text-[11px] font-medium ${
-                                overdue ? "text-red-700" : "text-gray-400"
+                                overdue ? "text-red-700" : "text-gray-600"
                               }`}
                               title={new Date(p.next_follow_up_at).toLocaleString("es-MX")}
                             >
@@ -1034,7 +1034,7 @@ function AdminLeadsContent() {
                       )
                     })}
                     {cards.length === 0 && (
-                      <li className="py-3 text-center text-[11px] text-gray-400">Vacío</li>
+                      <li className="py-3 text-center text-[11px] text-gray-600">Vacío</li>
                     )}
                   </ul>
                 </div>
@@ -1237,7 +1237,7 @@ function LeadInbox({
                       {l.coupon_code ?? "—"}
                     </td>
                     <td
-                      className="px-4 py-3 text-xs text-gray-400"
+                      className="px-4 py-3 text-xs text-gray-600"
                       title={new Date(l.created_at).toLocaleString("es-MX")}
                     >
                       {formatRelativeTime(l.created_at)}
@@ -1253,7 +1253,7 @@ function LeadInbox({
                           l.status === "convertido"
                             ? "bg-emerald-100 text-emerald-800"
                             : l.status === "descartado"
-                              ? "bg-gray-100 text-gray-500"
+                              ? "bg-gray-100 text-gray-600"
                               : "bg-amber-100 text-amber-800"
                         }`}
                       >
@@ -1316,7 +1316,7 @@ function LeadInbox({
               })}
               {leads.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-400">
+                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-600">
                     <Users className="mx-auto mb-2 h-5 w-5 text-gray-300" />
                     Sin leads en esta bandeja
                   </td>
@@ -1357,7 +1357,7 @@ function FunnelView({ leads }: { leads: FunnelLead[] }) {
     <>
       <div className={CARD}>
         <h2 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-gray-900">
-          <Filter className="h-3.5 w-3.5 text-gray-400" />
+          <Filter className="h-3.5 w-3.5 text-gray-600" />
           Embudo de captación
         </h2>
         <ul className="space-y-3">
@@ -1367,7 +1367,7 @@ function FunnelView({ leads }: { leads: FunnelLead[] }) {
                 <span className="font-semibold text-gray-700">{step.label}</span>
                 <span className="text-gray-500">
                   {step.count}
-                  <span className="ml-2 text-gray-400">
+                  <span className="ml-2 text-gray-600">
                     {step.rateFromPrevious === null
                       ? "—"
                       : `${formatRate(step.rateFromPrevious)} de capturados`}
@@ -1384,7 +1384,7 @@ function FunnelView({ leads }: { leads: FunnelLead[] }) {
           ))}
         </ul>
         {leads.length === 0 && (
-          <p className="mt-3 text-xs text-gray-400">Todavía no hay leads capturados que medir.</p>
+          <p className="mt-3 text-xs text-gray-600">Todavía no hay leads capturados que medir.</p>
         )}
       </div>
 
@@ -1393,7 +1393,7 @@ function FunnelView({ leads }: { leads: FunnelLead[] }) {
           <h2 className="mb-3 text-sm font-bold text-gray-900">Por fuente</h2>
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-gray-400">
+              <tr className="text-left text-gray-600">
                 <th className="pb-2">Fuente</th>
                 <th className="pb-2 text-right">Capturados</th>
                 <th className="pb-2 text-right">Calificados</th>
@@ -1415,7 +1415,7 @@ function FunnelView({ leads }: { leads: FunnelLead[] }) {
               ))}
               {bySource.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-4 text-center text-gray-400">
+                  <td colSpan={5} className="py-4 text-center text-gray-600">
                     Sin datos
                   </td>
                 </tr>
@@ -1428,7 +1428,7 @@ function FunnelView({ leads }: { leads: FunnelLead[] }) {
           <h2 className="mb-3 text-sm font-bold text-gray-900">Por segmento del calificador</h2>
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-gray-400">
+              <tr className="text-left text-gray-600">
                 <th className="pb-2">Segmento</th>
                 <th className="pb-2 text-right">Capturados</th>
                 <th className="pb-2 text-right">Convertidos</th>
@@ -1448,7 +1448,7 @@ function FunnelView({ leads }: { leads: FunnelLead[] }) {
               ))}
               {bySegment.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="py-4 text-center text-gray-400">
+                  <td colSpan={4} className="py-4 text-center text-gray-600">
                     Sin datos
                   </td>
                 </tr>
@@ -1517,7 +1517,7 @@ function SlaView() {
   if (loading) {
     return (
       <div className={CARD}>
-        <p className="flex items-center gap-2 py-8 text-xs text-gray-400">
+        <p className="flex items-center gap-2 py-8 text-xs text-gray-600">
           <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> Calculando
           SLA de conversaciones...
         </p>
@@ -1574,10 +1574,10 @@ function SlaView() {
       <div className={CARD}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="flex items-center gap-1.5 text-sm font-bold text-gray-900">
-            <MessageCircle className="h-3.5 w-3.5 text-gray-400" />
+            <MessageCircle className="h-3.5 w-3.5 text-gray-600" />
             SLA de conversaciones
           </h2>
-          <span className="text-[11px] text-gray-400">
+          <span className="text-[11px] text-gray-600">
             {sla.considered} prospectos abiertos considerados
           </span>
         </div>
@@ -1591,7 +1591,7 @@ function SlaView() {
           <SlaStat label="P90 1.ª respuesta" value={formatMinutes(stats.p90Minutes)} />
         </dl>
 
-        <p className="mt-3 text-[11px] text-gray-400">
+        <p className="mt-3 text-[11px] text-gray-600">
           {stats.measured} conversaciones medidas · {stats.pending} sin respuesta todavía ·{" "}
           {stats.unmeasured} sin mensajes entrantes
           {stats.bestMinutes !== null && ` · mejor ${formatMinutes(stats.bestMinutes)}`}
@@ -1601,7 +1601,7 @@ function SlaView() {
       <div className={CARD}>
         <h2 className="mb-3 text-sm font-bold text-gray-900">Carga por vendedor</h2>
         {loads.length === 0 ? (
-          <p className="py-4 text-center text-xs text-gray-400">Sin vendedores registrados</p>
+          <p className="py-4 text-center text-xs text-gray-600">Sin vendedores registrados</p>
         ) : (
           <ul className="space-y-2">
             {loads.map((load) => (
@@ -1641,14 +1641,14 @@ function SlaView() {
         </div>
 
         {pending.length === 0 ? (
-          <p className="py-4 text-center text-xs text-gray-400">
+          <p className="py-4 text-center text-xs text-gray-600">
             Nadie está esperando respuesta. Buen trabajo.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-xs">
               <thead>
-                <tr className="text-left text-gray-400">
+                <tr className="text-left text-gray-600">
                   <th className="pb-2">Prospecto</th>
                   <th className="pb-2">Vendedor</th>
                   <th className="pb-2 text-right">Esperando</th>
@@ -1678,7 +1678,7 @@ function SlaView() {
               </tbody>
             </table>
             {pending.length >= 200 && (
-              <p className="mt-2 text-[11px] text-gray-400">
+              <p className="mt-2 text-[11px] text-gray-600">
                 Se muestran los 200 casos más antiguos; el CSV incluye los mismos.
               </p>
             )}

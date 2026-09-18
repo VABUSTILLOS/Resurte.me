@@ -86,7 +86,7 @@ export default function AdminOrdersPage() {
     <ToastProvider>
       <Suspense
         fallback={
-          <div className="flex items-center justify-center py-20 text-gray-400">
+          <div className="flex items-center justify-center py-20 text-gray-600">
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
             Cargando pedidos...
           </div>
@@ -582,7 +582,7 @@ function AdminOrdersContent() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+      <div className="flex items-center justify-center py-24 text-gray-600 text-sm">
         Cargando pedidos...
       </div>
     )
@@ -592,7 +592,7 @@ function AdminOrdersContent() {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <p className="text-red-700 text-sm font-medium">{error}</p>
-        <p className="text-gray-400 text-xs mt-1">Verifica que estés autenticado como administrador.</p>
+        <p className="text-gray-600 text-xs mt-1">Verifica que estés autenticado como administrador.</p>
         {/* Fase 7 — recuperación ante error sin recargar la página */}
         <button
           type="button"
@@ -640,7 +640,7 @@ function AdminOrdersContent() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
           <input
             type="text"
             placeholder="Buscar por #pedido, cliente o teléfono..."
@@ -689,7 +689,7 @@ function AdminOrdersContent() {
             <button
               type="button"
               onClick={() => { setFromDate(""); setToDate("") }}
-              className="text-xs text-gray-400 hover:text-gray-600"
+              className="text-xs text-gray-600 hover:text-gray-700"
             >
               Limpiar
             </button>
@@ -718,7 +718,7 @@ function AdminOrdersContent() {
             <button
               type="button"
               onClick={() => setPaymentStatusFilter("all")}
-              className="text-xs text-gray-400 hover:text-gray-600"
+              className="text-xs text-gray-600 hover:text-gray-700"
             >
               Limpiar
             </button>
@@ -749,7 +749,7 @@ function AdminOrdersContent() {
                 type="button"
                 onClick={() => removeSavedFilter(f.name)}
                 aria-label={`Eliminar filtro ${f.name}`}
-                className="text-brand-400 hover:text-brand-700"
+                className="text-brand-600 hover:text-brand-700"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -996,12 +996,12 @@ function AdminOrdersContent() {
                         WhatsApp
                       </span>
                     ) : (
-                      <span className="text-xs text-gray-400">Web</span>
+                      <span className="text-xs text-gray-600">Web</span>
                     )}
                   </td>
                   {/* Fase 7 — fecha relativa con la absoluta en el tooltip */}
                   <td
-                    className="px-5 py-3 text-xs text-gray-400"
+                    className="px-5 py-3 text-xs text-gray-600"
                     title={new Date(order.created_at).toLocaleString("es-MX")}
                   >
                     {formatRelativeTime(order.created_at)}
@@ -1018,7 +1018,7 @@ function AdminOrdersContent() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-5 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={10} className="px-5 py-12 text-center text-gray-600 text-sm">
                     No hay pedidos que coincidan con el filtro.
                   </td>
                 </tr>
@@ -1055,7 +1055,7 @@ function AdminOrdersContent() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Pedido #{selectedOrder.id}</h2>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-600">
                   {orderCustomerLabel(selectedOrder)} ·{" "}
                   {new Date(selectedOrder.created_at).toLocaleString("es-MX", {
                     day: "numeric",
@@ -1069,7 +1069,7 @@ function AdminOrdersContent() {
               <button
                 type="button"
                 onClick={() => setSelectedOrder(null)}
-                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+                className="p-2 rounded-lg text-gray-600 hover:text-gray-700 hover:bg-gray-50 transition-colors"
                 aria-label="Cerrar detalle"
               >
                 <X className="w-4 h-4" />
@@ -1079,10 +1079,10 @@ function AdminOrdersContent() {
             <div className="px-6 py-4 space-y-4">
               {selectedOrder.address && (
                 <div>
-                  <p className="text-xs font-medium text-gray-400 mb-1">Dirección de entrega</p>
+                  <p className="text-xs font-medium text-gray-600 mb-1">Dirección de entrega</p>
                   <p className="text-sm text-gray-700">{formatAdminAddress(selectedOrder.address)}</p>
                   {selectedOrder.address.references ? (
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-600 mt-0.5">
                       Ref: {selectedOrder.address.references}
                     </p>
                   ) : null}
@@ -1090,7 +1090,7 @@ function AdminOrdersContent() {
               )}
 
               <div>
-                <p className="text-xs font-medium text-gray-400 mb-1.5">
+                <p className="text-xs font-medium text-gray-600 mb-1.5">
                   Productos ({selectedOrder.items.length})
                 </p>
                 <ul className="divide-y divide-gray-100 rounded-xl border border-gray-100">
@@ -1149,7 +1149,7 @@ function AdminOrdersContent() {
                 selectedOrder.status !== "cancelled" &&
                 selectedOrder.status !== "delivered" && (
                   <div className="flex items-center gap-2 pt-1">
-                    <Bike className="w-4 h-4 text-gray-400 shrink-0" />
+                    <Bike className="w-4 h-4 text-gray-600 shrink-0" />
                     <select
                       value={selectedOrder.driver_id ?? ""}
                       disabled={updatingId === selectedOrder.id}
@@ -1173,7 +1173,7 @@ function AdminOrdersContent() {
                 )}
               {selectedOrder.driver_id != null &&
                 (selectedOrder.status === "delivered" || selectedOrder.status === "cancelled") && (
-                  <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                  <p className="text-xs text-gray-600 flex items-center gap-1.5">
                     <Bike className="w-3.5 h-3.5" />
                     Repartidor:{" "}
                     {drivers.find((d) => d.id === selectedOrder.driver_id)?.name ??

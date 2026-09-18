@@ -60,6 +60,10 @@ const ADMIN_NAV_GROUPS = [
       // pago, no un listado más: mientras Stripe Connect esté apagado, el
       // 100 % del dinero con tarjeta de los micrositios pasa por aquí.
       { href: "/admin/foodos/dispersiones", label: "Dispersiones FoodOS", exact: false },
+      // E.3 — la cola de revisión de los micrositios. Es la única puerta a
+      // `status = 'active'` desde 00168, así que sin esta entrada el cambio
+      // dejaría a los restaurantes en revisión para siempre.
+      { href: "/admin/foodos/restaurantes", label: "Revisión FoodOS", exact: false },
       // P14: puerta de entrada a la sesión de soporte. Va junto a Restaurantes
       // porque es la misma audiencia, pero es una acción sobre el restaurante,
       // no un listado más.

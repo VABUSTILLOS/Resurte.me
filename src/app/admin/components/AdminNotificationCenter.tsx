@@ -126,7 +126,7 @@ export function AdminNotificationCenter() {
         onClick={() => setOpen((o) => !o)}
         aria-label={events.length > 0 ? `Notificaciones (${events.length})` : "Notificaciones"}
         aria-expanded={open}
-        className="relative inline-flex items-center justify-center rounded-full p-2 text-gray-500 hover:bg-gray-100 transition-colors"
+        className="relative inline-flex items-center justify-center rounded-full p-2 text-gray-600 hover:bg-gray-100 transition-colors"
       >
         <Bell className="w-4 h-4" aria-hidden="true" />
         {events.length > 0 && (
@@ -150,7 +150,7 @@ export function AdminNotificationCenter() {
                 onClick={() => updatePrefs({ ...prefs, sound: !prefs.sound })}
                 aria-label={prefs.sound ? "Silenciar sonido" : "Activar sonido"}
                 title={prefs.sound ? "Sonido activado" : "Sonido desactivado"}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100"
+                className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100"
               >
                 {prefs.sound ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
               </button>
@@ -159,7 +159,7 @@ export function AdminNotificationCenter() {
                 onClick={() => setEvents([])}
                 aria-label="Limpiar notificaciones"
                 title="Limpiar"
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100"
+                className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -168,14 +168,14 @@ export function AdminNotificationCenter() {
 
           <ul className="max-h-72 overflow-y-auto divide-y divide-gray-50">
             {events.length === 0 && (
-              <li className="px-4 py-6 text-center text-xs text-gray-400">
+              <li className="px-4 py-6 text-center text-xs text-gray-600">
                 Sin notificaciones en esta sesión
               </li>
             )}
             {events.map((ev) => (
               <li key={ev.id} className="px-4 py-2.5">
                 <p className="text-xs font-medium text-gray-800">{ev.message}</p>
-                <p className="text-[10px] text-gray-400" title={new Date(ev.at).toLocaleString("es-MX")}>
+                <p className="text-[10px] text-gray-600" title={new Date(ev.at).toLocaleString("es-MX")}>
                   {formatRelativeTime(ev.at)}
                 </p>
               </li>

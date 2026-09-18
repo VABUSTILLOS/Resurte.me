@@ -33,7 +33,7 @@ const EMPTY_DRAFT: Draft = { id: null, title: "", body: "", category: "", isActi
 
 /** "18/60" — verde mientras quepa, rojo cuando ya no. */
 function counterClass(length: number, max: number): string {
-  return length > max ? "text-red-700 font-semibold" : "text-gray-400"
+  return length > max ? "text-red-700 font-semibold" : "text-gray-600"
 }
 
 /**
@@ -235,7 +235,7 @@ export function LeadQuickReplies() {
                   }
                   className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-[11px] text-gray-700"
                 />
-                <span className="text-[10px] text-gray-400">menor = antes</span>
+                <span className="text-[10px] text-gray-600">menor = antes</span>
               </div>
             </div>
           </div>
@@ -290,14 +290,14 @@ export function LeadQuickReplies() {
               Cancelar
             </button>
             {draftError && draft.title.trim() !== "" && (
-              <span className="text-[10px] text-gray-400">{draftError}</span>
+              <span className="text-[10px] text-gray-600">{draftError}</span>
             )}
           </div>
         </div>
       )}
 
       {loading && replies.length === 0 ? (
-        <p className="flex items-center gap-2 py-10 text-sm text-gray-400">
+        <p className="flex items-center gap-2 py-10 text-sm text-gray-600">
           <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> Cargando respuestas
           rápidas...
         </p>
@@ -348,7 +348,7 @@ export function LeadQuickReplies() {
                       )}
                     </p>
                     <p className="mt-0.5 whitespace-pre-wrap text-xs text-gray-600">{reply.body}</p>
-                    <p className="mt-1 text-[10px] text-gray-400">
+                    <p className="mt-1 text-[10px] text-gray-600">
                       Orden {reply.sortOrder}
                       {reply.variables.length > 0
                         ? ` · variables: ${reply.variables.map((name) => `{{${name}}}`).join(", ")}`

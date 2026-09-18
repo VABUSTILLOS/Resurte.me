@@ -56,7 +56,7 @@ function ScoreBar({ score }: { score: number }) {
 
 function Delta({ value }: { value: number | null }) {
   if (value === null) {
-    return <span className="text-[11px] text-gray-400">sin base</span>
+    return <span className="text-[11px] text-gray-600">sin base</span>
   }
   const Icon = value > 0 ? TrendingUp : value < 0 ? TrendingDown : Minus
   const color = value > 0 ? "text-green-700" : value < 0 ? "text-red-700" : "text-gray-500"
@@ -142,7 +142,7 @@ export function CityPerformance() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold text-gray-900">Desempeño de cada ciudad</h2>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-gray-600">
             Ranking por ingresos, pedidos, tendencia y calidad · comparado con los {days} días anteriores
           </p>
         </div>
@@ -207,7 +207,7 @@ export function CityPerformance() {
                     Desempeño de cada ciudad en los últimos {days} días, ordenado por score
                   </caption>
                   <thead>
-                    <tr className="border-b border-gray-100 text-left text-[11px] uppercase tracking-wide text-gray-400">
+                    <tr className="border-b border-gray-100 text-left text-[11px] uppercase tracking-wide text-gray-600">
                       <th scope="col" className="py-2 pr-3 font-medium">Ciudad</th>
                       <th scope="col" className="py-2 pr-3 font-medium">Score</th>
                       <th scope="col" className="py-2 pr-3 text-right font-medium">Pedidos</th>
@@ -250,7 +250,7 @@ export function CityPerformance() {
                         <td className="py-2.5 pr-3 text-right tabular-nums">{city.whatsappShare}%</td>
                         <td className="py-2.5 pr-3 text-right tabular-nums">
                           {city.catalogCoverage === null ? (
-                            <span className="text-gray-400">—</span>
+                            <span className="text-gray-600">—</span>
                           ) : (
                             <span
                               className={
@@ -325,7 +325,7 @@ export function CityPerformance() {
                 <AlertTriangle className="h-4 w-4 text-amber-700" aria-hidden="true" />
                 Ciudades que necesitan atención
               </h3>
-              <p className="mb-3 text-[11px] text-gray-400">
+              <p className="mb-3 text-[11px] text-gray-600">
                 Señales detectadas con las métricas del periodo y qué hacer al respecto.
               </p>
               <ul className="grid gap-3 lg:grid-cols-2">
@@ -408,7 +408,7 @@ export function CityPerformance() {
           {data.withoutOrders.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-gray-900">Sin pedidos en el periodo</h3>
-              <p className="mb-3 text-[11px] text-gray-400">
+              <p className="mb-3 text-[11px] text-gray-600">
                 {data.withoutOrders.length}{" "}
                 {data.withoutOrders.length === 1 ? "ciudad" : "ciudades"} sin ventas en los últimos {days} días.
               </p>
@@ -437,7 +437,7 @@ export function CityPerformance() {
                       ) : (
                         city.tips.map((tip) => (
                           <li key={tip.id} className="flex gap-1.5 text-[11px] text-gray-600">
-                            <Check className="mt-0.5 h-3 w-3 shrink-0 text-gray-400" aria-hidden="true" />
+                            <Check className="mt-0.5 h-3 w-3 shrink-0 text-gray-600" aria-hidden="true" />
                             <span>
                               <strong className="font-semibold text-gray-800">{tip.title}:</strong>{" "}
                               {tip.detail}{" "}
@@ -457,7 +457,7 @@ export function CityPerformance() {
             </div>
           )}
 
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-gray-600">
             Últimos {data.days} días vs. los {data.days} anteriores · ingresos y ticket solo cuentan pedidos
             pagados · el score combina ingresos (40%), pedidos (25%), tendencia (20%) y calidad (15%).
           </p>
@@ -470,7 +470,7 @@ export function CityPerformance() {
 function SummaryTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">{label}</p>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-gray-600">{label}</p>
       <p className="mt-0.5 text-lg font-bold tabular-nums text-gray-900">{value}</p>
     </div>
   )
@@ -487,7 +487,7 @@ function MobileStat({
 }) {
   return (
     <div>
-      <dt className="text-[11px] text-gray-400">{label}</dt>
+      <dt className="text-[11px] text-gray-600">{label}</dt>
       <dd className="font-semibold tabular-nums text-gray-900">
         {value} {delta !== undefined && <Delta value={delta} />}
       </dd>

@@ -129,7 +129,7 @@ export function LeadsCrmWidget({ summary }: { summary: AdminLeadsSummary }) {
       <div className="mt-4 bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Leads recientes</h3>
         {summary.recentLeads.length === 0 ? (
-          <p className="text-sm text-gray-400">Sin leads capturados aún.</p>
+          <p className="text-sm text-gray-600">Sin leads capturados aún.</p>
         ) : (
           <ul className="space-y-2">
             {summary.recentLeads.map((lead) => (
@@ -140,7 +140,7 @@ export function LeadsCrmWidget({ summary }: { summary: AdminLeadsSummary }) {
                 >
                   {lead.email ?? "Sin email"}
                 </a>
-                <span className="shrink-0 text-xs text-gray-400">
+                <span className="shrink-0 text-xs text-gray-600">
                   {formatRelativeTime(lead.created_at)}
                 </span>
               </li>

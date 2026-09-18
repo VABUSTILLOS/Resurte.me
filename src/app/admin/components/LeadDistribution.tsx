@@ -135,7 +135,7 @@ export function LeadDistribution({
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Cerrar el reparto"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-700"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -144,7 +144,7 @@ export function LeadDistribution({
           <div className="mt-2.5">
             <p className="text-[11px] font-semibold text-gray-600">Carga actual</p>
             {loading && loads === null ? (
-              <p className="flex items-center gap-2 py-2 text-[11px] text-gray-400">
+              <p className="flex items-center gap-2 py-2 text-[11px] text-gray-600">
                 <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" /> Cargando...
               </p>
             ) : loadError ? (
@@ -165,7 +165,7 @@ export function LeadDistribution({
             ) : (
               <table className="mt-1 w-full text-[11px]">
                 <thead>
-                  <tr className="text-left text-gray-400">
+                  <tr className="text-left text-gray-600">
                     <th className="font-medium">Vendedor</th>
                     <th className="w-12 text-right font-medium">Abiertos</th>
                     <th className="w-14 text-right font-medium">Vencidos</th>
@@ -178,7 +178,7 @@ export function LeadDistribution({
                       <td className="py-1 text-right tabular-nums">{load.open}</td>
                       <td
                         className={`py-1 text-right tabular-nums ${
-                          load.overdue > 0 ? "font-semibold text-amber-700" : "text-gray-400"
+                          load.overdue > 0 ? "font-semibold text-amber-700" : "text-gray-600"
                         }`}
                       >
                         {load.overdue}
@@ -235,7 +235,7 @@ export function LeadDistribution({
                     <li key={group.sellerName} className="flex items-start gap-2 text-[11px]">
                       <span className="min-w-0 flex-1 truncate text-gray-700">
                         {group.sellerName}
-                        <span className="ml-1 text-gray-400">{group.reason}</span>
+                        <span className="ml-1 text-gray-600">{group.reason}</span>
                       </span>
                       <span className="shrink-0 font-semibold tabular-nums text-gray-900">
                         +{group.count}

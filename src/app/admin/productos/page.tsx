@@ -326,7 +326,7 @@ function MobileCollapsible({
         aria-controls={id}
         className="touch-target mb-1.5 flex w-full items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 sm:hidden"
       >
-        {icon ?? <SlidersHorizontal className="w-4 h-4 text-gray-400" />}
+        {icon ?? <SlidersHorizontal className="w-4 h-4 text-gray-600" />}
         <span className="flex-1 text-left">
           {label}
           {badge !== undefined && badge > 0 && (
@@ -3101,7 +3101,7 @@ function AdminProductsContent() {
   // listado vacío no es un catálogo vacío, y sin una salida "Limpiar filtros" el
   // panel solo muestra una pantalla en blanco sin error (el síntoma reportado).
   const emptyListState = (
-    <div className="px-5 py-12 text-center text-gray-400 text-sm">
+    <div className="px-5 py-12 text-center text-gray-600 text-sm">
       <p>
         {activeFilterCount > 0
           ? "Ningún producto coincide con los filtros activos"
@@ -3113,7 +3113,7 @@ function AdminProductsContent() {
           onClick={clearFilters}
           className="touch-target mt-4 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
         >
-          <SlidersHorizontal className="w-4 h-4 text-gray-400" />
+          <SlidersHorizontal className="w-4 h-4 text-gray-600" />
           Limpiar filtros
         </button>
       )}
@@ -3468,7 +3468,7 @@ function AdminProductsContent() {
           <button
             type="button"
             onClick={() => setUndoAction(null)}
-            className="ml-auto p-1 rounded-lg text-brand-400 hover:bg-brand-100"
+            className="ml-auto p-1 rounded-lg text-brand-600 hover:bg-brand-100"
             aria-label="Cerrar aviso"
           >
             <X className="w-4 h-4" />
@@ -3543,7 +3543,7 @@ function AdminProductsContent() {
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex items-center gap-2 sm:flex-1">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
             <input
               ref={searchRef}
               type="text"
@@ -3560,7 +3560,7 @@ function AdminProductsContent() {
             aria-controls="filtros-catalogo"
             className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 sm:hidden"
           >
-            <SlidersHorizontal className="w-4 h-4 text-gray-400" />
+            <SlidersHorizontal className="w-4 h-4 text-gray-600" />
             Filtros
             {activeFilterCount > 0 && (
               <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-bold text-brand-700">
@@ -3985,7 +3985,7 @@ function AdminProductsContent() {
         </button>
         {tagList.length > 0 && (
           <label className={`${secondaryFilterClass} items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-gray-200 text-gray-600`}>
-            <Tag className="w-3.5 h-3.5 text-gray-400" />
+            <Tag className="w-3.5 h-3.5 text-gray-600" />
             <span className="sr-only">Filtrar por etiqueta</span>
             <select
               value={tagFilter}
@@ -4060,7 +4060,7 @@ function AdminProductsContent() {
                 ＋ Guardar vista actual
               </button>
               {savedViews.length === 0 ? (
-                <p className="px-3 py-2 text-[11px] text-gray-400">
+                <p className="px-3 py-2 text-[11px] text-gray-600">
                   Sin vistas guardadas. Guarda la combinación de filtros, orden y vista para
                   recuperarla con un clic.
                 </p>
@@ -4104,7 +4104,7 @@ function AdminProductsContent() {
                 </ul>
               )}
               {savedViews.length > 0 && (
-                <p className="px-3 pt-2 pb-1 text-[10px] text-gray-400">
+                <p className="px-3 pt-2 pb-1 text-[10px] text-gray-600">
                   {savedViews.length} de {MAX_PRODUCT_PRESETS} vistas · las más antiguas se
                   descartan al superar el tope
                 </p>
@@ -4120,7 +4120,7 @@ function AdminProductsContent() {
             aria-pressed={view === "table"}
             title="Vista de tabla"
             className={`p-1.5 rounded-md transition-colors ${
-              view === "table" ? "bg-brand-600 text-white" : "text-gray-400 hover:text-gray-600"
+              view === "table" ? "bg-brand-600 text-white" : "text-gray-600 hover:text-gray-700"
             }`}
           >
             <LayoutList className="w-4 h-4" />
@@ -4131,7 +4131,7 @@ function AdminProductsContent() {
             aria-pressed={view === "grid"}
             title="Vista de tarjetas"
             className={`p-1.5 rounded-md transition-colors ${
-              view === "grid" ? "bg-brand-600 text-white" : "text-gray-400 hover:text-gray-600"
+              view === "grid" ? "bg-brand-600 text-white" : "text-gray-600 hover:text-gray-700"
             }`}
           >
             <LayoutGrid className="w-4 h-4" />
@@ -4145,7 +4145,7 @@ function AdminProductsContent() {
         <div
           className={`${filtersOpen ? "flex" : "hidden sm:flex"} items-center gap-1 rounded-lg border border-gray-200 bg-white pl-1.5 pr-0.5 py-0.5`}
         >
-          <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" aria-hidden="true" />
+          <ArrowUpDown className="w-3.5 h-3.5 text-gray-600" aria-hidden="true" />
           <label htmlFor="product-sort-key" className="sr-only">
             Ordenar por
           </label>
@@ -4186,7 +4186,7 @@ function AdminProductsContent() {
               onClick={() => setSort(DEFAULT_PRODUCT_SORT)}
               aria-label="Volver al orden por defecto (nombre ascendente)"
               title="Orden por defecto"
-              className="p-1 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="p-1 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-700"
             >
               <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
@@ -4451,7 +4451,7 @@ function AdminProductsContent() {
         <div ref={tableScrollRef} className="min-h-0 flex-1 overflow-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 border-b border-gray-100 bg-gray-50">
-              <tr className="text-left text-xs text-gray-400 font-medium">
+              <tr className="text-left text-xs text-gray-600 font-medium">
                 <th className="pl-4 pr-1 py-3 w-10">
                   <input
                     type="checkbox"
@@ -4554,7 +4554,7 @@ function AdminProductsContent() {
                           className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-brand-300 transition-shadow disabled:opacity-50"
                         >
                           {uploadingImageId === product.id ? (
-                            <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />
+                            <RefreshCw className="w-4 h-4 text-gray-600 animate-spin" />
                           ) : product.image_url ? (
                             // eslint-disable-next-line @next/next/no-img-element -- thumb admin, URL dinámica de Storage
                             <img
@@ -4563,7 +4563,7 @@ function AdminProductsContent() {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <ImagePlus className="w-4 h-4 text-gray-400" />
+                            <ImagePlus className="w-4 h-4 text-gray-600" />
                           )}
                         </button>
                         <div>
@@ -4584,10 +4584,10 @@ function AdminProductsContent() {
                               </span>
                             )}
                           </p>
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-gray-600">
                             {product.brand ?? "—"}
                             {product.sku && (
-                              <span className="ml-1.5 font-mono text-[10px] text-gray-400">
+                              <span className="ml-1.5 font-mono text-[10px] text-gray-600">
                                 · {product.sku}
                               </span>
                             )}
@@ -4637,7 +4637,7 @@ function AdminProductsContent() {
                                 </span>
                               ))}
                               {(product.tags?.length ?? 0) > 4 && (
-                                <span className="text-[10px] text-gray-400">
+                                <span className="text-[10px] text-gray-600">
                                   +{(product.tags?.length ?? 0) - 4}
                                 </span>
                               )}
@@ -4663,7 +4663,7 @@ function AdminProductsContent() {
                             </div>
                           )}
                           {edit && (
-                            <p className="text-[10px] text-gray-400">
+                            <p className="text-[10px] text-gray-600">
                               Editado {timeAgo(edit.at)}
                               {edit.email ? ` por ${edit.email}` : ""}
                             </p>
@@ -4680,7 +4680,7 @@ function AdminProductsContent() {
                     <td className="px-5 py-3">
                       {editingPrice === product.id ? (
                         <div className="flex items-center gap-1">
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-600">
                             Precio
                           </span>
                           <input
@@ -4701,7 +4701,7 @@ function AdminProductsContent() {
                           </button>
                           <button
                             onClick={() => setEditingPrice(null)}
-                            className="p-1 rounded-lg text-gray-400 hover:bg-gray-100"
+                            className="p-1 rounded-lg text-gray-600 hover:bg-gray-100"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -4718,7 +4718,7 @@ function AdminProductsContent() {
                               <span className="font-semibold text-brand-600">
                                 ${Number(resolveSalePrice(product)).toFixed(2)}
                               </span>
-                              <span className="ml-1.5 text-xs text-gray-400 line-through">
+                              <span className="ml-1.5 text-xs text-gray-600 line-through">
                                 ${Number(product.price ?? 0).toFixed(2)}
                               </span>
                             </div>
@@ -4730,7 +4730,7 @@ function AdminProductsContent() {
                                 ${Number(product.price ?? 0).toFixed(2)}
                               </span>
                               <span
-                                className="ml-1.5 text-xs text-gray-400 line-through"
+                                className="ml-1.5 text-xs text-gray-600 line-through"
                                 title="Precio de oferta guardado, fuera de la ventana de vigencia"
                               >
                                 ${Number(product.sale_price).toFixed(2)}
@@ -4793,7 +4793,7 @@ function AdminProductsContent() {
                           onClick={() => adjustQuantity(product, -1)}
                           disabled={saving.has(product.id) || (product.stock_quantity ?? 0) <= 0}
                           aria-label={`Quitar 1 unidad de ${product.name}`}
-                          className="p-0.5 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+                          className="p-0.5 rounded text-gray-600 hover:text-gray-800 hover:bg-gray-100 disabled:opacity-30"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
@@ -4805,7 +4805,7 @@ function AdminProductsContent() {
                           onClick={() => adjustQuantity(product, 1)}
                           disabled={saving.has(product.id)}
                           aria-label={`Agregar 1 unidad de ${product.name}`}
-                          className="p-0.5 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+                          className="p-0.5 rounded text-gray-600 hover:text-gray-800 hover:bg-gray-100 disabled:opacity-30"
                         >
                           <Plus className="w-3 h-3" />
                         </button>
@@ -4821,7 +4821,7 @@ function AdminProductsContent() {
                       >
                         <span
                           className={`relative w-9 h-5 rounded-full transition-colors ${
-                            product.is_visible ? "bg-green-500" : "bg-gray-300"
+                            product.is_visible ? "bg-green-700" : "bg-gray-300"
                           }`}
                         >
                           {saving.has(product.id) ? (
@@ -4863,7 +4863,7 @@ function AdminProductsContent() {
                           onClick={() => toggleWhatsApp(product)}
                           disabled={saving.has(product.id)}
                           className={`relative w-9 h-5 rounded-full transition-colors ${
-                            product.show_in_whatsapp ? "bg-green-500" : "bg-gray-300"
+                            product.show_in_whatsapp ? "bg-green-700" : "bg-gray-300"
                           }`}
                         >
                           <span
@@ -4875,7 +4875,7 @@ function AdminProductsContent() {
                         {waPending.has(product.id) && (
                           <span
                             title="Cambios pendientes de sincronizar con WhatsApp"
-                            className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"
+                            className="w-2 h-2 rounded-full bg-amber-700 animate-pulse"
                           />
                         )}
                       </div>
@@ -4913,7 +4913,7 @@ function AdminProductsContent() {
                         {sales[product.id] ?? 0}
                       </span>
                       {soldAmount > 0 && (
-                        <p className="text-[10px] text-gray-400">
+                        <p className="text-[10px] text-gray-600">
                           ${soldAmount.toFixed(2)}
                         </p>
                       )}
@@ -4925,7 +4925,7 @@ function AdminProductsContent() {
                           onClick={() => setProductForm(product)}
                           title={`Editar ${product.name}`}
                           aria-label={`Editar ${product.name}`}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                          className="p-1.5 rounded-lg text-gray-600 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                         >
                           <SquarePen className="w-4 h-4" />
                         </button>
@@ -4935,7 +4935,7 @@ function AdminProductsContent() {
                             target="_blank"
                             title={`Ver ${product.name} en la tienda`}
                             aria-label={`Ver ${product.name} en la tienda`}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                            className="p-1.5 rounded-lg text-gray-600 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                           >
                             <ExternalLink className="w-4 h-4" />
                           </Link>
@@ -5029,12 +5029,12 @@ function AdminProductsContent() {
                     <p className="text-sm font-medium text-gray-900 truncate" title={product.name}>
                       {product.name}
                     </p>
-                    <p className="text-xs text-gray-400 truncate">{product.brand ?? "—"}</p>
+                    <p className="text-xs text-gray-600 truncate">{product.brand ?? "—"}</p>
                     <div className="mt-1.5 flex items-center justify-between">
                       <span className="text-sm font-semibold text-gray-900">
                         ${Number(product.sale_price ?? product.price ?? 0).toFixed(2)}
                         {product.unit ? (
-                          <span className="text-xs font-normal text-gray-400">/{product.unit}</span>
+                          <span className="text-xs font-normal text-gray-600">/{product.unit}</span>
                         ) : null}
                       </span>
                       <span
@@ -5058,7 +5058,7 @@ function AdminProductsContent() {
                       >
                         <span
                           className={`relative inline-block w-8 h-4.5 rounded-full transition-colors ${
-                            product.is_visible ? "bg-green-500" : "bg-gray-300"
+                            product.is_visible ? "bg-green-700" : "bg-gray-300"
                           }`}
                           style={{ height: "1.125rem" }}
                         >
@@ -5075,7 +5075,7 @@ function AdminProductsContent() {
                           onClick={() => setProductForm(product)}
                           title={`Editar ${product.name}`}
                           aria-label={`Editar ${product.name}`}
-                          className="touch-target p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                          className="touch-target p-1.5 rounded-lg text-gray-600 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                         >
                           <SquarePen className="w-4 h-4" />
                         </button>
@@ -5085,7 +5085,7 @@ function AdminProductsContent() {
                             target="_blank"
                             title={`Ver ${product.name} en la tienda`}
                             aria-label={`Ver ${product.name} en la tienda`}
-                            className="touch-target p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                            className="touch-target p-1.5 rounded-lg text-gray-600 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                           >
                             <ExternalLink className="w-4 h-4" />
                           </Link>
@@ -5107,7 +5107,7 @@ function AdminProductsContent() {
       {/* Fase 5 — paginación (compartida por ambas vistas) */}
       {total > pageSize && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5 bg-white rounded-xl border border-gray-200">
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-600">
               Mostrando {(currentPage - 1) * pageSize + 1}–
               {Math.min(currentPage * pageSize, total)} de {total}
             </p>
@@ -5215,7 +5215,7 @@ function AdminProductsContent() {
               <h2 className="text-sm font-bold text-gray-900 truncate">{lightbox.name}</h2>
               <button
                 onClick={() => setLightbox(null)}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -5265,7 +5265,7 @@ function AdminProductsContent() {
               <button
                 onClick={() => setCityModalOpen(false)}
                 disabled={bulkSaving}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -5291,7 +5291,7 @@ function AdminProductsContent() {
                       className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                     />
                     <span className="text-sm text-gray-900">
-                      {city.name} <span className="text-gray-400">· {city.state}</span>
+                      {city.name} <span className="text-gray-600">· {city.state}</span>
                     </span>
                     {mixed && (
                       <span className="ml-auto text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
@@ -5302,11 +5302,11 @@ function AdminProductsContent() {
                 )
               })}
               {cities.length === 0 && (
-                <p className="py-6 text-center text-sm text-gray-400">No hay ciudades activas.</p>
+                <p className="py-6 text-center text-sm text-gray-600">No hay ciudades activas.</p>
               )}
             </div>
             <div className="px-5 pt-2 pb-1">
-              <p className="text-[11px] text-gray-400">
+              <p className="text-[11px] text-gray-600">
                 Marcar todas equivale a <strong>Global</strong> (sin restricciones); desmarcar
                 todas deja el producto sin ciudad disponible.
               </p>
@@ -5375,7 +5375,7 @@ function AdminProductsContent() {
               <button
                 onClick={() => setBulkSaleOpen(false)}
                 disabled={bulkSaving}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -5447,7 +5447,7 @@ function AdminProductsContent() {
                       />
                     </label>
                   </div>
-                  <p className="text-[10px] text-gray-400">
+                  <p className="text-[10px] text-gray-600">
                     Ventana opcional de la oferta; vacía = sin límite de vigencia.
                   </p>
                 </>
@@ -5489,7 +5489,7 @@ function AdminProductsContent() {
               <button
                 onClick={() => setBulkTagOpen(false)}
                 disabled={bulkSaving}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -5600,7 +5600,7 @@ function AdminProductsContent() {
               <button
                 onClick={() => setSeoOpen(false)}
                 disabled={seoApplying}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-50"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -5623,7 +5623,7 @@ function AdminProductsContent() {
                         onClick={() =>
                           setSeoProposals((prev) => prev.filter((p) => p.id !== draft.id))
                         }
-                        className="p-1 rounded-lg text-gray-400 hover:bg-gray-100"
+                        className="p-1 rounded-lg text-gray-600 hover:bg-gray-100"
                         aria-label={`Quitar propuesta de ${draft.name}`}
                       >
                         <X className="w-3.5 h-3.5" />
@@ -5647,7 +5647,7 @@ function AdminProductsContent() {
                       />
                       <p
                         className={`mt-1 text-[11px] ${
-                          titleLen > SEO_TITLE_MAX ? "text-amber-700" : "text-gray-400"
+                          titleLen > SEO_TITLE_MAX ? "text-amber-700" : "text-gray-600"
                         }`}
                       >
                         {titleLen}/{SEO_TITLE_MAX} caracteres
@@ -5672,7 +5672,7 @@ function AdminProductsContent() {
                       />
                       <p
                         className={`mt-1 text-[11px] ${
-                          descLen > SEO_DESCRIPTION_MAX ? "text-amber-700" : "text-gray-400"
+                          descLen > SEO_DESCRIPTION_MAX ? "text-amber-700" : "text-gray-600"
                         }`}
                       >
                         {descLen}/{SEO_DESCRIPTION_MAX} caracteres
@@ -5683,7 +5683,7 @@ function AdminProductsContent() {
               })}
 
               {seoProposals.length === 0 && (
-                <p className="py-6 text-center text-sm text-gray-400">
+                <p className="py-6 text-center text-sm text-gray-600">
                   No quedan propuestas por aplicar.
                 </p>
               )}
@@ -5765,7 +5765,7 @@ function AdminProductsContent() {
               </div>
               <button
                 onClick={() => setActivityOpen(false)}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -5773,7 +5773,7 @@ function AdminProductsContent() {
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-3">
               {activityLoading ? (
-                <div className="flex items-center justify-center py-8 text-gray-400">
+                <div className="flex items-center justify-center py-8 text-gray-600">
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   Cargando…
                 </div>
@@ -5782,7 +5782,7 @@ function AdminProductsContent() {
                   Historial no disponible en este momento.
                 </p>
               ) : activityEntries.length === 0 ? (
-                <p className="py-8 text-center text-sm text-gray-400">Sin actividad registrada.</p>
+                <p className="py-8 text-center text-sm text-gray-600">Sin actividad registrada.</p>
               ) : (
                 <ul className="divide-y divide-gray-50">
                   {activityEntries.map((entry, i) => {
@@ -5800,7 +5800,7 @@ function AdminProductsContent() {
                           {AUDIT_ACTION_LABEL[entry.action as AuditAction] ?? entry.action}
                           <span className="font-normal text-gray-500"> · {productName}</span>
                         </p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-gray-600">
                           {timeAgo(entry.created_at)}
                           {entry.actor_email ? ` · ${entry.actor_email}` : ""}
                         </p>
@@ -5832,7 +5832,7 @@ function AdminProductsContent() {
               </h2>
               <button
                 onClick={() => setImagesModalOpen(false)}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -5865,7 +5865,7 @@ function AdminProductsContent() {
                       </p>
                       <p className="text-[11px] text-red-600 font-medium">{issue.reason}</p>
                       {issue.url && (
-                        <p className="text-[10px] text-gray-400 font-mono truncate" title={issue.url}>
+                        <p className="text-[10px] text-gray-600 font-mono truncate" title={issue.url}>
                           {issue.url}
                         </p>
                       )}
@@ -5922,7 +5922,7 @@ function AdminProductsContent() {
               <button
                 onClick={() => setReportOpen(false)}
                 disabled={reportLoading}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -5962,12 +5962,12 @@ function AdminProductsContent() {
               <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-gray-700">Resumen del rango</span>
-                  {insightsLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />}
+                  {insightsLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-600" />}
                 </div>
                 {insightsLoading && !reportInsights ? (
-                  <p className="text-xs text-gray-400">Calculando…</p>
+                  <p className="text-xs text-gray-600">Calculando…</p>
                 ) : !reportInsights || reportInsights.products === 0 ? (
-                  <p className="text-xs text-gray-400">Sin ventas en el rango.</p>
+                  <p className="text-xs text-gray-600">Sin ventas en el rango.</p>
                 ) : (
                   <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
@@ -6015,7 +6015,7 @@ function AdminProductsContent() {
                           {label}: {count}
                         </span>
                       ))}
-                      <span className="text-[11px] text-gray-400">
+                      <span className="text-[11px] text-gray-600">
                         {Math.round(reportInsights.aShare * 100)}% del ingreso en A
                       </span>
                     </div>
@@ -6109,7 +6109,7 @@ function AdminProductsContent() {
               <button
                 onClick={() => setBulkMarginOpen(false)}
                 disabled={bulkSaving}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -6171,7 +6171,7 @@ function AdminProductsContent() {
               <button
                 onClick={() => setBulkUnitOpen(false)}
                 disabled={bulkSaving}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -6231,7 +6231,7 @@ function AdminProductsContent() {
               <button
                 onClick={() => setStorePricesFor(null)}
                 disabled={storePricesSaving}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -6239,12 +6239,12 @@ function AdminProductsContent() {
             </div>
             <div className="overflow-y-auto px-5 py-3">
               {storePricesLoading ? (
-                <div className="flex items-center justify-center py-8 text-gray-400">
+                <div className="flex items-center justify-center py-8 text-gray-600">
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   Cargando…
                 </div>
               ) : storeList.length === 0 ? (
-                <p className="py-8 text-center text-sm text-gray-400">No hay tiendas activas.</p>
+                <p className="py-8 text-center text-sm text-gray-600">No hay tiendas activas.</p>
               ) : (
                 <ul className="divide-y divide-gray-50">
                   {storeList.map((store) => {
@@ -6326,7 +6326,7 @@ function AdminProductsContent() {
               </div>
               <button
                 onClick={() => setHistoryFor(null)}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -6365,7 +6365,7 @@ function AdminProductsContent() {
             })()}
             <div className="overflow-y-auto px-5 py-3">
               {historyLoading ? (
-                <div className="flex items-center justify-center py-8 text-gray-400">
+                <div className="flex items-center justify-center py-8 text-gray-600">
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   Cargando…
                 </div>
@@ -6374,7 +6374,7 @@ function AdminProductsContent() {
                   Historial no disponible en este momento.
                 </p>
               ) : historyEntries.length === 0 ? (
-                <p className="py-8 text-center text-sm text-gray-400">
+                <p className="py-8 text-center text-sm text-gray-600">
                   Sin cambios registrados.
                 </p>
               ) : (
@@ -6387,7 +6387,7 @@ function AdminProductsContent() {
                         <p className="text-sm font-medium text-gray-900">
                           {AUDIT_ACTION_LABEL[entry.action as AuditAction] ?? entry.action}
                         </p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-gray-600">
                           {timeAgo(entry.created_at)}
                           {entry.actor_email ? ` · ${entry.actor_email}` : ""}
                         </p>
@@ -6399,7 +6399,7 @@ function AdminProductsContent() {
                                 className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[11px]"
                               >
                                 <span className="font-semibold text-gray-500">{row.label}:</span>
-                                <span className="text-gray-400 line-through">{row.before}</span>
+                                <span className="text-gray-600 line-through">{row.before}</span>
                                 <span className="text-gray-300">→</span>
                                 <span className="font-semibold text-gray-800">{row.after}</span>
                               </li>
@@ -6412,7 +6412,7 @@ function AdminProductsContent() {
                           </p>
                         )}
                         {rows.length === 0 && extras.length === 0 && (
-                          <p className="mt-0.5 text-[10px] font-mono text-gray-400 break-all">
+                          <p className="mt-0.5 text-[10px] font-mono text-gray-600 break-all">
                             {JSON.stringify(entry.detail ?? {})}
                           </p>
                         )}
@@ -6456,7 +6456,7 @@ function AdminProductsContent() {
               <button
                 onClick={() => setBulkCategoryOpen(false)}
                 disabled={bulkSaving}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />
@@ -6516,7 +6516,7 @@ function AdminProductsContent() {
               <button
                 onClick={() => setBulkPriceOpen(false)}
                 disabled={bulkSaving}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
                 aria-label="Cerrar"
               >
                 <X className="w-4 h-4" />

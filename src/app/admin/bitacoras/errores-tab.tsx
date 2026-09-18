@@ -133,7 +133,7 @@ export function ErroresTab() {
       </div>
 
       {loading && (
-        <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+        <div className="flex items-center justify-center py-24 text-gray-600 text-sm">
           <Loader2 className="w-4 h-4 animate-spin mr-2" />
           Cargando errores…
         </div>
@@ -148,7 +148,7 @@ export function ErroresTab() {
       {report && !loading && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {report.entries.length === 0 ? (
-            <p className="px-5 py-12 text-center text-sm text-gray-400">
+            <p className="px-5 py-12 text-center text-sm text-gray-600">
               Sin errores en la vista actual. 🎉
             </p>
           ) : (
@@ -161,15 +161,15 @@ export function ErroresTab() {
                     >
                       {e.severity}
                     </span>
-                    <span className="text-[10px] font-medium text-gray-400 uppercase">
+                    <span className="text-[10px] font-medium text-gray-600 uppercase">
                       {e.source}
                     </span>
                     {e.url && (
-                      <span className="text-[10px] text-gray-400 truncate max-w-[220px]">
+                      <span className="text-[10px] text-gray-600 truncate max-w-[220px]">
                         {e.url}
                       </span>
                     )}
-                    <time className="text-[10px] text-gray-400 ml-auto shrink-0">
+                    <time className="text-[10px] text-gray-600 ml-auto shrink-0">
                       {new Date(e.created_at).toLocaleString("es-MX")}
                     </time>
                   </div>

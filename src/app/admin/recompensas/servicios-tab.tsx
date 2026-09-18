@@ -208,12 +208,12 @@ export function ServiciosTab() {
       )}
 
       {loading ? (
-        <p className="text-sm text-gray-400 py-12 text-center">Cargando catálogo…</p>
+        <p className="text-sm text-gray-600 py-12 text-center">Cargando catálogo…</p>
       ) : services.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
           <Gift className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <p className="text-gray-500 font-medium">Catálogo vacío</p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-600 mt-1">
             Aplica la migración 00075 y/o crea el primer servicio.
           </p>
         </div>
@@ -236,7 +236,7 @@ export function ServiciosTab() {
                     <td className="px-4 py-3">
                       <span className="mr-1.5">{s.icon}</span>
                       <span className="font-semibold text-gray-900">{s.name}</span>
-                      <span className="block text-[10px] text-gray-400">{s.id}</span>
+                      <span className="block text-[10px] text-gray-600">{s.id}</span>
                     </td>
                     <td className="px-4 py-3 capitalize">{s.tier}</td>
                     <td className="px-4 py-3 capitalize">{s.category}</td>
@@ -269,7 +269,7 @@ export function ServiciosTab() {
                         className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 font-semibold transition-colors ${
                           s.is_active
                             ? "bg-brand-50 text-brand-700 border border-brand-200"
-                            : "bg-gray-100 text-gray-500 border border-gray-200"
+                            : "bg-gray-100 text-gray-600 border border-gray-200"
                         }`}
                         aria-label={s.is_active ? `Ocultar ${s.name}` : `Mostrar ${s.name}`}
                       >

@@ -158,7 +158,7 @@ export function ImportProductsModal({
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100"
+            className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100"
           >
             <X className="w-4 h-4" />
           </button>
@@ -266,7 +266,7 @@ export function ImportProductsModal({
                   </li>
                 ))}
                 {parsed.rows.length > 10 && (
-                  <li className="text-[11px] text-gray-400">…y {parsed.rows.length - 10} más</li>
+                  <li className="text-[11px] text-gray-600">…y {parsed.rows.length - 10} más</li>
                 )}
               </ul>
             )}
@@ -286,11 +286,11 @@ export function ImportProductsModal({
                   {plan.toCreate.slice(0, 20).map((r) => (
                     <li key={`c-${r.line}`} className="text-[11px] text-gray-700">
                       {r.name}
-                      {r.sku && <span className="text-gray-400"> · {r.sku}</span>}
+                      {r.sku && <span className="text-gray-600"> · {r.sku}</span>}
                     </li>
                   ))}
                   {plan.toCreate.length > 20 && (
-                    <li className="text-[11px] text-gray-400">…y {plan.toCreate.length - 20} más</li>
+                    <li className="text-[11px] text-gray-600">…y {plan.toCreate.length - 20} más</li>
                   )}
                 </ul>
               )}
@@ -306,7 +306,7 @@ export function ImportProductsModal({
                     </li>
                   ))}
                   {plan.toUpdate.length > 20 && (
-                    <li className="text-[11px] text-gray-400">…y {plan.toUpdate.length - 20} más</li>
+                    <li className="text-[11px] text-gray-600">…y {plan.toUpdate.length - 20} más</li>
                   )}
                 </ul>
               )}

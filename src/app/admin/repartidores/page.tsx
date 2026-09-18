@@ -136,12 +136,12 @@ export default function AdminRepartidoresPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-gray-400 py-12 text-center">Cargando repartidores…</p>
+        <p className="text-sm text-gray-600 py-12 text-center">Cargando repartidores…</p>
       ) : drivers.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
           <Bike className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <p className="text-gray-500 font-medium">Sin repartidores</p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-600 mt-1">
             Agrega al primero arriba para asignarlo a los pedidos en camino.
           </p>
         </div>
@@ -155,7 +155,7 @@ export default function AdminRepartidoresPage() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900">{d.name}</p>
                 {d.phone && (
-                  <p className="text-xs text-gray-400 flex items-center gap-1">
+                  <p className="text-xs text-gray-600 flex items-center gap-1">
                     <Phone className="w-3 h-3" />
                     {d.phone}
                   </p>
@@ -166,7 +166,7 @@ export default function AdminRepartidoresPage() {
                 className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                   d.is_active
                     ? "bg-brand-50 text-brand-700 border border-brand-200"
-                    : "bg-gray-100 text-gray-500 border border-gray-200"
+                    : "bg-gray-100 text-gray-600 border border-gray-200"
                 }`}
               >
                 {d.is_active ? "Activo" : "Inactivo"}

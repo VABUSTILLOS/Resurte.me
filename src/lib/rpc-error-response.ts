@@ -22,6 +22,16 @@ const STATUS_BY_CODE: Record<string, number> = {
   "22023": 400,
   // llave duplicada
   "23505": 409,
+  // permiso insuficiente. Las RPC de negocio comprueban el rol por su cuenta
+  // (`is_admin()` en las de comisiones, `profiles.role = 'admin'` en
+  // `foodos_restaurant_review`), así que un `42501` significa «no te toca», no
+  // «se rompió algo»: 403 lo dice, y 500 lo ocultaría como una avería.
+  "42501": 403,
+  // no existe. `P0002` es `no_data_found` y las RPC lo usan para «esa fila no
+  // está» (`foodos_restaurant_review` con un id que ya no existe). Es el mismo
+  // caso que `23503` —algo que el cliente nombró y no está— y merece el mismo
+  // 404: un 500 lo disfrazaría de avería y escondería que la petición estaba mal.
+  P0002: 404,
 }
 
 export function rpcErrorResponse(

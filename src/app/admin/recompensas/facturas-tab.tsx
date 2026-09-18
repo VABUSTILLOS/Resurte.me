@@ -176,12 +176,12 @@ export function FacturasTab() {
       )}
 
       {loading ? (
-        <p className="text-sm text-gray-400 py-12 text-center">Cargando envíos…</p>
+        <p className="text-sm text-gray-600 py-12 text-center">Cargando envíos…</p>
       ) : submissions.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
           <FileText className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <p className="text-gray-500 font-medium">No hay facturas por revisar</p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-600 mt-1">
             Cuando un cliente suba su factura desde Recompensas, aparecerá aquí.
           </p>
         </div>
@@ -208,7 +208,7 @@ export function FacturasTab() {
                           ` · Total capturado: $${Number(s.total_amount).toLocaleString("es-MX")}`}
                       </p>
                       {s.notes && (
-                        <p className="text-xs text-gray-400 mt-1">{s.notes}</p>
+                        <p className="text-xs text-gray-600 mt-1">{s.notes}</p>
                       )}
                     </div>
                     {s.signed_url && (

@@ -116,7 +116,7 @@ function AdminFoodosRestaurantsContent() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24 text-sm text-gray-400">
+      <div className="flex items-center justify-center py-24 text-sm text-gray-600">
         Cargando restaurantes...
       </div>
     )
@@ -208,10 +208,10 @@ function AdminFoodosRestaurantsContent() {
               <tr key={row.id} className="align-top hover:bg-gray-50">
                 <td className="px-5 py-3">
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-900">
-                    <Store className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+                    <Store className="h-3.5 w-3.5 text-gray-600" aria-hidden="true" />
                     {row.name}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-gray-400">
+                  <p className="mt-0.5 text-[11px] text-gray-600">
                     /r/{row.slug} · {row.status}
                   </p>
                   {row.ownerEmail && (
@@ -240,7 +240,7 @@ function AdminFoodosRestaurantsContent() {
                     </p>
                   )}
                   {row.tier !== row.earnedTier && (
-                    <p className="mt-0.5 text-[11px] text-gray-400">
+                    <p className="mt-0.5 text-[11px] text-gray-600">
                       Ganado: {row.earnedTier}
                     </p>
                   )}
@@ -253,7 +253,7 @@ function AdminFoodosRestaurantsContent() {
                     </p>
                   )}
                   {row.overrideExpiresAt && (
-                    <p className="mt-0.5 text-[11px] text-gray-400">
+                    <p className="mt-0.5 text-[11px] text-gray-600">
                       Vence {new Date(row.overrideExpiresAt).toLocaleDateString("es-MX")}
                     </p>
                   )}
@@ -263,15 +263,15 @@ function AdminFoodosRestaurantsContent() {
                   <span className="font-semibold text-gray-800">
                     {row.qualifyingWeeksThisMonth}
                   </span>
-                  <span className="text-gray-400"> / 4</span>
-                  <p className="mt-0.5 text-[11px] text-gray-400">
+                  <span className="text-gray-600"> / 4</span>
+                  <p className="mt-0.5 text-[11px] text-gray-600">
                     Semana en curso: ${row.weekSpend.toLocaleString("es-MX")}
                   </p>
                 </td>
 
                 <td className="px-5 py-3">
                   {row.features.length === 0 ? (
-                    <span className="text-[11px] text-gray-400">Solo FoodOS base</span>
+                    <span className="text-[11px] text-gray-600">Solo FoodOS base</span>
                   ) : (
                     <ul className="flex max-w-[16rem] flex-wrap gap-1">
                       {row.features.map((feature) => (
@@ -288,11 +288,11 @@ function AdminFoodosRestaurantsContent() {
 
                 <td className="px-5 py-3 text-xs text-gray-600">
                   <p className="flex items-center gap-1.5">
-                    <Bot className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+                    <Bot className="h-3.5 w-3.5 text-gray-600" aria-hidden="true" />
                     {row.aiSessions} sesiones · {row.aiMessages} mensajes
                   </p>
                   <p className="mt-0.5 flex items-center gap-1.5">
-                    <Truck className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+                    <Truck className="h-3.5 w-3.5 text-gray-600" aria-hidden="true" />
                     {row.deliveries} entregas
                   </p>
                 </td>
@@ -312,7 +312,7 @@ function AdminFoodosRestaurantsContent() {
 
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-400">
+                <td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-600">
                   <UtensilsCrossed
                     className="mx-auto mb-2 h-5 w-5 text-gray-300"
                     aria-hidden="true"
@@ -327,7 +327,7 @@ function AdminFoodosRestaurantsContent() {
         </table>
       </div>
 
-      <p className="mt-4 text-[11px] text-gray-400">
+      <p className="mt-4 text-[11px] text-gray-600">
         Escalón de niveles: {TIERS.map((t) => `${t} (${TIER_RANK[t]})`).join(" · ")}. El uso cuenta
         todo el histórico, no solo el mes en curso.
       </p>
@@ -338,7 +338,7 @@ function AdminFoodosRestaurantsContent() {
 const DIRECTION_TONE: Record<"up" | "down" | "flat", string> = {
   up: "text-emerald-700",
   down: "text-red-700",
-  flat: "text-gray-400",
+  flat: "text-gray-600",
 }
 
 const DIRECTION_GLYPH: Record<"up" | "down" | "flat", string> = {
@@ -398,9 +398,9 @@ function AdoptionPanel({ adoption }: { adoption: AdminFoodosAdoption }) {
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {tiles.map((tile) => (
           <div key={tile.label} className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-            <p className="text-xs font-medium text-gray-400">{tile.label}</p>
+            <p className="text-xs font-medium text-gray-600">{tile.label}</p>
             <p className="mt-1 text-xl font-bold text-gray-900">{tile.value}</p>
-            <p className="text-xs text-gray-400">{tile.hint}</p>
+            <p className="text-xs text-gray-600">{tile.hint}</p>
           </div>
         ))}
       </div>
@@ -420,7 +420,7 @@ function AdoptionPanel({ adoption }: { adoption: AdminFoodosAdoption }) {
           <tbody className="divide-y divide-gray-100">
             {measured.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-6 text-center text-xs text-gray-400">
+                <td colSpan={6} className="px-5 py-6 text-center text-xs text-gray-600">
                   Ningún restaurante tiene capacidades premium abiertas todavía.
                 </td>
               </tr>
@@ -433,7 +433,7 @@ function AdoptionPanel({ adoption }: { adoption: AdminFoodosAdoption }) {
                 <td className="px-5 py-3 text-xs text-gray-600">{feature.unlocked}</td>
                 <td className={`px-5 py-3 text-xs font-semibold ${rateTone(feature.activationRate)}`}>
                   {feature.activationRate.toFixed(1)}%
-                  <span className="ml-1 font-normal text-gray-400">
+                  <span className="ml-1 font-normal text-gray-600">
                     ({feature.activated}/{feature.unlocked})
                   </span>
                 </td>
@@ -441,19 +441,19 @@ function AdoptionPanel({ adoption }: { adoption: AdminFoodosAdoption }) {
                   className={`px-5 py-3 text-xs font-semibold ${rateTone(feature.weeklyActiveRate)}`}
                 >
                   {feature.weeklyActiveRate.toFixed(1)}%
-                  <span className="ml-1 font-normal text-gray-400">
+                  <span className="ml-1 font-normal text-gray-600">
                     ({feature.activeRecent}/{feature.unlocked})
                   </span>
                 </td>
                 <td className={`px-5 py-3 text-xs font-semibold ${rateTone(feature.retentionRate)}`}>
                   {feature.activeRecent === 0 ? "—" : `${feature.retentionRate.toFixed(1)}%`}
-                  <span className="ml-1 font-normal text-gray-400">
+                  <span className="ml-1 font-normal text-gray-600">
                     ({feature.retained}/{feature.activeRecent})
                   </span>
                 </td>
                 <td className="px-5 py-3 text-xs">
                   <span className="text-gray-600">{feature.usage.current}</span>
-                  <span className="text-gray-400"> vs {feature.usage.previous} </span>
+                  <span className="text-gray-600"> vs {feature.usage.previous} </span>
                   <span className={`font-semibold ${DIRECTION_TONE[feature.usage.direction]}`}>
                     <span aria-hidden="true">{DIRECTION_GLYPH[feature.usage.direction]}</span>
                     {feature.usage.deltaPct === null
@@ -468,7 +468,7 @@ function AdoptionPanel({ adoption }: { adoption: AdminFoodosAdoption }) {
       </div>
 
       {untracked.length > 0 && (
-        <p className="mt-2 text-xs text-gray-400">
+        <p className="mt-2 text-xs text-gray-600">
           Sin telemetría en la base, así que no se miden:{" "}
           {untracked.map((f) => FEATURE_LABEL[f]).join(", ")}. El manifest y el icono se sirven
           derivados de la configuración del restaurante y no dejan rastro.

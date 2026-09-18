@@ -252,7 +252,7 @@ export default function AdminAutomationsPage() {
 
       {/* Automations list */}
       {loading ? (
-        <div className="py-16 text-center text-sm text-gray-400">Cargando automatizaciones…</div>
+        <div className="py-16 text-center text-sm text-gray-600">Cargando automatizaciones…</div>
       ) : loadError ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm text-red-700 mb-3">No se pudieron cargar las automatizaciones ({loadError}).</p>
@@ -279,7 +279,7 @@ export default function AdminAutomationsPage() {
               <div className="flex items-start gap-3">
                 <div
                   className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                    auto.isActive ? "bg-brand-50 text-brand-600" : "bg-gray-100 text-gray-400"
+                    auto.isActive ? "bg-brand-50 text-brand-600" : "bg-gray-100 text-gray-600"
                   }`}
                 >
                   {auto.icon}
@@ -292,7 +292,7 @@ export default function AdminAutomationsPage() {
                     const s = stats[auto.type]
                     if (!s || (s.sent7d === 0 && s.failed7d === 0)) return null
                     return (
-                      <p className="text-[11px] text-gray-400 mt-1">
+                      <p className="text-[11px] text-gray-600 mt-1">
                         {s.sent7d} enviados (7 días)
                         {s.failed7d > 0 && <span className="text-red-700"> · {s.failed7d} fallidos</span>}
                         {s.lastSentAt && (
@@ -341,7 +341,7 @@ export default function AdminAutomationsPage() {
                     }
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                   />
-                  <p className="text-[10px] text-gray-400 mt-1">
+                  <p className="text-[10px] text-gray-600 mt-1">
                     Nombre exacto de la plantilla aprobada en Meta Business Manager
                   </p>
                   {noTemplate.has(auto.type) && (
@@ -387,22 +387,22 @@ export default function AdminAutomationsPage() {
 
                 {/* Config details */}
                 {auto.type === "payment_recovery" && (
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-gray-600">
                     Niveles: 1 hora, 24 horas, 48 horas después de crear el pedido no pagado
                   </div>
                 )}
                 {auto.type === "birthday" && (
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-gray-600">
                     Cupón: {String(auto.config.coupon_code)} — {String(auto.config.discount_percent)}% descuento
                   </div>
                 )}
                 {auto.type === "reactivation" && (
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-gray-600">
                     Cupón: {String(auto.config.coupon_code)} — ${String(auto.config.discount_amount)} MXN · Inactividad: {String(auto.config.inactive_days)} días
                   </div>
                 )}
                 {auto.type === "onboarding" && (
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-gray-600">
                     Cupón: {String(auto.config.coupon_code)} — {String(auto.config.discount_percent)}% descuento
                   </div>
                 )}

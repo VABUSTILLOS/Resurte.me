@@ -29,7 +29,7 @@ export function DeltaChip({
   goodDirection?: "up" | "down"
 }) {
   if (deltaPct === null) {
-    return <span className="text-[11px] text-gray-400">sin base</span>
+    return <span className="text-[11px] text-gray-600">sin base</span>
   }
   const Icon = direction === "up" ? TrendingUp : direction === "down" ? TrendingDown : Minus
   const good = direction !== "flat" && direction === goodDirection
@@ -67,9 +67,9 @@ export function MetricWithDelta({
 }) {
   return (
     <div>
-      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">{label}</p>
+      <p className="text-[11px] font-medium text-gray-600 uppercase tracking-wide">{label}</p>
       <p className="mt-0.5 text-lg font-bold text-gray-900">{current}</p>
-      <p className="text-[11px] text-gray-400">
+      <p className="text-[11px] text-gray-600">
         {previous !== undefined && <>antes: {previous} </>}
         {comp && (
           <DeltaChip

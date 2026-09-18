@@ -14,7 +14,12 @@ import {
   deleteBranch,
 } from "../actions"
 import { publicRestaurantUrl } from "@/lib/foodos"
-import type { FoodosRestaurant, FoodosBranch } from "@/types/foodos"
+import {
+  ownerActionTarget,
+  ownerStatusAction,
+  type OwnerStatusAction,
+} from "@/lib/foodos-moderation"
+import type { FoodosRestaurant, FoodosBranch, FoodosRestaurantStatus } from "@/types/foodos"
 import {
   Store, MapPin, Plus, Trash2, QrCode, Copy, Check, ExternalLink, Loader2, Building2, Clock,
 } from "lucide-react"
@@ -23,6 +28,39 @@ import { WebhooksCard } from "./_components/webhooks-card"
 import { ConnectPaymentsCard } from "./_components/connect-payments-card"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
+
+/** Etiqueta del estado. El `switch` es exhaustivo sobre el tipo, así que añadir
+ *  un estado nuevo en `@/lib/foodos-moderation` rompe la compilación aquí. */
+function statusLabel(status: FoodosRestaurantStatus): string {
+  switch (status) {
+    case "draft":
+      return t("foodos.restaurante.statusDraft")
+    case "pending_review":
+      return t("foodos.restaurante.statusPendingReview")
+    case "active":
+      return t("foodos.restaurante.statusActive")
+    case "paused":
+      return t("foodos.restaurante.statusPaused")
+  }
+}
+
+const STATUS_BADGE: Record<FoodosRestaurantStatus, string> = {
+  draft: "bg-gray-100 text-gray-700",
+  pending_review: "bg-sky-100 text-sky-800",
+  active: "bg-green-100 text-green-800",
+  paused: "bg-amber-100 text-amber-800",
+}
+
+function statusActionLabel(action: OwnerStatusAction): string {
+  switch (action) {
+    case "solicitar":
+      return t("foodos.restaurante.requestReview")
+    case "retirar":
+      return t("foodos.restaurante.withdrawReview")
+    case "pausar":
+      return t("foodos.restaurante.pauseStore")
+  }
+}
 
 export default function RestaurantePage() {
   const [loading, setLoading] = useState(true)
@@ -137,11 +175,23 @@ export default function RestaurantePage() {
     }
   }
 
-  async function handleToggleStatus() {
+  /**
+   * Ejecuta la única acción de estado válida desde el estado actual. La tabla
+   * de transiciones vive en `@/lib/foodos-moderation` y **nunca devuelve
+   * `active`**: publicar lo decide Resurte.me. Antes esta función era un
+   * interruptor que mandaba `active` directamente, y ése era el agujero: cualquiera
+   * publicaba su restaurante sin revisión.
+   */
+  async function handleStatusAction(action: OwnerStatusAction) {
     if (!restaurant) return
-    const next = restaurant.status === "active" ? "paused" : "active"
-    await setRestaurantStatus(restaurant.id, next)
-    setRestaurant({ ...restaurant, status: next })
+    const next = ownerActionTarget(action)
+    setError(null)
+    try {
+      await setRestaurantStatus(restaurant.id, next)
+      setRestaurant({ ...restaurant, status: next })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("foodos.restaurante.saveError"))
+    }
   }
 
   async function handleAddBranch(e: React.FormEvent) {
@@ -272,22 +322,54 @@ export default function RestaurantePage() {
           </p>
         </div>
         {restaurant && (
-          <button
-            onClick={handleToggleStatus}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-              restaurant.status === "active"
-                ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
-                : "bg-[#0E7A0E] text-white hover:bg-[#0e7a0e]"
-            }`}
-          >
-            {restaurant.status === "active" ? t("foodos.restaurante.pauseStore") : t("foodos.restaurante.activateStore")}
-          </button>
+          <div className="flex items-center gap-3">
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_BADGE[restaurant.status]}`}
+            >
+              {statusLabel(restaurant.status)}
+            </span>
+            {(() => {
+              const action = ownerStatusAction(restaurant.status)
+              if (!action) return null
+              return (
+                <button
+                  onClick={() => handleStatusAction(action)}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                    action === "pausar"
+                      ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                      : "bg-[#0E7A0E] text-white hover:bg-[#0e7a0e]"
+                  }`}
+                >
+                  {statusActionLabel(action)}
+                </button>
+              )
+            })()}
+          </div>
         )}
       </div>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
           {error}
+        </div>
+      )}
+
+      {restaurant?.review_note && restaurant.status !== "active" && (
+        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-xl px-4 py-3">
+          <p className="font-semibold">{t("foodos.restaurante.reviewNoteTitle")}</p>
+          <p className="mt-1">{restaurant.review_note}</p>
+        </div>
+      )}
+
+      {restaurant?.status === "pending_review" && (
+        <div className="bg-sky-50 border border-sky-200 text-sky-900 text-sm rounded-xl px-4 py-3">
+          {t("foodos.restaurante.statusPendingHint")}
+        </div>
+      )}
+
+      {restaurant?.status === "paused" && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-xl px-4 py-3">
+          {t("foodos.restaurante.statusPausedHint")}
         </div>
       )}
 

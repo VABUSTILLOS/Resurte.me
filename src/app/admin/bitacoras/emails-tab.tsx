@@ -133,12 +133,12 @@ export function EmailsTab() {
       )}
 
       {loading ? (
-        <p className="text-sm text-gray-400 py-12 text-center">Cargando bitácora…</p>
+        <p className="text-sm text-gray-600 py-12 text-center">Cargando bitácora…</p>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
           <Mail className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <p className="text-gray-500 font-medium">Sin correos registrados</p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-600 mt-1">
             Los emails de pedidos y campañas aparecerán aquí al enviarse.
           </p>
         </div>
@@ -162,10 +162,10 @@ export function EmailsTab() {
                     <td className="px-4 py-2.5 text-gray-500">
                       {TYPE_LABEL[log.email_type] ?? log.email_type}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-400">
+                    <td className="px-4 py-2.5 text-gray-600">
                       {log.order_id ? `#${log.order_id}` : "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap">
+                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">
                       {new Date(log.sent_at).toLocaleString("es-MX", {
                         day: "numeric",
                         month: "short",

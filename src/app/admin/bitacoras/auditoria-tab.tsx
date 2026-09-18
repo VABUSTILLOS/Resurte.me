@@ -81,7 +81,7 @@ export function AuditoriaTab() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+        <div className="flex items-center justify-center py-24 text-gray-600 text-sm">
           Cargando bitácora...
         </div>
       ) : error ? (
@@ -112,7 +112,7 @@ export function AuditoriaTab() {
                 {entries.map((e) => (
                   <tr key={e.id} className="hover:bg-gray-50">
                     <td
-                      className="px-5 py-3 text-xs text-gray-400 whitespace-nowrap"
+                      className="px-5 py-3 text-xs text-gray-600 whitespace-nowrap"
                       title={new Date(e.created_at).toLocaleString("es-MX")}
                     >
                       {formatRelativeTime(e.created_at)}
@@ -132,7 +132,7 @@ export function AuditoriaTab() {
                 ))}
                 {entries.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-400">
+                    <td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-600">
                       <ScrollText className="w-8 h-8 text-gray-200 mx-auto mb-2" aria-hidden="true" />
                       Sin eventos registrados con estos filtros
                     </td>

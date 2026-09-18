@@ -1176,7 +1176,7 @@ e2e/keyboard.spec.ts` → verde. El contrato recorre 391 archivos en ~1,1 s.
 |---|---|---|
 | A14 | **`framer-motion` sin `MotionConfig` en 20 archivos ajenos** al perímetro de esta ronda (`src/app/panel/foodos/**`, `src/app/recompensas/**`, `src/components/auth/**`). R6 los cuenta y los excluye por perímetro; la deuda es real y es de la otra sesión | 🔜 |
 | A15 | **Un sitio con foco sin indicador, ajeno**: `src/app/recompensas/_components/InvoiceScannerScreen.tsx:468`. R1 lo detecta y lo excluye. Mismo arreglo de una línea que los 9 de esta ronda | 🔜 |
-| A16 | **Contraste de `/admin/**` y `/panel/**`**: axe sigue sin mirarlos y B36/B37 cubren solo `/admin/productos`. La técnica de esta ronda (contrato estático por AST) es la que hace falta; el alcance es de otra ronda | 🔜 |
+| A16 | **Contraste de `/admin/**`**: axe sigue sin mirarlos y B36/B37 cubrían solo `/admin/productos`. **Cerrado para `/admin/**` en la ronda 15** con un contrato estático por AST sobre los 50 archivos restantes (`src/lib/admin-contrast.contract.test.ts`, 12 pruebas). Queda fuera `/panel/**`, que se declara abajo como CX1 | ✅ |
 | A17 | **`iconOnlyButton` (113) y `inputNoName` (135)** medidos por AST y **deliberadamente fuera del contrato**: su tasa de falsos positivos es alta (iconos con `title`, inputs con `htmlFor`+`id` o dentro de un `<label>`), y congelar una línea base ruidosa consagra el ruido. Se declaran medidos, no aprobados | 🔜 |
 
 ### Ronda 14 — La máquina de estados y quien la pinta
@@ -1264,6 +1264,161 @@ consumidor y el export muerto desapareció.
 pinta es una guardia que miente — y `locale.test.ts` comprueba paridad de
 traducción, nunca uso, así que una cadena traducida no es evidencia de que alguien
 la renderice.
+
+### Ronda 15 — El contrato que medía la mitad de cada plantilla
+
+**Punto de partida medido.** Árbol en la migración 00167, `npm test` → 326
+archivos / 5564 pruebas, 0 en rojo. Antes de tocar nada se midió la deuda
+declarada, y la medición desmintió a la declaración en tres de sus cuatro
+entradas: A14 estaba obsoleta, A15 seguía siendo real pero **se había movido**
+(`InvoiceScannerScreen.tsx:468` → `:474`), y A16 no era deuda latente sino
+**fallo vivo** — `admin-productos-contrast.contract.test.ts` (B36) ya medía estas
+mismas clases como fallos, con un `PERIMETRO` de 6 archivos escrito a mano.
+
+**F1 — inventario formal por AST.** 130 sitios / 32 archivos en `/admin/**`.
+Comprobado antes de escribir una línea: ningún token prohibido aparece dentro de
+un comentario, así que la sustitución de tokens es segura (un token dentro de un
+comentario se sustituiría y no pintaría nada).
+
+**F2 — el barrido de texto.** 124 reemplazos en 27 archivos.
+`text-{red,amber,green,emerald,orange}-{500,600}` → `-700`; rellenos
+`bg-{amber-400/500/600,green-500/600,emerald-500}` → `-700`; hex
+`bg-[#25D366]` → `bg-[#0F7A3D]` y `hover:bg-[#1fb857]` → `hover:bg-[#0F6B3A]`.
+Un verificador de sitios exactos confirmó que solo quedaban los 12 sitios de
+exención ajena declarados.
+
+**La paleta se derivó, no se recordó.** Se dejó de escribir la tabla de colores a
+mano y se extrajo de `node_modules/tailwindcss/theme.css` (286 tokens en OKLCH) y
+de `globals.css` (la paleta propia, en hex). Se validó la conversión OKLab→sRGB:
+**10 de 13 conversiones coincidieron exactamente** con los hex publicados de
+Tailwind v4, y las auto-pruebas de luminancia WCAG reproducen `#000/#fff` 21.00,
+`#767676/#fff` 4.54 y `#949494/#fff` 3.03. Una tabla de contraste escrita a mano
+es una tabla que miente en cuanto alguien toca el tema.
+
+**F3 — el riesgo del fondo oscuro, eliminado por eliminación.** 308 sitios con
+`text-gray-400`: 228 resolvieron a fondo claro y **0 a fondo oscuro**. Los 80
+restantes se cerraron con `layout.tsx:34` (`bg-gray-50`), que es la superficie
+real del panel. Los 77 candidatos marcados con ancestro "oscuro" eran **falsos
+positivos**: el único negro era el *backdrop* `bg-black/40` de un modal, no una
+superficie de texto. Y el único caso genuino de superficie oscura,
+`LeadConversations.tsx:129`, resultó **seguro por ramas**: `bg-gray-900` es la
+rama activa y el `text-gray-400` vive en la rama inactiva sobre `bg-white`. Con
+eso: **cero exenciones necesarias**.
+
+**Se refutaron dos arreglos propios antes de aplicarlos.** `CityPerformance.tsx:47`
+(`bg-blue-500` sobre `bg-gray-100`) da **3.42 ≥ 3.0**: pasa. Y `:353`/`:378`/`:393`
+son iconos **`aria-hidden` decorativos**, exentos. Un barrido que no sabe
+detenerse inventa trabajo. El `bg-gray-300` del toggle tampoco se tocó: tiene
+etiqueta adyacente y `aria-label`, así que 1.4.11 no le aplica.
+
+**Fallos gráficos reales:** `bg-green-500` ×3 (2.22:1) y `bg-amber-400` ×1
+(1.72:1) → `-700`. Además 10 hover inertes; 7 se corrigieron **de vuelta** a 700
+después de encontrar un bug en mi propio script (los dos `if` de hover no eran
+mutuamente excluyentes y subían `hover:text-gray-600` dos veces a 800). En el
+mismo barrido apareció el único par inerte duplicado del perímetro,
+`marketing/page.tsx:579` con `hover:text-red-700 == text-red-700`, preexistente y
+en archivo propio → `hover:text-red-800`.
+
+**El contrato.** `src/lib/admin-contrast.contract.test.ts`, 12 pruebas sobre 50
+archivos (61 `.tsx` en `/admin` − 6 de B36 − 5 ajenos). La primera corrida dio
+**10/11 y la cazó mi propia guardia**: `whatsapp/page.tsx:1816 text-white/70` era
+inmedible, y el arreglo fue enseñarle a `rgbDeToken` a devolver `alfa` para
+colores neutros.
+
+**Los dos defectos del contrato — el hallazgo importante de la ronda.**
+
+1. **`ts.forEachChild` trata un retorno *truthy* como "detente".**
+   `ts.forEachChild(n, (c) => literales(c, out))` devolvía el acumulador, así que
+   de cualquier subárbol **solo se recogía el primer literal**: cada
+   `` className={`… ${…}`} `` se medía únicamente por su TemplateHead y **todas
+   las ramas de un ternario eran invisibles**. Se comprobó la maquinaria
+   heredada: `a11y-static.contract.test.ts:182` y
+   `panel-sync-ui.contract.test.ts:98/184` usan un `visitar` con cuerpo de bloque
+   que devuelve `void` — **sin el defecto**. Era exclusivo de mi contrato.
+2. **La unión de ramas inventa pares imposibles.** Las alternativas de un ternario
+   son mutuamente excluyentes; aplanarlas produjo pares como `text-white` (una
+   rama) × `bg-white` (otra) = **1.00:1**, que no existe en pantalla. El modelo
+   correcto es enumerar **alternativas** y medir cada una por separado.
+
+Con el modelo reparado, la lista de fallos cayó de **52 a 4**. Los 48 que
+desaparecieron eran artefactos del propio contrato, no defectos del producto.
+
+**Los 4 fallos genuinos** eran todos la misma clase invisible hasta entonces:
+`text-gray-500` sobre `bg-gray-100` = **4.39:1**.
+`AdminNotificationCenter.tsx:124`, `leads/page.tsx:1251`,
+`recompensas/servicios-tab.tsx:266`, `repartidores/page.tsx:164` → `text-gray-600`.
+Y se **refutaron con prueba** los dos falsos positivos que el resolver acusaba:
+`bitacoras/errores-tab.tsx:109` usa la **misma condición** que el ternario de su
+botón padre, así que `text-gray-500` siempre coocurre con `bg-white` (4.84 ✓); y
+`comisiones/page.tsx:469` (`text-gray-500 hover:bg-red-50 hover:text-red-700`)
+cruza base con base y hover con hover, nunca la base con el fondo del hover.
+
+**Canarias y mutación.** 50 archivos / **377 pares** / 1891 con texto / 2514
+literales `className` (antes 50 / 178 / 1992 / 2280). Los umbrales se subieron a
+45 / 340 / 1700 / 2260 y se documentó **la dirección de cada delta**, con el
+aviso de que un movimiento **a la baja** en cualquiera de ellos delata un
+recorrido roto. La batería de mutación M1–M5 (texto prohibido, afordancia muerta,
+relleno prohibido, `text-brand-400`, y el `gray-500` sobre `gray-100` que era
+invisible) → **5 de 5 detectadas**, archivo restaurado byte-idéntico.
+
+**B36 también era mío y lo rompió mi propio barrido.** El barrido cambió
+`text-gray-400` → `text-gray-600` dentro de 4 de los 6 archivos de B36 sin
+actualizar las aserciones literales de B36, dejando el árbol compartido con 1
+prueba en rojo. Las dos aserciones obsoletas describían la **rama hermana** de un
+ternario cuyo *otro* ramo (`text-amber-700`) es lo que el nombre de la prueba
+declara, así que se actualizaron a `gray-600` **sin relajar el trinquete**, y se
+añadió una prueba nueva que prohíbe `text-gray-400` y `text-brand-400` en los 6
+archivos. Un barrido que invalida su propia guardia es un barrido incompleto.
+
+**Lo que sobrevive, medido.** 27 `text-gray-400` quedan en `/admin/**` y **los 27
+están en los 5 archivos ajenos** (11 + 3 + 5 + 6 + 2); el perímetro propio queda
+en **0**. `/admin/**` conserva 281 `text-gray-500`, gobernados por la prueba de
+par y **no** por prohibición: `gray-500` pasa sobre blanco (4.84) y sobre
+`gray-50` (4.63), que es la superficie del panel; prohibirlo forzaría a oscurecer
+texto secundario legítimo. La decisión #6 del contrato lo deja escrito.
+
+**Deuda declarada, no arreglada** — con el prefijo `CX`, que estaba libre:
+
+| # | Deuda | Estado |
+|---|---|---|
+| CX1 | **`/panel/**` sin cobertura de contraste**: es el resto de A16. El perímetro del contrato es `/admin/**`; el panel de negocio usa la misma paleta y no tiene contrato propio | 🔜 |
+| CX2 | **A14 obsoleta**: los 28 imports / 9 `MotionConfig` que declaraba ya no coinciden con el árbol. O se remide o se retira la fila | 🔜 |
+| CX3 | **A15 sigue real y se movió**: `src/app/recompensas/_components/InvoiceScannerScreen.tsx:474`. Arreglo de una línea, archivo ajeno | 🔜 |
+| CX4 | **Integridad del propio documento**: 26 IDs de fila duplicados y 17 filas con rango que `ROW_DEF_RE` no ve, así que un puntero a ellas no resuelve. El contrato de punteros no puede vigilar lo que no ve | 🔜 |
+| CX5 | **R1 con un hueco**: `ring-0` y `border-transparent` no cuentan como indicador de foco para el contrato estático | 🔜 |
+| CX6 | **Fallo latente en la paleta propia**: `warm-400` (`#8F939B`) da **3.08** sobre blanco y **2.95** sobre `gray-50`; `cream-600` (`#999893`) da **2.89** y **2.77**. Ninguno se usa hoy como texto en `/admin`, así que no hay fallo vivo — pero el día que se use, falla | 🔜 |
+| CX7 | **El verde de WhatsApp**: `#25D366` da **1.98:1** con texto blanco. Es el color de marca del canal y por eso se declaró en vez de prohibirse; el barrido lo movió a `#0F7A3D` (**5.42**) donde se usa como relleno con texto | 🔜 |
+| CX8 | **654 `text-gray-400` fuera del perímetro** en todo `src/**` (0 en `/admin` propio, 27 en los 5 archivos ajenos). Fuera de política, sin contrato que lo mida | 🔜 |
+| CX9 | **775 `text-gray-500` en todo `src/**`** (281 en `/admin`). El contrato los mide por par donde tiene perímetro; fuera de él, nadie | 🔜 |
+
+**Verificación final medida.** `npx tsc --noEmit` → **0** ·
+**`npm test` → 333 archivos / 5687 pruebas, 0 en rojo** · `npm run build` → exit 0
+· los cuatro contratos de esta superficie (`admin-contrast` 12, B36 13,
+`a11y-static` y `docs-pointers`) → **51 pruebas, 0 en rojo**.
+
+**Dos gates en rojo, y los dos son de otro.** `npm run knip` dio exit 1 a mitad de
+ronda con 3 exports sin consumidor en `src/lib/foodos-moderation.ts:92/148/153`;
+al cerrar la ronda **ya da exit 0**: era exactamente el refactor que la otra
+sesión tenía en vuelo. `npm run lint` cierra en **exit 1 con 2 warnings, ambos
+ajenos y también en vuelo**: `src/app/admin/foodos/restaurantes/page.tsx:85`
+(`react-hooks/set-state-in-effect`, sobre un efecto que el propio autor anota en
+un comentario **citando la regla por su nombre**, con marca de tiempo 20:21:45,
+posterior a mi barrido) y `src/lib/foodos-moderation.contract.test.ts:2`
+(`relative` importado sin usar, en un archivo cuyo módulo se escribió a las
+20:24:46, **después** de mi última edición). Un barrido que solo sustituye tokens
+`className` no puede producir ni un warning de hooks ni un import sin usar. Lint
+estaba en 0 al empezar esta ronda y volverá a 0 cuando la otra sesión cierre. La
+lección operativa: **un gate rojo no siempre es tuyo** — `git log` no atribuye en
+este árbol, así que la atribución se hace por marca de tiempo y por contenido del
+warning.
+
+**Lección.** Un contrato de accesibilidad es un instrumento de medida, y esta
+ronda descubrió que el mío medía **la mitad de cada plantilla** y fabricaba pares
+de color que no existen. Los 48 fallos que desaparecieron al reparar el modelo no
+eran producto defectuoso: eran el contrato hablando de sí mismo. La deuda
+declarada, en cambio, mintió en tres de cuatro entradas — incluida una que
+apuntaba al archivo equivocado por seis líneas. **Antes de arreglar el backlog,
+mídelo; y antes de creerte tu propia medición, mutílala.**
 
 ## Agentes de mantenimiento por dominio
 

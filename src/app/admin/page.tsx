@@ -319,7 +319,7 @@ function AdminDashboardContent() {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <p className="text-red-700 text-sm font-medium">{error}</p>
-        <p className="text-gray-400 text-xs mt-1">
+        <p className="text-gray-600 text-xs mt-1">
           Verifica que estés autenticado como administrador.
         </p>
         {/* Fase 7 — recuperación ante error sin recargar la página */}
@@ -369,7 +369,7 @@ function AdminDashboardContent() {
                       ? "text-green-700"
                       : card.trend === "down"
                       ? "text-red-700"
-                      : "text-gray-400"
+                      : "text-gray-600"
                   }`}
                 >
                   {card.trend === "up" && <ArrowUpRight className="w-3 h-3" />}
@@ -487,7 +487,7 @@ function AdminDashboardContent() {
                   </td>
                   {/* Fase 7 — fecha relativa con la absoluta en el tooltip */}
                   <td
-                    className="px-5 py-3 text-xs text-gray-400"
+                    className="px-5 py-3 text-xs text-gray-600"
                     title={new Date(order.created_at).toLocaleString("es-MX")}
                   >
                     {formatRelativeTime(order.created_at)}
@@ -496,7 +496,7 @@ function AdminDashboardContent() {
               ))}
               {recentOrders.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={6} className="px-5 py-12 text-center text-gray-600 text-sm">
                     No hay pedidos aún.
                   </td>
                 </tr>
@@ -510,7 +510,7 @@ function AdminDashboardContent() {
       {auditEntries.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mt-8">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
-            <ClipboardList className="w-4 h-4 text-gray-400" />
+            <ClipboardList className="w-4 h-4 text-gray-600" />
             <h2 className="font-semibold text-gray-900">Bitácora de actividad</h2>
           </div>
           <ul className="divide-y divide-gray-100">
@@ -522,7 +522,7 @@ function AdminDashboardContent() {
                     <p className="text-xs text-gray-500 truncate">{entry.body}</p>
                   )}
                 </div>
-                <time className="text-xs text-gray-400 shrink-0">
+                <time className="text-xs text-gray-600 shrink-0">
                   {new Date(entry.created_at).toLocaleString("es-MX", {
                     day: "numeric",
                     month: "short",

@@ -66,7 +66,7 @@ interface FunnelData {
 
 const CARD = "rounded-xl border border-gray-200 bg-white p-4"
 const TH =
-  "py-1.5 pr-4 text-left text-[11px] font-medium uppercase tracking-wide text-gray-400"
+  "py-1.5 pr-4 text-left text-[11px] font-medium uppercase tracking-wide text-gray-600"
 const TD = "py-1.5 pr-4 text-sm text-gray-700"
 const TD_NUM = "py-1.5 pr-4 text-sm text-gray-700 text-right tabular-nums"
 
@@ -137,7 +137,7 @@ export default function ConversionDashboardPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center py-24 text-sm text-gray-400">
+        <div className="flex items-center justify-center py-24 text-sm text-gray-600">
           <Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" />
           Cargando el embudo de conversión...
         </div>
@@ -471,7 +471,7 @@ function ConversionContent() {
                         <tr key={row.key} className="border-b border-gray-50 last:border-0">
                           <td className={TD}>
                             <span className="font-medium text-gray-900">{row.label}</span>
-                            <span className="block text-[11px] text-gray-400">
+                            <span className="block text-[11px] text-gray-600">
                               {row.description}
                             </span>
                           </td>
@@ -761,7 +761,7 @@ function ConversionContent() {
                     Retención de recompra por cohorte mensual.
                   </caption>
                   <thead>
-                    <tr className="text-left text-gray-400">
+                    <tr className="text-left text-gray-600">
                       <th scope="col" className="py-1 pr-4 font-medium">Cohorte</th>
                       <th scope="col" className="py-1 pr-4 font-medium">Clientes</th>
                       {Array.from({ length: cohorts[0]?.retentions.length ?? 0 }, (_, i) => (
@@ -838,7 +838,7 @@ function DeltaInline({
   /** Un conteo se compara en `%`; una tasa, en puntos porcentuales. */
   unit?: "%" | "pp"
 }) {
-  if (deltaPct === null) return <span className="text-[11px] text-gray-400">sin base</span>
+  if (deltaPct === null) return <span className="text-[11px] text-gray-600">sin base</span>
   const good = direction !== "flat" && direction === goodDirection
   const bad = direction !== "flat" && direction !== goodDirection
   return (

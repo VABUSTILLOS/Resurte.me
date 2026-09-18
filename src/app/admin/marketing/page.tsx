@@ -358,13 +358,13 @@ function MarketingContent() {
                 className={`mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-lg border transition-colors ${
                   rule.is_active
                     ? "bg-brand-50 border-brand-200 text-brand-700"
-                    : "bg-gray-50 border-gray-200 text-gray-400"
+                    : "bg-gray-50 border-gray-200 text-gray-600"
                 }`}
               >
                 <Power className="w-4 h-4" />
               </button>
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-semibold ${rule.is_active ? "text-gray-900" : "text-gray-400 line-through"}`}>
+                <p className={`text-sm font-semibold ${rule.is_active ? "text-gray-900" : "text-gray-600 line-through"}`}>
                   {rule.title}
                   <span className="ml-2 text-xs font-normal text-gray-500">
                     {TRIGGER_LABEL[rule.trigger_type] ?? rule.trigger_type}
@@ -372,7 +372,7 @@ function MarketingContent() {
                   </span>
                 </p>
                 <p className="text-xs text-gray-500 truncate">{rule.description}</p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-600">
                   Producto #{rule.product_id} · orden {rule.display_order}
                 </p>
               </div>
@@ -388,7 +388,7 @@ function MarketingContent() {
                 type="button"
                 onClick={() => void deleteRule(rule)}
                 aria-label="Eliminar regla"
-                className="text-gray-400 hover:text-red-700 p-1"
+                className="text-gray-600 hover:text-red-700 p-1"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -541,7 +541,7 @@ function MarketingContent() {
                   isFocused ? "ring-2 ring-brand-300 bg-brand-50/50 px-2" : ""
                 }`}
               >
-                <span className={`font-mono font-bold ${inactive ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                <span className={`font-mono font-bold ${inactive ? "text-gray-600 line-through" : "text-gray-900"}`}>
                   {c.code}
                 </span>
                 <span className="text-gray-600">
@@ -550,7 +550,7 @@ function MarketingContent() {
                     : `$${Number(c.discount_value).toFixed(2)}`}
                   {c.min_order > 0 && ` · mín. $${Number(c.min_order).toFixed(0)}`}
                 </span>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-600">
                   {c.used_count}{c.max_uses > 0 ? `/${c.max_uses}` : ""} usos
                   {c.expires_at &&
                     ` · ${isExpired(c) ? "expiró" : "expira"} ${new Date(c.expires_at).toLocaleDateString("es-MX")}`}
@@ -581,7 +581,7 @@ function MarketingContent() {
                     onClick={() => void deleteCoupon(c)}
                     aria-label={`Eliminar cupón ${c.code}`}
                     title="Eliminar"
-                    className="rounded-lg p-1.5 text-red-700 hover:bg-red-50 hover:text-red-700"
+                    className="rounded-lg p-1.5 text-red-700 hover:bg-red-50 hover:text-red-800"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

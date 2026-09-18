@@ -2,9 +2,15 @@
 // Tipos de FoodOS: sistema de pedidos y cross-selling gratuito
 // para los clientes restauranteros de Resurte.me.
 // Espejo de supabase/migrations/00023_foodos.sql
+// + supabase/migrations/00168_foodos_restaurant_moderation.sql
 // ============================================================
 
-export type FoodosRestaurantStatus = "draft" | "active" | "paused"
+import type { FoodosRestaurantStatus } from "@/lib/foodos-moderation"
+
+// El catálogo de estados vive en `@/lib/foodos-moderation` para que la lista de
+// valores y el tipo no puedan divergir: allí está la tabla de transiciones y
+// aquí sólo el alias que ya importaban las pantallas.
+export type { FoodosRestaurantStatus }
 
 export interface FoodosRestaurant {
   id: string
@@ -15,6 +21,15 @@ export interface FoodosRestaurant {
   description: string | null
   collection_id: number | null
   status: FoodosRestaurantStatus
+  // Moderación (00168). `submitted_at` lo sella el trigger cuando el dueño
+  // solicita la revisión; `review_*` los escribe sólo
+  // `foodos_restaurant_review()`, que llama la ruta admin. El dueño no tiene
+  // privilegio de columna sobre ninguno de los cuatro: son el registro de la
+  // decisión, no un campo del formulario.
+  submitted_at: string | null
+  review_note: string | null
+  reviewed_at: string | null
+  reviewed_by: string | null
   currency: string
   timezone: string
   theme_color: string | null

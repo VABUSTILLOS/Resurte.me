@@ -147,7 +147,7 @@ export default async function PrintOrderPage({
           </p>
         </div>
 
-        <p className="text-center text-[10px] text-gray-400 mt-6">
+        <p className="text-center text-[10px] text-gray-600 mt-6">
           ¡Gracias por tu pedido! · resurte.me
         </p>
       </div>

@@ -85,7 +85,7 @@ export function LeadConversations({
 
   if (loading && !inbox) {
     return (
-      <p className="flex items-center gap-2 py-16 text-sm text-gray-400">
+      <p className="flex items-center gap-2 py-16 text-sm text-gray-600">
         <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" /> Cargando bandeja...
       </p>
     )
@@ -126,7 +126,7 @@ export function LeadConversations({
                 }`}
               >
                 {label}
-                <span className={view === key ? "ml-1 text-white/70" : "ml-1 text-gray-400"}>
+                <span className={view === key ? "ml-1 text-white/70" : "ml-1 text-gray-600"}>
                   ({count})
                 </span>
               </button>
@@ -151,7 +151,7 @@ export function LeadConversations({
 
           <label className="relative min-w-[180px] flex-1">
             <span className="sr-only">Buscar conversación</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-600" />
             <input
               type="search"
               value={q}
@@ -173,7 +173,7 @@ export function LeadConversations({
         </div>
 
         {inbox && (inbox.sinConversacion > 0 || inbox.sinMensajes > 0) && (
-          <p className="mt-2 text-[11px] text-gray-400">
+          <p className="mt-2 text-[11px] text-gray-600">
             {inbox.sinConversacion > 0 && `${inbox.sinConversacion} sin teléfono`}
             {inbox.sinConversacion > 0 && inbox.sinMensajes > 0 && " · "}
             {inbox.sinMensajes > 0 && `${inbox.sinMensajes} con teléfono pero sin mensajes`}
@@ -184,7 +184,7 @@ export function LeadConversations({
       <div className="lg:grid lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-3">
         <div className={`${CARD} overflow-hidden ${selected ? "hidden lg:block" : ""}`}>
           {visible.length === 0 ? (
-            <p className="px-4 py-10 text-center text-xs text-gray-400">
+            <p className="px-4 py-10 text-center text-xs text-gray-600">
               {threads.length === 0
                 ? "Todavía no hay conversaciones de WhatsApp"
                 : "Ningún hilo coincide con el filtro"}
@@ -205,7 +205,7 @@ export function LeadConversations({
                         {thread.prospect.name}
                       </span>
                       {thread.lastMessageAt && (
-                        <span className="flex-none text-[11px] text-gray-400">
+                        <span className="flex-none text-[11px] text-gray-600">
                           {formatRelativeTime(thread.lastMessageAt)}
                         </span>
                       )}
@@ -215,7 +215,7 @@ export function LeadConversations({
                         {thread.prospect.restaurant_name}
                       </span>
                     )}
-                    <p className="mt-0.5 line-clamp-1 text-[11px] text-gray-400">
+                    <p className="mt-0.5 line-clamp-1 text-[11px] text-gray-600">
                       {thread.preview ?? "Sin mensajes"}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-1">
@@ -251,7 +251,7 @@ export function LeadConversations({
           />
         ) : (
           <div className={`${CARD} hidden items-center justify-center px-6 py-16 lg:flex`}>
-            <p className="text-xs text-gray-400">Elige una conversación para ver el hilo</p>
+            <p className="text-xs text-gray-600">Elige una conversación para ver el hilo</p>
           </div>
         )}
       </div>

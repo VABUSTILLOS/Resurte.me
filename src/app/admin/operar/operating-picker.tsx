@@ -136,7 +136,7 @@ export function OperatingPicker({
           </label>
           <div className="relative flex-1 min-w-[220px]">
             <Search
-              className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
+              className="w-4 h-4 text-gray-600 absolute left-3 top-1/2 -translate-y-1/2"
               aria-hidden="true"
             />
             <input
@@ -181,7 +181,7 @@ export function OperatingPicker({
                   key={row.id}
                   className="py-3 flex flex-wrap items-center gap-x-3 gap-y-2"
                 >
-                  <Store className="w-4 h-4 text-gray-400 shrink-0" aria-hidden="true" />
+                  <Store className="w-4 h-4 text-gray-600 shrink-0" aria-hidden="true" />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-gray-900 truncate">{row.name}</span>
@@ -221,7 +221,7 @@ export function OperatingPicker({
                   </Link>
 
                   {isOwn ? (
-                    <span className="shrink-0 text-xs text-gray-400 px-3 py-1.5">
+                    <span className="shrink-0 text-xs text-gray-600 px-3 py-1.5">
                       No necesitas soporte aquí
                     </span>
                   ) : isOperating ? (

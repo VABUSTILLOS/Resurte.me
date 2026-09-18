@@ -137,7 +137,7 @@ export function RowActionMenu({
         aria-expanded={open}
         aria-label={label}
         title={label}
-        className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+        className="p-1.5 rounded-lg text-gray-600 hover:text-brand-600 hover:bg-brand-50 transition-colors"
       >
         <MoreHorizontal className="w-4 h-4" />
       </button>
