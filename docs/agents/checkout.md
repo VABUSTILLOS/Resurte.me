@@ -203,3 +203,10 @@ src/lib/order-cancellation.contract.test.ts "src/app/api/orders/[id]/cancel/rout
 mano, cancelar un pedido `pending` sin cobro desde `/mis-pedidos/[orderId]`
 (sesión) y desde `/pedido/[orderId]?t=` (invitado), comprobando que el inventario
 vuelve y que el cupón se libera.
+
+FoodOS tiene su propio par de puertas y su propia máquina de estados, así que su
+verificación va aparte: `npx vitest run src/lib/foodos-order-status.test.ts
+"src/app/api/foodos/orders/[id]/cancel/route.test.ts"` y, a mano, cancelar un
+pedido `pending` sin cobro desde `/r/[slug]/pedido/[id]?t=` comprobando que
+`usage_count` del cupón baja, y confirmar que un pedido ya confirmado o cobrado
+**explica el motivo** en vez de esconder el botón.
