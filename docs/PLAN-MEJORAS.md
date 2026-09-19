@@ -1688,7 +1688,7 @@ que se corrieron en serie.
 | E8 | **El guard de `mobile-chrome.spec.ts:28` era una carrera.** `isVisible({ timeout: 3000 })` competía con la autoapertura de la guía | ✅ **Ronda 23** — el guard ahora espera a que el banner esté: `await expect(acceptCookies).toBeVisible({ timeout: 8000 })`, más `toHaveCount(0)` sobre el botón de cerrar la guía y `not.toBeVisible()` tras el tap. Es insensible al tiempo de la animación en vez de competir con él |
 | E9 | **Los fallos del `e2e` local eran contención**, no lógica: `fullyParallel: true` contra un único dev server. Medido dos veces — **19 de 22** en la línea base y **26 de 27** en la corrida de cierre. En CI los absorbía `retries: 2`; en local **enmascaraban regresiones reales** | ✅ **Ronda 23** — `WORKERS = 2` (`playwright.config.ts:62`) con la medición escrita al lado (`:46-61`: 1 worker verde en 1.0 min, 2 en 1.8 min, 4 rojo), `E2E_WORKERS` para ajustarlo y `reuseExistingServer: false`. Y la causa de fondo, que no era la contención sino la memoria: local ya no corre `next dev` sino `next build` + `next start` (`E2E_SERVER`, `:84`), porque el `next-server` del e2e crecía ~7 MB/s hasta agotar los 16 GB |
 | E10 | **La incógnita del cancel sigue abierta.** *Qué* mata el paso `E2E smoke tests` no está determinado —muere a 92 s, 152 s, 144 s y 257 s en cuatro corridas, siempre con `The runner has received a shutdown signal`, sin marca de sistema y **sin corrida solapada**—; la hipótesis viva es muerte por inactividad de stdout, y la línea de progreso de E2 es la sonda que lo responderá en la próxima corrida de CI | 🔜 |
-| E11 | **Qué originó el primer rojo, si el calentamiento no cambió.** `f9d83339` trae tres archivos y `e2e/global-setup.ts` **no** es uno de ellos: quedan `e2e/redeem.spec.ts` (−102/+51) —que ya explica su propio 404— y `src/components/layout/footer.tsx` (+/−14) como candidatos del fallo que **no** es el cancel. Falta aislar `footer.tsx` contra `checkout-drawer.spec.ts:166`, el test que falló en esa corrida | 🔜 |
+| E11 | **Qué originó el primer rojo, si el calentamiento no cambió.** `f9d83339` trae tres archivos y `e2e/global-setup.ts` **no** es uno de ellos: quedan `e2e/redeem.spec.ts` (−102/+51) —que ya explica su propio 404— y `src/components/layout/footer.tsx` (+/−14) como candidatos del fallo que **no** es el cancel. Falta aislar `footer.tsx` contra `checkout-drawer.spec.ts:166`, el test que falló en esa corrida | ✅ **Ronda 26** — **`footer.tsx` es inocente y el rojo era una carrera del propio test.** Medido: su diff en `f9d83339` es **solo clases Tailwind** (`pt-8→pt-6`, `gap-*` reducidos, `mb-2→mb-1`, `mt-3→mt-2 sm:mt-3`) más borrar «— Central de Abastos Digital» del copyright —cero JavaScript, cero estado, cero listeners—, y `git diff f9d83339 HEAD -- footer.tsx` sale **vacío**: el archivo está idéntico a como estaba en la corrida roja. El listener del carrito vive en `cart-drawer.tsx` y lo monta `layout.tsx` **como hermano** del footer. El test de `:166` usaba como señal de apertura el texto «🔥 Restaurantes también compran», que solo se pinta con el carrito **no vacío**, y el evento es un **toggle**: despachar a ciegas podía cerrar el drawer que el intento anterior acababa de abrir, así que el bucle oscilaba y su error final («No se pudo abrir el cart drawer») acusaba al drawer tanto si no había abierto como si el carrito aún no había hidratado de `localStorage`. Ahora la señal es el propio `role="dialog"` (el drawer se **desmonta** al cerrar, `if (!isOpen) return null`) y el reintento **solo despacha si se observa cerrado**. Verificación: el spec completo **26/26 en verde** en local, con el mismo `footer.tsx` de la corrida roja |
 
 ### Ronda 17 — El modelo plano del contrato de punteros
 
@@ -1953,9 +1953,9 @@ contenido del mensaje de error.
 | CRM1 | **`orders.seller_id` existía y ninguna ruta la escribía.** El aviso de `00155:39` se confirmó: usarla para atribuir comisión daría **cero siempre**. El camino del dinero es `crm_prospects.user_id → orders.user_id` y así se dejó. **Cerrada en la ronda 23** eliminando la columna (`00189`): su único efecto real era la segunda FK `orders → profiles`, causa del `PGRST201` de los embeds | ✅ |
 | CRM2 | **`getProspectClientOrders` limitaba a 50 pedidos.** Las ventas y la comisión salían de las **mismas 50 filas** de la lista, así que a partir del pedido 51 el ingreso quedaba **subestimado en silencio** —con la etiqueta prometiendo «histórico»—. El total se separó de la lista: `scanPaidRevenue` (`src/lib/comercializacion/actions/vinculos.ts`) escanea el historial con la ventana alta y la **fila de más** de `readCrmPipelineValue` (`CRM_REVENUE_SCAN_LIMIT`), y si el historial no cupiera la cifra se pinta como **mínimo** (`≥ $X`, `formatMeasuredAmount`), nunca como total | ✅ |
 | CRM3 | **No se puede verificar RLS real en producción**, solo lo que declaran las migraciones. `crm_tasks` tiene RLS encendida y **0 políticas**: el acceso depende de que todo pase por `createServiceClient()`. **Cerrada en la ronda 23**: el perímetro resultó ser de **24 tablas**, no una, y su modelo de acceso quedó declarado con el archivo que lo demuestra (`rls-declared.contract.test.ts`). La parte que sigue abierta es la de arriba —**RLS real no se puede verificar desde el repo**, solo declararse— y por eso el contrato verifica la declaración, no la base | 🟡 |
-| CRM4 | **La atribución de uso de columnas salió de grep de identificadores.** Una referencia dinámica (nombre construido en runtime) podría escapar al inventario de H3 | 🔜 |
+| CRM4 | **La atribución de uso de columnas salió de grep de identificadores.** Una referencia dinámica (nombre construido en runtime) podría escapar al inventario de H3. **Cerrada en la ronda 26 con contrato, no con promesa**: los nombres de columna viven en **un solo vocabulario** (`CRM_PROSPECT_COLUMN_SETS`, la escalera de degradación) y toda lista que llega a un `.select()` de `crm_prospects` sale de ahí. Quedan **exactamente dos** sitios que construyen la lista a mano —`readLeadRow` y `buildQuery`— y `crm-column-refs.contract.test.ts` (10) los declara, cuenta y resuelve: un tercero, o uno alimentado por algo que no sea el vocabulario, pone el contrato en rojo | ✅ |
 | CRM5 | **`estimated_value` es un valor declarado, no un histórico.** El pipeline es una **foto**, no una tendencia: no se puede responder "¿cuánto valía el pipeline el mes pasado?". **Cerrada en la ronda 23 declarando la limitación, no construyendo la serie** (una tabla de snapshots sin lector sería superficie muerta); `crm-forecast.contract.test.ts` (15) la hace falsable | ✅ |
-| CRM6 | **El motivo de pérdida no se puede exigir retroactivamente.** Las filas históricas en `perdido` no lo tienen y el `CHECK` lo permite a propósito; cualquier métrica por motivo tendrá denominador parcial | 🔜 |
+| CRM6 | **El motivo de pérdida no se puede exigir retroactivamente.** Las filas históricas en `perdido` no lo tienen y el `CHECK` lo permite a propósito; cualquier métrica por motivo tendrá denominador parcial. **Cerrada en la ronda 26 declarando la cobertura**: el hueco es **histórico** (anterior a `00184`) y **no crece**, porque `crmClosePatch` lanza si falta el motivo y `actions.ts:1918` es su único llamador. `crm-loss-reason.contract.test.ts` (14) vigila el vocabulario, la asimetría del `CHECK` y que la métrica **diga su denominador** | ✅ |
 
 **Lección.** El CRM no estaba a medio construir: estaba **construido y sin boca ni
 manos**. Tres de los siete hallazgos (H3, H4, H6) eran *escrituras que nadie podía
@@ -2012,7 +2012,7 @@ contratos de test que vigilan **esta misma documentación**.
 | AU7 | **Huecos y duplicidad en la bitácora admin.** El contrato `src/lib/admin-audit.contract.test.ts` ya exigía que toda ruta mutante audite o esté exenta con motivo escrito; la excepción de `bump-affinity` era **más estrecha que la ruta** (justificaba `weight` pero no el alta ni la baja del par, que sí son merchandising) y se corrigió con `affinity_pair_create` / `_update` / `_delete`. La **duplicidad** también quedó cerrada: se retiró `src/lib/audit.ts` —el módulo legado de 4 acciones que espejaba en `notifications`— y `/api/admin/audit-log` ahora lee `admin_audit_log`, el mismo libro que la pestaña de `/admin/bitacoras`. Retirarlo destapó **dos huecos que solo el legado cubría**: la **asignación de repartidor** no tenía equivalente en el catálogo nuevo (`order_driver_assigned` / `order_driver_unassigned`, añadidas con test) y `product_images_update` / `products_seed` quedaron sin escritor al retirar los endpoints de `AU8` (eliminadas de `AUDIT_ACTIONS`). Un registro que no registra todo no es un registro | ✅ |
 | AU8 | **Dos endpoints admin no usaban `requireAdmin()`.** `seed-products` y `update-images` se protegían con token de entorno (`SEED_API_TOKEN` / `ADMIN_API_SECRET`, fail-closed) y llevaban datos hardcodeados de un solo uso. Violaban el invariante #1 de `docs/agents/admin.md:11-12`. Eran scripts, no features: **retirados** en la Ronda 20 | ✅ |
 | AU9 | **El CRM tiene el ciclo de retroalimentación roto.** Son las seis filas `CRM1`–`CRM6` que declaró la ronda 18. Tres quedaron cerradas. **`CRM2`** —las ventas y la comisión del cliente vinculado se calculaban sobre las 50 filas de la lista, no sobre el historial— se separó la medición de la presentación (`scanPaidRevenue` + `formatMeasuredAmount`, con `≥` cuando el historial no cabe en la ventana). **`CRM1`** (`orders.seller_id` sin escritor) se cerró eliminando la columna, porque el silencio no era un dato. **`CRM5`** (`estimated_value` es foto, no histórico) se cerró **declarando la limitación y no construyendo la serie**: el CRM puede decir cuánto vale el pipeline ahora y no puede decir cuánto valía el mes pasado, y esa segunda pregunta no se deriva de la primera. **`CRM3`** quedó a medias por construcción: el perímetro resultó ser de **24 tablas** con RLS y cero políticas, no una, y su modelo de acceso se declaró con evidencia (`rls-declared.contract.test.ts`); lo que sigue abierto es que **RLS real no se puede verificar desde el repo**, solo declararse. Siguen abiertas `CRM4` (atribución de uso por grep) y `CRM6` (motivo de pérdida no retroactivo). La ronda 18 le dio boca y manos; la 23 le dio memoria de lo que sabe y de lo que no | 🟡 |
-| AU10 | **La cobertura e2e es desigual y no autentica.** Sin e2e para ~10 secciones admin (bitácoras-UI, comisiones, conversion, proveedores, recompensas, seo-ia, sistema, whatsapp, dispersiones, repartidores), y el propio `docs/agents/admin.md:1247` admite que `e2e/a11y.spec.ts` **no** sirve para `/admin/*`. El repo no tiene seed ni credenciales, así que el e2e verifica guards y render, no flujos. Se suma al backlog de accesibilidad ya abierto (`A14`–`A17`, `CX1`–`CX9`) y al de flakiness (`E7`–`E11`) | 🔜 |
+| AU10 | **La cobertura e2e es desigual y no autentica.** Sin e2e para ~10 secciones admin (bitácoras-UI, comisiones, conversion, proveedores, recompensas, seo-ia, sistema, whatsapp, dispersiones, repartidores), y el propio `docs/agents/admin.md:1247` admite que `e2e/a11y.spec.ts` **no** sirve para `/admin/*`. El repo no tiene seed ni credenciales, así que el e2e verifica guards y render, no flujos. Se suma al backlog de flakiness, del que `E7`–`E9` **cerraron en la Ronda 23** y solo quedan abiertos `E10` y `E11`. La mitad autenticada ya tiene camino y no depende de terceros: `docs/CREDENCIALES.md` §4 lo resuelve con un usuario admin de prueba en el propio Supabase | 🔜 |
 
 **Lo que esta ronda desmintió.** El inventario de `docs/REPORTE-FUNCIONES-Y-MEJORAS.md`
 declaraba "Facturas (CFDI)" como función del admin y "12 herramientas" en el panel.
@@ -2769,6 +2769,96 @@ no declara ningún conteo a propósito: un documento que no afirma un número no
 quedar obsoleto por él. Los 8 todos bloqueados quedaron reescritos con **su
 credencial, su origen y su comando de verificación** (`g6`). Sin commit: el árbol
 sigue siendo del usuario.
+
+### Ronda 26 — El fortalecimiento, medido (y dos filas que mentían)
+
+**Origen.** Al preguntar **cómo había quedado el fortalecimiento**, la respuesta no
+estaba en la prosa: este documento llevaba cinco rondas de actas y el backlog había
+ido cerrando filas **sin que ninguna acta dijera el total**. Así que la ronda empezó
+**midiendo el backlog fila por fila** en vez de resumirlo, y el conteo salió limpio:
+**de 23 trabajos en 5 oleadas, 17 cerrados**.
+
+- **A — Accesibilidad del panel: 7/7 ✅** (Ronda 23).
+- **B — El bug móvil: 3/3 ✅** (Ronda 23).
+- **C — Memoria del CRM: 5/5 ✅** (`CRM1`–`CRM3` y `CRM5` en la Ronda 23; `CRM4` y
+  `CRM6` en esta ronda).
+- **D — El POS que se ofrece y no existe: 2/2 ✅** (Ronda 23).
+- **E — Bloqueado por un tercero: 0/6 ejecutados 🔜** — y ese es el resultado
+  **correcto**: la Ronda 25 convirtió una incógnita en una lista con nombre, precio y
+  orden. Las 4 debilidades que siguen abiertas **no son deuda de código**: tres
+  esperan una compra o una decisión, una espera un piloto.
+
+**Oleada A — la deriva: dos filas describían un estado que ya no existe.** Medir, y
+no leer, destapó que la documentación se había desincronizado de sí misma:
+`docs/AUDITORIA-ESTATUS.md` seguía listando la **debilidad #9 (accesibilidad) como
+abierta** cuando la Ronda 23 la había cerrado, y la fila `AU10` citaba los logs
+`A14`–`A17` y `CX1`–`CX9` como «ya abiertos» **cuando las 9 filas `CX1`–`CX9` ya
+estaban ✅**. Ninguna de las dos rompía una prueba: el texto no falla, se lee igual de
+bien y el lector deja de confiar en él — el mismo modo de fallo que el resto de los
+contratos, un escalón más arriba. Las dos quedaron corregidas, y el **§12 «Estado tras
+la Ronda 25 — el fortalecimiento, medido»** de `docs/AUDITORIA-ESTATUS.md` fija el
+conteo por oleada para que la próxima ronda no tenga que reconstruirlo.
+
+**Oleada B — la memoria del CRM, hecha falsable (`CRM4`, `CRM6`).** Las dos filas
+pedían lo mismo que `CRM5` ya había resuelto en la Ronda 24: **declarar, no
+construir**.
+- **`CRM6` — el motivo de pérdida no se puede exigir retroactivamente.** El hueco es
+  **histórico** (anterior a la migración `00184`) y **no crece**, porque `crmClosePatch`
+  lanza si falta el motivo y `src/app/admin/actions.ts` es su único llamador. Lo que
+  faltaba no era un dato: era que la métrica **dijera su denominador**. Nuevo
+  `src/lib/crm-loss-reason.contract.test.ts`, **14 pruebas**: el vocabulario, la
+  **asimetría del `CHECK`** (que permite el `NULL` a propósito) y que el porcentaje por
+  motivo se declare como **parcial**.
+- **`CRM4` — la atribución de uso de columnas salió de grep de identificadores.** Una
+  referencia **construida en runtime** podría escapar al inventario. La forma de
+  volverlo falsable ya existía: los nombres de columna de `crm_prospects` **viven en un
+  solo lugar** (`CRM_PROSPECT_COLUMN_SETS`, la escalera de degradación) y toda lista que
+  llega a un `.select()` sale de ahí. Quedan **exactamente dos** sitios que construyen
+  la lista a mano —`readLeadRow` y `buildQuery`— y
+  `src/lib/crm-column-refs.contract.test.ts`, **10 pruebas**, los declara, cuenta y
+  resuelve: un tercero, o uno alimentado por algo que no sea el vocabulario, lo pone en
+  rojo. Ambas reglas se probaron con **sabotaje vivo** antes de darlas por buenas.
+
+**Oleada C — el veredicto de `E11`: el footer es inocente y el rojo era una carrera
+del propio test.** La fila pedía aislar `src/components/layout/footer.tsx` contra el
+test que había fallado en CI. El diff medido de ese archivo en el commit rojo es
+**solo clases Tailwind** (`pt-8→pt-6`, `gap-*` reducidos, `mb-2→mb-1`, `mt-3→mt-2
+sm:mt-3`) más borrar «— Central de Abastos Digital» del copyright: **cero JavaScript,
+cero estado, cero listeners**, y `git diff <commit rojo> HEAD -- footer.tsx` sale
+**vacío**. El listener del carrito vive en `cart-drawer.tsx` y `layout.tsx` lo monta
+**como hermano** del footer. Lo que fallaba era el test: usaba como señal de apertura el
+texto «🔥 Restaurantes también compran», que **solo se pinta con el carrito no vacío**,
+de modo que **dos condiciones compartían una señal**; y como el evento es un **toggle**,
+despachar a ciegas podía cerrar el drawer que el intento anterior acababa de abrir. El
+bucle oscilaba y su error final acusaba al drawer tanto si no había abierto como si el
+carrito aún no había hidratado. **La señal correcta ya existía y se estaba ignorando**:
+el drawer se **desmonta** al cerrar (`if (!isOpen) return null`), así que el propio
+`role="dialog"` es su señal de apertura. Verificación: el spec completo
+`e2e/checkout-drawer.spec.ts` en **26/26**, con el **mismo `footer.tsx`** de la corrida
+roja.
+
+**Tres lecciones, todas de la misma familia — un instrumento que dice medir y no mide.**
+1. **`next build` typechea, y el `webServer` del e2e corre `build:e2e` = `next build`.**
+   Un solo error de `tsc` **mata el run entero de Playwright antes del primer test**
+   (`Failed to type check.` → `Process from config.webServer was not able to start`).
+   Y **`vitest` no typechea**: un contrato nuevo puede estar verde en vitest y romper el
+   e2e. De ahí que `verify` empiece por el typecheck — y de ahí la disciplina de correr
+   `npm run typecheck` **antes** de cualquier Playwright.
+2. **Un tipo más estrecho que su fuente es un lugar donde esconder un caso.**
+   `crmProspect()` devuelve la fila **ya tipada**, pero el `CHECK` asimétrico permite que
+   la base traiga un motivo fuera del vocabulario o sin la columna. Escribir esos casos
+   **obliga a castear**, y **el casteo es la prueba de que el tipo no se ensanchó** para
+   tapar el hueco.
+3. **Un componente que se desmonta al cerrar es su propia señal de apertura**, y un
+   evento **toggle** exige un reintento **idempotente**. Esperar un texto del contenido
+   conflaciona «no abrió» con «todavía no tiene datos»; esperar el `role="dialog"` no.
+
+**Cierre medido.** `npm run verify` en verde: typecheck, lint, **376 archivos de test /
+6,529 pruebas**, `knip` exit 0 — desde los 374 / 6,505 de la Ronda 25, es decir
+**+2 archivos y +24 pruebas, exactamente los dos contratos nuevos** (14 + 10). El
+fortalecimiento no encendió ninguna capacidad: Wallet sigue en 501, POS sigue
+`implemented: false`, el cron sigue fail-closed sin su secreto. Lo único que cambió es
+**lo que el repo sabe sobre sí mismo**. Sin commit: el árbol sigue siendo del usuario.
 
 ## Agentes de mantenimiento por dominio
 

@@ -389,7 +389,7 @@ flujos de escritura reales (`admin-productos.spec.ts`,
 | 6 | **Facturación CFDI no existe** | Bloquea al restaurantero que necesita factura | grep sin resultados; `invoice_submissions` son créditos |
 | 7 | **CRM con ciclo de retroalimentación roto** | El CRM no puede atribuir ni aprender | `CRM1`–`CRM6` de la Ronda 18 |
 | 8 | **Huecos de auditoría admin** | ✅ **Resuelto (Ronda 20)**: un solo libro, `admin_audit_log` | excepción de `bump-affinity` más estrecha que la ruta; dos feeds paralelos |
-| 9 | **Accesibilidad incompleta fuera de rutas públicas** | Riesgo legal y de uso en el móvil | `CX1`–`CX9`, `A14`–`A17` de la Ronda 13 |
+| 9 | **Accesibilidad incompleta fuera de rutas públicas** | ✅ **Resuelto (Ronda 23)**: `CX1`–`CX9` y `A14`/`A15` cerradas; `A17` queda 🟡 por decisión escrita (25 botones en cero, 193 campos medidos y sin aprobar) | `CX1`–`CX9`, `A14`–`A17` de la Ronda 13 |
 | 10 | **Repartidores parcial + Wallet sin certificados** | Dos superficies que prometen más de lo que entregan | `repartidores/page.tsx` (180), Apple 501 |
 
 ### Lectura estratégica
@@ -734,3 +734,94 @@ que calla (Oleada C), un nombre que hace dos trabajos (Oleada D) y ahora **una
 lista que no declara su borde**. La reparación es la misma en las cuatro y
 ninguna cambió el comportamiento visible de las 54 superficies: **escribir el
 límite donde se pueda verificar.**
+
+---
+
+## 12. Estado tras la Ronda 25 — el fortalecimiento, medido
+
+El plan de fortalecimiento declaró **23 trabajos en cinco oleadas**. Ejecutados,
+**17**. Lo que queda no es deuda de código: son **dos decisiones de producto**,
+**seis deudas de tercero** y **una investigación que espera datos**.
+
+| Oleada | Qué atacaba | Trabajos | Estado |
+|---|---|---|---|
+| **A** | La accesibilidad del panel | 7 de 7 | ✅ Ronda 23 |
+| **B** | El bug que solo aparecía en el móvil | 3 de 3 | ✅ Ronda 23 |
+| **C** | La memoria del CRM | 3 de 5 | 🟡 `CRM4`, `CRM6` |
+| **D** | El POS que se ofrece y no existe | 2 de 2 | ✅ Ronda 23 |
+| **E** | Lo bloqueado por un tercero | 0 de 6 | 🔜 con nombre y precio (Ronda 25) |
+
+**La Oleada E no se ejecutó, y ese es el resultado correcto:** no estaba en
+nuestras manos. Lo que la Ronda 25 cambió es que dejó de ser una incógnita
+—«bloqueado por un tercero»— y pasó a ser una **lista con nombre, precio y orden
+de ataque** (ver `docs/CREDENCIALES.md`). Un bloqueo del que ya se sabe dónde se
+compra no es un bloqueo: es una decisión de gasto.
+
+### Lo que se movió, medido
+
+| | Archivos de test | Pruebas | knip |
+|---|---|---|---|
+| Al escribir el plan (tras la Ronda 22) | 362 | 6,349 | 0 |
+| **Tras la Ronda 25** | **374** | **6,505** | **0** |
+
+**+12 archivos y +156 pruebas**, casi todas contratos nuevos sobre superficies
+que hasta ahora no tenían ninguno: contraste del panel, paleta latente, `seller_id`,
+RLS declarada, previsión del CRM, límites de bitácora, etiquetas de FoodOS y la
+guía de credenciales. Y el arnés de e2e pasó de **10 rojos en 5m32s** a **11
+passed en 1,4 min** sobre `next build` + `next start`.
+
+### Las diez debilidades de §6, hoy
+
+| # | Debilidad | Estado |
+|---|---|---|
+| 1 | El dinero no llega al restaurante (Connect apagado) | 🔜 **prerequisito de código cerrado**; falta Stripe y piloto |
+| 2 | POS sin implementar y sin impresión térmica | 🟡 fuera de Diamante; los adaptadores siguen `implemented:false` |
+| 3 | El valor concentrado en Diamante | 🟡 dos capacidades bajaron a Oro; la escalera sigue apoyándose en una recompra previa |
+| 4 | Admin todo-o-nada | ✅ Ronda 20 |
+| 5 | El panel sin tests de superficie | ✅ Ronda 20 |
+| 6 | Facturación CFDI no existe | 🔜 con PAC, costo y el slice no bloqueado |
+| 7 | CRM con ciclo de retroalimentación roto | 🟡 4 de 6 |
+| 8 | Huecos de auditoría admin | ✅ Ronda 20 |
+| 9 | Accesibilidad incompleta fuera de rutas públicas | ✅ Ronda 23 |
+| 10 | Repartidores parcial + Wallet sin certificados | 🔜 con el camino barato (Google) y el bloqueo de firma (Apple) |
+
+**Cuatro cerradas, dos a medias, cuatro abiertas** — y las cuatro abiertas
+comparten una propiedad que conviene nombrar: **ninguna es deuda de código**.
+Tres esperan una compra o una decisión de producto, y una espera un piloto.
+
+### Lo que queda, clasificado
+
+| Grupo | Qué | Por qué no se cierra midiendo |
+|---|---|---|
+| **Decisión** | `CRM6` — el motivo de pérdida no es retroactivo | Se cierra **declarando**, como `CRM5`, no construyendo un backfill |
+| **Decisión** | `CRM4` — la atribución de uso salió de grep | Aceptar y declarar, o construir un detector que resista el nombre en runtime |
+| **Datos** | `E10` — qué mata el paso de e2e en CI | La sonda **ya existe** (`PROGRESS_EVERY` en `e2e/global-setup.ts`); espera la próxima corrida |
+| **Investigación** | `E11` — qué originó el primer rojo | El candidato no se ha aislado |
+| **Tercero** | `AU1`, `AU2`, `AU6`, Wallet | `docs/CREDENCIALES.md` §1–§5 |
+
+### Dos filas que se quedaron mintiendo
+
+La medición de esta ronda encontró que **dos filas describían un estado que ya no
+existía**, del mismo tipo que las que la Ronda 23 desmintió:
+
+- La **debilidad #9 de §6** seguía listada como abierta cuando sus nueve filas
+  `CX1`–`CX9` y `A14`/`A15` estaban cerradas desde la Ronda 23. Un lector que
+  audite leyendo el documento —el error que la Ronda 19 cometió— volvía a
+  concluir que había deuda de accesibilidad. **Corregida aquí.**
+- La fila **`AU10`** del backlog seguía diciendo que se sumaba «al backlog de
+  accesibilidad **ya abierto**», y ese backlog está cerrado. Su mitad real —la
+  cobertura e2e desigual y sin autenticar— sigue abierta, y ahora tiene camino
+  sin comprar nada. **Corregida aquí.**
+
+`A17` **no** se marca ✅: su 🟡 es una decisión escrita —25 botones congelados en
+cero, 193 campos medidos y **sin** aprobar— y marcarlo cerrado sería la mentira
+contraria.
+
+**Lo que la Ronda 25 deja como método.** El tramo entero tiene una sola forma:
+**hacer que el instrumento diga lo que no ve.** Cinco instrumentos que mentían
+(Ronda 23), tres silencios del esquema (Oleada C), un nombre haciendo dos
+trabajos (Oleada D), una lista sin borde (Ronda 24) y ahora **dos filas que
+sobrevivieron a su propia deuda**. Ninguna de las cinco reparaciones cambió el
+comportamiento visible de las 54 superficies, y las cuatro debilidades que siguen
+abiertas no se cierran con código: se cierran **comprando, decidiendo o
+esperando**.

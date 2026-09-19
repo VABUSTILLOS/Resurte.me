@@ -224,18 +224,31 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
 
     // Abre el cart drawer (toggle del mismo evento que usa MobileCartBar).
+    //
+    // La señal de apertura es el **propio diálogo**, no un texto de su
+    // contenido: `CartDrawer` devuelve `null` cuando está cerrado
+    // (`cart-drawer.tsx`), así que el `role="dialog"` solo existe abierto. El
+    // aviso de cross-sell que se usaba antes ("🔥 Restaurantes también compran")
+    // solo se pinta con el carrito **no vacío** (`cart.items.length > 0`), así
+    // que servía de señal para dos cosas distintas: cuando faltaba, el bucle no
+    // sabía si el drawer no había abierto o si el carrito aún no había hidratado
+    // de `localStorage` — y el error final acusaba al drawer en ambos casos.
+    //
+    // Y el reintento es **idempotente**: el evento es un *toggle*, así que
+    // despachar a ciegas podía cerrar el drawer que el intento anterior acababa
+    // de abrir (el bucle oscilaba y podía terminar en cerrado). Ahora solo se
+    // despacha si se observa cerrado.
+    const cartDrawer = page.getByRole("dialog", { name: "Mi Carrito" })
     const restaurantsHint = page.getByText("🔥 Restaurantes también compran")
-    let cartDrawerOpen = false
-    for (let i = 0; i < 6 && !cartDrawerOpen; i++) {
+    for (let i = 0; i < 6; i++) {
+      if (await cartDrawer.isVisible()) break
       await page.evaluate((evt) => window.dispatchEvent(new Event(evt)), CART_DRAWER_EVENT)
-      try {
-        await expect(restaurantsHint).toBeVisible({ timeout: 1000 })
-        cartDrawerOpen = true
-      } catch {
-        // reintenta hasta que el listener de React esté registrado
-      }
+      await cartDrawer.waitFor({ state: "visible", timeout: 1000 }).catch(() => {})
     }
-    if (!cartDrawerOpen) throw new Error("No se pudo abrir el cart drawer")
+    await expect(cartDrawer).toBeVisible()
+    // El carrito viene sembrado en `localStorage`, así que el aviso depende de
+    // la hidratación del store, no de la red: se le da su propia espera.
+    await expect(restaurantsHint).toBeVisible({ timeout: 5000 })
 
     // BumpCards montado en el cross-sell del drawer: 2 tarjetas simultáneas.
     const guacamoleCard = page.getByRole("button", { name: /Guacamole preparado/ })

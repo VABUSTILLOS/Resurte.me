@@ -83,6 +83,16 @@ export function isCrmClosed(status: CrmStatus): boolean {
  *
  * Los siete son los que salieron de la cartera real: los cuatro primeros son
  * decisión del cliente, los tres últimos son del proveedor o del mercado.
+ *
+ * **El denominador de cualquier métrica por motivo es parcial, y el hueco es
+ * histórico.** `crm_prospects.loss_reason` es nullable y el `CHECK` de `00184`
+ * lo permite a propósito: las filas que ya estaban en `perdido` cuando entró
+ * esa migración no tienen motivo, y no se les puede inventar uno sin escribir
+ * un dato falso. Desde entonces la única ruta que escribe la columna es
+ * `crmClosePatch`, que **lanza** si falta el motivo, así que el hueco no crece:
+ * se queda en lo anterior a `00184`. Una métrica por motivo divide, por tanto,
+ * sobre los perdidos **con** motivo —nunca sobre todos— y debe decir su cobertura.
+ * `src/lib/crm-loss-reason.contract.test.ts` lo hace falsable.
  */
 export const CRM_LOSS_REASONS = [
   "precio",
