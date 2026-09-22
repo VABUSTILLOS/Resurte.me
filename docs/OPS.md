@@ -1472,6 +1472,139 @@ esas piezas se pierde.
 
 ---
 
+## 13. RLS real de las 24 tablas declaradas (medido el 22-sep-2026)
+
+### Por qué existe esta sección
+
+La fila `CRM3` quedó a medias **por construcción**, no por falta de trabajo:
+`src/lib/rls-declared.contract.test.ts` congela `MODELO_DE_ACCESO`, un registro
+de las **24 tablas de `public` con RLS encendida y cero políticas**
+(deny-by-default), cada una con el archivo que demuestra quién la lee. Ese
+contrato comprueba la **declaración**; no puede comprobar la base —no tiene
+conexión y corre en el mismo `npm test` que todo lo demás, sin Supabase
+delante. Un registro puede ser impecable y la base no parecerse a él.
+
+Lo que faltaba era medir la base **una vez, a mano**, y dejar el resultado
+escrito con fecha. Es lo mismo que se hizo con la migración `00165`, y por el
+mismo motivo: hay una pregunta —«¿el RLS que declaro es el RLS que hay?»— que
+ningún test estático puede responder y que no se debe responder de memoria.
+
+### Cómo se mide
+
+Canal privilegiado: PostgREST no expone `pg_class` ni `pg_policies`
+(`406 PGRST106`), así que hace falta la Management API (§9). El token está en el
+keychain, así que no hay que pegarlo en ningún archivo:
+
+```bash
+TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+curl -s -X POST \
+  "https://api.supabase.com/v1/projects/isogthougrpctnfzcdes/database/query" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d @- <<'JSON'
+{"query":"select c.relname as tabla, c.relrowsecurity as rls, (select count(*) from pg_policies p where p.schemaname = 'public' and p.tablename = c.relname) as politicas from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind = 'r' order by c.relname"}
+JSON
+```
+
+El resultado sale como JSON: una fila por tabla de `public`, con `rls` (el
+`relrowsecurity` real, no el que declara la migración) y `politicas` (el conteo
+real en `pg_policies`). Una tabla con `rls: true` y `politicas: 0` es
+deny-by-default **de verdad**, que es exactamente lo que el registro afirma de
+sus 24.
+
+### Qué salió (22-sep-2026)
+
+**111 tablas en `public`; 25 con cero políticas; 1 con RLS apagada.** Las tres
+cifras encajan con el registro, sin sobrar ni faltar nada:
+
+- De las 25 con cero políticas, **24 son las declaradas** y la 25 es
+  `spatial_ref_sys` (PostGIS, RLS apagada, ver más abajo).
+- Las 24 declaradas dieron, una por una, `rls = true` y `politicas = 0`. Cero
+  excepciones, cero tablas declaradas con RLS apagada, cero entradas muertas
+  (ninguna declarada tiene ya políticas).
+- El conjunto que miden las migraciones y el que mide la base **coinciden
+  exactamente**, en las dos direcciones: 24 = 24, sin diferencia simétrica.
+
+Y el conteo de tablas también cuadra: **110 `CREATE TABLE` en las migraciones +
+`spatial_ref_sys` (que no está en ninguna migración, la crea PostGIS) = 111**.
+
+#### La evidencia declarada, comprobada archivo por archivo
+
+No basta con que la base cuadre: cada entrada del registro nombra un archivo, y
+ese archivo tiene que existir **y seguir demostrando el acceso** (usar
+`createServiceClient()` y nombrar la tabla). Las 23 entradas que nombran un
+archivo —que se reparten en 11 archivos distintos— pasan las dos cosas:
+
+| Tablas del registro | Archivo declarado | ¿Existe? | ¿`createServiceClient()`? |
+| --- | --- | --- | --- |
+| `bump_affinity` | `src/app/api/admin/bump-affinity/route.ts` | sí | sí |
+| `bump_rules` | `src/app/api/admin/bump-rules/route.ts` | sí | sí |
+| `commission_adjustments` | `src/app/api/admin/comisiones/[id]/adjustments/route.ts` | sí | sí |
+| `commission_periods` | `src/app/api/admin/comisiones/route.ts` | sí | sí |
+| `delivery_drivers` | `src/app/api/admin/drivers/route.ts` | sí | sí |
+| `email_logs` | `src/app/api/admin/email-logs/route.ts` | sí | sí |
+| `foodos_payouts` | `src/app/api/admin/foodos/payouts/route.ts` | sí | sí |
+| `order_upsells` | `src/app/api/admin/funnel/route.ts` | sí | sí |
+| `product_suppliers`, `suppliers` | `src/app/api/admin/suppliers/route.ts` | sí | sí |
+| `geo_panel_checks` | `src/app/admin/seo-ia/actions.ts` | sí | sí |
+| `crm_quick_replies`, `crm_sequence_enrollments`, `crm_sequence_steps`, `crm_sequences`, `crm_tasks`, `leads`, `whatsapp_automation_sends`, `whatsapp_catalog_items`, `whatsapp_catalogs`, `whatsapp_sync_items`, `whatsapp_sync_queue`, `whatsapp_sync_runs` (12) | `src/app/admin/actions.ts` | sí | sí |
+| `rate_limits` | RPC `consume_rate_limit`, llamada desde `src/lib/rate-limit.ts` | sí | sí |
+
+`rate_limits` es el único del registro que no se toca con un `.from()`: se
+consume por la RPC `consume_rate_limit`. Comprobado en la misma sesión, porque
+la entrada del registro lo afirma y era el punto más fácil de que se quedara
+viejo:
+
+```json
+[{"proname":"consume_rate_limit","args":"p_key text, p_limit integer, p_window_seconds integer",
+  "proacl":"postgres=X/postgres|service_role=X/postgres",
+  "anon_exec":false,"auth_exec":false,"svc_exec":true}]
+```
+
+Es decir: `anon` y `authenticated` **no** pueden ejecutarla, `service_role` sí, y
+no queda la entrada `=X` (PUBLIC) que haría inerte el `REVOKE` de `00165`. Si esa
+RPC estuviera abierta, `rate_limits` dejaría de ser deny-by-default por la puerta
+de atrás y el registro estaría describiendo un modelo de acceso que no existe.
+
+### `spatial_ref_sys`: RLS apagada, y no es una discrepancia
+
+Es la **única** tabla de `public` con `relrowsecurity = false`, y no entra en el
+perímetro del registro por una razón de forma: el registro se construye barriendo
+`supabase/migrations/*.sql`, y `spatial_ref_sys` **no está en ninguna migración**
+—la crea la extensión PostGIS, con dueño y grantor `supabase_admin`—. Tampoco
+puede arreglarse desde una migración: `ENABLE ROW LEVEL SECURITY` devuelve `42501`
+y el `REVOKE` es un no-op silencioso. Es un límite **conocido, aceptado y ya
+documentado** en la cabecera de `src/lib/rls-coverage.contract.test.ts`, que lo
+excluye por nombre en `RLS_EXEMPT`. Esta medición lo confirma en vivo (dueño
+`supabase_admin`, extensión `postgis`, `=r/supabase_admin` para PUBLIC) y no
+cambia nada.
+
+### Veredicto: cero discrepancias
+
+No hubo que corregir ninguna entrada del registro por una discrepancia, ni
+tocar la base. Lo medido coincide con lo declarado en los tres ejes:
+
+1. Las 24 tablas declaradas tienen RLS encendida y cero políticas.
+2. Ninguna tabla con políticas quedó declarada como «sin políticas».
+3. Ninguna entrada apunta a un archivo inexistente o que ya no demuestre el
+   acceso.
+
+El único cambio en el registro fue **añadir el archivo a la entrada de
+`rate_limits`**, que era la única que describía el mecanismo sin nombrar dónde
+vive. No era un defecto —la entrada era cierta— pero era la única entrada que un
+lector no podía seguir hasta un archivo, y el propio contrato declara que cada
+entrada lleva el archivo que demuestra el acceso.
+
+### Cuándo hay que repetir esto
+
+No en cada commit: es una medición **fechada**, y lo que la mantiene viva es el
+contrato estático. Hay que repetirla cuando cambie el perímetro (una tabla nueva
+con RLS y sin políticas), cuando se añada una política a una de las 24, o antes
+de una auditoría. Lo que **no** hay que hacer es deducir el estado de la base
+leyendo el registro: el registro dice lo que el repo pretende, no lo que la base
+tiene.
+
+---
+
 ## Referencias
 
 - `vercel.json` (crons + headers de seguridad), `src/app/api/cron/*`, `src/app/api/workflows/*`, `src/app/api/foodos/campaigns/run`.

@@ -131,7 +131,7 @@ export function ActivityFormModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <FieldLabel>Tipo</FieldLabel>
-            <Select value={type} onChange={(e) => setType(e.target.value as ActivityType)}>
+            <Select aria-label="Tipo" value={type} onChange={(e) => setType(e.target.value as ActivityType)}>
               {ACTIVITY_TYPES.map((t) => (
                 <option key={t} value={t}>
                   {ACTIVITY_TYPE_LABEL[t]}
@@ -142,6 +142,7 @@ export function ActivityFormModal({
           <div>
             <FieldLabel>Dirección</FieldLabel>
             <Select
+              aria-label="Dirección"
               value={direction}
               onChange={(e) => setDirection(e.target.value as ActivityDirection)}
             >
@@ -153,7 +154,7 @@ export function ActivityFormModal({
 
         <div>
           <FieldLabel>Resultado</FieldLabel>
-          <Select value={outcome} onChange={(e) => setOutcome(e.target.value)}>
+          <Select aria-label="Resultado" value={outcome} onChange={(e) => setOutcome(e.target.value)}>
             <option value="">— Sin seleccionar —</option>
             {ACTIVITY_OUTCOMES.map((o) => (
               <option key={o} value={o}>
@@ -167,6 +168,7 @@ export function ActivityFormModal({
           <div>
             <FieldLabel>Duración (minutos)</FieldLabel>
             <Input
+              aria-label="Duración (minutos)"
               type="number"
               min="0"
               value={duration}
@@ -179,6 +181,7 @@ export function ActivityFormModal({
         <div>
           <FieldLabel>Resumen / notas</FieldLabel>
           <TextArea
+            aria-label="Resumen / notas"
             rows={3}
             value={summary}
             onChange={(e) => setSummary(e.target.value)}

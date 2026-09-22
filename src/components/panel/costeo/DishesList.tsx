@@ -37,6 +37,7 @@ export default function DishesList({
                   type="checkbox"
                   checked={selectedIds.has(dish.id)}
                   onChange={() => onToggleSelect(dish.id)}
+                  aria-label={`Seleccionar ${dish.name}`}
                   className="w-4 h-4 rounded accent-[#0E7A0E] cursor-pointer shrink-0"
                 />
                 <h4 className="font-bold text-gray-900 truncate">{dish.name}</h4>

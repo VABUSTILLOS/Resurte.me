@@ -174,6 +174,7 @@ export default function CombosSection({
                         type="checkbox"
                         checked={!!selected}
                         onChange={() => toggleComboDish(dish.id, dish.name)}
+                        aria-label={`Incluir ${dish.name} en el combo`}
                         className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
                       />
                       <span className="flex-1 text-sm text-gray-700 truncate">{dish.name}</span>

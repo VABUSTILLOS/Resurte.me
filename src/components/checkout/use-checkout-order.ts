@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, type Dispatch, type SetStateAction } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { PUBLIC_ADDRESSES_SELECT } from "@/lib/sensitive-columns"
 import { AnalyticsEvents } from "@/lib/analytics"
 import type { Address, City, PaymentMethod, CartItem, RepurchaseCouponInfo } from "@/types"
 import {
@@ -114,9 +115,13 @@ async function fetchOwnAddresses(): Promise<Address[]> {
   // / `is_default` / `last_used_at` (00117/00050 pendientes), PostgREST
   // devuelve error y se reintenta con el orden clásico: la preselección se
   // recalcula igual en el cliente con `pickPreferredAddress`.
+  // Columnas explícitas (00195): `select("*")` pediría también `guest_token`,
+  // que ya no está concedido a `anon` ni a `authenticated`. PostgREST expande
+  // `*` a todas las columnas de su caché y falla la consulta entera con
+  // `42501`, así que la lista vacía de hoy se volvería un error.
   const preferred = await supabase
     .from("addresses")
-    .select("*")
+    .select(PUBLIC_ADDRESSES_SELECT)
     .is("deleted_at", null)
     .order("is_default", { ascending: false })
     .order("last_used_at", { ascending: false })
@@ -124,7 +129,7 @@ async function fetchOwnAddresses(): Promise<Address[]> {
 
   const legacy = await supabase
     .from("addresses")
-    .select("*")
+    .select(PUBLIC_ADDRESSES_SELECT)
     .order("created_at", { ascending: false })
   if (legacy.error) return []
   return ((legacy.data ?? []) as Address[]).filter((a) => !a.deleted_at)

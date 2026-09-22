@@ -60,27 +60,27 @@ export default function AddEditModal({
         </div>
         <div className="space-y-3">
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Nombre</label>
-            <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)}
+            <label htmlFor="inv-name" className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Nombre</label>
+            <input type="text" id="inv-name" value={formName} onChange={(e) => setFormName(e.target.value)}
               placeholder="Ej: Harina de trigo"
               className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#0E7A0E]" autoFocus />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Stock actual</label>
-              <input type="number" value={formStock} onChange={(e) => setFormStock(e.target.value)} min="0"
+              <label htmlFor="inv-stock" className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Stock actual</label>
+              <input type="number" id="inv-stock" value={formStock} onChange={(e) => setFormStock(e.target.value)} min="0"
                 className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#0E7A0E]" />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Stock mínimo</label>
-              <input type="number" value={formMinStock} onChange={(e) => setFormMinStock(e.target.value)} min="1"
+              <label htmlFor="inv-min-stock" className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Stock mínimo</label>
+              <input type="number" id="inv-min-stock" value={formMinStock} onChange={(e) => setFormMinStock(e.target.value)} min="1"
                 className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#0E7A0E]" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Unidad</label>
-              <select value={formUnit} onChange={(e) => setFormUnit(e.target.value)}
+              <label htmlFor="inv-unit" className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Unidad</label>
+              <select id="inv-unit" value={formUnit} onChange={(e) => setFormUnit(e.target.value)}
                 className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#0E7A0E]">
                 <option value="kg">kg</option>
                 <option value="g">g</option>
@@ -93,16 +93,16 @@ export default function AddEditModal({
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Precio por unidad</label>
-              <input type="number" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} min="0" step="0.01"
+              <label htmlFor="inv-price" className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Precio por unidad</label>
+              <input type="number" id="inv-price" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} min="0" step="0.01"
                 className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#0E7A0E]" />
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">
+            <label htmlFor="inv-category" className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">
               Categoría <span className="text-gray-300">(opcional)</span>
             </label>
-            <input type="text" value={formCategory} onChange={(e) => setFormCategory(e.target.value)}
+            <input type="text" id="inv-category" value={formCategory} onChange={(e) => setFormCategory(e.target.value)}
               placeholder="Ej: Lácteos"
               className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#0E7A0E]" />
           </div>

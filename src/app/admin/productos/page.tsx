@@ -5636,6 +5636,7 @@ function AdminProductsContent() {
                       <input
                         value={draft.seo_title}
                         maxLength={SEO_TITLE_MAX}
+                        aria-label="Título SEO"
                         onChange={(e) =>
                           setSeoProposals((prev) =>
                             prev.map((p) =>
@@ -5661,6 +5662,7 @@ function AdminProductsContent() {
                         value={draft.seo_description}
                         maxLength={SEO_DESCRIPTION_MAX}
                         rows={2}
+                        aria-label="Descripción SEO"
                         onChange={(e) =>
                           setSeoProposals((prev) =>
                             prev.map((p) =>

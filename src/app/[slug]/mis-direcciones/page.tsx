@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import { useCity } from "@/contexts/city-context"
 import { createClient } from "@/lib/supabase/client"
+import { PUBLIC_ADDRESSES_SELECT } from "@/lib/sensitive-columns"
 import type { Address } from "@/types"
 import {
   ArrowLeft,
@@ -51,9 +52,13 @@ type AddressClient = NonNullable<ReturnType<typeof createClient>>
  * memoria, para no dejar la página vacía.
  */
 async function fetchActiveAddresses(client: AddressClient): Promise<Address[]> {
+  // Columnas explícitas (00195): `select("*")` pediría también `guest_token`,
+  // que ya no está concedido a `anon` ni a `authenticated`. PostgREST expande
+  // `*` a todas las columnas de su caché y falla la consulta entera con
+  // `42501`, así que la lista vacía de hoy se volvería un error.
   const preferred = await client
     .from("addresses")
-    .select("*")
+    .select(PUBLIC_ADDRESSES_SELECT)
     .is("deleted_at", null)
     .order("is_default", { ascending: false })
     .order("last_used_at", { ascending: false })
@@ -61,7 +66,7 @@ async function fetchActiveAddresses(client: AddressClient): Promise<Address[]> {
 
   const legacy = await client
     .from("addresses")
-    .select("*")
+    .select(PUBLIC_ADDRESSES_SELECT)
     .order("created_at", { ascending: false })
   if (legacy.error) return []
   return ((legacy.data ?? []) as Address[]).filter((a) => !a.deleted_at)

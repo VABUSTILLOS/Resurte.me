@@ -196,6 +196,7 @@ export function ProofSection({ orderId, proofPath, status, onChanged }: Props) {
             id={`proof-file-${orderId}`}
             type="file"
             accept={DELIVERY_PROOF_ACCEPT_ATTR}
+            aria-label="Comprobante de entrega"
             disabled={busy}
             onChange={(e) => {
               const file = e.target.files?.[0]

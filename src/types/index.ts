@@ -339,8 +339,17 @@ export interface OrderWithCashback {
   total: number
   payment_method: PaymentMethod | null
   payment_status: PaymentStatus
-  stripe_payment_intent_id: string | null
-  stripe_checkout_session_id: string | null
+  /**
+   * Identificadores de Stripe del cobro.
+   *
+   * Opcionales desde `00195`: se revocaron de `anon` y de `authenticated`, así
+   * que ninguna lectura con la llave pública ni con el cliente de sesión los
+   * trae —solo `service_role` (`src/lib/payments.ts`,
+   * `src/lib/stripe-webhook-handlers.ts`)—. Están aquí porque describen la fila
+   * de `orders`; quien los lea tiene que venir con el cliente de servicio.
+   */
+  stripe_payment_intent_id?: string | null
+  stripe_checkout_session_id?: string | null
   scheduled_for: string | null
   source: 'web' | 'whatsapp'
   cashback_credits: number | null

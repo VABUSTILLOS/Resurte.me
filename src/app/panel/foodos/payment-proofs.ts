@@ -20,6 +20,7 @@
 
 import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { createServiceClient } from "@/lib/supabase/service"
+import { PUBLIC_FOODOS_ORDER_PAYMENTS_SELECT } from "@/lib/sensitive-columns"
 import { notifyFoodosCustomer } from "@/lib/foodos-notifications"
 import { revalidatePath } from "next/cache"
 import { after } from "next/server"
@@ -50,7 +51,11 @@ export async function listPendingPaymentProofs(
 
   const { data: proofs, error } = await ctx.client
     .from("foodos_order_payments")
-    .select("*")
+    // Columnas explícitas (00195): `reviewed_by` (auditoría interna) ya no está
+    // concedida a `authenticated`, y con `select("*")` PostgREST fallaría la
+    // consulta entera con `42501`. La escritura de esa columna sigue intacta:
+    // es privilegio de `UPDATE`, no de `SELECT`.
+    .select(PUBLIC_FOODOS_ORDER_PAYMENTS_SELECT)
     .eq("restaurant_id", restaurantId)
     .eq("status", "pending")
     .order("created_at", { ascending: true })

@@ -280,6 +280,7 @@ export function PedidosPage({
             <div>
               <FieldLabel>Cliente *</FieldLabel>
               <Select
+                aria-label="Cliente *"
                 value={selectedClient}
                 onChange={(e) => setSelectedClient(e.target.value)}
               >
@@ -295,6 +296,7 @@ export function PedidosPage({
             <div>
               <FieldLabel>Dirección de entrega *</FieldLabel>
               <Select
+                aria-label="Dirección de entrega *"
                 value={selectedAddress}
                 onChange={(e) => setSelectedAddress(e.target.value)}
                 disabled={!selectedClient}
@@ -363,6 +365,7 @@ export function PedidosPage({
               <Input
                 className="pl-9"
                 placeholder="Buscar producto del catálogo… (ej. tortilla, carne, jitomate)"
+                aria-label="Buscar producto del catálogo"
                 value={productQuery}
                 onChange={(e) => setProductQuery(e.target.value)}
               />
@@ -454,7 +457,7 @@ export function PedidosPage({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <FieldLabel>Método de pago</FieldLabel>
-              <Select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+              <Select aria-label="Método de pago" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
                 {PAYMENT_METHODS.map((m) => (
                   <option key={m.value} value={m.value}>
                     {m.label}
@@ -465,6 +468,7 @@ export function PedidosPage({
             <div>
               <FieldLabel>Nota para el pedido</FieldLabel>
               <Input
+                aria-label="Nota para el pedido"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Ej. Entregar antes de las 10 am"

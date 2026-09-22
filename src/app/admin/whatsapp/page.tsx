@@ -846,8 +846,9 @@ export default function AdminWhatsAppPage() {
           {/* Alta manual */}
           <form onSubmit={handleCreateTemplate} className="flex flex-wrap items-end gap-2 mb-4">
             <div>
-              <label className="block text-[11px] font-semibold text-[#242529] mb-1">Nombre</label>
+              <label htmlFor="tpl-name" className="block text-[11px] font-semibold text-[#242529] mb-1">Nombre</label>
               <input
+                id="tpl-name"
                 value={tplName}
                 onChange={(e) => setTplName(e.target.value)}
                 placeholder="mi_plantilla"
@@ -855,8 +856,9 @@ export default function AdminWhatsAppPage() {
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-[#242529] mb-1">Tipo</label>
+              <label htmlFor="tpl-type" className="block text-[11px] font-semibold text-[#242529] mb-1">Tipo</label>
               <select
+                id="tpl-type"
                 value={tplType}
                 onChange={(e) => setTplType(e.target.value)}
                 className="px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
@@ -870,8 +872,9 @@ export default function AdminWhatsAppPage() {
               </select>
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-[#242529] mb-1">Idioma</label>
+              <label htmlFor="tpl-lang" className="block text-[11px] font-semibold text-[#242529] mb-1">Idioma</label>
               <input
+                id="tpl-lang"
                 value={tplLang}
                 onChange={(e) => setTplLang(e.target.value)}
                 className="w-24 px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
@@ -1270,8 +1273,9 @@ export default function AdminWhatsAppPage() {
           </p>
           <form onSubmit={handleSaveCreds} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[#242529] mb-1">Phone Number ID</label>
+              <label htmlFor="wa-phone-number-id" className="block text-xs font-semibold text-[#242529] mb-1">Phone Number ID</label>
               <input
+                id="wa-phone-number-id"
                 value={credsPhoneId}
                 onChange={(e) => setCredsPhoneId(e.target.value)}
                 placeholder="p. ej. 1234567890"
@@ -1279,8 +1283,9 @@ export default function AdminWhatsAppPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#242529] mb-1">WABA ID</label>
+              <label htmlFor="wa-waba-id" className="block text-xs font-semibold text-[#242529] mb-1">WABA ID</label>
               <input
+                id="wa-waba-id"
                 value={credsWabaId}
                 onChange={(e) => setCredsWabaId(e.target.value)}
                 placeholder="p. ej. 9876543210"
@@ -1288,8 +1293,9 @@ export default function AdminWhatsAppPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#242529] mb-1">Catalog ID de Meta</label>
+              <label htmlFor="wa-catalog-id" className="block text-xs font-semibold text-[#242529] mb-1">Catalog ID de Meta</label>
               <input
+                id="wa-catalog-id"
                 value={credsCatalogId}
                 onChange={(e) => setCredsCatalogId(e.target.value)}
                 placeholder="p. ej. 555666777"
@@ -1297,10 +1303,11 @@ export default function AdminWhatsAppPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#242529] mb-1">
+              <label htmlFor="wa-display-phone" className="block text-xs font-semibold text-[#242529] mb-1">
                 Número público <span className="font-normal text-[#B0B3B8]">(para enlaces wa.me y QR)</span>
               </label>
               <input
+                id="wa-display-phone"
                 value={credsDisplayPhone}
                 onChange={(e) => setCredsDisplayPhone(e.target.value)}
                 placeholder="p. ej. 614 123 4567"
@@ -1309,10 +1316,11 @@ export default function AdminWhatsAppPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#242529] mb-1">
+              <label htmlFor="wa-access-token" className="block text-xs font-semibold text-[#242529] mb-1">
                 Access token {credsHasToken && <span className="text-[#0E7A0E]">✓ configurado</span>}
               </label>
               <input
+                id="wa-access-token"
                 type="password"
                 value={credsToken}
                 onChange={(e) => setCredsToken(e.target.value)}

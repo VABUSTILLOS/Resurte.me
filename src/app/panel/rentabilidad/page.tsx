@@ -625,6 +625,7 @@ export default function RentabilidadPage() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
+            aria-label={t("rentabilidad.sortLabel")}
             className="text-xs font-semibold text-gray-700 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <option value="name">{t("rentabilidad.sortName")}</option>
@@ -773,6 +774,7 @@ export default function RentabilidadPage() {
                       autoFocus
                       type="number"
                       value={editValue}
+                      aria-label={`${t("rentabilidad.priceLabel")} de ${dish.name}`}
                       onChange={(e) => setEditValue(e.target.value)}
                       onBlur={() => {
                         const newPrice = parseFloat(editValue)

@@ -255,7 +255,7 @@ function BriefingModal({
             </div>
           ))}
         </div>
-        <TextArea rows={10} value={briefing.text} readOnly />
+        <TextArea rows={10} value={briefing.text} aria-label="Briefing generado" readOnly />
         <div className="flex flex-col sm:flex-row gap-2">
           <Button className="flex-1" onClick={shareWhatsApp}>
             <Send className="w-4 h-4" /> Compartir por WhatsApp
@@ -538,6 +538,7 @@ function DraftModal({
         <TextArea
           rows={12}
           value={text || draft.message}
+          aria-label="Mensaje para el prospecto"
           onChange={(e) => setText(e.target.value)}
         />
         {!draft.whatsapp && (

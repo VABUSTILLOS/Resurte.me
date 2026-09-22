@@ -51,6 +51,7 @@ export default function MermaForm({
         <select
           value={selectedCategory}
           onChange={(e) => onCategoryChange(e.target.value)}
+          aria-label="Categoría de la merma"
           className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E] bg-white"
         >
           {WASTE_CATEGORIES.map((cat) => (
@@ -59,9 +60,10 @@ export default function MermaForm({
         </select>
         <div className="flex gap-3">
           <div className="flex-1">
-            <label className="text-xs text-gray-400 mb-1 block">Cantidad (kg)</label>
+            <label htmlFor="merma-amount" className="text-xs text-gray-400 mb-1 block">Cantidad (kg)</label>
             <input
               type="number"
+              id="merma-amount"
               value={amountKg}
               onChange={(e) => onAmountKgChange(e.target.value)}
               placeholder="Ej: 2.5"
@@ -71,9 +73,10 @@ export default function MermaForm({
             />
           </div>
           <div className="flex-1">
-            <label className="text-xs text-gray-400 mb-1 block">Costo por kg ($)</label>
+            <label htmlFor="merma-cost" className="text-xs text-gray-400 mb-1 block">Costo por kg ($)</label>
             <input
               type="number"
+              id="merma-cost"
               value={costPerKg}
               onChange={(e) => onCostPerKgChange(e.target.value)}
               placeholder="Ej: 85"
@@ -103,9 +106,10 @@ export default function MermaForm({
           </div>
         </div>
         <div>
-          <label className="text-xs text-gray-400 mb-1 block">Nota o motivo (opcional)</label>
+          <label htmlFor="merma-note" className="text-xs text-gray-400 mb-1 block">Nota o motivo (opcional)</label>
           <input
             type="text"
+            id="merma-note"
             value={note}
             onChange={(e) => onNoteChange(e.target.value)}
             placeholder="Ej: Se echó a perder por cadena de frío..."
@@ -114,8 +118,9 @@ export default function MermaForm({
         </div>
         {!editingId && inventoryItems.length > 0 && (
           <div>
-            <label className="text-xs text-gray-400 mb-1 block">Descontar de inventario (opcional)</label>
+            <label htmlFor="merma-item" className="text-xs text-gray-400 mb-1 block">Descontar de inventario (opcional)</label>
             <select
+              id="merma-item"
               value={selectedItemId}
               onChange={(e) => onItemChange?.(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E] bg-white"

@@ -426,6 +426,7 @@ export default function AperturaPage() {
                 <input
                   type="date"
                   value={phaseDate}
+                  aria-label={`${phase}: ${t("apertura.targetDate")}`}
                   onChange={(e) => setPhaseDate(phase, e.target.value)}
                   className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#0E7A0E] bg-white"
                 />

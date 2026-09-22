@@ -415,7 +415,15 @@ export interface FoodosOrder {
   status: FoodosOrderStatus
   payment_method: string | null
   payment_status: FoodosPaymentStatus
-  stripe_payment_intent_id: string | null
+  /**
+   * Identificador de Stripe del cobro.
+   *
+   * Opcional desde `00195`: se revocó de `anon` y de `authenticated`, así que
+   * solo lo lee `service_role` (`src/lib/payments.ts`,
+   * `src/lib/reconcile-payments.ts`, `src/lib/stripe-webhook-handlers.ts`). El
+   * panel del dueño lee el pedido sin él.
+   */
+  stripe_payment_intent_id?: string | null
   slug: string | null
   customer_name: string | null
   customer_phone: string | null

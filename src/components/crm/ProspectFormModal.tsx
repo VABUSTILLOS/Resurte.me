@@ -255,6 +255,7 @@ export function ProspectFormModal({
         <div>
           <FieldLabel>Nombre del contacto *</FieldLabel>
           <Input
+            aria-label="Nombre del contacto *"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             placeholder="Ej. María García"
@@ -264,6 +265,7 @@ export function ProspectFormModal({
         <div>
           <FieldLabel>Restaurante</FieldLabel>
           <Input
+            aria-label="Restaurante"
             value={form.restaurant_name}
             onChange={(e) => setForm({ ...form, restaurant_name: e.target.value })}
             placeholder="Ej. Taquería El Fuego"
@@ -274,6 +276,7 @@ export function ProspectFormModal({
           <div>
             <FieldLabel>Teléfono</FieldLabel>
             <Input
+              aria-label="Teléfono"
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
               placeholder="55 1234 5678"
@@ -282,6 +285,7 @@ export function ProspectFormModal({
           <div>
             <FieldLabel>WhatsApp</FieldLabel>
             <Input
+              aria-label="WhatsApp"
               value={form.whatsapp}
               onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
               placeholder="55 1234 5678"
@@ -292,6 +296,7 @@ export function ProspectFormModal({
         <div>
           <FieldLabel>Email</FieldLabel>
           <Input
+            aria-label="Email"
             type="email"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -303,6 +308,7 @@ export function ProspectFormModal({
           <div>
             <FieldLabel>Ciudad</FieldLabel>
             <Select
+              aria-label="Ciudad"
               value={form.city_id}
               onChange={(e) => setForm({ ...form, city_id: e.target.value })}
             >
@@ -317,6 +323,7 @@ export function ProspectFormModal({
           <div>
             <FieldLabel>Estado</FieldLabel>
             <Select
+              aria-label="Estado"
               value={form.status}
               onChange={(e) =>
                 setForm({ ...form, status: e.target.value as ProspectStatus })
@@ -335,6 +342,7 @@ export function ProspectFormModal({
           <div>
             <FieldLabel>Vendedor</FieldLabel>
             <Select
+              aria-label="Vendedor"
               value={form.seller_id}
               onChange={(e) => setForm({ ...form, seller_id: e.target.value })}
             >
@@ -354,6 +362,7 @@ export function ProspectFormModal({
         <div>
           <FieldLabel>Valor previsto del trato</FieldLabel>
           <Input
+            aria-label="Valor previsto del trato"
             type="number"
             min="0"
             step="0.01"
@@ -370,6 +379,7 @@ export function ProspectFormModal({
           <div>
             <FieldLabel>Tier (segmento)</FieldLabel>
             <Select
+              aria-label="Tier (segmento)"
               value={form.tier}
               onChange={(e) => setForm({ ...form, tier: e.target.value })}
             >
@@ -384,6 +394,7 @@ export function ProspectFormModal({
           <div>
             <FieldLabel>Zona de ruta</FieldLabel>
             <Select
+              aria-label="Zona de ruta"
               value={form.zone}
               onChange={(e) => setForm({ ...form, zone: e.target.value })}
             >
@@ -401,6 +412,7 @@ export function ProspectFormModal({
           <div>
             <FieldLabel>Empleados</FieldLabel>
             <Input
+              aria-label="Empleados"
               type="number"
               min="0"
               value={form.employees}
@@ -411,6 +423,7 @@ export function ProspectFormModal({
           <div>
             <FieldLabel>Instagram</FieldLabel>
             <Input
+              aria-label="Instagram"
               value={form.instagram}
               onChange={(e) => setForm({ ...form, instagram: e.target.value })}
               placeholder="@restaurante"
@@ -422,6 +435,7 @@ export function ProspectFormModal({
           <div>
             <FieldLabel>Volumen semanal mín.</FieldLabel>
             <Input
+              aria-label="Volumen semanal mín."
               type="number"
               min="0"
               value={form.weekly_volume_min}
@@ -432,6 +446,7 @@ export function ProspectFormModal({
           <div>
             <FieldLabel>Volumen semanal máx.</FieldLabel>
             <Input
+              aria-label="Volumen semanal máx."
               type="number"
               min="0"
               value={form.weekly_volume_max}
@@ -444,6 +459,7 @@ export function ProspectFormModal({
         <div>
           <FieldLabel>Próximo seguimiento</FieldLabel>
           <Input
+            aria-label="Próximo seguimiento"
             type="datetime-local"
             value={form.next_follow_up_at}
             onChange={(e) => setForm({ ...form, next_follow_up_at: e.target.value })}
@@ -453,6 +469,7 @@ export function ProspectFormModal({
         <div>
           <FieldLabel>Notas</FieldLabel>
           <TextArea
+            aria-label="Notas"
             rows={3}
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}

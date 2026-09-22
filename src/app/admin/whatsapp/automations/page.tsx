@@ -334,6 +334,7 @@ export default function AdminAutomationsPage() {
                   <input
                     type="text"
                     value={auto.templateName}
+                    aria-label="Plantilla de WhatsApp"
                     onChange={(e) =>
                       setAutomations((prev) =>
                         prev.map((a) => (a.type === auto.type ? { ...a, templateName: e.target.value } : a))
@@ -360,6 +361,7 @@ export default function AdminAutomationsPage() {
                     type="number"
                     min={0}
                     value={auto.delayHours}
+                    aria-label={`${auto.triggerLabel} (${auto.triggerUnit})`}
                     onChange={(e) =>
                       setAutomations((prev) =>
                         prev.map((a) =>

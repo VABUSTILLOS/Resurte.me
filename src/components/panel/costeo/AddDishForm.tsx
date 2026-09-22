@@ -143,6 +143,7 @@ export default function AddDishForm({
               <div className="flex items-center gap-2">
                 <select
                   value={ing.ingredientName}
+                  aria-label={`Ingrediente ${idx + 1}`}
                   onChange={(e) => updateIngredient(idx, "ingredientName", e.target.value)}
                   className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E] bg-white"
                 >
@@ -234,6 +235,7 @@ export default function AddDishForm({
             />
             <select
               value={customUnit}
+              aria-label="Unidad del ingrediente"
               onChange={(e) => setCustomUnit(e.target.value)}
               className="w-24 px-2 py-2 rounded-lg border border-blue-200 text-sm bg-white"
             >

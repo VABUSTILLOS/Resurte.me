@@ -110,6 +110,7 @@ export function UserShopView({ categories, products, citySlug }: Props) {
                     placeholder=" "
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
+                    aria-label="Buscar en el catálogo"
                     className="marquee-input w-full text-sm text-[#343538] py-2.5 bg-transparent outline-none placeholder:text-gray-500"
                   />
                   <MarqueePlaceholder text="Buscar frutas, verduras, carnes, abarrotes..." />

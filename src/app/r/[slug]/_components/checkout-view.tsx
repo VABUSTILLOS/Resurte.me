@@ -300,12 +300,14 @@ export function CheckoutView({
                     type="date"
                     value={scheduledDate}
                     min={dayKeyOf(DEFAULT_TIMEZONE)}
+                    aria-label={lang === "es" ? "Fecha del pedido programado" : "Scheduled order date"}
                     onChange={(e) => setScheduledDate(e.target.value)}
                     className="px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   <input
                     type="time"
                     value={scheduledTime}
+                    aria-label={lang === "es" ? "Hora del pedido programado" : "Scheduled order time"}
                     onChange={(e) => setScheduledTime(e.target.value)}
                     className="px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />

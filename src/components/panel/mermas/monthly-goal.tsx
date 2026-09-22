@@ -28,9 +28,10 @@ export default function MonthlyGoal({
       {open && (
         <div className="border-t border-gray-100 p-4 space-y-3">
           <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-600 shrink-0">Meta máxima:</label>
+            <label htmlFor="merma-monthly-goal" className="text-sm text-gray-600 shrink-0">Meta máxima:</label>
             <input
               type="number"
+              id="merma-monthly-goal"
               value={monthlyGoal || ""}
               onChange={(e) => onGoalChange(parseFloat(e.target.value) || 0)}
               placeholder="$5,000"

@@ -144,6 +144,7 @@ export function WhatsappTemplateMenu({
               <div className="flex items-center gap-2">
                 <Input
                   value={t.label}
+                  aria-label="Nombre de la plantilla"
                   onChange={(e) =>
                     persist(
                       templates.map((x, i) =>
@@ -165,6 +166,7 @@ export function WhatsappTemplateMenu({
               <TextArea
                 rows={4}
                 value={t.body}
+                aria-label="Mensaje de la plantilla"
                 onChange={(e) =>
                   persist(
                     templates.map((x, i) =>

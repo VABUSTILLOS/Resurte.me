@@ -14,6 +14,7 @@ export default function SortControls({ itemCount, sortBy, onSortChange }: Props)
       <select
         value={sortBy}
         onChange={(e) => onSortChange(e.target.value as SortField)}
+        aria-label="Ordenar"
         className="text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg px-2 py-1"
       >
         <option value="name">Nombre</option>

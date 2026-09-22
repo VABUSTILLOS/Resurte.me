@@ -6,6 +6,7 @@ import { getActivePersonalCoupon } from "@/lib/repurchase-coupon"
 import { computeRunningOutProducts } from "@/lib/reorder-heuristics"
 import { isoWeek, QUALIFYING_WEEK_MIN } from "@/lib/utils"
 import { computeWeekProgress, type WeekProgress } from "@/lib/wallet-progress"
+import { PUBLIC_ORDERS_WITH_ITEMS_SELECT } from "@/lib/sensitive-columns"
 import { summarizeWallet, type WalletSummary } from "@/lib/wallet-summary"
 import {
   summarizeWalletExpiry,
@@ -101,7 +102,10 @@ export async function getUserPurchaseHistory(
 
   const { data, count } = await supabase
     .from("orders")
-    .select("*, order_items(*, products(id, name, image_url, slug))", { count: "exact" })
+    // Columnas explícitas (00195): `select("*")` pediría los `stripe_*` y el
+    // `restore_token`, que ya no están concedidos a `authenticated`, y la
+    // consulta entera fallaría con `42501`.
+    .select(PUBLIC_ORDERS_WITH_ITEMS_SELECT, { count: "exact" })
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .range(from, to)

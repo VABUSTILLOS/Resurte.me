@@ -174,11 +174,31 @@ publicaron con una regla que conviene no romper:
 
 Las imágenes de esos 51 viven en dos sitios: **29 reutilizan** un `.webp` que ya
 estaba en `public/images/products/**` (misma comida, otra presentación) y **22
-son fichas de marca** en `public/images/products/ab-foods/<slug>.webp`. No hay
-foto real del proveedor y **no se bajan imágenes de terceros**: una ficha
-honesta es preferible a una foto ajena o a un `image_url` roto.
+son fotografías reales** en `public/images/products/ab-foods/<slug>-foto.webp`.
 
-## Privilegios de columna: qué puede leer la llave pública (`00192`, `00193`)
+Las 22 fotos vienen de **Wikimedia Commons** y se usan bajo su licencia
+original: **17 exigen atribución** (CC BY / CC BY-SA) y 5 son CC0 o dominio
+público. La atribución tiene dos mitades y las dos son obligatorias —una CC BY
+sin atribuir es una infracción—: `src/content/image-credits.ts` es la
+verificable y `/creditos` la visible, con
+`src/lib/image-credits.contract.test.ts` comprobando que cada foto publicada
+tenga entrada, que ninguna apunte a un archivo inexistente y que ninguna
+licencia que exija atribución quede sin autor ni enlace.
+
+Dos detalles que no son obvios:
+
+- **El sufijo `-foto` no es cosmético.** `next.config.ts` sirve `/images/**` y
+  `*.webp` con `Cache-Control: public, max-age=31536000, immutable`: si la foto
+  nueva ocupara el mismo `<slug>.webp` que la ficha anterior, el navegador de
+  cada cliente que ya la visitó seguiría mostrando la ficha **un año**. Cambiar
+  el nombre es lo que fuerza una URL nueva; la migración `00194` reapunta
+  `image_url`/`images`.
+- **Son fotos del tipo de alimento, no del SKU exacto** (unas papas curly, no
+  «Papa Curly Savory caja 13.61 kg»), y **ninguna muestra el envase de otra
+  marca**: representar «Queso crema Krol» con una foto de Philadelphia sería
+  engañoso para el cliente. Se dice en `/creditos`.
+
+## Privilegios de columna: qué puede leer la llave pública (`00192`, `00193`, `00195`)
 
 **Regla, y aplica a toda tabla nueva:** `anon` y `authenticated` reciben
 `SELECT` **columna por columna**, nunca a nivel de tabla. El motivo es que RLS
@@ -196,13 +216,37 @@ Lo que quedó privado y quién lo lee entonces:
 | `products` | `cost`, `admin_note`, `low_stock_threshold`, `deleted_at`, `publish_at`, `unpublish_at` | El panel y el cron, con `service_role` |
 | `foodos_restaurants` | `platform_fee_percent`, los seis `stripe_*`, `submitted_at`, `review_note`, `reviewed_at`, `reviewed_by` | `connect-actions.ts` y el panel del dueño, con `service_role` |
 | `foodos_menu_items` | `cost` | `getFoodosPanelData` / `listMenuItems`, con `service_role` |
+| `orders` | `restore_token`, los cinco `stripe_*` | Pagos, webhooks de Stripe y los correos, con `service_role` |
+| `foodos_orders` | `stripe_payment_intent_id`, `stripe_refund_id`, `stripe_transfer_id` | Pagos, conciliación y la ruta de reembolso, con `service_role` |
+| `addresses` | `guest_token` | `/api/addresses/guest`, `payments.ts` y `upsell-offers.ts`, con `service_role` |
+| `foodos_order_payments` | `reviewed_by` | Auditoría interna; el panel la **escribe** al aprobar, pero no la lee |
+| `foodos_ai_messages` | `tokens_used` | El orquestador la escribe; ningún lector de sesión la pide |
+| `foodos_webhooks` | `secret` | El dueño (con el cliente de sesión) y el despachador, con `service_role` |
+| `foodos_whatsapp_connections` | `access_token_enc` | El panel del dueño y `foodos-whatsapp.ts`, con el cliente de sesión |
+| `foodos_pos_connections` | `webhook_secret` | `pos/connections.ts`, con el cliente de sesión |
+| `foodos_couriers` | `access_token` | `flotilla/deliveries.ts` **filtra** por ella, con el cliente de sesión |
+| `foodos_deliveries` | `courier_payout` | El panel de flotilla, con el cliente de sesión |
+| `foodos_delivery_zones` | `payout_mode`, `payout_value` | El panel de flotilla, con el cliente de sesión |
+| `foodos_wallet_passes` | `token` | `foodos-wallet/passes.ts`, con el cliente de sesión |
+| `foodos_ai_usage` | `tokens_used` | `ai/usage.ts` (aviso del 80 % del tope), con el cliente de sesión |
 
-Las listas viven en `src/lib/product-columns.ts` y `src/lib/foodos-columns.ts`
-porque el código las necesita para pedirlas: PostgREST expande `select("*")` a
-toda su caché, así que una sola columna sin privilegio **falla la consulta
-entera** con `42501`. Los contratos `product-columns.contract.test.ts` y
-`foodos-columns.contract.test.ts` comparan el SQL con el código y barren `src/`
-buscando lectores sin `service_role` que pidan una columna privada.
+`00195` endurece las trece últimas: son 21 columnas, y **nueve de ellas se
+conservan para `authenticated`** porque el panel del dueño sí las lee con el
+cliente de sesión —el `secret` de sus webhooks, el token cifrado de su WhatsApp,
+el `webhook_secret` de su POS, el `access_token` de sus mensajeros (que
+`flotilla/deliveries.ts` usa para **filtrar**), la tarifa de sus zonas, el
+`courier_payout` de sus entregas, el `token` de sus tarjetas de wallet y el
+`tokens_used` de su consumo de IA—; se revocan solo de `anon`. Las otras doce
+los lee únicamente `service_role` y se revocan de los dos.
+
+Las listas viven en `src/lib/product-columns.ts`, `src/lib/foodos-columns.ts` y
+`src/lib/sensitive-columns.ts` porque el código las necesita para pedirlas:
+PostgREST expande `select("*")` a toda su caché, así que una sola columna sin
+privilegio **falla la consulta entera** con `42501`. Los contratos
+`product-columns.contract.test.ts`, `foodos-columns.contract.test.ts` y
+`sensitive-columns.contract.test.ts` comparan el SQL con el código y barren
+`src/` buscando lectores sin `service_role` que pidan una columna privada o
+`select("*")` sobre esas tablas.
 
 ### Dos excepciones que parecen fugas y no lo son
 

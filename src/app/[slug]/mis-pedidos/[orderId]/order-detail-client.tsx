@@ -21,6 +21,7 @@ import {
   customerCancelRefusal,
 } from "@/lib/order-cancellation"
 import type { OrderStatus, OrderWithCashback, OrderItem } from "@/types"
+import { PUBLIC_ORDERS_DETAIL_SELECT } from "@/lib/sensitive-columns"
 
 const ORDER_STATUSES: OrderStatus[] = ["pending", "confirmed", "preparing", "out_for_delivery", "delivered"]
 
@@ -53,7 +54,11 @@ interface OrderDetail extends OrderWithCashback {
 }
 
 interface OrderRow extends OrderWithCashback {
-  // Supabase devuelve la relación anidada con la clave del nombre de tabla
+  // Supabase devuelve la relación anidada con la clave del nombre de tabla.
+  // `orders.address_id` es una relación **de a uno**, así que en tiempo de
+  // ejecución PostgREST manda un objeto; supabase-js, sin tipos generados,
+  // tipa todo embed como arreglo. Por eso el `as unknown as OrderRow` de
+  // abajo: el tipo de aquí es el que devuelve el servidor de verdad.
   addresses?: {
     id: number
     label: string
@@ -112,9 +117,11 @@ export function OrderDetailClient() {
       try {
         const { data, error } = await supabase
           .from("orders")
-          .select(
-            "*, order_items(*, products(id, name, image_url, slug)), addresses(*) "
-          )
+          // Columnas explícitas: `select("*")` pediría también los `stripe_*` y
+          // el `restore_token`, que `00195` revocó de `authenticated`, y
+          // PostgREST falla la consulta entera con `42501` en vez de devolver
+          // una fila incompleta.
+          .select(PUBLIC_ORDERS_DETAIL_SELECT)
           .eq("user_id", session.user.id)
           .eq("id", orderId)
           .single()
@@ -124,7 +131,7 @@ export function OrderDetailClient() {
           return true
         }
 
-        const { order_items, addresses, ...row } = data as OrderRow
+        const { order_items, addresses, ...row } = data as unknown as OrderRow
         const items = (order_items ?? []).map((item) => ({
           id: item.id,
           order_id: item.order_id,

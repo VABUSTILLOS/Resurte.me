@@ -95,6 +95,21 @@ const ROW_POINTER_RE =
 const ROW_DEF_RE = /^\|\s*([A-Z]{1,3})(\d+)\s*\|/
 /** Definición de fila en rango: `| A1-A8 | …`. */
 const RANGE_ROW_RE = /^\|\s*([A-Z]{1,3})(\d+)\s*[-–]\s*([A-Z]{1,3})?(\d+)\s*\|/
+/**
+ * Tercera forma de fila: el ID va como **prefijo de la celda**, con texto
+ * detrás — `| R1 foco | … |`, la que usa `### Ronda 13` (DP1).
+ *
+ * Va en un regex **propio** y no se afloja `ROW_DEF_RE`, a propósito: el
+ * contrato de `ROW_DEF_RE` es exigir la barra inmediatamente después de los
+ * dígitos, y si se le quita esa exigencia cualquier `| A1 algo |` de una tabla
+ * ajena entra como definición de fila. Aquí el patrón es más estrecho: dígitos,
+ * espacio, y una palabra que no es barra.
+ *
+ * Se evalúa **después** de `RANGE_ROW_RE`: si fuera antes, `| R1-R4 |` casaría
+ * aquí (`-` es una palabra válida para `[^\s|]`) y el rango dejaría de
+ * expandirse.
+ */
+const PREFIX_ROW_RE = /^\|\s*([A-Z]{1,3})(\d+)\s+[^\s|]/
 /** Etiqueta de producto que imita el vocabulario de rondas. */
 const PRODUCT_LABEL_RE = /Productos ronda (\d+)/gi
 
@@ -164,6 +179,16 @@ LINES.forEach((text, index) => {
     for (let n = from; n <= to; n++) {
       ROWS.push({ line: index + 1, id: `${letter}${n}`.toUpperCase(), section: currentSection, fromRange: true })
     }
+    return
+  }
+  const prefijo = PREFIX_ROW_RE.exec(text)
+  if (prefijo) {
+    ROWS.push({
+      line: index + 1,
+      id: `${prefijo[1]}${prefijo[2]}`.toUpperCase(),
+      section: currentSection,
+      fromRange: false,
+    })
   }
 })
 
@@ -270,6 +295,29 @@ describe("contrato de punteros de docs/PLAN-MEJORAS.md", () => {
     expect(POINTERS.length, "no se encontró ningún puntero a una sección").toBeGreaterThanOrEqual(1)
     expect(ROW_POINTERS.length, "no se encontró ningún puntero a una fila").toBeGreaterThanOrEqual(1)
     expect(PRODUCT_LABELS.length, "desaparecieron las etiquetas `Productos ronda N`").toBeGreaterThanOrEqual(5)
+  })
+
+  it("reconoce la tercera forma de fila: el ID como prefijo de la celda", () => {
+    // `### Ronda 13` numera seis filas así: `| R1 foco | … |`. Sin este
+    // reconocimiento el contrato no las veía, y como consecuencia creía que
+    // `R1` era único (solo lo veía en el rango `R1-R4` de §5 Recompensas)
+    // cuando ya era ambiguo. Esta prueba es el canario de DP1: si alguien
+    // vuelve a dejar la forma fuera del modelo, el recuento cae a cero.
+    const prefijo = ROWS.filter((r) => !r.fromRange && /^R[1-6]$/.test(r.id))
+    expect(
+      prefijo.length,
+      "no se reconoció ninguna fila `| R1 foco | … |`: la tercera forma volvió a ser invisible"
+    ).toBeGreaterThanOrEqual(6)
+  })
+
+  it("`R1` queda marcado como ambiguo, que es la verdad del documento", () => {
+    // El defecto que DP1 dejó escrito no era una cita colgando: era que el
+    // modelo **mentía**. Con la forma reconocida, `R1`-`R4` viven en dos
+    // secciones (el rango de §5 y la tabla de la Ronda 13) y un puntero desnudo
+    // desde una tercera tiene que fallar pidiendo calificador.
+    for (const id of ["R1", "R2", "R3", "R4"]) {
+      expect(AMBIGUOUS, `${id} debería ser ambiguo (vive en §5 y en la Ronda 13)`).toContain(id)
+    }
   })
 
   it("ninguna acta repite número ni va hacia atrás", () => {

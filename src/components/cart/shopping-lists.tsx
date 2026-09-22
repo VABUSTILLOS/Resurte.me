@@ -118,6 +118,7 @@ export function ShoppingLists() {
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleRename(list.id)}
+                        aria-label={`Nuevo nombre de la lista ${list.name}`}
                         className="flex-1 px-2 py-1 border border-[#e0dbd2] rounded-lg text-sm"
                         autoFocus
                       />

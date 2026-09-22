@@ -351,6 +351,7 @@ export function ProspectosPage({
             <Input
               className="pl-9"
               placeholder="Buscar por nombre, restaurante, teléfono…"
+              aria-label="Buscar prospectos"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -358,6 +359,7 @@ export function ProspectosPage({
           <Select
             className="!w-auto"
             value={status}
+            aria-label="Filtrar por estado"
             onChange={(e) => setStatus(e.target.value as ProspectStatus | "todos")}
           >
             <option value="todos">Todos los estados</option>

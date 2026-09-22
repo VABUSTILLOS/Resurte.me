@@ -41,6 +41,7 @@ import {
 } from "@/lib/foodos-tables"
 import { requireFoodosFeature } from "@/lib/foodos-tier"
 import { createServiceClient } from "@/lib/supabase/service"
+import { PUBLIC_FOODOS_ORDERS_SELECT } from "@/lib/sensitive-columns"
 import { logger } from "@/lib/logger"
 import type {
   FoodosCombo,
@@ -227,9 +228,12 @@ export async function getMesasData(
 
   let orders: FoodosOrder[] = []
   if (ticketIds.length) {
+    // Columnas explícitas (00195): los `stripe_*` de `foodos_orders` ya no están
+    // concedidos a `authenticated`, y con `select("*")` PostgREST falla la
+    // consulta entera con `42501` — la cuenta de mesa se quedaría sin pedidos.
     const ordersRes = await supabase
       .from("foodos_orders")
-      .select("*")
+      .select(PUBLIC_FOODOS_ORDERS_SELECT)
       .in("table_ticket_id", ticketIds)
       .order("created_at")
     orders = (ordersRes.data as unknown as FoodosOrder[] | null) ?? []

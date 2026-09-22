@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { buildTicket, type TicketKind, type TicketPayment } from "@/lib/foodos-printing"
+import { PUBLIC_FOODOS_ORDERS_SELECT } from "@/lib/sensitive-columns"
 import type { FoodosBranch, FoodosOrder, FoodosRestaurant } from "@/types/foodos"
 import { TicketView } from "./ticket-view"
 
@@ -40,7 +41,10 @@ export default async function FoodosPrintOrderPage({
   // RLS no filtra: se acota el pedido al restaurante operado para que un id
   // ajeno no sea imprimible. Sin impersonación RLS sigue siendo la barrera.
   const db = ctx.client
-  const base = db.from("foodos_orders").select("*").eq("id", id)
+  // Columnas explícitas (00195): los `stripe_*` de `foodos_orders` ya no están
+  // concedidos a `authenticated`. El ticket no los usa; con `select("*")` la
+  // consulta entera fallaría con `42501`.
+  const base = db.from("foodos_orders").select(PUBLIC_FOODOS_ORDERS_SELECT).eq("id", id)
   const { data: order } = await (ctx.impersonating && ctx.restaurantId
     ? base.eq("restaurant_id", ctx.restaurantId)
     : base

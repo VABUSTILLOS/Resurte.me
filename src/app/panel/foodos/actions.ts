@@ -21,6 +21,7 @@ import { loadAiUsage, type AiUsageSnapshot } from "@/lib/ai/usage"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { PUBLIC_FOODOS_ORDERS_SELECT } from "@/lib/sensitive-columns"
 import { logger } from "@/lib/logger"
 import { formatMoney, slugify } from "@/lib/foodos"
 import { tallyAbTest } from "@/lib/messaging/channel"
@@ -169,7 +170,7 @@ export async function getFoodosPanelData() {
   const [branches, orders, customers, categories, items, combos, rules, automations, campaigns, optionGroups, optionValues] =
     await Promise.all([
       db.from("foodos_branches").select("*").eq("restaurant_id", r.id).order("name"),
-      db.from("foodos_orders").select("*").eq("restaurant_id", r.id).order("created_at", { ascending: false }).limit(200),
+      db.from("foodos_orders").select(PUBLIC_FOODOS_ORDERS_SELECT).eq("restaurant_id", r.id).order("created_at", { ascending: false }).limit(200),
       db.from("foodos_customers").select("*").eq("restaurant_id", r.id).order("total_spend", { ascending: false }).limit(500),
       db.from("foodos_menu_categories").select("*").eq("restaurant_id", r.id).order("sort_order"),
       service.from("foodos_menu_items").select("*").eq("restaurant_id", r.id).order("sort_order"),
@@ -876,9 +877,12 @@ export async function getAiUsage(): Promise<AiUsageSnapshot | null> {
 
 export async function listOrders(restaurantId: string) {
   const { supabase } = await requireFoodosAuth()
+  // Columnas explícitas (00195): los `stripe_*` de `foodos_orders` ya no están
+  // concedidos a `authenticated`, y con `select("*")` PostgREST fallaría la
+  // consulta entera con `42501`.
   const { data, error } = await supabase
     .from("foodos_orders")
-    .select("*")
+    .select(PUBLIC_FOODOS_ORDERS_SELECT)
     .eq("restaurant_id", restaurantId)
     .order("created_at", { ascending: false })
     .limit(200)

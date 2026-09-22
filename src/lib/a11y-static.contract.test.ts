@@ -43,13 +43,33 @@ import { pintaPrimitivo } from "./contrast"
  * no literal), texto pintado por expresión (`{copied ? "copiado" : "copiar"}`) y
  * props por spread. Corregidas las tres, los 25 se arreglaron y R7 congela cero.
  *
- * `inputNoName` NO entra aquí, y la razón es la medición, no la pereza: el
- * nombre de un campo puede venir de un `<label htmlFor>` en otro nodo, de lo que
- * renderice un componente contenedor (`<Field label=…>`) o de un spread, y
- * ninguna de las tres se resuelve sin salir del archivo. Al triar los 79
- * candidatos a ruido aparecieron defectos reales mezclados (un `<label>` hermano
- * **sin** `htmlFor` no asocia nada), así que congelar esa cifra consagraría el
- * ruido en ambas direcciones. Queda medido y anotado en la fila A17.
+ * `inputNoName` ENTRA, y con las tres vías resueltas. La fila A17 lo dejó fuera
+ * porque el nombre de un campo puede venir de un `<label htmlFor>` en otro nodo
+ * del archivo, de lo que renderice un componente contenedor (`<Field label=…>`)
+ * o de un spread, y ninguna de las tres se resolvía sin salir del archivo. La
+ * medición de esta ronda encontró el perímetro exacto de la fila —**193** campos,
+ * los que no traen `placeholder`— y lo trió: **43** eran defectos, 17 sin nombre
+ * de ninguna clase y 26 con una etiqueta hermana que no asociaba nada, que es
+ * justo el caso que el heurístico absolvía por proximidad (un `<label>` sin
+ * `htmlFor` no asocia, aunque esté pegado al campo). Los 43 se corrigieron y R8
+ * los congela en cero con siete pruebas de detector.
+ *
+ * Las tres vías se resuelven sin salir del archivo, y lo que no se puede decidir
+ * no se mide: el `id` de un campo se coteja con los `htmlFor` del archivo —por
+ * texto, así que `htmlFor={`roi-${k}`}` reconoce a su `id={`roi-${k}`}`—, el
+ * `<label>` que envuelve exonera salvo que su `htmlFor` declare otro id, el
+ * padre directo exonera si es un componente con props de nombre, y un elemento
+ * con spread queda fuera. El `placeholder` cuenta como nombre, que es lo que ya
+ * hace la regla `label` de axe-core —el gate de `e2e/a11y.spec.ts`—; sin eso el
+ * perímetro no sería el de la fila, sino el de todos los buscadores del repo.
+ *
+ * HUECO DECLARADO: el detector mide campos escritos como etiqueta HTML. Un campo
+ * escrito como componente propio (`<Input>` de `comercializacion/ui.tsx`) queda
+ * fuera, porque la definición vive en otro archivo y el detector no la lee. Se
+ * midió en esta ronda: 34 usos, 26 de ellos con un `<FieldLabel>` hermano que
+ * tampoco asocia —el mismo defecto, en otra forma—, y los 34 se corrigieron a
+ * mano con `aria-label`. Lo que falta no es el arreglo sino la guardia: traerlos
+ * al contrato exige resolver el componente, y eso es otra ronda.
  */
 
 const RAIZ = process.cwd()
@@ -382,6 +402,168 @@ function controlSinNombre(sf: ts.SourceFile): Elemento[] {
   })
 }
 
+// ---------------------------------------------------------------------------
+// Regla R8: nombre accesible en campos de formulario
+// ---------------------------------------------------------------------------
+
+/**
+ * Campos que un lector de pantalla anuncia con un nombre. Se miden por la
+ * etiqueta HTML, no por el componente: un `<Input>` propio solo se puede juzgar
+ * leyendo su definición, y ahí ya se ve el `<input>` real.
+ */
+const CAMPOS = new Set(["input", "select", "textarea"])
+
+/** `type` literal del campo, en minúsculas. */
+function tipoDeCampo(attrs: ts.JsxAttributes): string {
+  return (textoAtributo(attrs, "type") ?? "").trim().toLowerCase()
+}
+
+/** Un componente propio (`<Field …>`) decide por sí mismo cómo rotula a su hijo. */
+function esComponente(tag: string): boolean {
+  return /^[A-Z]/.test(tag)
+}
+
+/**
+ * La forma con la que un campo se deja asociar: el texto de su `id`.
+ *
+ * No basta el literal. `id={`roi-${field.key}`}` y `htmlFor={`roi-${field.key}`}`
+ * son la misma expresión escrita dos veces, y compararlas por su texto las
+ * reconoce; quedarse en los literales convertiría en hallazgo una asociación que
+ * el navegador sí resuelve. Un identificador —`htmlFor={id}` frente a `id={id}`—
+ * y un acceso a propiedad —`htmlFor={campo.id}` frente a `id={campo.id}`— se
+ * cotejan igual: dentro de un archivo, la misma expresión es el mismo valor.
+ *
+ * `null` significa que **no hay nada que cotejar**: sin `id`, o con un `id`
+ * vacío. Ahí no se mide, porque el campo no declara con qué asociarse.
+ */
+function formaDeAsociacion(attrs: ts.JsxAttributes, nombre: string): string | null {
+  const a = atributo(attrs, nombre)
+  const i = a?.initializer
+  if (!i) return null
+  if (ts.isStringLiteral(i) || ts.isNoSubstitutionTemplateLiteral(i)) return i.text.trim() || null
+  if (!ts.isJsxExpression(i) || !i.expression) return null
+  const e = i.expression
+  if (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e)) return e.text.trim() || null
+  if (ts.isIdentifier(e)) return `$${e.text}`
+  return e.getText().replace(/\s+/g, " ")
+}
+
+/**
+ * Vía 1 — los ids que algún `<label htmlFor>` **del mismo archivo** reclama.
+ *
+ * El `<label>` y el campo pueden estar en ramas distintas del JSX (lo normal:
+ * uno al lado del otro dentro de un `<div>`), así que la asociación se resuelve
+ * por el archivo entero y no por el subárbol. Un `<label>` **sin** `htmlFor` no
+ * reclama nada: no aparece aquí, y por eso el campo que tiene al lado sigue
+ * siendo un hallazgo en vez de quedar absuelto por proximidad.
+ */
+function idsReclamados(sf: ts.SourceFile): Set<string> {
+  const out = new Set<string>()
+  for (const e of elementos(sf)) {
+    if (e.tag !== "label") continue
+    const forma = formaDeAsociacion(e.attrs, "htmlFor")
+    if (forma) out.add(forma)
+  }
+  return out
+}
+
+/**
+ * Vía 2 — props con las que un componente contenedor rotula a su hijo.
+ *
+ * `<Field label="Correo">` no pinta el `<label>` en este nodo: lo pinta dentro
+ * de `Field`, y el archivo no puede saber con qué forma. Se exime por eso, no
+ * por sospecha, y la exención se limita al **padre directo**, que es el único
+ * que recibe el campo. El `placeholder` entra en la lista porque un contenedor
+ * que lo recibe lo reenvía al campo, y ahí ya nombra.
+ */
+const PROPS_DE_NOMBRE = ["label", "aria-label", "aria-labelledby", "title", "placeholder"]
+
+/**
+ * El nodo JSX del elemento, tal como aparece entre los hijos de su padre.
+ */
+function nodoDe(e: Elemento): ts.Node {
+  const ab = e.attrs.parent
+  return ts.isJsxOpeningElement(ab) ? ab.parent : ab
+}
+
+/**
+ * ¿Tiene al lado una etiqueta visible que no lo nombra?
+ *
+ * Es el defecto que el heurístico anterior absolvía por proximidad: un `<label>`
+ * **hermano** —no ancestro— **sin `htmlFor`** no asocia nada. El campo puede
+ * salvarse con un `placeholder`, pero entonces su nombre accesible es el del
+ * ejemplo y no el de la etiqueta que el usuario ve, que es justo lo que prohíbe
+ * WCAG 2.5.3 (Label in Name) y lo que deja a un lector de pantalla anunciando
+ * «Ej: 2.5» donde la pantalla dice «Cantidad (kg)».
+ *
+ * Se mira el hermano directo, y un `<label>` **con** `htmlFor` no cuenta: si lo
+ * tiene, ya está atado a otro campo y no es la etiqueta de este. Se midió que en
+ * el perímetro no hay ninguna etiqueta visible un nivel más arriba —dentro de un
+ * envoltorio, junto al campo—, así que el hermano directo cubre lo que hay.
+ */
+function etiquetaHermanaSuelta(e: Elemento): boolean {
+  const padre = e.ancestros[e.ancestros.length - 1]
+  if (!padre) return false
+  const propio = nodoDe(e)
+  return padre.hijos.some((h) => {
+    if (h === propio || !(ts.isJsxElement(h) || ts.isJsxSelfClosingElement(h))) return false
+    const ab = ts.isJsxElement(h) ? h.openingElement : h
+    if (ab.tagName.getText() !== "label") return false
+    // Un `<label>` que trae `htmlFor` —aunque no se pueda resolver— no es una
+    // etiqueta suelta: reclama una asociación. Sin él, no asocia nada.
+    return atributo(ab.attributes, "htmlFor") === undefined
+  })
+}
+
+/**
+ * R8 — campo de formulario sin nombre accesible (WCAG 4.1.2 A / 2.5.3 A).
+ *
+ * Un nombre puede llegar por cinco vías, y las tres últimas son las que el
+ * heurístico anterior no sabía leer: un `<label htmlFor>` que apunta al `id` del
+ * campo **en otro nodo del mismo archivo**; un `<label>` que lo envuelve; las
+ * props de un componente contenedor (`<Field label=…>`); el `placeholder`; y el
+ * spread, que no se mide. Cuando ninguna nombra al campo, lo que queda es un
+ * control mudo o una etiqueta visible que no asocia nada.
+ */
+function campoSinNombre(sf: ts.SourceFile): Elemento[] {
+  const reclamados = idsReclamados(sf)
+  return elementos(sf).filter((e) => {
+    if (!CAMPOS.has(e.tag)) return false
+    // Vía 3: con spread, el nombre puede venir de fuera y no se mide.
+    if (tieneSpread(e.attrs)) return false
+    if (tipoDeCampo(e.attrs) === "hidden") return false
+    if (FUERA_DEL_ARBOL.test(e.clase)) return false
+    // Un nombre explícito manda: quien lo escribió quiso nombrar el campo.
+    if (ATRIBUTOS_DE_NOMBRE.some((n) => nombra(e.attrs, n))) return false
+    // Vía 1: el `id` que algún `<label htmlFor>` del archivo reclama.
+    const id = formaDeAsociacion(e.attrs, "id")
+    if (id && reclamados.has(id)) return false
+    // `<label>` ancestro: la asociación implícita del HTML. Un `<label>` que
+    // además trae `htmlFor` asocia por el id —no por envolver—, así que solo
+    // exonera si su `htmlFor` no se puede cotejar aquí o es el de este campo.
+    const ancestro = e.ancestros.find((a) => a.tag === "label")
+    if (ancestro) {
+      const suyo = formaDeAsociacion(ancestro.attrs, "htmlFor")
+      if (suyo === null || suyo === id) return false
+    }
+    // Vía 2: el padre directo es un componente que lo rota desde dentro.
+    const padre = e.ancestros[e.ancestros.length - 1]
+    if (padre && esComponente(padre.tag) && PROPS_DE_NOMBRE.some((p) => nombra(padre.attrs, p))) {
+      return false
+    }
+    // La etiqueta suelta se comprueba antes que el `placeholder`: el
+    // `placeholder` nombra, pero no con el texto que el usuario ve al lado.
+    if (etiquetaHermanaSuelta(e)) return true
+    // El `placeholder` sí nombra, y por eso cierra la regla: es lo que ya hace
+    // la regla `label` de axe-core —el gate que este repo corre en
+    // `e2e/a11y.spec.ts`, con `non-empty-placeholder` en su lista de aceptación—
+    // y el último recurso del cálculo de nombre accesible del navegador. El
+    // contrato mide si el nombre **existe**; que un `placeholder` sea un nombre
+    // pobre es asunto de WCAG 3.3.2, no de esta regla.
+    return !nombra(e.attrs, "placeholder")
+  })
+}
+
 /**
  * R6 — un archivo que anima con framer-motion respeta la preferencia del
  * sistema. `reducedMotion="user"` no apaga las animaciones: desactiva las de
@@ -548,6 +730,7 @@ function analizar(fuente: string) {
     imgs: imgsSinAlt(sf).map((e) => e.linea),
     tabindex: tabIndexPositivo(sf).map((e) => e.linea),
     controles: controlSinNombre(sf).map((e) => e.linea),
+    campos: campoSinNombre(sf).map((e) => e.linea),
     motion: motionSinPreferencia(sf),
     motionPropio: tieneMotionConfig(sf),
   }
@@ -818,6 +1001,99 @@ describe("detectores — se prueban antes de mirar el perímetro", () => {
     // Un `<div>` con icono no es un control.
     expect(analizar(`<div><Trash2 /></div>`).controles).toEqual([])
   })
+
+  it("R8 encuentra el campo sin nombre", () => {
+    expect(analizar(`<input type="email" />`).campos).toEqual([1])
+    expect(analizar(`<select value={estado} />`).campos).toEqual([1])
+    expect(analizar(`<textarea rows={3} />`).campos).toEqual([1])
+    // Un nombre vacío no nombra, ni en el atributo ni en el hueco de ejemplo.
+    expect(analizar(`<input aria-label="" />`).campos).toEqual([1])
+    expect(analizar(`<input aria-label=" " />`).campos).toEqual([1])
+    expect(analizar(`<input placeholder=" " />`).campos).toEqual([1])
+  })
+
+  it("R8 no marca el campo que ya tiene nombre", () => {
+    expect(analizar(`<input aria-label="Correo" />`).campos).toEqual([])
+    expect(analizar(`<input aria-labelledby="titulo" />`).campos).toEqual([])
+    expect(analizar(`<input title="Correo" />`).campos).toEqual([])
+    expect(analizar(`<input aria-label={t("campos.correo")} />`).campos).toEqual([])
+    expect(analizar(`<input placeholder="tu@correo.mx" />`).campos).toEqual([])
+    // Otro nodo no es un campo.
+    expect(analizar(`<div aria-label="Correo" />`).campos).toEqual([])
+  })
+
+  it("R8 resuelve el nombre que vive en otro nodo del mismo archivo (vía 1)", () => {
+    // El `<label>` y el campo están en ramas distintas del JSX: lo normal.
+    expect(
+      analizar(`<div>\n<label htmlFor="correo">Correo</label>\n<input id="correo" />\n</div>`).campos,
+    ).toEqual([])
+    // El `htmlFor` de otro campo no nombra a este.
+    expect(
+      analizar(`<div>\n<label htmlFor="otro">Otro</label>\n<input id="correo" />\n</div>`).campos,
+    ).toEqual([3])
+    // `htmlFor={id}` frente a `id={id}`: la misma expresión escrita dos veces.
+    expect(
+      analizar(`<div>\n<label htmlFor={id}>Correo</label>\n<input id={id} />\n</div>`).campos,
+    ).toEqual([])
+    // Dos expresiones distintas no son la misma asociación.
+    expect(
+      analizar(`<div>\n<label htmlFor={campo.id}>Correo</label>\n<input id={otro.id} />\n</div>`)
+        .campos,
+    ).toEqual([3])
+  })
+
+  it("R8 acepta el <label> que envuelve al campo", () => {
+    expect(analizar(`<label>Correo\n<input />\n</label>`).campos).toEqual([])
+    // Envolver no basta si el `<label>` trae `htmlFor`: asocia por el id, y el
+    // id que declara no es el del campo que envuelve.
+    expect(
+      analizar(`<div>\n<label htmlFor="otro">Correo\n<input id="correo" />\n</label>\n</div>`)
+        .campos,
+    ).toEqual([3])
+    // Si el `htmlFor` coincide con el id del campo, ya lo resolvió la vía 1.
+    expect(
+      analizar(`<div>\n<label htmlFor="correo">Correo\n<input id="correo" />\n</label>\n</div>`)
+        .campos,
+    ).toEqual([])
+  })
+
+  it("R8 resuelve el nombre que pone el componente contenedor (vía 2)", () => {
+    expect(analizar(`<Field label="Correo">\n<input />\n</Field>`).campos).toEqual([])
+    expect(analizar(`<Field aria-label="Correo">\n<input />\n</Field>`).campos).toEqual([])
+    // Un componente sin props de nombre no absuelve a su hijo.
+    expect(analizar(`<Field>\n<input />\n</Field>`).campos).toEqual([2])
+    // Un `<div>` no decide nada por su hijo, aunque lleve la prop.
+    expect(analizar(`<div label="Correo">\n<input />\n</div>`).campos).toEqual([2])
+  })
+
+  it("R8 marca el <label> hermano sin htmlFor", () => {
+    // El caso que el heurístico anterior daba por nombrado: la etiqueta está al
+    // lado, pero no asocia nada — ni con `htmlFor` ni envolviendo al campo.
+    expect(
+      analizar(`<div>\n<label>Cantidad (kg)</label>\n<input type="number" />\n</div>`).campos,
+    ).toEqual([3])
+    // Y sigue siendo defecto cuando un `placeholder` tapa el hueco: el nombre
+    // que anuncia el lector de pantalla no es el que el usuario ve al lado.
+    expect(
+      analizar(
+        `<div>\n<label>Cantidad (kg)</label>\n<input type="number" placeholder="Ej: 2.5" />\n</div>`,
+      ).campos,
+    ).toEqual([3])
+    // Un `<label>` con `htmlFor` no es una etiqueta suelta, aunque apunte a otro
+    // campo: ese ya tiene dueño.
+    expect(
+      analizar(`<div>\n<label htmlFor="otro">Cantidad</label>\n<input id="kg" />\n</div>`).campos,
+    ).toEqual([3])
+  })
+
+  it("R8 no mide lo que no puede decidir", () => {
+    // Vía 3: con spread, el nombre puede venir de fuera.
+    expect(analizar(`<input {...props} />`).campos).toEqual([])
+    // Fuera del árbol de accesibilidad: `type="hidden"` no se anuncia.
+    expect(analizar(`<input type="hidden" value={token} />`).campos).toEqual([])
+    expect(analizar(`<input className="hidden" />`).campos).toEqual([])
+    expect(analizar(`<input className="sr-only" />`).campos).toEqual([])
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -863,6 +1139,14 @@ describe("perímetro — accesibilidad estática", () => {
     // Tolerancia cero: los 25 que había se corrigieron con `aria-label` en esta
     // ronda. Si vuelve a aparecer un botón de icono mudo, falla aquí.
     expect(hallazgos(controlSinNombre)).toEqual([])
+  })
+
+  it("R8: ningún campo de formulario se queda sin nombre accesible", () => {
+    // Tolerancia cero: los 43 que había —17 sin nombre de ninguna clase y 26 con
+    // una etiqueta hermana que no asociaba nada— se corrigieron en esta ronda,
+    // casi todos conectando la etiqueta visible con `htmlFor`+`id`. Si vuelve a
+    // aparecer un campo mudo, o una etiqueta visible que no asocia, falla aquí.
+    expect(hallazgos(campoSinNombre)).toEqual([])
   })
 
   it("R5: toda animación usada está en el bloque de movimiento reducido", () => {

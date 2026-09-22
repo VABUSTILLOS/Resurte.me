@@ -130,7 +130,7 @@ export default function SaleForm({
       </div>
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[200px]">
-          <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Platillo</label>
+          <label htmlFor="venta-dish" className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Platillo</label>
           <select
             id="venta-dish"
             value={formDishId}
@@ -146,9 +146,10 @@ export default function SaleForm({
           </select>
         </div>
         <div className="w-24">
-          <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Cantidad</label>
+          <label htmlFor="venta-qty" className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Cantidad</label>
           <input
             type="number"
+            id="venta-qty"
             value={formQty}
             onChange={(e) => setFormQty(e.target.value)}
             min="1"
@@ -156,9 +157,10 @@ export default function SaleForm({
           />
         </div>
         <div className="w-40">
-          <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Fecha</label>
+          <label htmlFor="venta-date" className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Fecha</label>
           <input
             type="date"
+            id="venta-date"
             value={formDate}
             onChange={(e) => setFormDate(e.target.value)}
             className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"

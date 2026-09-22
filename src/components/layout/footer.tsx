@@ -14,6 +14,7 @@ export const FOOTER_LINKS = {
     { label: "Contacto", href: "/contact" },
     { label: "Política de privacidad", href: "/privacy" },
     { label: "Términos y condiciones", href: "/terms" },
+    { label: "Créditos de imágenes", href: "/creditos" },
   ],
   "Para tu negocio": [
     { label: "Línea de crédito", href: "/negocio/credito" },

@@ -976,6 +976,7 @@ function AdminOrdersContent() {
                     <select
                       value={order.status}
                       disabled={updatingId === order.id}
+                      aria-label={`Estado del pedido #${order.id}`}
                       className={`text-xs font-medium border rounded-lg px-2 py-1 cursor-pointer disabled:opacity-50 ${STATUS_COLOR[order.status]}`}
                       onChange={(e) => updateStatus(order.id, e.target.value)}
                     >

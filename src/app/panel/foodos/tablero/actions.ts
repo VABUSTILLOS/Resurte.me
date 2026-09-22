@@ -10,6 +10,7 @@
 
 import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { listRestaurantShifts, type ShiftRow } from "@/lib/foodos-shift"
+import { PUBLIC_FOODOS_ORDERS_SELECT } from "@/lib/sensitive-columns"
 import type { FoodosOrder } from "@/types/foodos"
 
 const DAY_MS = 86_400_000
@@ -48,9 +49,12 @@ export async function getFoodosReportData(input: {
   const cutoff = new Date(stamp - (days + 1) * DAY_MS).toISOString()
   const branchId = input.branchId ?? null
 
+  // Columnas explícitas (00195): los `stripe_*` de `foodos_orders` ya no están
+  // concedidos a `authenticated`. El reporte no los usa; con `select("*")` la
+  // consulta entera fallaría con `42501`.
   const base = db
     .from("foodos_orders")
-    .select("*")
+    .select(PUBLIC_FOODOS_ORDERS_SELECT)
     .eq("restaurant_id", restaurantId)
     .gte("created_at", cutoff)
 

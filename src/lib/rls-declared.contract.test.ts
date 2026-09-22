@@ -56,6 +56,19 @@ import { describe, expect, it } from "vitest"
  * Lo que este contrato **no** hace: juzgar si el modelo de acceso declarado es
  * el correcto. Comprueba que está escrito, que cubre el perímetro exacto y que
  * nombra un archivo de evidencia. Que sea verdad es trabajo de la revisión.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * La mitad que este contrato no puede hacer, y dónde está hecha
+ * ────────────────────────────────────────────────────────────────────────────
+ *
+ * Todo lo de arriba se mide **sobre las migraciones**, no sobre la base. Un
+ * registro impecable y una base que no se le parece se leerían igual de bien.
+ * Esa mitad se midió a mano con la Management API el **22-sep-2026** y el
+ * resultado está en `docs/OPS.md` §13: 24 de 24 con `relrowsecurity = true` y
+ * cero filas en `pg_policies`, sin diferencia simétrica contra el conjunto que
+ * calcula este archivo, y los 23 archivos de evidencia existiendo y usando
+ * `createServiceClient()`. Cero discrepancias. Si algún día este contrato pasa
+ * y la base no cuadra, el sitio donde se ve es esa sección, no este test.
  */
 
 const REPO = process.cwd()
@@ -130,7 +143,13 @@ const MODELO_DE_ACCESO: Record<string, string> = {
   leads: "createServiceClient() desde src/app/admin/actions.ts",
   order_upsells: "createServiceClient() desde src/app/api/admin/funnel/route.ts",
   product_suppliers: "createServiceClient() desde src/app/api/admin/suppliers/route.ts",
-  rate_limits: "RPC consume_rate_limit (EXECUTE sólo a service_role desde 00165), con el cliente de servicio",
+  // El archivo va nombrado porque es la única entrada del registro que no
+  // llega a la tabla con un `.from()`: el acceso es la RPC, y quien la invoca
+  // con el cliente de servicio es `src/lib/rate-limit.ts`. Verificado en vivo
+  // el 22-sep-2026 (`proacl` sin la entrada `=X`, `anon`/`authenticated` sin
+  // EXECUTE). Ver `docs/OPS.md` §13.
+  rate_limits:
+    "RPC consume_rate_limit (EXECUTE sólo a service_role desde 00165) desde src/lib/rate-limit.ts, con el cliente de servicio",
   suppliers: "createServiceClient() desde src/app/api/admin/suppliers/route.ts",
   whatsapp_automation_sends: "createServiceClient() desde src/app/admin/actions.ts",
   whatsapp_catalog_items: "createServiceClient() desde src/app/admin/actions.ts",

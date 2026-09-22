@@ -187,6 +187,7 @@ function LinkAccountPanel({
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && search()}
           placeholder="Buscar por nombre, teléfono o email…"
+          aria-label="Buscar prospectos"
         />
         <Button variant="secondary" onClick={search} disabled={searching || !query.trim()}>
           <Search className="w-4 h-4" />
