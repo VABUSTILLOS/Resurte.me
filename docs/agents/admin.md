@@ -67,7 +67,7 @@
 - Productos — scroll infinito (A44): la API sigue paginando en el servidor
   (`page`/`pageSize`, máx 1000), pero el panel **acumula tandas** y pide la
   siguiente con un `IntersectionObserver` sobre un centinela al final del
-  listado; ya no hay paginador. Tres reglas que no se pueden romper: (a) el
+  listado; ya no hay paginador. Cuatro reglas que no se pueden romper: (a) el
   centinela vive **dentro del scrollport** de cada vista —la tarjeta en tabla
   (el `thead` sticky necesita el suyo) y la ventana en grid—, así que el `root`
   del observer depende de `view`; (b) un cambio de filtros, orden o tanda
@@ -76,7 +76,12 @@
   (`@/lib/admin-product-list`, con tests) comparando la identidad del listado
   (filtros + orden + tanda); (c) una tanda que llega tarde (filtros cambiados en
   vuelo) se descarta por `listRequestRef` en vez de mezclarse con el listado
-  nuevo. `?page=N` sigue siendo deep-link: restaura hasta N tandas
+  nuevo. (d) El centinela se guarda como **estado** (callback ref), no como
+  `useRef`: se monta en un commit **posterior** al que fija `hasMore` —la carga
+  inicial hace `await row-meta` antes de quitar el esqueleto—, así que con una
+  ref el efecto del observador no se volvía a ejecutar y el listado no cargaba
+  nada al llegar al final (el fallo que se reportó como "no se ve el scroll
+  infinito"). `?page=N` sigue siendo deep-link: restaura hasta N tandas
   (`MAX_RESTORE_PAGES`). El botón "Cargar más" es el fallback accesible del
   observer y el conteo "Mostrando X de Y" sustituye al paginador.
 - Productos ronda 2: filtros/orden/tanda/vista viajan en la URL (deep-link;

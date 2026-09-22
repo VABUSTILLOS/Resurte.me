@@ -671,7 +671,13 @@ function AdminProductsContent() {
   const loadingMoreRef = useRef(false)
   /** La API reportó una tanda incompleta: no hay más filas que pedir. */
   const [endOfList, setEndOfList] = useState(false)
-  const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
+  /** Centinela del scroll infinito. Es ESTADO y no un `useRef` a propósito: el
+   *  nodo se monta en un commit posterior al que fija `hasMore` (la carga
+   *  inicial hace `await row-meta` antes de quitar el esqueleto), así que el
+   *  efecto del observador tiene que volver a ejecutarse cuando el centinela
+   *  aparece; con una ref el efecto no se re-ejecutaba y el centinela quedaba
+   *  sin observar (el scroll no cargaba nada). */
+  const [loadMoreSentinel, setLoadMoreSentinel] = useState<HTMLDivElement | null>(null)
 
   // Vista única de los filtros. El parseo, la serialización a URL, la query de
   // la API y el conteo de filtros activos leen todos de este objeto
@@ -977,8 +983,7 @@ function AdminProductsContent() {
   // en cada tanda para que un listado que no llena el scrollport encadene
   // cargas hasta llenarlo, en vez de quedarse a medias.
   useEffect(() => {
-    const sentinel = loadMoreSentinelRef.current
-    if (!sentinel || typeof IntersectionObserver === "undefined") return
+    if (!loadMoreSentinel || typeof IntersectionObserver === "undefined") return
     if (!hasMore || loadingMore) return
     const observer = new IntersectionObserver(
       (entries) => {
@@ -986,9 +991,9 @@ function AdminProductsContent() {
       },
       { root: view === "table" ? tableScrollRef.current : null, rootMargin: "600px 0px" }
     )
-    observer.observe(sentinel)
+    observer.observe(loadMoreSentinel)
     return () => observer.disconnect()
-  }, [view, hasMore, loadingMore, page])
+  }, [loadMoreSentinel, view, hasMore, loadingMore, page])
 
   const categoryName = (id: number | null) =>
     categories.find((c) => c.id === id)?.name ?? "Sin categoría"
@@ -5093,7 +5098,7 @@ function AdminProductsContent() {
           </table>
           {/* Centinela del scroll infinito: vive DENTRO del scrollport de la
               tarjeta, que es contra quien se mide en la vista tabla. */}
-          <div ref={loadMoreSentinelRef} aria-hidden="true" className="h-4" />
+          <div ref={setLoadMoreSentinel} aria-hidden="true" className="h-4" />
           {total === 0 && !refreshing && emptyListState}
         </div>
       </div>
@@ -5246,7 +5251,7 @@ function AdminProductsContent() {
           )}
           {/* Centinela del scroll infinito: en la vista grid el scrollport es
               la ventana, así que se mide contra el viewport. */}
-          <div ref={loadMoreSentinelRef} aria-hidden="true" className="h-4" />
+          <div ref={setLoadMoreSentinel} aria-hidden="true" className="h-4" />
         </div>
       )}
 
