@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest"
 
 import {
   IDS_PER_REQUEST,
+  MAX_RESTORE_PAGES,
   buildMap,
   chunkIds,
   isNewProduct,
+  pagesToRestore,
   productCount,
   timeAgo,
   type AvailabilityRow,
@@ -121,5 +123,35 @@ describe("chunkIds", () => {
   it("no pierde ni duplica ids al trocear", () => {
     const ids = Array.from({ length: IDS_PER_REQUEST * 2 + 3 }, (_, i) => i + 1)
     expect(chunkIds(ids).flat()).toEqual(ids)
+  })
+})
+
+describe("pagesToRestore", () => {
+  const base = { listKey: "q=&sort=name&dir=asc&pageSize=50", page: 4, initialPage: 1 }
+
+  it("en el primer render respeta el deep-link ?page=N", () => {
+    expect(pagesToRestore({ ...base, prevListKey: null, initialPage: 3 })).toBe(3)
+  })
+
+  it("con el mismo listado (recarga) conserva la profundidad alcanzada", () => {
+    expect(pagesToRestore({ ...base, prevListKey: base.listKey })).toBe(4)
+  })
+
+  it("con filtros, orden o tanda nuevos vuelve a la primera tanda", () => {
+    expect(pagesToRestore({ ...base, prevListKey: "q=resorte&sort=name&dir=asc&pageSize=50" })).toBe(1)
+    expect(pagesToRestore({ ...base, prevListKey: `${base.listKey}`.replace("dir=asc", "dir=desc") })).toBe(1)
+    expect(pagesToRestore({ ...base, prevListKey: `${base.listKey}`.replace("pageSize=50", "pageSize=200") })).toBe(1)
+  })
+
+  it("acota al tope para que un ?page=999 no dispare cientos de peticiones", () => {
+    expect(pagesToRestore({ ...base, prevListKey: null, initialPage: 999 })).toBe(MAX_RESTORE_PAGES)
+    expect(pagesToRestore({ ...base, prevListKey: base.listKey, page: 999 })).toBe(MAX_RESTORE_PAGES)
+  })
+
+  it("nunca devuelve menos de una tanda, ni con valores corruptos", () => {
+    expect(pagesToRestore({ ...base, prevListKey: null, initialPage: -5 })).toBe(1)
+    expect(pagesToRestore({ ...base, prevListKey: base.listKey, page: 0 })).toBe(1)
+    expect(pagesToRestore({ ...base, prevListKey: base.listKey, page: Number.NaN })).toBe(1)
+    expect(pagesToRestore({ ...base, prevListKey: base.listKey, page: 3.9 })).toBe(3)
   })
 })

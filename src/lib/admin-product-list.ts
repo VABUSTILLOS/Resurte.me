@@ -68,3 +68,34 @@ export function chunkIds(ids: number[]): number[][] {
   }
   return chunks
 }
+
+/** Tope de tandas que restaura un deep-link `?page=N` al abrir el panel: sin
+ *  él, una URL con una página alta dispara cientos de peticiones en serie. */
+export const MAX_RESTORE_PAGES = 10
+
+/**
+ * Tandas que el scroll infinito carga al reiniciar el listado.
+ *
+ * Tres casos que no pueden confundirse entre sí:
+ * - primer render (`prevListKey === null`): respeta el deep-link `?page=N`;
+ * - listado nuevo (filtros, orden o tanda distintos): primera tanda, porque lo
+ *   cargado ya no pertenece a lo que se va a pedir;
+ * - recarga de los mismos datos (edición, borrado): la profundidad alcanzada,
+ *   para no devolver al admin al principio del catálogo.
+ */
+export function pagesToRestore({
+  prevListKey,
+  listKey,
+  page,
+  initialPage,
+  max = MAX_RESTORE_PAGES,
+}: {
+  prevListKey: string | null
+  listKey: string
+  page: number
+  initialPage: number
+  max?: number
+}): number {
+  const target = prevListKey === null ? initialPage : prevListKey === listKey ? page : 1
+  return Math.min(Math.max(1, Math.trunc(target) || 1), max)
+}

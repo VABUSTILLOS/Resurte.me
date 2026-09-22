@@ -55,8 +55,8 @@
   visibles con `service_role` — es decir, únicamente en el panel admin, nunca
   desde una sonda con anon key.
 - Productos (`/admin/productos`): la tabla es server-side
-  (`GET /api/admin/products/list` con búsqueda/filtros/orden/paginación y
-  conteos para los chips); "seleccionar todo" abarca todas las páginas vía
+  (`GET /api/admin/products/list` con búsqueda/filtros/orden y conteos para los
+  chips); "seleccionar todo" abarca todo el filtro vía
   `idsOnly=1`; el export CSV usa las mismas columnas que la importación
   (re-importable); crear/editar/duplicar pasan por
   `POST /api/admin/products/create|duplicate` y el PATCH con whitelist —
@@ -64,7 +64,23 @@
   el duplicado nace despublicado y copia la disponibilidad por ciudad.
   Metadatos por fila (sync WA pendiente, última edición) vía
   `GET /api/admin/products/row-meta`.
-- Productos ronda 2: filtros/orden/página/vista viajan en la URL (deep-link);
+- Productos — scroll infinito (A44): la API sigue paginando en el servidor
+  (`page`/`pageSize`, máx 1000), pero el panel **acumula tandas** y pide la
+  siguiente con un `IntersectionObserver` sobre un centinela al final del
+  listado; ya no hay paginador. Tres reglas que no se pueden romper: (a) el
+  centinela vive **dentro del scrollport** de cada vista —la tarjeta en tabla
+  (el `thead` sticky necesita el suyo) y la ventana en grid—, así que el `root`
+  del observer depende de `view`; (b) un cambio de filtros, orden o tanda
+  **reemplaza** lo cargado desde la primera tanda, mientras una recarga por
+  edición/borrado conserva la profundidad alcanzada: lo decide `pagesToRestore`
+  (`@/lib/admin-product-list`, con tests) comparando la identidad del listado
+  (filtros + orden + tanda); (c) una tanda que llega tarde (filtros cambiados en
+  vuelo) se descarta por `listRequestRef` en vez de mezclarse con el listado
+  nuevo. `?page=N` sigue siendo deep-link: restaura hasta N tandas
+  (`MAX_RESTORE_PAGES`). El botón "Cargar más" es el fallback accesible del
+  observer y el conteo "Mostrando X de Y" sustituye al paginador.
+- Productos ronda 2: filtros/orden/tanda/vista viajan en la URL (deep-link;
+  `?page=N` restaura N tandas del scroll infinito);
   panel "Salud del catálogo" con chips accionables (incluye `waMismatch` =
   WA activo pero despublicado); eliminar producto RECHAZA con 409 si tiene
   `order_items` (el CASCADE destruiría historial de pedidos — sugerir
@@ -1011,6 +1027,16 @@ ventas van al final con `desc` y al principio con `asc`, y su "Ventas" es 0 (no
 vacío). Comprobar que el número de "Ventas" de un producto con pedidos
 cancelados NO los cuenta. A 375×812 el encabezado "Ventas" está oculto: el orden
 se cambia desde el `<select>` (elegir "Más vendidos" y ver que abre en `desc`).
+
+Scroll infinito de `/admin/productos` (A44, requiere sesión admin + productos):
+al llegar al final del listado se cargan solas las siguientes tandas (el pie pasa
+de "Mostrando 50 de N" a "Mostrando 100 de N"), sin paginador; al agotar el
+filtro el botón desaparece y queda "Fin del listado". Cambiar un filtro, el orden
+o la tanda vuelve a la primera tanda y al inicio del scroll; editar un producto
+(recarga por `reloadKey`) **conserva** la profundidad alcanzada en vez de devolver
+al principio. Recargar la URL con `?page=3` restaura tres tandas (150 filas) sin
+repetir filas, y la vista grid (móvil) hace lo mismo contra el scroll de la
+ventana. La tabla sigue scrolleando dentro de la tarjeta con el `thead` pegado.
 
 Barra de acciones masivas sticky de `/admin/productos` (requiere sesión admin +
 productos): seleccionar 2+ productos y bajar ~3 pantallas; la barra debe seguir

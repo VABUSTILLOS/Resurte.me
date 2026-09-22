@@ -18,10 +18,6 @@ import {
   RefreshCw,
   AlertTriangle,
   PackageX,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Eye,
   EyeOff,
   ArrowUp,
@@ -86,6 +82,7 @@ import {
   buildMap,
   chunkIds,
   isNewProduct,
+  pagesToRestore,
   productCount,
   timeAgo,
   type AvailabilityMap,
@@ -212,9 +209,11 @@ const STOCK_LABELS: Record<StockStatus, string> = {
   out_of_stock: "Agotado",
 }
 
-/** Fase 5 — paginación del catálogo (424+ productos).
- *  Sin virtualización: cada fila es DOM real, así que 200 es el techo que
- *  mantiene el render fluido en móvil (el endpoint admite más, la UI no). */
+/** Fase 5 — scroll infinito del catálogo (424+ productos).
+ *  La API sigue paginando en el servidor, pero el panel acumula las tandas y
+ *  pide la siguiente al acercarse al final: sin virtualización cada fila es DOM
+ *  real, así que 50 es la tanda que mantiene el render fluido en móvil (el
+ *  endpoint admite más, la UI no). */
 const DEFAULT_PAGE_SIZE = 50
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200]
 
@@ -234,7 +233,7 @@ const STOCK_FILTERS: { label: string; value: StockStatus | "all" }[] = [
 
 /**
  * Valor previo de un campo para los ids dados. La selección puede abarcar
- * otras páginas, así que el estado anterior se pide al servidor.
+ * todo el catálogo, así que el estado anterior se pide al servidor.
  *
  * Devuelve `null` si no se pudo leer completo: sin estado previo fiable no se
  * ofrece Deshacer, en vez de restaurar valores inventados.
@@ -377,7 +376,7 @@ function AdminProductsContent() {
    *  `product_city_availability` completa en el navegador. */
   const [availability, setAvailability] = useState<Record<number, number>>({})
   /** Disponibilidad de los ids seleccionados, cargada al abrir el modal de
-   *  ciudades (la selección puede abarcar todas las páginas). */
+   *  ciudades (la selección puede abarcar todo el catálogo). */
   const [modalAvailability, setModalAvailability] = useState<AvailabilityMap>(new Map())
   const [cityModalLoading, setCityModalLoading] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -476,13 +475,13 @@ function AdminProductsContent() {
 
   // Selección múltiple y asignación de ciudades (bulk). El estado de la
   // selección y el de la ejecución en lote viven en sus hooks (abajo, cuando ya
-  // se conocen la página y el total); aquí queda solo el modal de ciudades.
+  // se conocen las filas y el total); aquí queda solo el modal de ciudades.
   const [cityModalOpen, setCityModalOpen] = useState(false)
   const [draftCities, setDraftCities] = useState<Set<number>>(new Set())
   const [bulkSaving, setBulkSaving] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
-  // Scroll interno de la tabla (vista tabla). Se vuelve al principio al cambiar
-  // de página o de filtros para no aterrizar a mitad del listado.
+  // Scroll interno de la tabla (vista tabla). Se vuelve al principio al
+  // cambiar de filtros, orden o tanda para no aterrizar a mitad del listado.
   const tableScrollRef = useRef<HTMLDivElement>(null)
   // Fila sticky de categorías: su alto se publica en `--admin-catbar-h` para
   // que la barra de acciones masivas se ancle justo debajo y no la tape.
@@ -592,7 +591,7 @@ function AdminProductsContent() {
   ])
 
   // Fase 5 — filtros de categoría/stock (con deep-link ?stock= desde las
-  // alertas del dashboard) y paginación.
+  // alertas del dashboard) y el listado del scroll infinito.
   const initialSort = parseProductSort(searchParams.get("sort"), searchParams.get("dir"))
   const [categoryFilter, setCategoryFilter] = useState<string>(initialFilters.category)
   const [stockFilter, setStockFilter] = useState<StockStatus | "all">(initialFilters.stock)
@@ -613,7 +612,7 @@ function AdminProductsContent() {
   const [tagFilter, setTagFilter] = useState(initialFilters.tag)
   const [tagList, setTagList] = useState<{ tag: string; count: number }[]>([])
   // Ronda 7 — imágenes rotas detectadas por el sondeo del servidor. El filtro
-  // es local a la página cargada (el sondeo trabaja sobre filas concretas).
+  // es local a lo cargado (el sondeo trabaja sobre filas concretas).
   const [imageIssues, setImageIssues] = useState<
     Record<number, { url: string | null; status: number | null; reason: string }>
   >({})
@@ -648,11 +647,31 @@ function AdminProductsContent() {
     message: string
     run: () => Promise<void>
   } | null>(null)
-  const [page, setPage] = useState(Math.max(1, Number(searchParams.get("page")) || 1))
+  const initialPage = Math.max(1, Number(searchParams.get("page")) || 1)
+  // `page` es la última tanda cargada (viaja en la URL como deep-link) y
+  // `pageSize`, el tamaño de cada tanda del scroll infinito.
+  const [page, setPage] = useState(initialPage)
   const initialPageSize = Number(searchParams.get("pageSize"))
   const [pageSize, setPageSize] = useState(
     PAGE_SIZE_OPTIONS.includes(initialPageSize) ? initialPageSize : DEFAULT_PAGE_SIZE
   )
+  /** Identidad del listado vigente (filtros + orden + tanda). Si cambia, el
+   *  scroll infinito arranca en la primera tanda; si no, es una recarga
+   *  (edición, borrado) que vuelve a cargar hasta la profundidad alcanzada en
+   *  vez de devolver al admin al principio del catálogo. `null` = primer
+   *  render, que respeta el deep-link `?page=N`. */
+  const listKeyRef = useRef<string | null>(null)
+  /** Petición de listado vigente: una tanda que llega tarde (filtros cambiados
+   *  en vuelo) se descarta en vez de mezclarse con el listado nuevo. */
+  const listRequestRef = useRef(0)
+  const [loadingMore, setLoadingMore] = useState(false)
+  /** Candado de la carga en curso: el estado de React puede no haberse
+   *  re-renderizado cuando el observer vuelve a disparar en el mismo frame, y
+   *  pedir dos veces la misma tanda duplicaría filas al añadirla. */
+  const loadingMoreRef = useRef(false)
+  /** La API reportó una tanda incompleta: no hay más filas que pedir. */
+  const [endOfList, setEndOfList] = useState(false)
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
 
   // Vista única de los filtros. El parseo, la serialización a URL, la query de
   // la API y el conteo de filtros activos leen todos de este objeto
@@ -735,6 +754,9 @@ function AdminProductsContent() {
     underThreshold: 0,
   })
   const [refreshing, setRefreshing] = useState(false)
+  /** Quedan filas por traer: ni el servidor reportó el final ni lo cargado
+   *  alcanzó el total del filtro vigente. */
+  const hasMore = !endOfList && products.length < total
   // Conteo de productos por categoría (chips de categoría del listado).
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({})
   // true cuando la BD aún no tiene las migraciones 00096-00099: el panel
@@ -780,69 +802,119 @@ function AdminProductsContent() {
     }
   }, [supabase, reloadKey])
 
-  // Filas de la tabla: búsqueda/filtros/orden/paginación en el servidor.
+  /** Metadatos por fila (sync WA, última edición, ventas), best-effort.
+   *  `replace` limpia lo anterior (reinicio del listado); sin él se mezcla, que
+   *  es lo que necesita cada tanda nueva del scroll infinito. */
+  async function loadRowMeta(
+    ids: number[],
+    { replace, isStale }: { replace: boolean; isStale: () => boolean }
+  ) {
+    if (ids.length === 0) {
+      if (isStale() || !replace) return
+      setMetaDegraded([])
+      setWaPending(new Set())
+      setLastEdit({})
+      setSales({})
+      setSalesAmount({})
+      return
+    }
+    const metaRes = await fetch(`/api/admin/products/row-meta?ids=${ids.join(",")}`)
+    const meta = await metaRes.json().catch(() => ({}))
+    if (isStale()) return
+    if (!metaRes.ok) {
+      // La lectura entera falló: ninguna de las tres columnas decorativas tiene
+      // datos, así que se declaran las tres en vez de mentir con ceros. Las
+      // filas del listado ya se pintaron.
+      setMetaDegraded(["queue", "audit", "sales"])
+      if (replace) {
+        setWaPending(new Set())
+        setLastEdit({})
+        setSales({})
+        setSalesAmount({})
+      }
+      return
+    }
+    setMetaDegraded((meta.degraded ?? []) as RowMetaSource[])
+    setWaPending((prev) => new Set([...(replace ? [] : prev), ...(meta.waPending ?? [])]))
+    const edits: Record<number, { at: string; email: string | null }> = {}
+    for (const [id, v] of Object.entries(meta.lastEdit ?? {})) {
+      edits[Number(id)] = v as { at: string; email: string | null }
+    }
+    setLastEdit((prev) => (replace ? edits : { ...prev, ...edits }))
+    const soldById: Record<number, number> = {}
+    for (const [id, v] of Object.entries(meta.sales ?? {})) {
+      soldById[Number(id)] = v as number
+    }
+    setSales((prev) => (replace ? soldById : { ...prev, ...soldById }))
+    const amountsById: Record<number, number> = {}
+    for (const [id, v] of Object.entries(meta.salesAmount ?? {})) {
+      amountsById[Number(id)] = v as number
+    }
+    setSalesAmount((prev) => (replace ? amountsById : { ...prev, ...amountsById }))
+  }
+
+  // Filas del listado: búsqueda/filtros/orden en el servidor y scroll infinito
+  // en el cliente. Un reinicio (filtros, orden, tanda, recarga) reemplaza lo
+  // cargado; "cargar más" añade la tanda siguiente sin volver al principio.
   useEffect(() => {
     let cancelled = false
+    const requestId = ++listRequestRef.current
+    const isStale = () => cancelled || requestId !== listRequestRef.current
     ;(async () => {
       try {
         setRefreshing(true)
-        const res = await fetch(
-          `/api/admin/products/list?${listParams({ page: String(page), pageSize: String(pageSize) })}`
-        )
-        const data = await res.json().catch(() => ({}))
-        if (cancelled) return
-        if (!res.ok) {
-          setError(data.error ?? "Error al cargar productos")
-          return
-        }
-        setProducts(data.rows ?? [])
-        setTotal(data.total ?? 0)
-        setAvailability(data.availability ?? {})
-        if (data.counts) setCounts(data.counts)
-        if (data.brands) setBrands(data.brands)
-        setCategoryCounts(data.categoryCounts ?? {})
-        if (data.tags) setTagList(data.tags)
-        setSchemaDrift(data.schemaDrift === true)
-        // Metadatos por fila (sync WA + última edición), best-effort.
-        const ids = (data.rows ?? []).map((r: Product) => r.id)
-        if (ids.length > 0) {
-          const metaRes = await fetch(`/api/admin/products/row-meta?ids=${ids.join(",")}`)
-          const meta = await metaRes.json().catch(() => ({}))
-          if (!cancelled && metaRes.ok) {
-            setMetaDegraded((meta.degraded ?? []) as RowMetaSource[])
-            setWaPending(new Set(meta.waPending ?? []))
-            const byId: Record<number, { at: string; email: string | null }> = {}
-            for (const [id, v] of Object.entries(meta.lastEdit ?? {})) {
-              byId[Number(id)] = v as { at: string; email: string | null }
-            }
-            setLastEdit(byId)
-            const salesById: Record<number, number> = {}
-            for (const [id, v] of Object.entries(meta.sales ?? {})) {
-              salesById[Number(id)] = v as number
-            }
-            setSales(salesById)
-            const amountsById: Record<number, number> = {}
-            for (const [id, v] of Object.entries(meta.salesAmount ?? {})) {
-              amountsById[Number(id)] = v as number
-            }
-            setSalesAmount(amountsById)
-          } else if (!cancelled) {
-            // La lectura entera falló: ninguna de las tres columnas decorativas
-            // tiene datos, así que se declaran las tres en vez de mentir con
-            // ceros. Las filas del listado ya se pintaron.
-            setMetaDegraded(["queue", "audit", "sales"])
-            setWaPending(new Set())
-            setLastEdit({})
-            setSales({})
-            setSalesAmount({})
+        // Un listado nuevo (filtros, orden, tanda) arranca en la primera tanda;
+        // una recarga de los mismos datos y el deep-link `?page=N` del primer
+        // render restauran varias, para no volver al principio del catálogo.
+        const listKey = `${listParams({})}&pageSize=${pageSize}`
+        const pages = pagesToRestore({
+          prevListKey: listKeyRef.current,
+          listKey,
+          page,
+          initialPage,
+        })
+        listKeyRef.current = listKey
+        const rows: Product[] = []
+        let loaded = 0
+        let exhausted = false
+        for (let target = 1; target <= pages; target++) {
+          const res = await fetch(
+            `/api/admin/products/list?${listParams({ page: String(target), pageSize: String(pageSize) })}`
+          )
+          const data = await res.json().catch(() => ({}))
+          if (isStale()) return
+          if (!res.ok) {
+            setError(data.error ?? "Error al cargar productos")
+            return
           }
-        } else if (!cancelled) {
-          setMetaDegraded([])
-          setWaPending(new Set())
-          setLastEdit({})
-          setSales({})
-          setSalesAmount({})
+          const batch = (data.rows ?? []) as Product[]
+          rows.push(...batch)
+          loaded = target
+          if (target === 1) {
+            setTotal(data.total ?? 0)
+            setAvailability(data.availability ?? {})
+            if (data.counts) setCounts(data.counts)
+            if (data.brands) setBrands(data.brands)
+            setCategoryCounts(data.categoryCounts ?? {})
+            if (data.tags) setTagList(data.tags)
+            setSchemaDrift(data.schemaDrift === true)
+          } else {
+            // La disponibilidad de las tandas previas ya está en el estado.
+            setAvailability((prev) => ({ ...prev, ...(data.availability ?? {}) }))
+          }
+          // Tanda incompleta = el listado se acabó.
+          if (batch.length < pageSize) {
+            exhausted = true
+            break
+          }
         }
+        setProducts(rows)
+        setEndOfList(exhausted)
+        setPage(loaded)
+        await loadRowMeta(
+          rows.map((r) => r.id),
+          { replace: true, isStale }
+        )
       } finally {
         if (!cancelled) {
           setRefreshing(false)
@@ -854,12 +926,79 @@ function AdminProductsContent() {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reloadKey, filters, sort, page, pageSize])
+  }, [reloadKey, filters, sort, pageSize])
+
+  /** Pide la tanda siguiente y la añade al final del listado. */
+  async function loadMore() {
+    if (loadingMoreRef.current || refreshing || !hasMore) return
+    const requestId = listRequestRef.current
+    const next = page + 1
+    loadingMoreRef.current = true
+    setLoadingMore(true)
+    try {
+      const res = await fetch(
+        `/api/admin/products/list?${listParams({ page: String(next), pageSize: String(pageSize) })}`
+      )
+      const data = await res.json().catch(() => ({}))
+      // Filtros u orden cambiados en vuelo: la tanda ya no es de este listado.
+      if (requestId !== listRequestRef.current) return
+      if (!res.ok) {
+        setError(data.error ?? "Error al cargar más productos")
+        return
+      }
+      const batch = (data.rows ?? []) as Product[]
+      setProducts((prev) => [...prev, ...batch])
+      setAvailability((prev) => ({ ...prev, ...(data.availability ?? {}) }))
+      setTotal(data.total ?? 0)
+      if (batch.length < pageSize) setEndOfList(true)
+      setPage(next)
+      await loadRowMeta(batch.map((r) => r.id), {
+        replace: false,
+        isStale: () => requestId !== listRequestRef.current,
+      })
+    } finally {
+      loadingMoreRef.current = false
+      setLoadingMore(false)
+    }
+  }
+
+  // El observador del centinela se registra una vez por tanda, así que llama
+  // siempre a la versión vigente de `loadMore` (con los filtros y la tanda
+  // actuales) en vez de a la del render en que se creó el observer.
+  const loadMoreFnRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    loadMoreFnRef.current = () => void loadMore()
+  })
+
+  // Centinela del scroll infinito: al acercarse al final del listado se pide la
+  // tanda siguiente. En la vista tabla el listado scrollea dentro de la tarjeta
+  // (el `thead` sticky necesita su propio scrollport), así que ahí se mide
+  // contra ese contenedor; en la vista grid, contra la ventana. Se re-registra
+  // en cada tanda para que un listado que no llena el scrollport encadene
+  // cargas hasta llenarlo, en vez de quedarse a medias.
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current
+    if (!sentinel || typeof IntersectionObserver === "undefined") return
+    if (!hasMore || loadingMore) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMoreFnRef.current()
+      },
+      { root: view === "table" ? tableScrollRef.current : null, rootMargin: "600px 0px" }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [view, hasMore, loadingMore, page])
 
   const categoryName = (id: number | null) =>
     categories.find((c) => c.id === id)?.name ?? "Sin categoría"
 
-  const toggleSort = (key: ProductSortKey) => setSort((prev) => nextProductSort(prev, key))
+  // Cambiar el orden reinicia el listado: lo cargado está ordenado por la clave
+  // anterior, así que una tanda nueva no puede añadirse al final.
+  const toggleSort = (key: ProductSortKey) => {
+    resetListToFirstBatch()
+    setSort((prev) => nextProductSort(prev, key))
+  }
 
   const sortIcon = (key: ProductSortKey) =>
     sort.key !== key ? (
@@ -870,12 +1009,11 @@ function AdminProductsContent() {
       <ArrowDown className="w-3 h-3 text-brand-600" aria-hidden="true" />
     )
 
-  // Paginación server-side: las filas actuales son la página completa.
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const currentPage = Math.min(page, totalPages)
-  const pageItems = products
+  // Scroll infinito: lo cargado hasta ahora es el listado completo visible,
+  // en el orden que devolvió el servidor.
+  const loadedItems = products
   // Selección de filas y ejecución de acciones en lote: se instancian aquí
-  // porque necesitan la página visible y el total que reporta la API.
+  // porque necesitan las filas cargadas y el total que reporta la API.
   const {
     selected,
     setSelected,
@@ -884,7 +1022,7 @@ function AdminProductsContent() {
     allFilteredSelected,
     clearSelection,
   } = useProductSelection({
-    pageIds: pageItems.map((p) => p.id),
+    pageIds: loadedItems.map((p) => p.id),
     total,
     buildListQuery: listParams,
     idsPerRequest: IDS_PER_REQUEST,
@@ -901,14 +1039,20 @@ function AdminProductsContent() {
     finishBulk,
     isCancelled,
   } = useBulkRunner({ notify: setToast })
-  // Incidencias de imagen de la página cargada (el sondeo es bajo demanda).
-  const brokenItems = pageItems.filter((p) => imageIssues[p.id])
+  // Incidencias de imagen de lo cargado (el sondeo es bajo demanda).
+  const brokenItems = loadedItems.filter((p) => imageIssues[p.id])
   const filterBroken = onlyBrokenImage && brokenItems.length > 0
+
+  /** Vuelve el listado a su primera tanda y al inicio del scroll. Lo usan los
+   *  cambios de filtros y de orden, que reemplazan todo lo cargado. */
+  function resetListToFirstBatch() {
+    setPage(1)
+    resetListScroll()
+  }
 
   function updateFilters(next: () => void) {
     next()
-    setPage(1)
-    resetListScroll()
+    resetListToFirstBatch()
   }
 
   // El scroll del listado vive dentro de la tarjeta en la vista tabla (para
@@ -920,17 +1064,6 @@ function AdminProductsContent() {
       return
     }
     if (typeof window !== "undefined") window.scrollTo({ top: 0 })
-  }
-
-  // Salto de página con acotado: la entrada libre del paginador puede llegar
-  // vacía, con decimales o fuera de rango.
-  function goToPage(next: number) {
-    const target = Number.isFinite(next)
-      ? Math.max(1, Math.min(totalPages, Math.trunc(next)))
-      : currentPage
-    setPage(target)
-    resetListScroll()
-    return target
   }
 
   // Deja el listado sin ningún filtro. La lista de filtros a limpiar sale del
@@ -971,7 +1104,7 @@ function AdminProductsContent() {
     availability[productId] ?? cities.length
 
   // ---------- Modal de ciudades ----------
-  // La selección puede abarcar todas las páginas, así que la disponibilidad de
+  // La selección puede abarcar todo el catálogo, así que la disponibilidad de
   // esos ids se pide al abrir (antes se tenía el mapa completo en memoria).
   const openCityModal = async (onlyProductId?: number) => {
     const ids = onlyProductId != null ? [onlyProductId] : [...selected]
@@ -1435,9 +1568,9 @@ function AdminProductsContent() {
   /** Revisa con el servidor si las imágenes responden (ronda 7). */
   async function checkImages() {
     if (checkingImages) return
-    // Con selección se revisa la selección (puede estar en otras páginas);
-    // sin selección, las filas visibles.
-    const targets = selected.size > 0 ? [...selected] : pageItems.map((p) => p.id)
+    // Con selección se revisa la selección (puede estar fuera de lo cargado);
+    // sin selección, las filas cargadas.
+    const targets = selected.size > 0 ? [...selected] : loadedItems.map((p) => p.id)
     if (targets.length === 0) {
       setToast("No hay productos que revisar")
       return
@@ -1576,7 +1709,7 @@ function AdminProductsContent() {
   const [bulkAiBusy, setBulkAiBusy] = useState(false)
   async function bulkGenerateImages() {
     if (selected.size === 0 || bulkAiBusy) return
-    // Los sin imagen pueden estar en otras páginas: datos frescos del servidor.
+    // Los sin imagen pueden estar fuera de lo cargado: datos frescos del servidor.
     setBulkAiBusy(true)
     setError(null)
     beginBulk()
@@ -1937,7 +2070,7 @@ function AdminProductsContent() {
   }
 
   // Vistas guardadas de filtros: la query canónica del listado (filtros + orden
-  // + vista + tamaño de página) en `localStorage`. La lógica vive en
+  // + vista + tamaño de tanda) en `localStorage`. La lógica vive en
   // `@/lib/product-filter-presets`, la misma fuente que la URL.
   const [savedViews, setSavedViews] = useState<ProductPreset[]>(() => {
     if (typeof window === "undefined") return []
@@ -2298,7 +2431,7 @@ function AdminProductsContent() {
         })
       )
       const finished = finishBulk(result)
-      // Los omitidos son los que no están en la página o no tienen precio base.
+      // Los omitidos son los que no están cargados o no tienen precio base.
       const skipped = ids.length - updated.length
       if (finished && skipped > 0) {
         setError(
@@ -2436,7 +2569,7 @@ function AdminProductsContent() {
     if (bulkSaving) return
     const stale = products.filter((p) => saleState(p) === "expired")
     if (stale.length === 0) {
-      setToast("No hay ofertas vencidas en esta página")
+      setToast("No hay ofertas vencidas entre los productos cargados")
       return
     }
     if (
@@ -2626,7 +2759,7 @@ function AdminProductsContent() {
     beginBulk()
     try {
       const ids = [...selected]
-      // Estado previo para el Deshacer (la selección puede estar en otra página).
+      // Estado previo para el Deshacer (la selección puede estar fuera de lo cargado).
       const previous = await fetchPreviousField(ids, "category_id")
       const result = await bulkPatch(ids, { category_id: categoryId }, bulkRunOptions())
       const { updated } = result
@@ -2678,7 +2811,7 @@ function AdminProductsContent() {
     beginBulk()
     try {
       const ids = [...selected]
-      // Los seleccionados pueden estar en otras páginas: precios frescos del servidor.
+      // Los seleccionados pueden estar fuera de lo cargado: precios frescos del servidor.
       const freshRows = await fetchProductsByIds(ids)
       if (!freshRows) throw new Error("Error al leer precios actuales")
       const current = new Map<number, Product>(freshRows.map((r) => [r.id, r]))
@@ -2897,7 +3030,7 @@ function AdminProductsContent() {
       title:
         selected.size > 0
           ? `Revisar si responden las imágenes de ${selected.size} producto(s) seleccionado(s)`
-          : "Revisar si responden las imágenes de los productos de esta página",
+          : "Revisar si responden las imágenes de los productos cargados",
       icon: checkingImages ? (
         <Loader2 className="w-4 h-4 animate-spin" />
       ) : (
@@ -2905,7 +3038,7 @@ function AdminProductsContent() {
       ),
       variant: "button",
       onClick: checkImages,
-      disabled: checkingImages || (selected.size === 0 && pageItems.length === 0),
+      disabled: checkingImages || (selected.size === 0 && loadedItems.length === 0),
     },
     {
       key: "new",
@@ -2990,7 +3123,7 @@ function AdminProductsContent() {
   // Chips de filtros activos: explican por qué el listado está recortado y
   // permiten quitar UN filtro sin abrir el panel "Filtros" (que en móvil está
   // plegado). Cada chip reutiliza el setter del control original y pasa por
-  // `updateFilters`, así que quitar un chip vuelve a la página 1 igual que
+  // `updateFilters`, así que quitar un chip vuelve a la primera tanda igual que
   // cambiar el filtro a mano.
   type ActiveFilterChip = { key: string; label: string; onRemove: () => void }
   const activeFilterChips: ActiveFilterChip[] = []
@@ -3677,7 +3810,7 @@ function AdminProductsContent() {
               type="button"
               onClick={() => setOnlyBrokenImage((v) => !v)}
               aria-pressed={onlyBrokenImage}
-              title="Imágenes de esta página que no responden (revisadas con «Revisar imágenes»)"
+              title="Imágenes de los productos cargados que no responden (revisadas con «Revisar imágenes»)"
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 onlyBrokenImage
                   ? "bg-red-600 text-white"
@@ -3956,7 +4089,7 @@ function AdminProductsContent() {
             onClick={clearExpiredSales}
             disabled={bulkSaving}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-700 text-white text-xs font-semibold hover:bg-amber-800 disabled:opacity-50"
-            title="Borra precio de oferta y ventana en los productos con oferta vencida de esta página"
+            title="Borra precio de oferta y ventana en los productos cargados con oferta vencida"
           >
             <Trash2 className="w-3.5 h-3.5" />
             Limpiar ofertas vencidas
@@ -4156,6 +4289,7 @@ function AdminProductsContent() {
               const key = e.target.value as ProductSortKey
               // La dirección la fija la clave (ventas arranca en descendente),
               // no la que traía la clave anterior.
+              resetListToFirstBatch()
               setSort({ key, dir: defaultProductSortDir(key) })
             }}
             title="Ordenar el listado por"
@@ -4169,7 +4303,10 @@ function AdminProductsContent() {
           </select>
           <button
             type="button"
-            onClick={() => setSort((prev) => ({ key: prev.key, dir: prev.dir === "asc" ? "desc" : "asc" }))}
+            onClick={() => {
+              resetListToFirstBatch()
+              setSort((prev) => ({ key: prev.key, dir: prev.dir === "asc" ? "desc" : "asc" }))
+            }}
             aria-label={`Dirección del orden: ${productSortDirLabel(sort.dir)}. Pulsa para invertir`}
             title={`Dirección: ${productSortDirLabel(sort.dir)}`}
             className="p-1 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700"
@@ -4183,7 +4320,10 @@ function AdminProductsContent() {
           {sort.key !== DEFAULT_PRODUCT_SORT.key && (
             <button
               type="button"
-              onClick={() => setSort(DEFAULT_PRODUCT_SORT)}
+              onClick={() => {
+                resetListToFirstBatch()
+                setSort(DEFAULT_PRODUCT_SORT)
+              }}
               aria-label="Volver al orden por defecto (nombre ascendente)"
               title="Orden por defecto"
               className="p-1 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-700"
@@ -4433,7 +4573,7 @@ function AdminProductsContent() {
       )}
 
       {/* Products: tabla o grid. `aria-busy` cubre el refetch del listado
-          (filtros, orden, página). Antes se atenuaba todo el bloque con
+          (filtros, orden, tanda). Antes se atenuaba todo el bloque con
           `opacity-60`, lo que bajaba el contraste del texto ya renderizado; ahora
           la señal de "actualizando" es el spinner de la cabecera (junto al
           conteo, en la región viva) y el anuncio `sr-only`, sin tocar el texto. */}
@@ -4513,7 +4653,7 @@ function AdminProductsContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(filterBroken ? brokenItems : pageItems).map((product) => {
+              {(filterBroken ? brokenItems : loadedItems).map((product) => {
                 const global = isGlobal(product.id)
                 const cityCount = citiesAvailableCount(product.id)
                 const edit = lastEdit[product.id]
@@ -4951,6 +5091,9 @@ function AdminProductsContent() {
               })}
             </tbody>
           </table>
+          {/* Centinela del scroll infinito: vive DENTRO del scrollport de la
+              tarjeta, que es contra quien se mide en la vista tabla. */}
+          <div ref={loadMoreSentinelRef} aria-hidden="true" className="h-4" />
           {total === 0 && !refreshing && emptyListState}
         </div>
       </div>
@@ -4963,7 +5106,7 @@ function AdminProductsContent() {
             emptyListState
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {(filterBroken ? brokenItems : pageItems).map((product) => (
+              {(filterBroken ? brokenItems : loadedItems).map((product) => (
                 <div
                   key={product.id}
                   className={`relative rounded-xl border transition-colors overflow-hidden ${
@@ -5101,96 +5244,60 @@ function AdminProductsContent() {
               ))}
             </div>
           )}
+          {/* Centinela del scroll infinito: en la vista grid el scrollport es
+              la ventana, así que se mide contra el viewport. */}
+          <div ref={loadMoreSentinelRef} aria-hidden="true" className="h-4" />
         </div>
       )}
 
-      {/* Fase 5 — paginación (compartida por ambas vistas) */}
-      {total > pageSize && (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5 bg-white rounded-xl border border-gray-200">
-            <p className="text-xs text-gray-600">
-              Mostrando {(currentPage - 1) * pageSize + 1}–
-              {Math.min(currentPage * pageSize, total)} de {total}
-            </p>
-            <div className="flex items-center gap-1">
+      {/* Scroll infinito: progreso, reintento manual y tamaño de tanda. El
+          centinela vive dentro de cada scrollport; este botón es el camino
+          accesible (y el que queda si no hay IntersectionObserver). */}
+      {total > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 sm:px-5">
+          <p className="text-xs text-gray-600">
+            Mostrando <span className="tabular-nums">{loadedItems.length}</span> de{" "}
+            <span className="tabular-nums">{total}</span>
+          </p>
+          <div className="flex items-center gap-2">
+            {hasMore ? (
               <button
-                onClick={() => goToPage(1)}
-                disabled={currentPage === 1}
-                aria-label="Primera página"
-                title="Primera página"
-                className="touch-target p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                type="button"
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+                className="touch-target inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-60"
               >
-                <ChevronsLeft className="w-4 h-4" />
+                {loadingMore ? (
+                  <>
+                    <Loader2 aria-hidden="true" className="w-3.5 h-3.5 animate-spin" />
+                    Cargando…
+                  </>
+                ) : (
+                  "Cargar más"
+                )}
               </button>
-              <button
-                onClick={() => goToPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                aria-label="Página anterior"
-                title="Página anterior"
-                className="touch-target p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              {/* `key={currentPage}` remonta el input cuando la página cambia
-                  (por botón, filtro o URL) para que el valor mostrado sea
-                  siempre el real sin sincronizar estado en un efecto. */}
-              <div className="flex items-center gap-1 px-1 text-xs font-medium text-gray-600">
-                <label htmlFor="products-page-jump" className="sr-only">
-                  Ir a la página
-                </label>
-                <input
-                  key={currentPage}
-                  id="products-page-jump"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={totalPages}
-                  defaultValue={currentPage}
-                  onBlur={(e) => {
-                    e.currentTarget.value = String(goToPage(Number(e.currentTarget.value)))
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key !== "Enter") return
-                    e.preventDefault()
-                    e.currentTarget.value = String(goToPage(Number(e.currentTarget.value)))
-                  }}
-                  className="w-12 rounded-lg border border-gray-200 bg-white px-1.5 py-1 text-center text-xs tabular-nums text-gray-700 focus:outline-none focus:border-brand-500"
-                />
-                <span aria-hidden="true">/</span>
-                <span className="tabular-nums">{totalPages}</span>
-              </div>
-              <button
-                onClick={() => goToPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                aria-label="Página siguiente"
-                title="Página siguiente"
-                className="touch-target p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => goToPage(totalPages)}
-                disabled={currentPage === totalPages}
-                aria-label="Última página"
-                title="Última página"
-                className="touch-target p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronsRight className="w-4 h-4" />
-              </button>
-              <select
-                value={pageSize}
-                onChange={(e) => updateFilters(() => setPageSize(Number(e.target.value)))}
-                aria-label="Productos por página"
-                className="ml-1 px-2 py-1 border border-gray-200 rounded-lg text-xs text-gray-600 bg-white focus:outline-none focus:border-brand-500"
-              >
-                {PAGE_SIZE_OPTIONS.map((n) => (
-                  <option key={n} value={n}>
-                    {n} / página
-                  </option>
-                ))}
-              </select>
-            </div>
+            ) : (
+              <span className="text-xs text-gray-500">Fin del listado</span>
+            )}
+            <select
+              value={pageSize}
+              onChange={(e) => updateFilters(() => setPageSize(Number(e.target.value)))}
+              aria-label="Productos por tanda"
+              className="px-2 py-1 border border-gray-200 rounded-lg text-xs text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n} / tanda
+                </option>
+              ))}
+            </select>
           </div>
-        )}
+          {/* Región viva: anuncia la carga sin repetir el conteo en cada tanda. */}
+          <span role="status" className="sr-only">
+            {loadingMore ? "Cargando más productos…" : ""}
+          </span>
+        </div>
+      )}
 
       {/* Input oculto para subir imagen de producto */}
       <input

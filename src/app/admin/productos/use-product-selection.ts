@@ -21,7 +21,7 @@ import {
  * cada render, así que un `useCallback` dependería de él y cambiaría igual.
  */
 export interface UseProductSelectionOptions {
-  /** Ids de la página visible, en el orden en que se muestran (para Shift+clic). */
+  /** Ids de las filas cargadas, en el orden en que se muestran (Shift+clic). */
   pageIds: number[]
   /** Total de resultados del filtro actual, según la API. */
   total: number
