@@ -178,6 +178,54 @@ son fichas de marca** en `public/images/products/ab-foods/<slug>.webp`. No hay
 foto real del proveedor y **no se bajan imágenes de terceros**: una ficha
 honesta es preferible a una foto ajena o a un `image_url` roto.
 
+## Privilegios de columna: qué puede leer la llave pública (`00192`, `00193`)
+
+**Regla, y aplica a toda tabla nueva:** `anon` y `authenticated` reciben
+`SELECT` **columna por columna**, nunca a nivel de tabla. El motivo es que RLS
+filtra **filas, no columnas**: una política `USING (true)` o `status = 'active'`
+deja la fila visible, y con un `GRANT SELECT` de tabla eso incluye **todas** sus
+columnas. Un `REVOKE SELECT (columna)` escrito *después* es **inerte** —Postgres
+subsume el privilegio de columna en el de tabla, el tropiezo que dejó escrito
+`00160`—, así que el orden es siempre `REVOKE` de tabla y después `GRANT` de
+columnas.
+
+Lo que quedó privado y quién lo lee entonces:
+
+| Tabla | Privadas | Las lee |
+| --- | --- | --- |
+| `products` | `cost`, `admin_note`, `low_stock_threshold`, `deleted_at`, `publish_at`, `unpublish_at` | El panel y el cron, con `service_role` |
+| `foodos_restaurants` | `platform_fee_percent`, los seis `stripe_*`, `submitted_at`, `review_note`, `reviewed_at`, `reviewed_by` | `connect-actions.ts` y el panel del dueño, con `service_role` |
+| `foodos_menu_items` | `cost` | `getFoodosPanelData` / `listMenuItems`, con `service_role` |
+
+Las listas viven en `src/lib/product-columns.ts` y `src/lib/foodos-columns.ts`
+porque el código las necesita para pedirlas: PostgREST expande `select("*")` a
+toda su caché, así que una sola columna sin privilegio **falla la consulta
+entera** con `42501`. Los contratos `product-columns.contract.test.ts` y
+`foodos-columns.contract.test.ts` comparan el SQL con el código y barren `src/`
+buscando lectores sin `service_role` que pidan una columna privada.
+
+### Dos excepciones que parecen fugas y no lo son
+
+- **`foodos_restaurants.user_id` es pública, y tiene que serlo.** 67 políticas
+  RLS del tipo «dueño» (`auth.uid() = user_id`, o un `EXISTS` que entra a
+  `foodos_restaurants` por `user_id`) están declaradas con rol `{public}`. Para
+  un visitante anónimo `auth.uid()` es `NULL`, así que nunca dan filas — pero
+  **igual se evalúan**, y evaluarlas exige leer la columna. Revocarla da
+  `42501 permission denied for table foodos_restaurants` y la tienda pública se
+  queda sin menú: es el fallo exacto que produjo la primera versión de `00193`.
+  Acotar esas 67 políticas a `{authenticated}` es semánticamente neutro pero
+  toca 54 tablas —`orders`, `profiles` y `wallets` incluidas—, y el premio es
+  esconder un UUID que **no es una credencial**. La guarda de `00193` afirma el
+  privilegio **en positivo** para que nadie lo «limpie» otra vez.
+- **`foodos_restaurants.transfer_clabe` / `transfer_bank` /
+  `transfer_beneficiary` son públicas a propósito**: el storefront las pinta en
+  la pantalla de éxito para que el comensal pague por transferencia SPEI. Son el
+  mecanismo de cobro, no un descuido.
+
+Si añades una política RLS que lea una columna privada, la consulta de esa tabla
+empieza a fallar con `42501` para `anon`. `foodos-columns.contract.test.ts` lo
+vigila sobre las migraciones.
+
 ## Flujo de cashback (Créditos Resurte)
 
 > Regla de negocio: **todas** las compras generan cashback a la tasa del nivel

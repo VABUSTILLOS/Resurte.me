@@ -37,6 +37,10 @@ vi.mock("@/lib/foodos-owner", () => ({ assertOwnRestaurant: mocks.assertOwnResta
 vi.mock("@/lib/foodos-order-create", () => ({ createFoodosOrder: mocks.createFoodosOrder }))
 vi.mock("@/lib/flotilla/deliveries", () => ({ quoteDelivery: mocks.quoteDelivery }))
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath, revalidateTag: vi.fn() }))
+// El menú se lee con el cliente de servicio desde 00193 (`foodos_menu_items.cost`
+// dejó de ser legible con la sesión); el doble de abajo lo apunta al mismo
+// cliente falso que usa la sesión.
+vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }))
 vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }))
@@ -48,6 +52,7 @@ vi.mock("@/lib/foodos-shift", async (importOriginal) => {
 })
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { createServiceClient } from "@/lib/supabase/service"
 
 import { NoOpenShiftError } from "@/lib/foodos-shift"
 
@@ -73,6 +78,7 @@ function operating(supabase: unknown) {
     actorEmail: USER.email ?? null,
   }
   mocks.getOperatingContext.mockResolvedValue(ctx as never)
+  vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
   return { supabase, user: USER, ownerUserId: USER.id, ctx } as never
 }
 const RESTAURANT_ROW = {

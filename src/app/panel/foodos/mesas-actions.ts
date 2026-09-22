@@ -40,6 +40,7 @@ import {
   type TableTicket,
 } from "@/lib/foodos-tables"
 import { requireFoodosFeature } from "@/lib/foodos-tier"
+import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
 import type {
   FoodosCombo,
@@ -162,6 +163,11 @@ export async function getMesasData(
   const { supabase, ownerUserId } = await requireFoodosAuth()
   await assertOwnRestaurant(supabase, ownerUserId, restaurantId)
 
+  // Mismo caso que en el mostrador: `foodos_menu_items.cost` es privada
+  // (00193) y la fila se usa como `FoodosMenuItem`. La propiedad ya se
+  // comprobó arriba y la consulta va acotada a `restaurantId`.
+  const menuDb = await createServiceClient()
+
   const scope = branchId ?? null
 
   const [
@@ -196,7 +202,7 @@ export async function getMesasData(
       .select("*")
       .eq("restaurant_id", restaurantId)
       .order("sort_order"),
-    supabase
+    menuDb
       .from("foodos_menu_items")
       .select("*")
       .eq("restaurant_id", restaurantId)

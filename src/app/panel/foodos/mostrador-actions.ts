@@ -27,6 +27,7 @@ import { quoteDelivery } from "@/lib/flotilla/deliveries"
 import { isPaymentMethod } from "@/lib/foodos-payments"
 import { findOpenShift, isNoOpenShiftError, requireOpenShift, type ShiftRow } from "@/lib/foodos-shift"
 import { requireFoodosFeature } from "@/lib/foodos-tier"
+import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
 import type {
   FoodosCombo,
@@ -106,6 +107,11 @@ export async function getMostradorData(
   const { supabase, ownerUserId } = await requireFoodosAuth()
   await assertOwnRestaurant(supabase, ownerUserId, restaurantId)
 
+  // El menú se lee con el cliente de servicio: `foodos_menu_items.cost` es
+  // privada (00193) y la fila se usa como `FoodosMenuItem`. La propiedad ya se
+  // comprobó arriba, y la consulta va acotada a `restaurantId`.
+  const menuDb = await createServiceClient()
+
   const scope = branchId ?? null
 
   const [restaurantRes, branchesRes, categoriesRes, itemsRes, combosRes, groupsRes, valuesRes, overridesRes, shift] =
@@ -125,7 +131,7 @@ export async function getMostradorData(
         .select("*")
         .eq("restaurant_id", restaurantId)
         .order("sort_order"),
-      supabase
+      menuDb
         .from("foodos_menu_items")
         .select("*")
         .eq("restaurant_id", restaurantId)

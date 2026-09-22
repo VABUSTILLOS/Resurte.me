@@ -73,6 +73,16 @@
   `canAccessTool(role, "foodos")` **además** del gate por nivel, y su copy —incluido
   el plural— pasa por `t()`; i18n no tiene ICU, así que el plural se resuelve con
   un helper (`plural(key, pluralKey, count)`).
+- **Las columnas privadas de FoodOS se leen con `service_role`** (`00193`):
+  `foodos_restaurants.platform_fee_percent`, los seis `stripe_*` y la moderación,
+  más `foodos_menu_items.cost`. `anon`/`authenticated` ya no tienen `SELECT` de
+  tabla sobre esas tablas —RLS filtra filas, no columnas—, así que
+  `getConnectStatus`, `loadOwnedRestaurant`, `getFoodosPanelData`,
+  `listMenuItems`, `syncWhatsAppCatalog` y `sendCatalogToCustomer` construyen el
+  cliente de servicio. **Eso saca a RLS de la ecuación: cada una de esas
+  lecturas tiene que comprobar la propiedad explícitamente** (`ctx.restaurantId`,
+  resuelto en servidor) y acotar la consulta a él. Detalle en
+  `supabase/ESQUEMA.md` §«Privilegios de columna».
 
 ## Verificación
 `npm test` (panel-*) + smoke a 375px: abrir sheet, cambiar de cocina, entrar a

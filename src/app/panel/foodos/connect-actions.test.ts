@@ -86,8 +86,13 @@ function setupSession(row: unknown) {
   return session
 }
 
-function setupService() {
-  const service = tableBuilder(null)
+/**
+ * Cliente de **servicio**: es el que lee la fila del restaurante desde `00193`
+ * (los `stripe_*` y `platform_fee_percent` dejaron de ser legibles con la
+ * sesión). Antes esta fila la servía el cliente de sesión.
+ */
+function setupService(row: unknown = null) {
+  const service = tableBuilder(row)
   vi.mocked(createServiceClient).mockResolvedValue({
     from: vi.fn(() => service.builder),
   } as never)
@@ -114,23 +119,25 @@ beforeEach(() => {
 
 describe("getConnectStatus", () => {
   it("deriva el estado del restaurante del usuario", async () => {
-    setupSession(RESTAURANT)
+    setupSession(null)
+    setupService(RESTAURANT)
     const status = await getConnectStatus("rest-1")
     expect(status?.state).toBe("active")
     expect(status?.accountId).toBe("acct_1")
     expect(status?.platformFeePercent).toBe(2)
   })
 
-  it("devuelve null cuando RLS no deja ver el restaurante", async () => {
+  it("devuelve null cuando el restaurante no existe", async () => {
     setupSession(null)
+    setupService(null)
     expect(await getConnectStatus("rest-1")).toBeNull()
   })
 })
 
 describe("startConnectOnboarding", () => {
   it("crea la cuenta Express, la persiste con el service client y devuelve el link", async () => {
-    setupSession({ ...RESTAURANT, stripe_account_id: null })
-    const service = setupService()
+    setupSession(null)
+    const service = setupService({ ...RESTAURANT, stripe_account_id: null })
 
     const result = await startConnectOnboarding("rest-1")
 
@@ -157,8 +164,8 @@ describe("startConnectOnboarding", () => {
   })
 
   it("reutiliza la cuenta existente sin crear otra", async () => {
-    setupSession(RESTAURANT)
-    const service = setupService()
+    setupSession(null)
+    const service = setupService(RESTAURANT)
 
     await startConnectOnboarding("rest-1")
 
@@ -171,7 +178,7 @@ describe("startConnectOnboarding", () => {
 
   it("falla cerrado si el restaurante no es del usuario", async () => {
     setupSession(null)
-    const service = setupService()
+    const service = setupService(null)
 
     await expect(startConnectOnboarding("rest-1")).rejects.toThrow(
       "Restaurante no encontrado"
@@ -181,13 +188,10 @@ describe("startConnectOnboarding", () => {
   })
 
   it("no genera link si la cuenta no se pudo persistir", async () => {
-    setupSession({ ...RESTAURANT, stripe_account_id: null })
-    const service = tableBuilder(null)
+    setupSession(null)
+    const service = setupService({ ...RESTAURANT, stripe_account_id: null })
     service.builder.then = (resolve: (value: unknown) => void) =>
       resolve({ data: null, error: { message: "permission denied" } })
-    vi.mocked(createServiceClient).mockResolvedValue({
-      from: vi.fn(() => service.builder),
-    } as never)
 
     await expect(startConnectOnboarding("rest-1")).rejects.toThrow(
       "No se pudo guardar la cuenta de cobros"
@@ -202,8 +206,8 @@ describe("startConnectOnboarding", () => {
 
 describe("refreshConnectStatus", () => {
   it("relee Stripe, sincroniza y devuelve el estado fresco", async () => {
-    setupSession({ ...RESTAURANT, stripe_payouts_enabled: false })
-    const service = setupService()
+    setupSession(null)
+    const service = setupService({ ...RESTAURANT, stripe_payouts_enabled: false })
     mocks.accountsRetrieve.mockResolvedValue(account())
 
     const status = await refreshConnectStatus("rest-1")
@@ -220,8 +224,8 @@ describe("refreshConnectStatus", () => {
   })
 
   it("no consulta Stripe si el restaurante no tiene cuenta", async () => {
-    setupSession({ ...RESTAURANT, stripe_account_id: null })
-    const service = setupService()
+    setupSession(null)
+    const service = setupService({ ...RESTAURANT, stripe_account_id: null })
 
     const status = await refreshConnectStatus("rest-1")
 
@@ -233,14 +237,16 @@ describe("refreshConnectStatus", () => {
 
 describe("openConnectDashboard", () => {
   it("devuelve el login link de la cuenta del restaurante", async () => {
-    setupSession(RESTAURANT)
+    setupSession(null)
+    setupService(RESTAURANT)
     const result = await openConnectDashboard("rest-1")
     expect(mocks.accountsCreateLoginLink).toHaveBeenCalledWith("acct_1")
     expect(result.url).toBe("https://connect.stripe.com/express")
   })
 
   it("no genera link sin cuenta de cobros", async () => {
-    setupSession({ ...RESTAURANT, stripe_account_id: null })
+    setupSession(null)
+    setupService({ ...RESTAURANT, stripe_account_id: null })
     await expect(openConnectDashboard("rest-1")).rejects.toThrow(
       "todavía no tiene cuenta de cobros"
     )

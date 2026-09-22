@@ -62,9 +62,13 @@ const CONNECT_COLUMNS =
 export async function getConnectStatus(
   restaurantId: string
 ): Promise<ConnectStatus | null> {
-  const { supabase, ctx } = await requireFoodosAuth()
+  const { ctx } = await requireFoodosAuth()
   if (!ctx.ownerUserId || restaurantId !== ctx.restaurantId) return null
-  const { data, error } = await supabase
+  // `stripe_*` y `platform_fee_percent` son privadas (00193): la lectura va con
+  // el cliente de servicio. La autorización ya ocurrió arriba y la consulta va
+  // acotada al restaurante autorizado, así que RLS no hacía falta aquí.
+  const service = await createServiceClient()
+  const { data, error } = await service
     .from("foodos_restaurants")
     .select(CONNECT_COLUMNS)
     .eq("id", restaurantId)
@@ -89,7 +93,9 @@ async function loadOwnedRestaurant(restaurantId: string) {
     throw new Error("Restaurante no encontrado")
   }
   const ownerUserId = ctx.ownerUserId
-  const { data, error } = await supabase
+  // Misma razón que en `getConnectStatus`: `CONNECT_COLUMNS` es privada (00193).
+  const service = await createServiceClient()
+  const { data, error } = await service
     .from("foodos_restaurants")
     .select(`id, name, user_id, ${CONNECT_COLUMNS}`)
     .eq("id", restaurantId)

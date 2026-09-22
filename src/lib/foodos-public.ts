@@ -6,6 +6,10 @@
 
 import { unstable_cache } from "next/cache"
 import { createPublicClient } from "@/lib/supabase/public"
+import {
+  PUBLIC_FOODOS_MENU_ITEM_SELECT,
+  PUBLIC_FOODOS_RESTAURANT_SELECT,
+} from "@/lib/foodos-columns"
 import type {
   FoodosRestaurant,
   FoodosBranch,
@@ -47,7 +51,7 @@ async function fetchPublicRestaurantBySlug(slug: string): Promise<PublicFoodosDa
 
   const { data: restaurant, error } = await supabase
     .from("foodos_restaurants")
-    .select("*")
+    .select(PUBLIC_FOODOS_RESTAURANT_SELECT)
     .eq("slug", slug)
     .eq("status", "active")
     .maybeSingle()
@@ -63,7 +67,7 @@ async function fetchPublicRestaurantBySlug(slug: string): Promise<PublicFoodosDa
       .order("sort_order"),
     supabase
       .from("foodos_menu_items")
-      .select("*")
+      .select(PUBLIC_FOODOS_MENU_ITEM_SELECT)
       .eq("restaurant_id", restaurant.id)
       .order("sort_order"),
     supabase.from("foodos_combos").select("*").eq("restaurant_id", restaurant.id),
@@ -97,7 +101,11 @@ async function fetchPublicRestaurantBySlug(slug: string): Promise<PublicFoodosDa
     : [{ data: [] as FoodosBranchHours[] }, { data: [] as FoodosBranchMenuOverride[] }]
 
   return {
-    restaurant: restaurant as FoodosRestaurant,
+    // `restaurant` viene del select público: tiene las 23 columnas de
+    // `PUBLIC_FOODOS_RESTAURANT_COLUMNS` y **no** las privadas (00193). El
+    // `as unknown as` es porque el tipo `FoodosRestaurant` describe la fila
+    // completa; la superficie pública nunca lee las que faltan.
+    restaurant: restaurant as unknown as FoodosRestaurant,
     branches: (branches.data as FoodosBranch[]) ?? [],
     categories: (categories.data as FoodosMenuCategory[]) ?? [],
     items: (items.data as FoodosMenuItem[]) ?? [],
@@ -125,13 +133,15 @@ async function fetchPublicMarketplace(): Promise<PublicMarketplaceEntry[]> {
 
   const { data: restaurants, error } = await supabase
     .from("foodos_restaurants")
-    .select("*")
+    .select(PUBLIC_FOODOS_RESTAURANT_SELECT)
     .eq("status", "active")
     .order("created_at", { ascending: false })
 
   if (error || !restaurants || restaurants.length === 0) return []
 
-  const ids = (restaurants as FoodosRestaurant[]).map((r) => r.id)
+  // Select público (00193): sin las columnas privadas. Ver el comentario del
+  // `restaurant` de arriba.
+  const ids = (restaurants as unknown as FoodosRestaurant[]).map((r) => r.id)
 
   const [branches, categories, items] = await Promise.all([
     supabase
@@ -146,7 +156,7 @@ async function fetchPublicMarketplace(): Promise<PublicMarketplaceEntry[]> {
       .order("sort_order"),
     supabase
       .from("foodos_menu_items")
-      .select("*")
+      .select(PUBLIC_FOODOS_MENU_ITEM_SELECT)
       .in("restaurant_id", ids)
       .eq("is_available", true),
   ])
@@ -164,7 +174,7 @@ async function fetchPublicMarketplace(): Promise<PublicMarketplaceEntry[]> {
     (i) => i.restaurant_id
   )
 
-  return (restaurants as FoodosRestaurant[]).map((restaurant) => ({
+  return (restaurants as unknown as FoodosRestaurant[]).map((restaurant) => ({
     restaurant,
     branches: branchesByRestaurant.get(restaurant.id) ?? [],
     categories: categoriesByRestaurant.get(restaurant.id) ?? [],

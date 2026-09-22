@@ -149,7 +149,14 @@ export async function getFoodosPanelData() {
   if (!ctx.restaurantId) return empty
 
   const db = ctx.client
-  const { data: restaurant, error: rErr } = await db
+  // `foodos_restaurants` y `foodos_menu_items` (abajo) se leen con el cliente
+  // de servicio: `00193` revocó `platform_fee_percent`, `review_note`, los
+  // `stripe_*` y `cost` para `anon`/`authenticated`, y el panel del dueño los
+  // necesita. La autorización **no** cambia —`requireFoodosAuth()` resolvió
+  // `ctx.restaurantId` en servidor y todas las consultas van acotadas a él—;
+  // solo cambia el rol con el que se ejecuta la lectura.
+  const service = await createServiceClient()
+  const { data: restaurant, error: rErr } = await service
     .from("foodos_restaurants")
     .select("*")
     .eq("id", ctx.restaurantId)
@@ -165,7 +172,7 @@ export async function getFoodosPanelData() {
       db.from("foodos_orders").select("*").eq("restaurant_id", r.id).order("created_at", { ascending: false }).limit(200),
       db.from("foodos_customers").select("*").eq("restaurant_id", r.id).order("total_spend", { ascending: false }).limit(500),
       db.from("foodos_menu_categories").select("*").eq("restaurant_id", r.id).order("sort_order"),
-      db.from("foodos_menu_items").select("*").eq("restaurant_id", r.id).order("sort_order"),
+      service.from("foodos_menu_items").select("*").eq("restaurant_id", r.id).order("sort_order"),
       db.from("foodos_combos").select("*").eq("restaurant_id", r.id).order("created_at"),
       db.from("foodos_upsell_rules").select("*").eq("restaurant_id", r.id).order("created_at"),
       db.from("foodos_automations").select("*").eq("restaurant_id", r.id).order("created_at"),
@@ -459,8 +466,16 @@ export async function listCategories(
 export async function listMenuItems(
   restaurantId: string
 ): Promise<FoodosMenuItem[]> {
-  const { supabase } = await requireFoodosAuth()
-  const { data, error } = await supabase
+  const { ctx } = await requireFoodosAuth()
+  // `foodos_menu_items.cost` es privada (00193), así que la lectura va con el
+  // cliente de servicio. Eso saca a RLS de la ecuación, y por eso la propiedad
+  // se comprueba aquí de forma explícita: `ctx.restaurantId` lo resolvió el
+  // servidor a partir del usuario (o de la cookie de soporte, ya validada).
+  if (!ctx.ownerUserId || restaurantId !== ctx.restaurantId) {
+    throw new Error("Restaurante no encontrado")
+  }
+  const service = await createServiceClient()
+  const { data, error } = await service
     .from("foodos_menu_items")
     .select("*")
     .eq("restaurant_id", restaurantId)
@@ -1707,7 +1722,12 @@ export async function reorderWhatsAppCatalog(
 export async function syncWhatsAppCatalog(
   restaurantId: string
 ): Promise<{ added: number; removed: number }> {
-  const { supabase } = await requireFoodosAuth()
+  const { supabase, ctx } = await requireFoodosAuth()
+  // La lectura de platillos va con el cliente de servicio (`cost` es privada,
+  // 00193) y eso saca a RLS de la ecuación: la propiedad se comprueba aquí.
+  if (!ctx.ownerUserId || restaurantId !== ctx.restaurantId) {
+    throw new Error("Restaurante no encontrado")
+  }
 
   // Verificar propiedad y conexión
   const { data: conn } = await supabase
@@ -1718,17 +1738,16 @@ export async function syncWhatsAppCatalog(
   if (!conn) throw new Error("Primero conecta tu WhatsApp Business")
   if (conn.status !== "connected") throw new Error("La conexión de WhatsApp tiene un error; revísala")
 
-  const { data: items, error: itemsErr } = await supabase
+  const service = await createServiceClient()
+  const { data: items, error: itemsErr } = await service
     .from("foodos_menu_items")
     .select("*")
     .eq("restaurant_id", restaurantId)
   if (itemsErr) throw new Error(itemsErr.message)
 
   const { getRestaurantWhatsAppConfig, buildCatalogProducts } = await import("@/lib/foodos-whatsapp")
-  const { createServiceClient } = await import("@/lib/supabase/service")
   const { syncCatalog } = await import("@/lib/whatsapp")
 
-  const service = await createServiceClient()
   const config = await getRestaurantWhatsAppConfig(service, restaurantId)
   if (!config) throw new Error("No se pudieron leer las credenciales")
 
@@ -1745,7 +1764,12 @@ export async function sendCatalogToCustomer(
   restaurantId: string,
   toPhone: string
 ): Promise<void> {
-  const { supabase } = await requireFoodosAuth()
+  const { supabase, ctx } = await requireFoodosAuth()
+  // Misma razón que en `syncWhatsAppCatalog`: `cost` es privada (00193), la
+  // lectura va con el cliente de servicio y la propiedad se comprueba aquí.
+  if (!ctx.ownerUserId || restaurantId !== ctx.restaurantId) {
+    throw new Error("Restaurante no encontrado")
+  }
   const { data: conn } = await supabase
     .from("foodos_whatsapp_connections")
     .select("status")
@@ -1753,8 +1777,9 @@ export async function sendCatalogToCustomer(
     .maybeSingle()
   if (conn?.status !== "connected") throw new Error("Conecta tu WhatsApp Business primero")
 
+  const service = await createServiceClient()
   const [itemsRes, catsRes] = await Promise.all([
-    supabase.from("foodos_menu_items").select("*").eq("restaurant_id", restaurantId),
+    service.from("foodos_menu_items").select("*").eq("restaurant_id", restaurantId),
     supabase.from("foodos_menu_categories").select("*").eq("restaurant_id", restaurantId),
   ])
   if (itemsRes.error) throw new Error(itemsRes.error.message)
@@ -1765,9 +1790,6 @@ export async function sendCatalogToCustomer(
     (catsRes.data as FoodosMenuCategory[]) ?? []
   )
   if (sections.length === 0) throw new Error("Tu catálogo de WhatsApp está vacío")
-
-  const { createServiceClient } = await import("@/lib/supabase/service")
-  const service = await createServiceClient()
   const config = await wa.getRestaurantWhatsAppConfig(service, restaurantId)
   if (!config) throw new Error("No se pudieron leer las credenciales")
 
