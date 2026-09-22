@@ -140,6 +140,36 @@ los datos ya existentes.
 4. `stock_status` es un ENUM `in_stock | low_stock | out_of_stock`. No hay
    inventario numérico.
 
+## Precios de proveedor y margen (migración `00191`)
+
+Los 51 artículos de **AB Foods** (lista mayoreo vigente al 10-sep-2026) se
+publicaron con una regla que conviene no romper:
+
+- **`price = CEIL(product_suppliers.cost × 1.18)`.** El costo sale de
+  `product_suppliers` —la fuente única, revocada para `anon`/`authenticated`—,
+  **no** de 51 números escritos a mano: re-ejecutar `00191` recalcula lo mismo.
+  El `CEIL` garantiza que el precio nunca quede por debajo del 18% de margen
+  ($979.90 → $1,157; $61.90 → $74).
+- **La `description` de un producto publicado no puede llevar el costo.** El
+  seed original (`supabase/seed_ab_foods.sql`, commit `2d8ae2d6`) lo escribía
+  ahí (`"… costo mayoreo $979.90 MXN …"`) porque los productos nacían **ocultos**;
+  al publicarlos ese texto le mostraría nuestro costo de compra a cualquier
+  visitante. `00191` reescribe las 51 descripciones.
+- **`products.cost` se queda `NULL` a propósito.** Es una columna **legible con
+  la llave pública**: `src/lib/data.ts` hace `select("*")` y PostgREST expone
+  toda columna con `GRANT SELECT` de tabla (verificado: `GET
+  /rest/v1/products?select=cost` responde `200`). Escribir ahí el costo de
+  compra lo publicaría. Consecuencia asumida: la "oferta por margen objetivo" de
+  `/admin/productos` **no aplica** a estos 51 productos. Arreglarlo bien exige
+  cambiar el `select("*")` por una lista explícita de columnas y revocar la
+  columna — pendiente, no hecho.
+
+Las imágenes de esos 51 viven en dos sitios: **29 reutilizan** un `.webp` que ya
+estaba en `public/images/products/**` (misma comida, otra presentación) y **22
+son fichas de marca** en `public/images/products/ab-foods/<slug>.webp`. No hay
+foto real del proveedor y **no se bajan imágenes de terceros**: una ficha
+honesta es preferible a una foto ajena o a un `image_url` roto.
+
 ## Flujo de cashback (Créditos Resurte)
 
 > Regla de negocio: **todas** las compras generan cashback a la tasa del nivel

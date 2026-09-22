@@ -1,5 +1,5 @@
 import { getIsoWeekMonday } from "@/lib/price-index"
-import { isSupabaseConfigured, supabaseUrl } from "@/lib/supabase/env"
+import { isSupabaseConfigured, supabaseServiceKey } from "@/lib/supabase/env"
 import { createServiceClient } from "@/lib/supabase/service"
 
 // ============================================================
@@ -55,7 +55,9 @@ export async function refreshPriceIndex(options?: {
   }
 
   // Sin Supabase utilizable no hay nada que recalcular: no es un error.
-  if (!isSupabaseConfigured() || !supabaseUrl() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  // `isSupabaseConfigured()` ya cubre la URL; la clave de servicio se pide con
+  // el filtro de placeholders para que un `[SENSITIVE]` cuente como ausente.
+  if (!isSupabaseConfigured() || !supabaseServiceKey()) {
     return {
       ...base,
       status: "skipped",

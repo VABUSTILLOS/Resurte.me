@@ -1,6 +1,18 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import robots from "@/app/robots"
 import { AI_CRAWLERS, AI_SEARCH_CRAWLERS, CITABLE_AI_CRAWLERS } from "./ai-crawlers"
+
+// Este archivo vigila el robots.txt **de producción**. Fuera de producción
+// `robots()` devuelve `disallow: "/"` (para que una copia en un preview no
+// compita con el sitio real), y entonces este contrato no aplica; ese caso lo
+// cubre `src/app/robots.test.ts`.
+beforeEach(() => {
+  vi.stubEnv("VERCEL_ENV", "production")
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
 
 type Rule = { userAgent?: string | string[]; allow?: string | string[]; disallow?: string | string[] }
 

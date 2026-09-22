@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next"
+import { isProductionDeploy } from "@/lib/deploy-env"
 import { AI_SEARCH_CRAWLERS } from "@/lib/ai-crawlers"
 
 // Crawlers de búsqueda con IA (ChatGPT, Perplexity, Claude, Copilot, etc.).
@@ -16,6 +17,14 @@ import { AI_SEARCH_CRAWLERS } from "@/lib/ai-crawlers"
 // Amazonbot, ImagesiftBot).
 
 export default function robots(): MetadataRoute.Robots {
+  // Fuera de producción no se indexa nada. Una copia (preview, sandbox de
+  // staging) que herede este robots competiría en Google con el sitio real por
+  // contenido duplicado. Falla hacia noindex a propósito: solo producción se
+  // identifica positivamente, vía `VERCEL_ENV`.
+  if (!isProductionDeploy()) {
+    return { rules: [{ userAgent: "*", disallow: "/" }] }
+  }
+
   return {
     rules: [
       {

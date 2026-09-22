@@ -119,35 +119,186 @@ Si el proyecto Vercel está en plan **Hobby**, el límite es **2 crons** — añ
 > Wallet, CFDI) y las que ya están cableadas en el código pero apagadas (Resend,
 > WhatsApp, VAPID, Uber Direct, SMS, Kie.ai, SMTP propio de Supabase).
 >
-> ⚠️ **Empieza por la §0 de esa guía**, no por las credenciales: hay una
-> **rotación pendiente de la contraseña de Postgres** (más abajo en esta misma
-> sección) que es el único riesgo vivo de la lista y no cuesta nada cerrar.
+> ⚠️ **Empieza por la §0 de esa guía** y por las tres subsecciones de arriba
+> (*recuperar el entorno local*, *rotar sin tumbar el sitio* y *ambiente local,
+> staging y producción*): dicen qué llave se puede leer, cuál no y cuál no debe
+> cruzar a un sandbox.
+
+### Recuperar el entorno local sin tocar producción
+
+`.env.local` **no se regenera con `vercel env pull`**. La CLI no puede descifrar
+las variables marcadas como *Sensitive*: escribe el literal `[SENSITIVE]` en su
+lugar y borra las llaves reales. Pasó el 17-sep-2026 con 21 variables, y el daño
+no fue perderlas sino que la pérdida entró **en silencio** — `[SENSITIVE]` es una
+cadena con contenido, así que pasa los guardas de "¿existe?" y las fallas
+aparecen después disfrazadas de 404, de estado vacío o de 401 opaco.
+
+Para inspeccionar **nombres** sin tocar nada, volcar a un archivo aparte:
+
+```bash
+vercel env pull .env.vercel-pull --environment=production   # nunca sobre .env.local
+```
+
+**Recuperar es leer; rotar es cambiar.** Todo lo que se pueda copiar de un panel
+se copia, y no se pulsa *Reset database password* ni *Revoke key*:
+
+| Variable | De dónde se copia (solo lectura) |
+| --- | --- |
+| `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET` | Supabase → *Project Settings → API* → *Reveal* |
+| `SUPABASE_SECRET_KEY` (`sb_secret_…`) | *Project Settings → API Keys*. Se muestra una sola vez: si se perdió, **crear una adicional** (es aditivo, las existentes siguen funcionando) |
+| `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe → *Developers → API keys* → *Reveal live key* |
+| `STRIPE_WEBHOOK_SECRET` | Stripe → *Developers → Webhooks* → endpoint → *Reveal* signing secret |
+| `POSTGRES_*` | Supabase → *Project Settings → Database → Connection string* |
+| `NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_EXIT_INTENT_COUPON` | Ya están en `.env.prod` (volcado de Production) |
+
+Cinco variables **no se recuperan de ningún panel** porque se muestran una sola
+vez al crearlas. `npm run env:doctor` las lista con qué hacer en cada caso:
+`POSTGRES_PASSWORD`, `CRON_SECRET`, `FOODOS_WA_ENCRYPTION_KEY`, `OPENAI_API_KEY` y
+`SUPABASE_SECRET_KEY`. Ninguna obliga a rotar nada: `POSTGRES_*` no lo lee la app
+(0 referencias en `src/`), `CRON_SECRET` lo inyecta Vercel por su cuenta en la
+cabecera del cron, y las otras tres admiten una llave nueva **aditiva**.
+
+> **`npm run env:doctor`** es el comando que responde "¿está completo mi
+> entorno?" sin imprimir jamás un valor: clasifica cada variable en *ok*, *vacía*
+> o *placeholder*, avisa si `NEXT_PUBLIC_SUPABASE_URL` apunta al proyecto de
+> producción y sale con código 1 si queda algún `[SENSITIVE]` o falta una
+> variable obligatoria. Funciona igual en tu máquina y dentro de un sandbox, así
+> que sirve también para auditar los *Secrets* de staging.
+
+### Rotar una llave sin tumbar el sitio
+
+Vercel aplica los cambios de variables **solo en el siguiente despliegue**, así
+que toda rotación tiene la misma forma: crear el valor nuevo en el proveedor
+**dejando vivo el viejo** → actualizar Vercel → redeploy → verificar → revocar el
+viejo.
+
+| Llave | ¿Cero downtime? | Por qué |
+| --- | --- | --- |
+| `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | ✅ | Stripe admite varias llaves vivas: la vieja sigue cobrando durante la ventana |
+| `STRIPE_WEBHOOK_SECRET` | ✅ | Stripe muestra dos signing secrets durante la rotación |
+| `SUPABASE_SECRET_KEY` | ✅ | Las API keys nuevas son aditivas |
+| `CRON_SECRET` | ✅ | Vercel (cabecera del cron) y la app leen la misma variable: el redeploy los sincroniza |
+| `POSTGRES_PASSWORD` + `POSTGRES_*` | ✅ | El código **nunca** lee `POSTGRES_*`: solo afecta a `psql` y a `supabase db push` |
+| `SUPABASE_SERVICE_ROLE_KEY` | ⚠️ | Se firma con el JWT secret; hay que actualizar el trío (JWT secret + `service_role` + anon) y redeployar en el mismo acto |
+| `FOODOS_WA_ENCRYPTION_KEY` | ⚠️ | No basta la variable: hay que **re-cifrar** `foodos_whatsapp_connections.access_token_enc` y `whatsapp_catalogs.access_token_enc` en el mismo movimiento |
+| `SUPABASE_JWT_SECRET` | ❌ | Valor único: al regenerarlo mueren todas las sesiones y las llaves legacy dejan de validar |
+
+### Ambiente local, staging y producción
+
+El repo tiene tres ambientes y **solo uno cobra dinero real**. La regla es que
+las llaves de producción no cruzan a los otros dos.
+
+| | Local (tu máquina) | Staging (sandbox de edición) | Producción (Vercel) |
+| --- | --- | --- | --- |
+| Supabase | proyecto de producción (por eso `env:doctor` avisa) | **proyecto aparte**, con las migraciones aplicadas | producción |
+| Stripe | llave live, con `ALLOW_LIVE_STRIPE=1` | llaves de **modo test** | llave live |
+| Indexable | no | **no** | sí |
+
+Dos guardarraíles en el código, y ambos fallan hacia el lado seguro:
+
+- **`src/lib/deploy-env.ts`** — `isProductionDeploy()` responde
+  `VERCEL_ENV === "production"`, que Vercel inyecta por su cuenta. Solo producción
+  se identifica **positivamente**.
+- **`src/app/robots.ts`** — fuera de producción devuelve `disallow: "/"`. Una
+  copia en un dominio de preview no compite en Google con el sitio real.
+- **`src/lib/stripe.ts`** — `getStripe()` **rechaza** una llave `sk_live_…` fuera
+  de producción. El escenario que evita: el sandbox de staging hereda la llave
+  real y una prueba cobra de verdad. `ALLOW_LIVE_STRIPE=1` es la válvula
+  explícita para probar contra la cuenta real **desde tu máquina**; no se pone en
+  Vercel ni en staging.
+
+⚠️ Nunca dejes `VERCEL_ENV` en `.env.local`: el volcado de Vercel lo escribe, y
+desde entonces tu entorno local se cree producción y desactiva los dos
+guardarraíles. `npm run env:doctor` lo marca como error.
+
+#### Montar el staging (una sola vez)
+
+1. **Proyecto Supabase aparte.** *New project* → `resurte-staging`, misma
+   organización y región (`us-east-2`) que producción. No reutilices el proyecto
+   de producción "sólo para probar un rato": es la única forma de que un sandbox
+   con `service_role` no pueda tocar datos de clientes.
+
+   ⚠️ **Antes de intentarlo, mira los cupos.** El plan Free permite **2 proyectos
+   activos por organización**, y esta organización ya tiene 2 (`Hustle Alliance`
+   en `us-east-1` y `Resurte.me` en `us-east-2`, ambos `ACTIVE_HEALTHY` — se ve
+   con `npx supabase projects list`). Para crear el staging hay que **liberar un
+   cupo** (pausar o borrar el que no se use) o pasar a un plan de pago. Confirma
+   el estado en el dashboard antes de asumir que el `create` va a pasar.
+2. **Aplicar el esquema** desde las migraciones versionadas del repo. ⚠️ La CLI
+   **solo puede estar enlazada a un proyecto a la vez** y este checkout está
+   enlazado a **producción** (`supabase/.temp/`), así que un `supabase link` a
+   staging dejaría `npm run db:status` apuntando a la base equivocada. Se aplica
+   **sin relinkear**:
+
+   ```bash
+   npx supabase db push --project-ref <ref-staging> --password <password-staging> --dry-run
+   npx supabase db push --project-ref <ref-staging> --password <password-staging>
+   ```
+
+3. **Stripe en modo test.** El interruptor *Test mode* del dashboard es un espacio
+   separado, con llaves `sk_test_…` / `pk_test_…` y su propio signing secret. Cero
+   contacto con el dinero real.
+4. **Capturar los *Secrets* del sandbox.** El import de Softgen **no trae
+   variables de entorno**: se capturan a mano en su panel *Secrets*, y solo con
+   valores de staging.
+
+   | Se pone | No se pone nunca |
+   | --- | --- |
+   | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` **de staging** | Cualquier valor del proyecto Supabase de producción |
+   | `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` **de test** | `STRIPE_SECRET_KEY` live |
+   | `CRON_SECRET` y `FOODOS_WA_ENCRYPTION_KEY` **nuevos** | `SUPABASE_JWT_SECRET` de producción |
+   | `ADMIN_EMAILS`, `NEXT_PUBLIC_SITE_URL` (URL del preview) | `ALLOW_LIVE_STRIPE` |
+
+   Regla mental: **si la llave sirve para tocar dinero, clientes o sesiones
+   reales, no cruza.**
+5. **Verificar dentro del sandbox**: `npm run env:doctor` (lee el entorno
+   inyectado cuando no hay `.env.local`).
+6. **El código no entra directo a `main`.** El import crea una **copia del repo
+   gestionada por Softgen** y te invita como colaborador; los cambios entran a
+   `VABUSTILLOS/Resurte.me` por PR, y producción despliega solo desde `main`.
+   Confirma en el import dónde vive esa copia antes de definir el flujo.
 
 ### Rotación de `CRON_SECRET`
 1. Vercel → Project → Settings → Environment Variables → editar `CRON_SECRET` → **nuevo valor largo y aleatorio** (p.ej. `openssl rand -hex 32`).
 2. Re-deployar (los cambios de env aplican al siguiente deploy).
 3. Verificar un cron manualmente (sección 5).
 
-### ⚠️ Contraseña de Postgres: rotación pendiente (incidente 17-sep-2026)
+### Contraseña de Postgres: rotación opcional (revisado 19-sep-2026)
 
-`supabase/.temp/pooler-url` —estado local que genera el CLI de Supabase— contiene la
-cadena de conexión del rol **`postgres` (superusuario) con contraseña en claro**, y
-estuvo **versionado en un repositorio público** (`VABUSTILLOS/Resurte.me`, 6 commits
-desde `2bee041`, un único blob ⇒ la contraseña nunca se rotó). Da acceso total a la
-base de producción: pedidos, direcciones y datos de clientes.
+**Corrección.** Esta sección afirmaba que `supabase/.temp/pooler-url` —estado
+local que genera el CLI de Supabase— contenía la cadena de conexión del rol
+**`postgres` (superusuario) con contraseña en claro**, versionada en un
+repositorio público (6 commits desde `2bee041`), y que por eso había que rotarla
+con urgencia.
 
-Ya está destrackeado y en `.gitignore`, pero **eso no revoca nada**: el historial ya
-está indexado y el secreto debe considerarse comprometido.
+Verificado el contenido versionado, **el archivo no lleva contraseña**. Hay un
+solo blob en todo el historial, y su contenido es
+`postgresql://postgres.<ref>@aws-0-us-east-2.pooler.supabase.com:5432/postgres`
+(92 bytes, sin segmento de contraseña):
 
-1. **Rotar ya**: Dashboard de Supabase → *Project Settings → Database → Reset database
-   password*. Es la única mitigación real; el historial es público e irreversible
-   sin reescritura forzada.
-2. Actualizar el secreto donde se use (`POSTGRES_PASSWORD` / `POSTGRES_URL*` en Vercel).
-3. Si además se quiere limpiar el historial: `git filter-repo --path supabase/.temp/
-   --invert-paths` y force-push coordinado. Hazlo **después** de rotar, no en lugar
-   de rotar.
-4. Regla permanente: nada de `supabase/.temp/` ni de `.env*` en git. El CLI regenera
-   `supabase/.temp/` en cada `supabase link`.
+```bash
+git rev-list --all --objects | grep 'supabase/.temp/pooler-url'  # un único blob
+git cat-file -p <blob>                                          # sin credenciales
+```
+
+El archivo **sí estuvo versionado**, pero lo que expone es el host del pooler y
+el nombre de usuario, que revelan el *project ref* — ya público de todos modos:
+viaja en `NEXT_PUBLIC_SUPABASE_URL` y en el bundle del cliente. **No es una
+credencial y no hay nada que revocar por este motivo.** Si en su momento se vio
+una contraseña en un archivo local, nunca se llegó a versionar.
+
+Lo que sigue en pie:
+
+1. **La rotación es opcional, no urgente.** Y si se hace, es la más barata de
+   todas: el código **nunca** lee `POSTGRES_*` (0 referencias en `src/`), así que
+   el sitio no se entera. Solo hay que actualizar `POSTGRES_PASSWORD` /
+   `POSTGRES_URL*` en Vercel y guardar la contraseña nueva donde uses `psql`.
+2. **Regla permanente**: nada de `supabase/.temp/` ni de `.env*` en git. El CLI
+   regenera `supabase/.temp/` en cada `supabase link`. La regla nunca dependió de
+   que ese archivo llevara un secreto, y sigue siendo correcta.
+3. Si se quiere limpiar el historial de todas formas:
+   `git filter-repo --path supabase/.temp/ --invert-paths` y force-push
+   coordinado.
 
 ---
 

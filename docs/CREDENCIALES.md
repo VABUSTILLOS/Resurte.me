@@ -14,26 +14,36 @@
 
 ---
 
-## 0. Lo urgente no es conseguir: es revocar
+## 0. Antes de la lista: qué se puede leer y qué no
 
-Antes de la lista, el único punto de esta guía con **riesgo vivo**.
+**Corrección (19-sep-2026).** Esta sección abría con una alarma: que
+`supabase/.temp/pooler-url` —estado local que genera el CLI de Supabase— contenía
+la cadena de conexión del rol **`postgres` (superusuario) con contraseña en
+claro**, versionada en el repositorio público `VABUSTILLOS/Resurte.me`, y que por
+eso había que rotarla **ya**.
 
-`docs/OPS.md §3` («Contraseña de Postgres: rotación pendiente») documenta que
-`supabase/.temp/pooler-url` —estado local que
-genera el CLI de Supabase— contiene la cadena de conexión del rol **`postgres`
-(superusuario) con contraseña en claro**, y que **estuvo versionado en el
-repositorio público** `VABUSTILLOS/Resurte.me` durante **6 commits** desde
-`2bee041`. Un único blob ⇒ **la contraseña nunca se rotó**. Da acceso total a la
-base de producción: pedidos, direcciones y datos de clientes.
+Verificado el contenido que sí se versionó, **el archivo no lleva contraseña**:
+hay un solo blob en todo el historial y su contenido es
+`postgresql://postgres.<ref>@aws-0-us-east-2.pooler.supabase.com:5432/postgres`,
+sin segmento de credencial. Lo que expone es el host del pooler y el usuario, que
+revelan el *project ref* — ya público de todos modos, porque viaja en
+`NEXT_PUBLIC_SUPABASE_URL` y en el bundle del cliente. **No hay nada que revocar
+por ese motivo.** El detalle y los comandos están en `docs/OPS.md §3`.
 
-Ya está destrackeado y en `.gitignore`, pero **eso no revoca nada**: el historial
-está indexado y el secreto debe considerarse comprometido.
+Lo que sí importa antes de conseguir cualquier credencial nueva:
 
-| Paso | Dónde | Qué hacer |
-|---|---|---|
-| 1 | Supabase Dashboard → *Project Settings* → *Database* → **Reset database password** | Rotar **ya**. Es la única mitigación real. |
-| 2 | Vercel → Settings → Environment Variables | Actualizar `POSTGRES_PASSWORD` y `POSTGRES_URL*` con la contraseña nueva. |
-| 3 | *(opcional)* `git filter-repo --path supabase/.temp/ --invert-paths` + force-push coordinado | Limpiar el historial **después** de rotar, no en lugar de rotar. |
+- **Recuperar no es rotar.** Si lo que falta son las llaves del entorno local, se
+  copian de los paneles (*Recuperar el entorno local sin tocar producción*,
+  `docs/OPS.md §3`). Copiar no cambia nada en producción; rotar sí.
+- **Cinco llaves se muestran una sola vez** y no salen de ningún panel:
+  `POSTGRES_PASSWORD`, `CRON_SECRET`, `FOODOS_WA_ENCRYPTION_KEY`,
+  `OPENAI_API_KEY` y `SUPABASE_SECRET_KEY`. `npm run env:doctor` dice qué hacer
+  con cada una. Ninguna obliga a rotar: `POSTGRES_URL` no lo lee la app, y las
+  demás admiten una llave nueva aditiva.
+- **Las llaves de producción no cruzan a un sandbox de edición** (Softgen u otro).
+  Un sandbox con `service_role` bypassa RLS sobre pedidos, direcciones y datos de
+  clientes, y con una llave live de Stripe cobra de verdad. Ver *Ambiente local,
+  staging y producción* en `docs/OPS.md §3`.
 
 **Regla permanente:** nada de `supabase/.temp/` ni de `.env*` en git. El CLI
 regenera `supabase/.temp/` en cada `supabase link`.

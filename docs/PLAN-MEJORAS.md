@@ -2860,6 +2860,92 @@ fortalecimiento no encendió ninguna capacidad: Wallet sigue en 501, POS sigue
 `implemented: false`, el cron sigue fail-closed sin su secreto. Lo único que cambió es
 **lo que el repo sabe sobre sí mismo**. Sin commit: el árbol sigue siendo del usuario.
 
+### Ronda 27 — El entorno que se borraba solo
+
+**Origen.** *«Necesito tener mis env keys y no las tengo actualmente»*. `.env.local`
+era un volcado de `vercel env pull`, y **21 variables estaban en `[SENSITIVE]`**: la
+CLI de Vercel no puede descifrar las marcadas como *Sensitive*, así que escribe ese
+literal en vez del valor. La app arrancaba igual, y las fallas aparecían después
+disfrazadas de 404, de estado vacío o de 401 opaco — exactamente los síntomas que
+`docs/OPS.md §3` ya documentaba para las dos variables que se habían reparado a mano
+el 17-sep.
+
+**El diagnóstico: perder las llaves fue el daño; que entrara en silencio fue el
+problema.** `[SENSITIVE]` **es una cadena con contenido**, así que todo guarda de
+«¿existe?» la da por buena. Y ahí estaba el hueco real:
+`src/lib/supabase/env.ts` **ya tenía el guarda correcto** —un `PLACEHOLDERS` con
+`[SENSITIVE]`, `your-project-url` y compañía, más un `isUsable()`— pero **solo lo
+usaban la URL y la anon key**. El tercer consumidor, `createServiceClient()`,
+validaba `!url || !serviceRoleKey` en crudo: construía un cliente con una llave
+falsa y la falla salía como 401 —o como un problema de RLS— en vez de como «falta
+configurar el entorno». `price-index-refresh.ts` comprobaba veracidad por el mismo
+camino. **La regla existía y no llegaba a todos sus consumidores**, que es un modo
+de fallo distinto de «la regla no existe» y más difícil de ver: el archivo con el
+guarda está bien escrito y su lectura da confianza.
+
+**Lo que se añadió.**
+- `supabaseServiceKey()` en `src/lib/supabase/env.ts`, reutilizando el guarda que ya
+  estaba ahí, y usada por `service.ts` y `price-index-refresh.ts`.
+- **`npm run env:doctor`** (`scripts/env-doctor.mjs`): clasifica cada variable en
+  *ok / vacía / placeholder*, avisa si `NEXT_PUBLIC_SUPABASE_URL` apunta al proyecto
+  de producción, distingue las cinco llaves que **no se recuperan de ningún panel**
+  (se muestran una sola vez) y sale con código 1 si queda un `[SENSITIVE]`. **Nunca
+  imprime un valor**, y funciona igual en la máquina y dentro de un sandbox, porque
+  lee `.env.local` cuando existe y el entorno inyectado cuando no.
+- **`src/lib/deploy-env.ts`** + `robots.ts` + `stripe.ts`: los tres guardarraíles del
+  apartado siguiente.
+
+**La pregunta que trajo el resto: cómo editar desde el celular sin filtrar
+producción.** La intención era cargar las llaves en un builder de terceros. Ahí el
+`service_role` bypassa RLS por diseño (pedidos, direcciones y datos de clientes) y
+una llave live de Stripe cobra de verdad, así que la respuesta no podía ser «comparte
+las llaves»: es **un staging con llaves propias**. De ahí `isProductionDeploy()`
+—`VERCEL_ENV === "production"`, que Vercel inyecta por su cuenta, de modo que **solo
+producción se identifica positivamente**— y sus dos consumidores: `robots()` devuelve
+`disallow: "/"` fuera de producción, y `getStripe()` **rechaza** una llave `sk_live_…`
+fuera de producción, con `ALLOW_LIVE_STRIPE=1` como válvula explícita para la máquina
+del desarrollador. Los dos fallan hacia el lado seguro: un entorno que no se
+identifica **no indexa y no cobra**.
+
+**Una comprobación que ahorra un callejón.** `npx supabase projects list` —read-only—
+revela que la organización ya tiene **2 proyectos activos** (`Hustle Alliance` y
+`Resurte.me`), que es justo el tope del plan Free. El runbook lo dice **antes** del
+primer comando, no después del error: el staging exige liberar un cupo (pausar o
+borrar el que no se use) o pasar a un plan de pago.
+
+**Una alarma que era falsa.** `docs/OPS.md §3` y `docs/CREDENCIALES.md §0` abrían con
+una rotación urgente: que `supabase/.temp/pooler-url` había estado versionado en un
+repositorio público **con la contraseña de `postgres` en claro**. Verificado el
+historial, **hay un solo blob y no lleva contraseña** (92 bytes:
+`postgresql://postgres.<ref>@aws-0-us-east-2.pooler.supabase.com:5432/postgres`); lo
+que expone es el host del pooler y el usuario, que revelan un *project ref* ya público
+porque viaja en `NEXT_PUBLIC_SUPABASE_URL`. Las dos guías quedaron corregidas con el
+comando que lo comprueba. La regla de no versionar `supabase/.temp/` ni `.env*` sigue
+igual: nunca dependió de que ese archivo llevara un secreto.
+
+**Tres lecciones.**
+1. **Un guarda que no llega a todos sus consumidores no es un guarda.** El fallo no
+   estaba en la lógica de `env.ts`, que era correcta, sino en que dos módulos leían
+   `process.env` por fuera. Cuando un guarda vive en una función y no en el dato, cada
+   consumidor nuevo es una oportunidad de saltárselo.
+2. **El valor centinela de una plataforma es un valor verdadero.** `[SENSITIVE]` es
+   lo que la herramienta escribe *en lugar de* un secreto, y para cualquier `if` es
+   simplemente una cadena no vacía. Los centinelas hay que tratarlos como ausencia,
+   no como dato.
+3. **Recuperar no es rotar.** Copiar de un panel no cambia nada en producción; rotar
+   sí. Y `SUPABASE_JWT_SECRET` es la única llave que **no** admite rotación sin
+   downtime (mata todas las sesiones y desvalida las llaves legacy), mientras que
+   `POSTGRES_PASSWORD` —la que la guía marcaba como urgente— resulta la más barata de
+   todas, porque el código **nunca** lee `POSTGRES_*`.
+
+**Cierre medido.** `npm run verify` en verde: typecheck, lint, **380 archivos de test /
+6,551 pruebas**, `knip` exit 0 — desde los 376 / 6,529 de la Ronda 26, es decir **+4
+archivos y +22 pruebas, exactamente los cuatro contratos nuevos** (`supabase/env`,
+`deploy-env`, `stripe`, `app/robots`). Los 6 rojos intermedios fueron de
+`ai-crawlers.test.ts`, que vigila el robots.txt **de producción** y ahora lo declara
+(`VERCEL_ENV=production` en el `beforeEach`) en vez de depender del entorno de quien
+corre las pruebas. Sin commit: el árbol sigue siendo del usuario.
+
 ## Agentes de mantenimiento por dominio
 
 Ver `docs/agents/` — perímetro, invariantes y verificación por feature.

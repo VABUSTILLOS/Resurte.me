@@ -58,6 +58,14 @@
 - `RecentlyViewed` persiste en localStorage (`resurte-recently-viewed`, tope 12) y
   se monta desde la página de producto (server) recibiendo el producto por props —
   no leer localStorage en render inicial.
+- Precio de proveedor (00191): el precio de venta de los artículos de un
+  proveedor se deriva del **costo de lista**, no se teclea. La regla vigente es
+  `price = CEIL(product_suppliers.cost × 1.18)`; el costo vive **solo** en
+  `product_suppliers` (revocado para `anon`) porque `products.cost` es legible
+  con la llave pública (`data.ts` hace `select("*")`). Y una `description`
+  publicada **nunca** lleva costo ni SKU del proveedor: al publicar un producto
+  que nació oculto hay que reescribirla. Detalle en `supabase/ESQUEMA.md`
+  §«Precios de proveedor y margen».
 
 ## Verificación
 `npx vitest run src/lib/unit-price.test.ts` + `npm run build` (prerender de 20

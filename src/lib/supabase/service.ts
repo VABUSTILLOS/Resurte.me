@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import { supabaseServiceKey, supabaseUrl } from "./env"
 
 /**
  * Client con la service role key, SIN cookies de sesión.
@@ -11,8 +12,11 @@ import { createClient } from "@supabase/supabase-js"
  * `service_role` (bypass de RLS) para el cálculo server-side de bumps.
  */
 export async function createServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  // `supabaseUrl()`/`supabaseServiceKey()` y no `process.env` en crudo: filtran
+  // los placeholders (`[SENSITIVE]`, `your-project-url`) para que un entorno
+  // mal configurado falle aquí y con este mensaje, no con un 401 más adelante.
+  const url = supabaseUrl()
+  const serviceRoleKey = supabaseServiceKey()
   if (!url || !serviceRoleKey) {
     throw new Error(
       "Supabase no está configurado: faltan NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY"

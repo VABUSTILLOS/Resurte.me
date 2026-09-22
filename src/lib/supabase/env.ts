@@ -36,6 +36,21 @@ export function supabaseAnonKey(): string | null {
   return isUsable(raw) ? raw : null
 }
 
+/**
+ * Clave de servicio (`service_role`). Bypassa RLS: **solo servidor**.
+ *
+ * Pasa por el mismo filtro de placeholders que la URL y la anon key a
+ * propósito. `[SENSITIVE]` es lo que escribe `vercel env pull` en lugar del
+ * valor real, y como es una cadena con contenido, un guarda de "¿existe?" la da
+ * por buena: el cliente se construye con una llave falsa y la falla aparece
+ * después como un 401 opaco —o como un problema de RLS— en vez de como "falta
+ * configurar el entorno".
+ */
+export function supabaseServiceKey(): string | null {
+  const raw = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  return isUsable(raw) ? raw : null
+}
+
 export function isSupabaseConfigured(): boolean {
   return supabaseUrl() !== null && supabaseAnonKey() !== null
 }
