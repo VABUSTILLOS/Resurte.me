@@ -1,4 +1,5 @@
 import { createPublicClient } from "@/lib/supabase/public"
+import { PUBLIC_PRODUCT_SELECT } from "@/lib/product-columns"
 import type { City, Category, Product, RestaurantCollection } from "@/types"
 import { logger } from "@/lib/logger"
 import { expandSearchTerms, escapeIlike } from "@/lib/search-terms"
@@ -99,7 +100,7 @@ export async function getProducts(
   if (!supabase) return []
   let query = supabase
     .from("products")
-    .select("*")
+    .select(PUBLIC_PRODUCT_SELECT)
 
   if (!includeHidden) {
     query = query.eq("is_visible", true)
@@ -115,7 +116,7 @@ export async function getProducts(
   let rows = data
   if (error) {
     // sort_order (00100) aún no aplicado: ordenar solo por nombre.
-    let fallback = supabase.from("products").select("*")
+    let fallback = supabase.from("products").select(PUBLIC_PRODUCT_SELECT)
     if (!includeHidden) {
       fallback = fallback.eq("is_visible", true)
     }
@@ -127,7 +128,13 @@ export async function getProducts(
   }
   // Oferta fuera de su ventana (00107): se anula sale_price para que tarjetas,
   // detalle y JSON-LD sigan usando sale_price ?? price sin cambios.
-  return normalizeSale(rows as Product[])
+  //
+  // El `as unknown as` es porque el select ya no es `"*"`: `createPublicClient()`
+  // no lleva un tipo `Database` generado, así que supabase-js no puede inferir
+  // la fila desde un select construido en runtime y cae a `GenericStringError`.
+  // La conversión a `Product` siempre fue manual; lo que vigila que las columnas
+  // pedidas sean las correctas es `product-columns.contract.test.ts`.
+  return normalizeSale(rows as unknown as Product[])
 }
 
 const PAGE_SIZE = 24
@@ -149,7 +156,7 @@ export async function getProductsPaginated(
 
   let query = supabase
     .from("products")
-    .select("*", { count: "exact", head: false })
+    .select(PUBLIC_PRODUCT_SELECT, { count: "exact", head: false })
 
   if (!includeHidden) {
     query = query.eq("is_visible", true)
@@ -169,7 +176,7 @@ export async function getProductsPaginated(
     // sort_order (00100) aún no aplicado: ordenar solo por nombre.
     let fallback = supabase
       .from("products")
-      .select("*", { count: "exact", head: false })
+      .select(PUBLIC_PRODUCT_SELECT, { count: "exact", head: false })
     if (!includeHidden) {
       fallback = fallback.eq("is_visible", true)
     }
@@ -180,7 +187,7 @@ export async function getProductsPaginated(
     ;({ data, count } = await fallback)
   }
 
-  const products = normalizeSale(data as Product[])
+  const products = normalizeSale(data as unknown as Product[])
   const total = count ?? products.length
   const hasMore = from + products.length < total
 
@@ -195,7 +202,7 @@ export async function getProductBySlug(
   if (!supabase) return null
   let query = supabase
     .from("products")
-    .select("*")
+    .select(PUBLIC_PRODUCT_SELECT)
     .eq("slug", slug)
 
   if (!includeHidden) {
@@ -203,7 +210,7 @@ export async function getProductBySlug(
   }
 
   const { data } = await query.single()
-  const product = (data as Product) ?? null
+  const product = (data as unknown as Product) ?? null
   return product ? withResolvedSale(product) : null
 }
 
@@ -236,13 +243,13 @@ export async function searchAll(
 
   const { data: products } = await supabase
     .from("products")
-    .select("*")
+    .select(PUBLIC_PRODUCT_SELECT)
     .or(orFilter)
     .eq("is_visible", true)
     .limit(20)
 
   return {
-    products: normalizeSale(products as Product[]),
+    products: normalizeSale(products as unknown as Product[]),
   }
 }
 

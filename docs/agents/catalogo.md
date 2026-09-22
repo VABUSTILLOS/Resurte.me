@@ -61,11 +61,19 @@
 - Precio de proveedor (00191): el precio de venta de los artículos de un
   proveedor se deriva del **costo de lista**, no se teclea. La regla vigente es
   `price = CEIL(product_suppliers.cost × 1.18)`; el costo vive **solo** en
-  `product_suppliers` (revocado para `anon`) porque `products.cost` es legible
-  con la llave pública (`data.ts` hace `select("*")`). Y una `description`
-  publicada **nunca** lleva costo ni SKU del proveedor: al publicar un producto
-  que nació oculto hay que reescribirla. Detalle en `supabase/ESQUEMA.md`
-  §«Precios de proveedor y margen».
+  `product_suppliers`, que está revocado para `anon`/`authenticated`. Y una
+  `description` publicada **nunca** lleva costo ni SKU del proveedor: al
+  publicar un producto que nació oculto hay que reescribirla. Detalle en
+  `supabase/ESQUEMA.md` §«Precios de proveedor y margen».
+- Columnas públicas de `products` (00192): la tienda **no** lee `products` con
+  `select("*")`. El `GRANT SELECT` es por columna, así que `*` falla con `42501`
+  y deja el catálogo vacío. Para añadir una columna al catálogo público hay que
+  tocar **dos** sitios que el contrato compara entre sí:
+  `PUBLIC_PRODUCT_COLUMNS` en `src/lib/product-columns.ts` y el `GRANT SELECT (…)`
+  de `00192_products_column_privileges.sql`. `cost`, `admin_note`,
+  `low_stock_threshold`, `deleted_at` y `publish_at`/`unpublish_at` son
+  privadas: solo las lee `service_role`. Guardia:
+  `npx vitest run src/lib/product-columns.contract.test.ts`.
 
 ## Verificación
 `npx vitest run src/lib/unit-price.test.ts` + `npm run build` (prerender de 20

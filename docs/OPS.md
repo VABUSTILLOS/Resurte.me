@@ -1076,6 +1076,10 @@ migración nueva hasta repararlas. `npm run db:status` lo detecta y te da los
 comandos exactos. La lista completa y la regla están en «Regla: las
 migraciones numeradas se aplican por CLI, nunca por MCP».
 
+> Ese «limpio» duró horas: la misma tarde el MCP se volvió a usar tres veces y
+> dejó el ledger sucio otra vez. Ver «Reparación ejecutada el 22-sep-2026», más
+> abajo, para el estado vigente.
+
 ### Migraciones recientes ya aplicadas a producción
 
 `00112_bump_affinity.sql`, `00113_user_carts_bumps.sql` y
@@ -1223,6 +1227,36 @@ ls supabase/migrations/*.sql | sed 's|.*/||' | cut -c1-5 | sort | uniq -d
 ```
 
 Salida vacía = sin duplicados.
+
+**Reparación ejecutada el 22-sep-2026 (3 filas con timestamp + 1 sin fila).**
+El «limpio» del 18-sep duró horas: esa misma tarde el MCP se usó **tres veces
+más** y dejó `20260918145352` (`refund_path`), `20260918150529`
+(`admin_permissions`) y `20260918211606` (`email_logs_sent_at_index`) — es
+decir, los archivos `00187`, `00188` y `00190`. Con eso `db push` volvió a
+quedar bloqueado **por completo** con `LegacyDbPushMissingLocalError`, y así
+siguió hasta hoy: no se podía aplicar ninguna migración nueva. Encima, `00189`
+(`drop_orders_seller_id`) **nunca tuvo fila en el ledger**, aunque su efecto sí
+estaba vivo —`orders.seller_id` y su índice `idx_orders_seller` no existen en la
+base—; como la migración es idempotente (`DROP COLUMN IF EXISTS`), lo que
+faltaba era solo la fila, no el DDL.
+
+La reparación fue por SQL sobre `supabase_migrations.schema_migrations`, en una
+transacción: `UPDATE` de las tres `version` a su número de archivo (con el
+`name` de cada fila verificado contra el archivo, para no renumerar la fila
+equivocada) + `INSERT` de `00189`. **No hubo que borrar nada**: a diferencia de
+la recaída del 17-sep, los tres timestamps correspondían a migraciones numeradas
+reales, así que fue un renombre y no un `DELETE`+`INSERT`.
+
+Estado verificado el 22-sep-2026: **183 filas**, `00001`…`00192` emparejadas
+1:1, cero huérfanas, cero versiones sin cinco dígitos,
+`npx supabase migration list --linked` → 183 pares `local`/`remote` idénticos,
+`npx supabase db push --dry-run` → `{"upToDate":true}`, y `npm run db:status` →
+**exit 0**. Las dos migraciones de ese día (`00191` de AB Foods y `00192` de
+privilegios de columna) se aplicaron con fila numérica propia.
+
+La lección que se repite tres veces ya no es «cuidado con el MCP» sino que la
+detección tiene que ser un **comando**: `npm run db:status` antes de dar por
+buena cualquier migración.
 
 **Hueco deliberado `00170`–`00178`.** Entre `00169` y `00179` faltan **nueve
 números** y eso es **correcto**: no son huérfanas, no son un `DELETE` accidental

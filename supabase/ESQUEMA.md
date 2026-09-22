@@ -155,14 +155,22 @@ publicaron con una regla que conviene no romper:
   ahí (`"… costo mayoreo $979.90 MXN …"`) porque los productos nacían **ocultos**;
   al publicarlos ese texto le mostraría nuestro costo de compra a cualquier
   visitante. `00191` reescribe las 51 descripciones.
-- **`products.cost` se queda `NULL` a propósito.** Es una columna **legible con
-  la llave pública**: `src/lib/data.ts` hace `select("*")` y PostgREST expone
-  toda columna con `GRANT SELECT` de tabla (verificado: `GET
-  /rest/v1/products?select=cost` responde `200`). Escribir ahí el costo de
-  compra lo publicaría. Consecuencia asumida: la "oferta por margen objetivo" de
-  `/admin/productos` **no aplica** a estos 51 productos. Arreglarlo bien exige
-  cambiar el `select("*")` por una lista explícita de columnas y revocar la
-  columna — pendiente, no hecho.
+- **`products.cost` no se escribe, y desde `00192` tampoco es legible.** El
+  costo de compra vive **solo** en `product_suppliers` (revocado para
+  `anon`/`authenticated`). Escribirlo en `products.cost` era publicarlo: la
+  columna se podía leer con la llave anónima porque `products` tenía
+  `GRANT SELECT` **a nivel de tabla** y la política RLS es `SELECT USING (true)`
+  —RLS filtra filas, no columnas—. `00192_products_column_privileges.sql`
+  revoca ese `GRANT` de tabla y lo vuelve a conceder **columna por columna**;
+  `cost`, `admin_note`, `low_stock_threshold`, `deleted_at` y
+  `publish_at`/`unpublish_at` quedan fuera. La lista blanca vive en
+  `src/lib/product-columns.ts` y el catálogo público pide esas columnas
+  explícitamente (PostgREST expande `select("*")` a todas las columnas de su
+  caché y la consulta falla entera con `42501`).
+  Consecuencia asumida: la "oferta por margen objetivo" de `/admin/productos`
+  **no aplica** a los 51 productos de AB Foods, porque lee `products.cost`.
+  `src/lib/product-columns.contract.test.ts` vigila que el SQL y el código no
+  diverjan y que ningún lector sin `service_role` pida una columna privada.
 
 Las imágenes de esos 51 viven en dos sitios: **29 reutilizan** un `.webp` que ya
 estaba en `public/images/products/**` (misma comida, otra presentación) y **22
