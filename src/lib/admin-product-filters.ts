@@ -11,8 +11,11 @@
  * genera el parseo, la serialización y los parámetros de la API.
  */
 
+import { supplierFilterValue } from "@/lib/admin-supplier-panel"
+
 export type StockStatus = "in_stock" | "low_stock" | "out_of_stock"
 export type PublicationFilter = "all" | "published" | "unpublished"
+
 
 /** Filtros booleanos de "catálogo incompleto" + los de Ronda 7. */
 export const PRODUCT_FLAG_KEYS = [
@@ -40,6 +43,12 @@ export interface ProductFilters {
   tag: string
   city: string
   brand: string
+  /**
+   * Proveedor: `all`, `none` (productos sin proveedor) o el `slug` del
+   * proveedor. Es un `<select>` como ciudad y marca, no un chip, así que no
+   * participa de los contadores del RPC `admin_product_filter_counts`.
+   */
+  supplier: string
   noImage: boolean
   noCities: boolean
   noPrice: boolean
@@ -75,6 +84,7 @@ export const EMPTY_PRODUCT_FILTERS: ProductFilters = {
   tag: ALL,
   city: ALL,
   brand: ALL,
+  supplier: ALL,
   noImage: false,
   noCities: false,
   noPrice: false,
@@ -118,6 +128,7 @@ export function parseProductFilters(sp: FilterSource): ProductFilters {
     tag: sp.get("tag") || ALL,
     city: sp.get("city") || ALL,
     brand: sp.get("brand") || ALL,
+    supplier: supplierFilterValue(sp.get("supplier")),
     ...parseFlags(sp),
   }
 }
@@ -142,6 +153,7 @@ export function productFiltersToSearchParams(
   if (filters.tag !== ALL) sp.set("tag", filters.tag)
   if (filters.city !== ALL) sp.set("city", filters.city)
   if (filters.brand !== ALL) sp.set("brand", filters.brand)
+  if (filters.supplier !== ALL) sp.set("supplier", filters.supplier)
   return sp
 }
 
@@ -159,6 +171,7 @@ export function productFilterApiParams(filters: ProductFilters): Record<string, 
     tag: filters.tag,
     city: filters.city,
     brand: filters.brand,
+    supplier: filters.supplier,
   }
   for (const key of PRODUCT_FLAG_KEYS) params[key] = filters[key] ? "1" : "0"
   return params
@@ -178,6 +191,7 @@ export function activeProductFilterCount(filters: ProductFilters): number {
   if (filters.status !== DEFAULT_STATUS_FILTER) count++
   if (filters.city !== ALL) count++
   if (filters.brand !== ALL) count++
+  if (filters.supplier !== ALL) count++
   if (filters.tag !== ALL) count++
   for (const key of PRODUCT_FLAG_KEYS) if (filters[key]) count++
   return count

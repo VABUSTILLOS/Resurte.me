@@ -350,6 +350,28 @@
   cuenta ocurrencias, enumera todo `text-white(/N)` del perímetro, camina hacia
   atrás hasta el `bg-*` más cercano y exige que esté en una lista blanca con
   ratio ≥4.5:1, así que se autoextiende y no se queda obsoleta.
+- Proveedores en `/admin/productos` (ronda 17): el apartado "Proveedores" prende
+  o apaga **todos los productos de un proveedor**, en la tienda (`is_visible`) o
+  por ciudad (`product_city_availability`). Cuatro cosas que no se pueden
+  romper: (1) es una acción de **una sola vez** sobre los productos actuales —no
+  hay regla persistente ni herencia, así que un producto nuevo del proveedor hay
+  que publicarlo aparte—; (2) **no escribe nada por su cuenta**: reusa
+  `POST /api/admin/products/bulk` y `PATCH /api/admin/products/city-availability`,
+  y por eso hereda gratis bitácora, purga de caché, fallos por id y Deshacer;
+  (3) el payload de ciudades lo decide `supplierCityPlan`
+  (`src/lib/admin-supplier-panel.ts`, puro y probado): "Global" **borra** las
+  filas en vez de escribir `true` en las 20, porque en 00065 una fila impide que
+  una ciudad nueva herede el default, y "solo en las marcadas" con todas
+  marcadas se resuelve igual que Global; (4) `GET /api/admin/suppliers/overview`
+  existe en vez de reusar `GET /api/admin/suppliers` porque esa ruta devuelve
+  `product_suppliers` con `select("*")`, es decir **el costo de compra**: el
+  resumen devuelve solo conteos, ids y estado de ciudades. La insignia por fila
+  llega por `row-meta` (fuente `suppliers`, con degradación propia) y solo se
+  pinta cuando hay proveedor. La UI vive en
+  `src/app/admin/components/SupplierPanel.tsx` (no inline en `page.tsx`, que ya
+  pasa de 6 700 líneas), y de paso `MobileCollapsible` se movió a
+  `src/app/admin/components/MobileCollapsible.tsx` porque lo comparten los tres
+  bloques plegables del panel (filtros, salud del catálogo y proveedores).
 - Productos ronda 10 — conteos de los chips (B15-B16): la RPC
   `admin_product_filter_counts(p_include_deleted)` (00118) es la v2 de la de la
   ronda 8 y devuelve los 11 contadores + `brands` + `tagCounts` en una sola

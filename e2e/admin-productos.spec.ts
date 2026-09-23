@@ -98,6 +98,9 @@ test.describe("panel productos — guards de API", { tag: "@ci" }, () => {
     for (const url of [
       "/api/admin/products/audit",
       "/api/admin/products/row-meta?ids=1,2",
+      // El resumen por proveedor alimenta el apartado "Proveedores": expuesto
+      // a anónimos sería un mapa de quién nos surte y cuántos productos tiene.
+      "/api/admin/suppliers/overview",
       "/api/admin/products/sales-report?period=monthly",
     ]) {
       const response = await request.get(url)
@@ -127,6 +130,17 @@ test.describe("panel productos — deep-links", { tag: "@ci" }, () => {
     const response = await page.goto("/admin/productos?page=-1&pageSize=999999&view=nope")
     expect(response?.status()).toBeLessThan(500)
     await expect(page.locator("body")).not.toBeEmpty()
+  })
+
+  test("el filtro por proveedor acepta basura sin propagarla", async ({ page }) => {
+    // `supplier` es texto libre (el slug del proveedor), así que la URL es el
+    // único punto donde se puede colar algo raro: debe descartarse, no
+    // reenviarse a la API ni dejar el listado en blanco.
+    for (const value of ["<script>alert(1)</script>", "../../etc/passwd", "", "none", "frugasa"]) {
+      const response = await page.goto(`/admin/productos?supplier=${encodeURIComponent(value)}`)
+      expect(response?.status()).toBeLessThan(500)
+      await expect(page.locator("body")).not.toBeEmpty()
+    }
   })
 
   test("los flags de filtro aceptan basura sin propagarla", async ({ page }) => {

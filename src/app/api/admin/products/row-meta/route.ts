@@ -6,6 +6,7 @@ import {
   parseMetaIds,
   parseRowMetaPayload,
   type RowMetaSources,
+  type RowMetaSupplierRow,
 } from "@/lib/admin-product-row-meta"
 import { NextResponse, type NextRequest } from "next/server"
 
@@ -16,6 +17,7 @@ import { NextResponse, type NextRequest } from "next/server"
  * - lastEdit: última edición registrada en admin_audit_log por producto.
  * - sales/salesAmount: unidades y monto vendidos (pedidos no cancelados),
  *   que alimentan la columna "Ventas" del listado.
+ * - suppliers: nombre del proveedor, para la insignia de la fila.
  *
  * Las tres fuentes son decorativas: si una falla, degrada a vacío y se declara
  * en `degraded` — nunca tumba la respuesta entera, porque las otras dos siguen
@@ -49,7 +51,7 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createServiceClient()
 
-    const [queueRes, auditRes, salesRes] = await Promise.all([
+    const [queueRes, auditRes, salesRes, suppliersRes] = await Promise.all([
       supabase
         .from("whatsapp_sync_queue")
         .select("product_id")
@@ -66,12 +68,27 @@ export async function GET(request: NextRequest) {
       // la vista descarta los pedidos cancelados, así que la columna Ventas
       // cuadra con el orden por ventas.
       supabase.from("products_with_sales").select("id,sales_units,sales_revenue").in("id", ids),
+      // Proveedor por producto para la insignia de la fila. Se piden los dos
+      // lados por separado y el join se hace abajo: el embed de PostgREST
+      // devuelve la relación como objeto o como arreglo según cómo infiera la
+      // clave foránea, y la insignia no puede depender de eso.
+      Promise.all([
+        supabase
+          .from("product_suppliers")
+          .select("product_id,supplier_id,is_primary")
+          .in("product_id", ids),
+        supabase.from("suppliers").select("id,name"),
+      ]).then(([links, names]) => ({ links, names })),
     ])
 
     const sources: RowMetaSources = {
       queue: { ok: !queueRes.error, rows: queueRes.data ?? [] },
       audit: { ok: !auditRes.error, rows: auditRes.data ?? [] },
       sales: { ok: !salesRes.error, rows: salesRes.data ?? [] },
+      suppliers: {
+        ok: !suppliersRes.links.error && !suppliersRes.names.error,
+        rows: joinSupplierNames(suppliersRes.links.data ?? [], suppliersRes.names.data ?? []),
+      },
     }
     for (const [source, res] of [
       ["queue", queueRes],
@@ -90,10 +107,24 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/** Aplana el nombre del proveedor sobre cada vínculo. */
+function joinSupplierNames(
+  links: { product_id: number | null; supplier_id: number | null; is_primary: boolean | null }[],
+  suppliers: { id: number; name: string | null }[]
+): RowMetaSupplierRow[] {
+  const nameById = new Map(suppliers.map((s) => [s.id, s.name]))
+  return links.map((link) => ({
+    product_id: link.product_id,
+    is_primary: link.is_primary,
+    supplier_name: link.supplier_id == null ? null : (nameById.get(link.supplier_id) ?? null),
+  }))
+}
+
 function emptySources(): RowMetaSources {
   return {
     queue: { ok: true, rows: [] },
     audit: { ok: true, rows: [] },
     sales: { ok: true, rows: [] },
+    suppliers: { ok: true, rows: [] },
   }
 }

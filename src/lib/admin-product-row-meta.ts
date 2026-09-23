@@ -16,7 +16,7 @@
  */
 
 /** Fuentes decorativas que pueden degradar de forma independiente. */
-export type RowMetaSource = "queue" | "audit" | "sales"
+export type RowMetaSource = "queue" | "audit" | "sales" | "suppliers"
 
 /**
  * Tope de ids por petición. Coincide con el tamaño de página máximo del panel
@@ -35,6 +35,8 @@ export interface RowMetaPayload {
   lastEdit: Record<string, RowMetaLastEdit>
   sales: Record<string, number>
   salesAmount: Record<string, number>
+  /** id de producto -> nombre del proveedor. Ausente = sin proveedor. */
+  suppliers: Record<string, string>
   degraded: RowMetaSource[]
 }
 
@@ -54,6 +56,19 @@ export interface RowMetaSalesRow {
   sales_revenue: number | string | null
 }
 
+/**
+ * Fila ya resuelta: el nombre del proveedor viene aplanado.
+ *
+ * El join se hace en la ruta y no con un embed de PostgREST a propósito: la
+ * relación se devuelve como objeto o como arreglo según cómo infiera la clave
+ * foránea, y de eso dependía una insignia que debe ser determinista.
+ */
+export interface RowMetaSupplierRow {
+  product_id: number | null
+  is_primary: boolean | null
+  supplier_name: string | null
+}
+
 export interface RowMetaSourceResult<TRow> {
   /** `false` cuando la lectura falló; la fuente degrada en vez de lanzar. */
   ok: boolean
@@ -64,6 +79,7 @@ export interface RowMetaSources {
   queue: RowMetaSourceResult<RowMetaQueueRow>
   audit: RowMetaSourceResult<RowMetaAuditRow>
   sales: RowMetaSourceResult<RowMetaSalesRow>
+  suppliers: RowMetaSourceResult<RowMetaSupplierRow>
 }
 
 /** `numeric`/`bigint` llegan como cadena en algunos caminos de PostgREST. */
@@ -95,6 +111,7 @@ export function parseRowMetaPayload(sources: RowMetaSources): RowMetaPayload {
   if (!sources.queue.ok) degraded.push("queue")
   if (!sources.audit.ok) degraded.push("audit")
   if (!sources.sales.ok) degraded.push("sales")
+  if (!sources.suppliers.ok) degraded.push("suppliers")
 
   const waPending = sources.queue.ok
     ? [...new Set(sources.queue.rows.map((r) => r.product_id).filter((id): id is number => typeof id === "number"))]
@@ -122,5 +139,24 @@ export function parseRowMetaPayload(sources: RowMetaSources): RowMetaPayload {
     }
   }
 
-  return { waPending, lastEdit, sales, salesAmount, degraded }
+  // Proveedor por producto. `is_primary` decide cuando un producto tiene varios
+  // vínculos: el panel muestra uno solo, y el primario es el que manda en el
+  // precio (00198 y 00191 leen `product_suppliers.cost` con ese orden).
+  const suppliers: Record<string, string> = {}
+  const supplierRank: Record<string, number> = {}
+  if (sources.suppliers.ok) {
+    for (const row of sources.suppliers.rows) {
+      const id = row.product_id
+      const name = row.supplier_name
+      if (typeof id !== "number" || !name) continue
+      const rank = row.is_primary === false ? 0 : 1
+      const key = String(id)
+      const current = supplierRank[key]
+      if (current !== undefined && current >= rank) continue
+      suppliers[key] = name
+      supplierRank[key] = rank
+    }
+  }
+
+  return { waPending, lastEdit, sales, salesAmount, suppliers, degraded }
 }

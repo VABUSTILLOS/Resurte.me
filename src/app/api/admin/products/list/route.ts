@@ -9,6 +9,7 @@ import {
   productSortOrderClauses,
   type ProductSortKey,
 } from "@/lib/admin-product-sort"
+import { SUPPLIER_FILTER_NONE } from "@/lib/admin-supplier-panel"
 import { NextResponse, type NextRequest } from "next/server"
 
 const COLS =
@@ -42,6 +43,8 @@ interface ListParams {
   waMismatch: boolean
   city: string
   brand: string
+  /** `all` | `none` (sin proveedor) | `slug` del proveedor. */
+  supplier: string
   onSale: boolean
   staleSale: boolean
   underThreshold: boolean
@@ -73,6 +76,9 @@ function parseParams(req: NextRequest): ListParams {
     waMismatch: sp.get("waMismatch") === "1",
     city: sp.get("city")?.trim() || "all",
     brand: sp.get("brand")?.trim() || "all",
+    // Un `?supplier=` vacío no es un filtro: `eq` contra "" no encuentra nada y
+    // el listado quedaría en blanco sin error (mismo criterio que `brand`).
+    supplier: sp.get("supplier")?.trim() || "all",
     onSale: sp.get("onSale") === "1",
     staleSale: sp.get("staleSale") === "1",
     underThreshold: sp.get("underThreshold") === "1",
@@ -315,6 +321,56 @@ async function duplicateNameProductIds(
     .map((row) => row.id as number)
 }
 
+/** Cómo se traduce el filtro de proveedor a la consulta. */
+type SupplierFilter =
+  | { kind: "in"; ids: number[] }
+  | { kind: "notIn"; ids: number[] }
+  | null
+
+/**
+ * Ids de producto del filtro `?supplier=`.
+ *
+ * - `all`  -> sin filtro.
+ * - `none` -> los que **no** tienen ningún vínculo (los 350 productos a los que
+ *   todavía no se les cargó lista de proveedor). Es un `NOT IN`, no un `IN`.
+ * - `slug` -> los del proveedor; un slug desconocido no encuentra nada.
+ *
+ * Se resuelve con una consulta por filtro activo (no por fila), igual que
+ * `underThreshold` y `dupNames`. Ante un error degrada a "sin resultados" en vez
+ * de tumbar el listado: `suppliers` y `product_suppliers` existen desde 00066,
+ * así que este camino es defensivo, y un fallo real se ve como listado vacío.
+ */
+async function resolveSupplierFilter(
+  supabase: ServiceClient,
+  value: string
+): Promise<SupplierFilter> {
+  if (value === "all") return null
+
+  if (value === SUPPLIER_FILTER_NONE) {
+    const { data, error } = await supabase.from("product_suppliers").select("product_id")
+    if (error) return { kind: "in", ids: [] }
+    return { kind: "notIn", ids: uniqueIds(data ?? []) }
+  }
+
+  const { data: supplier, error } = await supabase
+    .from("suppliers")
+    .select("id")
+    .eq("slug", value)
+    .maybeSingle()
+  if (error || !supplier) return { kind: "in", ids: [] }
+
+  const { data: links, error: linksError } = await supabase
+    .from("product_suppliers")
+    .select("product_id")
+    .eq("supplier_id", supplier.id as number)
+  if (linksError) return { kind: "in", ids: [] }
+  return { kind: "in", ids: uniqueIds(links ?? []) }
+}
+
+function uniqueIds(rows: { product_id: number }[]): number[] {
+  return [...new Set(rows.map((r) => r.product_id))]
+}
+
 /**
  * Aplica los filtros compartidos por la consulta de filas y los conteos.
  *
@@ -393,6 +449,16 @@ async function applyFilters(
   if (p.noCategory) query = query.is("category_id", null)
   if (p.waMismatch) query = query.eq("show_in_whatsapp", true).eq("is_visible", false)
   if (p.brand !== "all") query = query.eq("brand", p.brand)
+  if (p.supplier !== "all") {
+    const supplier = await resolveSupplierFilter(supabase, p.supplier)
+    if (supplier?.kind === "notIn") {
+      query =
+        supplier.ids.length > 0 ? query.not("id", "in", `(${supplier.ids.join(",")})`) : query
+    } else {
+      const ids = supplier?.ids ?? []
+      query = query.in("id", ids.length > 0 ? ids : [-1])
+    }
+  }
   if (p.onSale) query = query.not("sale_price", "is", null)
   // Ofertas vencidas: precio de oferta activo pero ventana ya cerrada.
   if (p.staleSale) {

@@ -97,9 +97,44 @@ describe("GET /api/admin/products/row-meta", () => {
       lastEdit: {},
       sales: {},
       salesAmount: {},
+      suppliers: {},
       degraded: [],
     })
     expect(from).not.toHaveBeenCalled()
+  })
+
+  it("aplana el nombre del proveedor sobre cada producto", async () => {
+    fakeBuilder({
+      product_suppliers: [
+        { product_id: 1, supplier_id: 10, is_primary: true },
+        { product_id: 2, supplier_id: 20, is_primary: true },
+      ],
+      suppliers: [
+        { id: 10, name: "FRUGASA" },
+        { id: 20, name: "AB Foods" },
+      ],
+    })
+
+    const res = await GET(metaRequest())
+    const body = await res.json()
+
+    expect(body.suppliers).toEqual({ "1": "FRUGASA", "2": "AB Foods" })
+    expect(body.degraded).toEqual([])
+  })
+
+  it("si los proveedores fallan, degrada esa fuente sin tumbar el resto", async () => {
+    fakeBuilder(
+      { products_with_sales: [{ id: 1, sales_units: 3, sales_revenue: 25 }] },
+      { suppliers: { message: "boom" } }
+    )
+
+    const res = await GET(metaRequest())
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.degraded).toEqual(["suppliers"])
+    expect(body.suppliers).toEqual({})
+    expect(body.sales).toEqual({ "1": 3 })
   })
 
   it("degrada la fuente caída y sigue entregando las demás", async () => {

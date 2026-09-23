@@ -28,21 +28,27 @@ describe("parseProductFilters", () => {
 
   it("lee los filtros de texto", () => {
     const parsed = parseProductFilters(
-      sp("q=tomate&category=3&tag=verano&city=5&brand=Acme")
+      sp("q=tomate&category=3&tag=verano&city=5&brand=Acme&supplier=frugasa")
     )
     expect(parsed.search).toBe("tomate")
     expect(parsed.category).toBe("3")
     expect(parsed.tag).toBe("verano")
     expect(parsed.city).toBe("5")
     expect(parsed.brand).toBe("Acme")
+    expect(parsed.supplier).toBe("frugasa")
   })
 
   it("trata un filtro de texto vacío como ausente", () => {
-    const parsed = parseProductFilters(sp("category=&tag=&city=&brand="))
+    const parsed = parseProductFilters(sp("category=&tag=&city=&brand=&supplier="))
     expect(parsed.category).toBe("all")
     expect(parsed.tag).toBe("all")
     expect(parsed.city).toBe("all")
     expect(parsed.brand).toBe("all")
+    expect(parsed.supplier).toBe("all")
+  })
+
+  it("acepta `none` como proveedor: son los productos sin proveedor", () => {
+    expect(parseProductFilters(sp("supplier=none")).supplier).toBe("none")
   })
 
   it("acepta los valores válidos de stock y status", () => {
@@ -84,13 +90,14 @@ describe("productFiltersToSearchParams", () => {
 
   it("escribe los filtros de texto no-default", () => {
     const out = productFiltersToSearchParams(
-      filters({ search: "arroz", category: "2", tag: "x", city: "9", brand: "Acme" })
+      filters({ search: "arroz", category: "2", tag: "x", city: "9", brand: "Acme", supplier: "frugasa" })
     )
     expect(out.get("q")).toBe("arroz")
     expect(out.get("category")).toBe("2")
     expect(out.get("tag")).toBe("x")
     expect(out.get("city")).toBe("9")
     expect(out.get("brand")).toBe("Acme")
+    expect(out.get("supplier")).toBe("frugasa")
   })
 
   it("no escribe stock/status en su valor default", () => {
@@ -131,6 +138,7 @@ describe("productFiltersToSearchParams", () => {
       tag: "verano",
       city: "3",
       brand: "Acme",
+      supplier: "ab-foods",
       noImage: true,
       trash: true,
       staleSale: true,
@@ -164,12 +172,13 @@ describe("productFilterApiParams", () => {
     expect(params.tag).toBe("all")
     expect(params.city).toBe("all")
     expect(params.brand).toBe("all")
+    expect(params.supplier).toBe("all")
   })
 
   it("cubre las 11 claves booleanas", () => {
     const params = productFilterApiParams(filters())
     for (const key of PRODUCT_FLAG_KEYS) expect(params[key]).toBeDefined()
-    expect(Object.keys(params)).toHaveLength(7 + PRODUCT_FLAG_KEYS.length)
+    expect(Object.keys(params)).toHaveLength(8 + PRODUCT_FLAG_KEYS.length)
   })
 
   it("ida y vuelta: parse(apiParams(f)) reproduce f", () => {
@@ -208,9 +217,10 @@ describe("activeProductFilterCount", () => {
         city: "2",
         brand: "Acme",
         tag: "verano",
+        supplier: "frugasa",
       })
     )
-    expect(count).toBe(7)
+    expect(count).toBe(8)
   })
 
   it("cuenta todos los booleanos activos", () => {

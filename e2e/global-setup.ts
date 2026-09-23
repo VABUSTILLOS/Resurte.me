@@ -252,6 +252,8 @@ const API_ROUTES = [
   "/api/admin/products/update",
   "/api/admin/products/city-availability",
   "/api/admin/products/bulk",
+  // Resumen por proveedor del apartado "Proveedores" de /admin/productos.
+  "/api/admin/suppliers/overview",
   // Carrito y cupón: los llama la UI del carrito al montar. `/api/cart/bumps`
   // se midió compilando en frío dentro de un test (money-flows, cupón válido).
   "/api/cart",

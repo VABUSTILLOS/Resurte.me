@@ -11,6 +11,7 @@ function sources(overrides: Partial<RowMetaSources> = {}): RowMetaSources {
     queue: { ok: true, rows: [] },
     audit: { ok: true, rows: [] },
     sales: { ok: true, rows: [] },
+    suppliers: { ok: true, rows: [] },
     ...overrides,
   }
 }
@@ -117,14 +118,70 @@ describe("parseRowMetaPayload", () => {
     expect(payload.lastEdit["9"]).toEqual({ at: "2026-01-01T00:00:00Z", email: "a@x.com" })
   })
 
-  it("sin fuentes caídas no declara degradación y siempre trae las cuatro claves", () => {
+  it("sin fuentes caídas no declara degradación y siempre trae las cinco claves", () => {
     const payload = parseRowMetaPayload(sources())
     expect(payload).toEqual({
       waPending: [],
       lastEdit: {},
       sales: {},
       salesAmount: {},
+      suppliers: {},
       degraded: [],
     })
+  })
+
+  it("marca el proveedor de cada producto", () => {
+    const payload = parseRowMetaPayload(
+      sources({
+        suppliers: {
+          ok: true,
+          rows: [
+            { product_id: 1, is_primary: true, supplier_name: "FRUGASA" },
+            { product_id: 2, is_primary: true, supplier_name: "AB Foods" },
+          ],
+        },
+      })
+    )
+    expect(payload.suppliers).toEqual({ "1": "FRUGASA", "2": "AB Foods" })
+  })
+
+  it("con varios vínculos gana el primario, sin importar el orden de llegada", () => {
+    const rows = [
+      { product_id: 7, is_primary: false, supplier_name: "Secundario" },
+      { product_id: 7, is_primary: true, supplier_name: "Primario" },
+    ]
+    expect(parseRowMetaPayload(sources({ suppliers: { ok: true, rows } })).suppliers).toEqual({
+      "7": "Primario",
+    })
+    // El orden inverso no debe cambiar el resultado.
+    expect(
+      parseRowMetaPayload(sources({ suppliers: { ok: true, rows: [...rows].reverse() } })).suppliers
+    ).toEqual({ "7": "Primario" })
+  })
+
+  it("ignora vínculos sin nombre de proveedor o sin producto", () => {
+    const payload = parseRowMetaPayload(
+      sources({
+        suppliers: {
+          ok: true,
+          rows: [
+            { product_id: null, is_primary: true, supplier_name: "Fantasma" },
+            { product_id: 3, is_primary: true, supplier_name: null },
+            { product_id: 4, is_primary: true, supplier_name: "Real" },
+          ],
+        },
+      })
+    )
+    expect(payload.suppliers).toEqual({ "4": "Real" })
+  })
+
+  it("si la fuente de proveedores falla, degrada y deja el mapa vacío", () => {
+    const payload = parseRowMetaPayload(
+      sources({
+        suppliers: { ok: false, rows: [{ product_id: 1, is_primary: true, supplier_name: "X" }] },
+      })
+    )
+    expect(payload.degraded).toEqual(["suppliers"])
+    expect(payload.suppliers).toEqual({})
   })
 })

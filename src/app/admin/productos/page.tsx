@@ -32,6 +32,7 @@ import {
   LayoutGrid,
   LayoutList,
   HeartPulse,
+  Truck,
   Trash2,
   History,
   ExternalLink,
@@ -88,6 +89,13 @@ import {
   type AvailabilityMap,
   type AvailabilityRow,
 } from "@/lib/admin-product-list"
+import {
+  SUPPLIER_FILTER_NONE,
+  parseSupplierOverview,
+  supplierCityPlan,
+  type SupplierCityMode,
+  type SupplierOverview,
+} from "@/lib/admin-supplier-panel"
 import { useProductSelection } from "./use-product-selection"
 import { useBulkRunner } from "./use-bulk-runner"
 import {
@@ -222,6 +230,7 @@ const META_SOURCE_LABELS: Record<RowMetaSource, string> = {
   queue: "los pendientes de WhatsApp",
   audit: "la última edición",
   sales: "las ventas",
+  suppliers: "el proveedor",
 }
 
 const STOCK_FILTERS: { label: string; value: StockStatus | "all" }[] = [
@@ -294,55 +303,6 @@ async function fetchAvailabilityRows(ids: number[]): Promise<AvailabilityRow[] |
   return rows
 }
 
-/**
- * Envuelve un bloque para que en móvil se pueda plegar y en escritorio se
- * muestre siempre. Un solo árbol de render (el mismo nodo se oculta con
- * `hidden`), así que no hay desajuste de hidratación.
- */
-function MobileCollapsible({
-  id,
-  label,
-  badge,
-  icon,
-  open,
-  onToggle,
-  children,
-}: {
-  id: string
-  label: string
-  badge?: number
-  icon?: ReactNode
-  open: boolean
-  onToggle: () => void
-  children: ReactNode
-}) {
-  return (
-    <div className="mb-3 sm:mb-4">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-controls={id}
-        className="touch-target mb-1.5 flex w-full items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 sm:hidden"
-      >
-        {icon ?? <SlidersHorizontal className="w-4 h-4 text-gray-600" />}
-        <span className="flex-1 text-left">
-          {label}
-          {badge !== undefined && badge > 0 && (
-            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
-              {badge}
-            </span>
-          )}
-        </span>
-        {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-      </button>
-      <div id={id} className={open ? "block" : "hidden sm:block"}>
-        {children}
-      </div>
-    </div>
-  )
-}
-
 export default function AdminProductsPage() {
   return (
     <Suspense fallback={<ProductsSkeleton />}>
@@ -353,6 +313,8 @@ export default function AdminProductsPage() {
 
 import { RestockPanel } from "../components/RestockPanel"
 import { ImportProductsModal } from "../components/ImportProductsModal"
+import { MobileCollapsible } from "../components/MobileCollapsible"
+import { SupplierPanel } from "../components/SupplierPanel"
 import { ProductFormModal } from "../components/ProductFormModal"
 import { ProductsSkeleton } from "../components/ProductsSkeleton"
 import { RowActionMenu, type RowActionItem } from "../components/RowActionMenu"
@@ -630,6 +592,9 @@ function AdminProductsContent() {
   const [cityFilter, setCityFilter] = useState(initialFilters.city)
   const [brandFilter, setBrandFilter] = useState(initialFilters.brand)
   const [brands, setBrands] = useState<string[]>([])
+  // Filtro por proveedor (server-side). Es un `<select>` como ciudad y marca:
+  // no entra en los contadores del RPC de chips, así que no necesita chip.
+  const [supplierFilter, setSupplierFilter] = useState(initialFilters.supplier)
   // Vista tabla/grid (también viaja en la URL).
   // La vista efectiva se deriva en render: `useMediaQuery` devuelve `false` en
   // SSR y en el primer render del cliente, así que el HTML prerenderizado
@@ -692,6 +657,7 @@ function AdminProductsContent() {
       tag: tagFilter,
       city: cityFilter,
       brand: brandFilter,
+      supplier: supplierFilter,
       noImage: onlyNoImage,
       noCities: onlyNoCities,
       noPrice: onlyNoPrice,
@@ -712,6 +678,7 @@ function AdminProductsContent() {
       tagFilter,
       cityFilter,
       brandFilter,
+      supplierFilter,
       onlyNoImage,
       onlyNoCities,
       onlyNoPrice,
@@ -771,6 +738,12 @@ function AdminProductsContent() {
   // Metadatos por fila: sync WA pendiente y última edición (audit log).
   const [waPending, setWaPending] = useState<Set<number>>(new Set())
   const [lastEdit, setLastEdit] = useState<Record<number, { at: string; email: string | null }>>({})
+  /** id de producto -> nombre del proveedor (ausente = sin proveedor). */
+  const [supplierByProduct, setSupplierByProduct] = useState<Record<number, string>>({})
+  // Apartado "Proveedores": resumen por proveedor + el control de ciudades
+  // abierto y su borrador de selección (uno a la vez, como el modal de ciudades).
+  const [suppliers, setSuppliers] = useState<SupplierOverview[]>([])
+  const [suppliersLoading, setSuppliersLoading] = useState(true)
   // Unidades vendidas por producto (columna Ventas, display only).
   const [sales, setSales] = useState<Record<number, number>>({})
   const [salesAmount, setSalesAmount] = useState<Record<number, number>>({})
@@ -788,6 +761,27 @@ function AdminProductsContent() {
     })
     return sp.toString()
   }
+
+  // Resumen por proveedor: alimenta el apartado "Proveedores" y las opciones
+  // del filtro. Es decorativo — si falla, el apartado no se pinta y el filtro
+  // queda en "Todos"; el listado no depende de esto.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/admin/suppliers/overview")
+        const data = res.ok ? await res.json().catch(() => null) : null
+        if (!cancelled) setSuppliers(parseSupplierOverview(data))
+      } catch {
+        if (!cancelled) setSuppliers([])
+      } finally {
+        if (!cancelled) setSuppliersLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Datos estáticos: categorías y ciudades. La disponibilidad por ciudad de las
   // filas visibles llega con el listado (ya no se descarga la tabla completa).
@@ -831,12 +825,13 @@ function AdminProductsContent() {
       // La lectura entera falló: ninguna de las tres columnas decorativas tiene
       // datos, así que se declaran las tres en vez de mentir con ceros. Las
       // filas del listado ya se pintaron.
-      setMetaDegraded(["queue", "audit", "sales"])
+      setMetaDegraded(["queue", "audit", "sales", "suppliers"])
       if (replace) {
         setWaPending(new Set())
         setLastEdit({})
         setSales({})
         setSalesAmount({})
+        setSupplierByProduct({})
       }
       return
     }
@@ -857,6 +852,11 @@ function AdminProductsContent() {
       amountsById[Number(id)] = v as number
     }
     setSalesAmount((prev) => (replace ? amountsById : { ...prev, ...amountsById }))
+    const supplierById: Record<number, string> = {}
+    for (const [id, v] of Object.entries(meta.suppliers ?? {})) {
+      supplierById[Number(id)] = v as string
+    }
+    setSupplierByProduct((prev) => (replace ? supplierById : { ...prev, ...supplierById }))
   }
 
   // Filas del listado: búsqueda/filtros/orden en el servidor y scroll infinito
@@ -1296,6 +1296,115 @@ function AdminProductsContent() {
     } catch {
       setBulkProgress(null)
       setError("Error al actualizar la visibilidad en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  /** Relee el resumen de proveedores (conteos y ciudades) tras una acción. */
+  async function reloadSuppliers() {
+    const res = await fetch("/api/admin/suppliers/overview")
+    const data = res.ok ? await res.json().catch(() => null) : null
+    setSuppliers(parseSupplierOverview(data))
+  }
+
+  /**
+   * Publica u oculta TODOS los productos de un proveedor.
+   *
+   * Es una acción de UNA SOLA VEZ sobre los productos actuales: no hay regla
+   * persistente por proveedor, así que un producto nuevo del proveedor no
+   * hereda nada y hay que volver a pulsar el botón.
+   */
+  async function applySupplierVisibility(supplier: SupplierOverview, isVisible: boolean) {
+    if (bulkSaving || supplier.productIds.length === 0) return
+    const ids = supplier.productIds
+    setBulkSaving(true)
+    setError(null)
+    beginBulk()
+    try {
+      const result = await applyVisibilityToIds(ids, isVisible)
+      const succeeded = result.updated
+      if (finishBulk(result) && succeeded.length > 0) {
+        setToast(
+          `${supplier.name}: ${productCount(succeeded.length)} ${
+            isVisible ? "publicado" : "despublicado"
+          }${succeeded.length === 1 ? "" : "s"}`
+        )
+        setUndoAction({
+          message: `${supplier.name}: se actualizaron ${productCount(succeeded.length)}.`,
+          run: () => applyVisibilityToIds(succeeded, !isVisible).then(() => reloadSuppliers()),
+        })
+        await reloadSuppliers()
+      }
+    } catch {
+      setBulkProgress(null)
+      setError(`Error al actualizar los productos de ${supplier.name}`)
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  /**
+   * Aplica uno de los tres modos de ciudad a TODOS los productos del proveedor.
+   *
+   * El payload lo decide `supplierCityPlan` (puro y probado): "Global" borra
+   * las filas en vez de escribir `true` en las 20, porque una fila impide que
+   * una ciudad nueva herede el default de 00065.
+   */
+  async function applySupplierCities(
+    supplier: SupplierOverview,
+    mode: SupplierCityMode,
+    selected: Set<number>
+  ) {
+    if (bulkSaving || supplier.productIds.length === 0) return
+    const planned = supplierCityPlan(mode, cities, selected)
+    if (!planned.ok) {
+      setError(planned.reason)
+      return
+    }
+    const ids = supplier.productIds
+    const body =
+      planned.plan.kind === "scope"
+        ? { scope: planned.plan.scope, isAvailable: planned.plan.isAvailable }
+        : { changes: planned.plan.changes }
+    setBulkSaving(true)
+    setError(null)
+    try {
+      // Estado previo para el Deshacer: el servidor es la única fuente de la
+      // disponibilidad, así que se captura antes de escribir.
+      const previous = await fetchAvailabilityRows(ids)
+      const res = await fetch("/api/admin/products/city-availability", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productIds: ids, ...body }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? "Error al actualizar disponibilidad")
+      }
+      setToast(`${supplier.name}: disponibilidad actualizada`)
+      if (previous) {
+        setUndoAction({
+          message: `${supplier.name}: disponibilidad actualizada en ${productCount(ids.length)}.`,
+          run: async () => {
+            const undoRes = await fetch("/api/admin/products/city-availability", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ productIds: ids, restore: previous }),
+            })
+            if (!undoRes.ok) {
+              const data = await undoRes.json().catch(() => ({}))
+              throw new Error(data.error ?? "Error al restaurar la disponibilidad")
+            }
+            setReloadKey((k) => k + 1)
+            await reloadSuppliers()
+          },
+        })
+      }
+      setReloadKey((k) => k + 1)
+      await reloadSuppliers()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al actualizar disponibilidad")
     } finally {
       setBulkSaving(false)
     }
@@ -3772,8 +3881,36 @@ function AdminProductsContent() {
               ))}
             </select>
           )}
+          {/* Proveedor: select y no chip, igual que ciudad y marca. Las opciones
+              salen de `suppliers` (el mismo estado que alimenta el apartado),
+              así que un proveedor nuevo aparece sin tocar nada más. */}
+          <select
+            value={supplierFilter}
+            onChange={(e) => updateFilters(() => setSupplierFilter(e.target.value))}
+            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+            aria-label="Filtrar por proveedor"
+          >
+            <option value="all">Todos los proveedores</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.slug}>
+                {s.name}
+              </option>
+            ))}
+            <option value={SUPPLIER_FILTER_NONE}>Sin proveedor</option>
+          </select>
         </div>
       </div>
+
+      {/* Proveedores: de dónde viene cada producto y prender/apagar todo un
+          proveedor, en la tienda o por ciudad. */}
+      <SupplierPanel
+        suppliers={suppliers}
+        loading={suppliersLoading}
+        cities={cities}
+        busy={bulkSaving}
+        onVisibility={applySupplierVisibility}
+        onCities={applySupplierCities}
+      />
 
       {/* Salud del catálogo: problemas detectados; cada chip aplica su filtro.
           En móvil va plegado tras el botón "Salud del catálogo". */}
@@ -4736,6 +4873,17 @@ function AdminProductsContent() {
                                 · {product.sku}
                               </span>
                             )}
+                            {/* Solo cuando hay proveedor: 350 productos no lo
+                                tienen y llenarían la tabla de guiones. */}
+                            {supplierByProduct[product.id] && (
+                              <span
+                                className="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-700 border border-gray-200"
+                                title={`Proveedor: ${supplierByProduct[product.id]}`}
+                              >
+                                <Truck className="w-2.5 h-2.5" aria-hidden="true" />
+                                {supplierByProduct[product.id]}
+                              </span>
+                            )}
                           </p>
                           {(product.tags?.length ||
                             saleState(product) === "expired" ||
@@ -5177,7 +5325,18 @@ function AdminProductsContent() {
                     <p className="text-sm font-medium text-gray-900 truncate" title={product.name}>
                       {product.name}
                     </p>
-                    <p className="text-xs text-gray-600 truncate">{product.brand ?? "—"}</p>
+                    <p className="text-xs text-gray-600 truncate">
+                      {product.brand ?? "—"}
+                      {supplierByProduct[product.id] && (
+                        <span
+                          className="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-700 border border-gray-200"
+                          title={`Proveedor: ${supplierByProduct[product.id]}`}
+                        >
+                          <Truck className="w-2.5 h-2.5" aria-hidden="true" />
+                          {supplierByProduct[product.id]}
+                        </span>
+                      )}
+                    </p>
                     <div className="mt-1.5 flex items-center justify-between">
                       <span className="text-sm font-semibold text-gray-900">
                         ${Number(product.sale_price ?? product.price ?? 0).toFixed(2)}
