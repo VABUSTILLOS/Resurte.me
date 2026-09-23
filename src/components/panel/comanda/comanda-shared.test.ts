@@ -34,6 +34,18 @@ describe("entryTime — hora de la comanda", () => {
     expect(entryTime(venta({ id }))).toBe(ts)
   })
 
+  it("no pierde precisión cuando el id completo supera Number.MAX_SAFE_INTEGER", () => {
+    // El id completo, parseado de una pieza, da ~2.97e18 (base36 del timestamp
+    // por 36⁴): por encima de 9.007e15 el último dígito lo decide el redondeo del
+    // motor, y en CI el mismo id devolvía el instante +1 ms. Este caso es el
+    // determinista que faltaba: fija el id en vez de generarlo, y afirma el
+    // límite además del resultado.
+    const ts = Date.parse("2026-01-15T09:05:00.000Z")
+    const id = ts.toString(36) + "zzzz"
+    expect(parseInt(id, 36)).toBeGreaterThan(Number.MAX_SAFE_INTEGER)
+    expect(entryTime(venta({ id }))).toBe(ts)
+  })
+
   it("devuelve 0 cuando el id está vacío", () => {
     expect(entryTime(venta({ id: "" }))).toBe(0)
   })

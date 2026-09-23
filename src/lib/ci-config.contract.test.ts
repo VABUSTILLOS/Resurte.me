@@ -133,17 +133,22 @@ describe("contrato de configuración de CI", () => {
     ).toEqual([])
   })
 
-  it("el workflow declara `concurrency` y cancela la corrida anterior", () => {
-    // Sin esto, 33 de 99 corridas se pisaban y `e2e` (155-244 s) moría a los
-    // ~91 s con `The operation was canceled.` — 13 de 40 corridas, contadas como
-    // `failure` aunque no lo fueran. El grupo incluye `github.ref`, así que un PR
-    // y `main` no se cancelan entre sí.
+  it("el workflow declara `concurrency` y no cancela las corridas de `main`", () => {
+    // El grupo incluye `github.ref`, así que un PR y `main` no se mezclan.
+    //
+    // `cancel-in-progress` se limita a los PRs, y no es una preferencia: este
+    // repo autocommitea cada pocos minutos, y con la cancelación global el job
+    // `e2e` moría calentando rutas (`[e2e] calentando 64/84`, `The operation was
+    // canceled.`) sin llegar nunca al primer test. El job quedaba rojo siempre y
+    // su rojo no significaba nada. En `main` se deja terminar; en un PR el push
+    // nuevo reemplaza al viejo y nadie pierde señal.
     const block = /^concurrency:\n((?:[ \t]+.*\n)+)/m.exec(CI)?.[1] ?? ""
 
     expect(block, "ci.yml no declara `concurrency`").not.toBe("")
-    expect(block, "falta `cancel-in-progress: true` en el bloque concurrency").toMatch(
-      /cancel-in-progress:\s*true/
-    )
+    expect(
+      block,
+      "`cancel-in-progress` debe quedar condicionado a los PRs: en `main` los autocommits cancelan `e2e` antes del primer test"
+    ).toMatch(/cancel-in-progress:\s*\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*\}\}/)
     expect(block, "el grupo debe incluir `github.ref` para no mezclar ramas").toMatch(
       /group:\s*\$\{\{\s*github\.workflow\s*\}\}\s*-\s*\$\{\{\s*github\.ref\s*\}\}/
     )

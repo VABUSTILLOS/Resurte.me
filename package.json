@@ -12,6 +12,7 @@
     "test": "vitest run",
     "db:status": "node scripts/db-status.mjs",
     "env:doctor": "node scripts/env-doctor.mjs",
+    "launch:check": "node scripts/launch-check.mjs",
     "precios:sync": "node scripts/alsuper-prices-sync.mjs",
     "knip": "knip",
     "verify": "npm run typecheck && npm run lint && npm test && npm run knip",

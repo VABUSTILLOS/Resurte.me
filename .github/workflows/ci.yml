@@ -5,14 +5,20 @@ on:
     branches: [main]
   pull_request:
 
-# Una corrida por rama y workflow: un push nuevo cancela el anterior en vez de
-# competir por el mismo runner. Sin esto, `e2e` (155-244 s) moría a los ~91 s con
-# `##[error]The operation was canceled.` cada vez que un push llegaba a <180 s
-# de la corrida anterior — 33 de 99 corridas lo hacían. El grupo incluye
-# `github.ref`, así que un PR y `main` no se cancelan entre sí.
+# Una corrida por rama y workflow, para que dos pushes no compitan por el mismo
+# runner.
+#
+# `cancel-in-progress` se limita a los PRs. En `main` NO se cancela, y la razón
+# es medida: este repo autocommitea ("Save uncommitted changes") cada pocos
+# minutos, así que con la cancelación activa el job `e2e` no llegaba nunca al
+# primer test — moría calentando rutas, con `##[error]The operation was
+# canceled.` (p. ej. `[e2e] calentando 64/84`), y el resultado era un job rojo
+# permanente que no medía nada. Al no cancelar, cada corrida de `main` termina y
+# su rojo (o su verde) significa algo. En un PR el push nuevo reemplaza al viejo
+# y nadie pierde señal, así que ahí sí se cancela.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:

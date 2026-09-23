@@ -1605,6 +1605,162 @@ tiene.
 
 ---
 
+## 14. Puesta en marcha de la tienda: estado medido y checklist de arranque (23-sep-2026)
+
+Medición hecha **contra producción**, no contra este documento: el bundle
+desplegado en `resurte.me`, la API de Stripe con la llave publicable real, la API
+de administración de Supabase y consultas de solo lectura a la base de datos de
+producción. Alcance: **la tienda Resurte.me** (catálogo, carrito, checkout,
+pedidos). Stripe Connect y las herramientas de venta de los restaurantes quedan
+fuera.
+
+### 14.1 Lo que se midió
+
+| Pregunta | Resultado | Cómo se midió |
+|---|---|---|
+| ¿Se pueden cobrar tarjetas reales? | **No** | El bundle de producción hornea `loadStripe("pk_test_…")`: modo test. La llave se validó contra la API de Stripe (crea token con tarjeta de prueba) y es válida, de test. |
+| ¿Los pedidos y compras se guardan? | **Sí** | `orders`: 23 filas, 14 con `stripe_payment_intent_id`, 9 `paid`+`confirmed`. `profiles`: 4. |
+| ¿Se puede registrar un usuario? | **A medias** | `disable_signup=false`, `external_google_enabled=true`, pero `mailer_autoconfirm=false` y **`smtp_host`/`smtp_user`/`smtp_pass` vacíos**: la confirmación depende del correo por defecto de Supabase, con `rate_limit_email_sent=2` por hora. |
+| ¿Se puede iniciar sesión? | **Sí** | `POST /auth/v1/token` responde 400 `invalid_credentials` con credenciales falsas (comportamiento correcto). 3 de 4 usuarios están confirmados. |
+| ¿El sitio está arriba? | **Sí** | 200 en `/`, `/auth/login`, `/auth/register`, `/cart`, `/admin`, `/panel`, `/r/mr-fresh`. Supabase `ACTIVE_HEALTHY`. Ledger de migraciones al día. Cron `/api/cron/daily` fail-closed (401 sin secreto). |
+
+Apagado en producción (no está en Vercel): Resend (`RESEND_API_KEY`),
+WhatsApp Business, VAPID (push), Uber Direct, SPEI, OXXO y
+`STRIPE_CONNECT_ENABLED`. `email_logs` está **vacío**: ningún correo
+transaccional de pedido ha salido nunca.
+
+### 14.2 Los dos defectos de instrumento que encontró la ronda
+
+**1. `entryTime()` perdía precisión y el test dependía del motor.** En
+`src/components/panel/comanda/comanda-shared.ts` se hacía
+`Math.floor(parseInt(id, 36) / 36⁴)`. El `parseInt` del id completo da ~2.97e18,
+por encima de `Number.MAX_SAFE_INTEGER` (9.007e15): el último dígito lo decidía
+el redondeo del motor. En CI devolvía el instante **+1 ms** y el test salía rojo
+(`expected 1768467900001 to be 1768467900000`), mientras en local salía exacto.
+Corregido descartando los 4 caracteres aleatorios **antes** de parsear; el test
+ahora fija el id y afirma el límite, así que es determinista.
+
+**2. El job `e2e` no llegaba nunca al primer test.** No era el
+`NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key` del workflow —ese valor es
+deliberado y está documentado en `playwright.config.ts`, el job corre en
+`next dev` justamente para no tener que prerenderizar sin credenciales— sino
+`cancel-in-progress: true` a nivel workflow. Como este repo autocommitea cada
+pocos minutos, el push siguiente cancelaba el job mientras calentaba rutas
+(`[e2e] calentando 64/84`, `##[error]The operation was canceled.`). El job
+quedaba rojo siempre y su rojo no significaba nada. Ahora `cancel-in-progress`
+solo aplica a PRs, así que las corridas de `main` terminan.
+
+### 14.3 Trampa del entorno local: `******` pasa todos los filtros
+
+`.env.local` tiene `NEXT_PUBLIC_SUPABASE_ANON_KEY` con una cadena de asteriscos
+(el valor enmascarado). Ni `npm run env:doctor` ni `src/lib/supabase/env.ts` la
+reconocen como inválida —`isUsable()` solo rechaza vacío y una lista corta de
+placeholders— así que **el cliente de Supabase se construye con una llave falsa
+y las fallas aparecen después como 401 opacos**, que es exactamente el síntoma
+que `env.ts` se escribió para evitar. Al recuperar el entorno local, verifica el
+valor real; no te fíes del "ok" del doctor.
+
+### 14.4 Checklist de arranque (lo que solo puede hacer el operador)
+
+1. **Stripe en modo live.** En el dashboard, modo live: `pk_live_…`, `sk_live_…`
+   y el signing secret `whsec_…`. Colocarlas en Vercel → Production:
+
+   ```bash
+   vercel env rm NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY production
+   vercel env add NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY production   # pk_live_…
+   vercel env rm STRIPE_SECRET_KEY production
+   vercel env add STRIPE_SECRET_KEY production                    # sk_live_…
+   vercel env rm STRIPE_WEBHOOK_SECRET production
+   vercel env add STRIPE_WEBHOOK_SECRET production                # whsec_… live
+   ```
+
+2. **Redesplegar.** `NEXT_PUBLIC_*` se hornea en el build: cambiar la variable
+   sin volver a desplegar deja el sitio con `pk_test_…`.
+
+3. **Verificar que el bundle ya no trae una llave de test:**
+
+   ```bash
+   npm run launch:check
+   ```
+
+   Es la medición completa de arranque (read-only, no escribe nada): modo de la
+   llave de Stripe en el bundle desplegado, rutas clave, webhook, cron y SMTP de
+   Supabase. Sale 1 si hay algún bloqueador y marca **NO MEDIDO** lo que no pudo
+   comprobar — nunca lo pinta como bueno. La comprobación de Stripe, suelta:
+
+   ```bash
+   curl -s https://resurte.me/ \
+     | grep -o '/_next/static/[A-Za-z0-9/._-]*\.js' | sort -u \
+     | while read -r f; do curl -s "https://resurte.me$f"; done \
+     | grep -o 'loadStripe("[^"]*"' | sort -u
+   ```
+
+   Debe decir `pk_live_…`. Si dice `pk_test_…`, el redeploy no tomó la variable.
+
+4. **Webhook en modo live.** Endpoint `https://resurte.me/api/webhooks/stripe`
+   con los eventos que consume `src/app/api/webhooks/stripe/route.ts`:
+   `payment_intent.succeeded`, `payment_intent.payment_failed`,
+   `payment_intent.processing`, `payment_intent.requires_action`,
+   `payment_intent.canceled`, `payment_intent.refunded`, `charge.refunded`,
+   `charge.dispute.created`. (`account.updated` es de Connect.)
+
+5. **SMTP propio en Supabase** (§8.1) y decidir la política de confirmación
+   (§8.1). Sin SMTP, el registro por email sigue a 2 correos por hora.
+
+6. **`RESEND_API_KEY` en Vercel Production** (§8.0) para los correos de pedido.
+
+7. **Prueba de cobro real de importe mínimo** y comprobación en la base:
+   `orders.payment_status='paid'`, `stripe_payment_intent_id` no nulo, y el
+   pedido en `confirmed` (lo marcó el webhook).
+
+### 14.5 Cabos sueltos, medidos
+
+**La CSP de producción está en modo auditoría, no aplicando.** El header que
+sirve `resurte.me` es `content-security-policy-report-only`, así que la política
+**no bloquea nada**: es telemetría. `src/lib/csp.ts` describe ese modo como
+temporal —«para auditar la política, desplegar con `CSP_REPORT_ONLY=1` y revisar
+el endpoint temporalmente»— y `CSP_REPORT_ONLY` lleva **46 días** puesta en
+Vercel Production. De paso: el comentario de cabecera de
+`src/app/api/csp-report/route.ts` afirma «La CSP se desplegó en modo enforce»,
+que no es lo que sirve producción. Pasar a enforce es una decisión del operador
+(una directiva mal ajustada tumba Stripe.js, GA o el píxel de Meta), y este
+script no la toma.
+
+**El botón de passkeys no puede funcionar hoy.** El dashboard tiene
+`passkey_enabled: false` (`GET /auth/v1/settings`), pero
+`src/components/auth/auth-form.tsx` muestra «Entrar con llave de acceso» en
+cuanto el navegador soporte WebAuthn: la comprobación es del navegador, no del
+servidor. El daño está acotado —`passkeyErrorMessage()` mapea los códigos de
+`@supabase/auth-js` a español y hay un caso por cada uno— así que el usuario ve
+un mensaje entendible en vez de un error crudo, pero es un botón que solo puede
+fallar. Se arregla activando passkeys en el dashboard (§8.0.2) o escondiendo el
+botón.
+
+**El cron diario no se pudo medir.** `/api/cron/daily` está declarado en
+`vercel.json` y verificado fail-closed (401 sin secreto), pero ninguno de sus
+jobs deja rastro en la base con el estado actual: los de correo no hacen nada sin
+`RESEND_API_KEY` (`email_logs` está vacío) y `reconcile-payments` solo escribe
+cuando hay algo que reconciliar, y no hay ningún pedido en `processing`. O sea
+que **la ausencia de rastro es lo esperado tanto si corrió como si no**. Lo que
+sí se midió: los tres jobs de `pg_cron` en Supabase están activos
+(`cleanup-guest-addresses`, `purge-rate-limits`, `expire-wallet-credits`). Para
+cerrar este cabo, mirar *Vercel → Cron Jobs → última ejecución*.
+
+### 14.6 Límites de esta medición
+
+- No se pudo leer el **valor** de `STRIPE_SECRET_KEY` ni de
+  `STRIPE_WEBHOOK_SECRET`: Vercel los marca Sensitive y `vercel env pull` los
+  devuelve como `[SENSITIVE]`. La conclusión sobre el modo test se apoya en la
+  llave **publicable**, que es la que el navegador usa para inicializar
+  Stripe.js: con una `pk_test_…`, Stripe.js no acepta tarjetas reales aunque el
+  secret fuera live.
+- No se probó un registro real con correo nuevo (habría consumido el cupo de 2
+  correos por hora y creado un usuario en producción).
+- FoodOS no se midió a fondo (fuera de alcance): se anotó que tiene 1 restaurante
+  activo, 0 pedidos y ninguna cuenta de Stripe conectada.
+
+---
+
 ## Referencias
 
 - `vercel.json` (crons + headers de seguridad), `src/app/api/cron/*`, `src/app/api/workflows/*`, `src/app/api/foodos/campaigns/run`.
