@@ -25,7 +25,8 @@ import { describe, expect, it } from "vitest"
  * Al medir el resto del esquema aparecieron **24 tablas** en ese estado, y sólo
  * `crm_tasks` lo declaraba (`COMMENT ON TABLE` en `00185`). Las otras 23 no
  * decían nada: nueve no tenían ni un `COMMENT ON TABLE`, y catorce tenían un
- * comentario que describía la tabla pero no quién puede leerla.
+ * comentario que describía la tabla pero no quién puede leerla. Con
+ * `competitor_prices` (`00197`, 22-sep-2026) el perímetro son **25**.
  *
  * ────────────────────────────────────────────────────────────────────────────
  * Qué se congela, y por qué en un registro y no en 24 comentarios
@@ -34,7 +35,7 @@ import { describe, expect, it } from "vitest"
  * La decisión de producto fue **no añadir políticas** —el acceso es de servicio
  * y añadir políticas de cliente sería inventar una superficie que nadie pidió—
  * y en su lugar **declarar el modelo de acceso**. La declaración vive aquí, en
- * un registro explícito, y no en 24 `COMMENT ON TABLE` nuevos, por una razón
+ * un registro explícito, y no en 25 `COMMENT ON TABLE` nuevos, por una razón
  * concreta: un comentario en la base de datos **no se puede verificar**, y este
  * contrato sí. Cada entrada lleva el archivo que demuestra el acceso, así que
  * una entrada que deja de ser cierta es una entrada que se puede comprobar.
@@ -64,10 +65,11 @@ import { describe, expect, it } from "vitest"
  * Todo lo de arriba se mide **sobre las migraciones**, no sobre la base. Un
  * registro impecable y una base que no se le parece se leerían igual de bien.
  * Esa mitad se midió a mano con la Management API el **22-sep-2026** y el
- * resultado está en `docs/OPS.md` §13: 24 de 24 con `relrowsecurity = true` y
- * cero filas en `pg_policies`, sin diferencia simétrica contra el conjunto que
- * calcula este archivo, y los 23 archivos de evidencia existiendo y usando
- * `createServiceClient()`. Cero discrepancias. Si algún día este contrato pasa
+ * resultado está en `docs/OPS.md` §13: las 24 de entonces con
+ * `relrowsecurity = true` y cero filas en `pg_policies`, sin diferencia
+ * simétrica contra el conjunto que calcula este archivo, y los 23 archivos de
+ * evidencia existiendo y usando `createServiceClient()`. Cero discrepancias.
+ * `competitor_prices` se añadió después y su evidencia es de otra clase. Si algún día este contrato pasa
  * y la base no cuadra, el sitio donde se ve es esa sección, no este test.
  */
 
@@ -118,11 +120,13 @@ const FUENTES = MIGRATION_FILES.map((f) => sinComentarios(readFileSync(join(MIGR
 const MEDICION = medir(FUENTES)
 
 /**
- * Las 24 tablas con RLS encendida y ninguna política, con el archivo que
+ * Las 25 tablas con RLS encendida y ninguna política, con el archivo que
  * demuestra cómo se accede a cada una. Todas se leen y escriben con
  * `createServiceClient()`; `rate_limits` lo hace a través de la RPC
  * `consume_rate_limit`, cuyo `EXECUTE` quedó restringido a `service_role` en
- * `00165` y que se invoca desde el mismo cliente de servicio.
+ * `00165` y que se invoca desde el mismo cliente de servicio, y
+ * `competitor_prices` es la única cuyo acceso vive fuera de `src/` (ver su
+ * entrada).
  */
 const MODELO_DE_ACCESO: Record<string, string> = {
   bump_affinity: "createServiceClient() desde src/app/api/admin/bump-affinity/route.ts",
@@ -136,6 +140,14 @@ const MODELO_DE_ACCESO: Record<string, string> = {
   crm_sequences: "createServiceClient() desde src/app/admin/actions.ts",
   crm_tasks:
     "createServiceClient() desde src/app/admin/actions.ts; declarada en COMMENT ON TABLE de 00185",
+  // La primera entrada del registro cuyo acceso NO vive en `src/`: el único
+  // lector es el SQL de la migración `00198` (topa el precio de venta contra
+  // `unit_price`) y el único escritor es `scripts/alsuper-prices-sync.mjs`,
+  // que corre con la llave de servicio fuera de la app. Ninguna superficie de
+  // `src/` la lee: si la leyera el cliente de sesión, `00020` (que prohíbe
+  // nombrar supermercados rivales en datos públicos) quedaría violado.
+  competitor_prices:
+    "scripts/alsuper-prices-sync.mjs (service_role) la escribe; la migración 00198 la lee en SQL para topar precios",
   delivery_drivers: "createServiceClient() desde src/app/api/admin/drivers/route.ts",
   email_logs: "createServiceClient() desde src/app/api/admin/email-logs/route.ts",
   foodos_payouts: "createServiceClient() desde src/app/api/admin/foodos/payouts/route.ts",
@@ -213,7 +225,7 @@ describe("perímetro — RLS sin políticas", () => {
 
   it("el registro cubre exactamente el perímetro medido", () => {
     expect(DECLARADAS).toEqual(MEDICION.sinPoliticas)
-    expect(DECLARADAS).toHaveLength(24)
+    expect(DECLARADAS).toHaveLength(25)
   })
 
   it("ninguna entrada está vacía y todas nombran dónde vive el acceso", () => {
@@ -223,7 +235,7 @@ describe("perímetro — RLS sin políticas", () => {
     expect(flojas).toEqual([])
 
     const sinEvidencia = Object.entries(MODELO_DE_ACCESO)
-      .filter(([, motivo]) => !/src\/|RPC/.test(motivo))
+      .filter(([, motivo]) => !/src\/|scripts\/|RPC/.test(motivo))
       .map(([tabla]) => tabla)
     expect(sinEvidencia).toEqual([])
   })

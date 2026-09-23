@@ -198,6 +198,57 @@ Dos detalles que no son obvios:
   marca**: representar «Queso crema Krol» con una foto de Philadelphia sería
   engañoso para el cliente. Se dice en `/creditos`.
 
+## Precios de proveedor FRUGASA y tope de la competencia (`00196`–`00200`)
+
+El segundo proveedor con lista cargada es **FRUGASA** (frutas, verduras, chiles
+secos, especias y granos; lista «Precios 1853» del 18-sep-2026). La regla de
+precio es la misma familia que `00191` pero con un ingrediente nuevo: un **tope
+contra la competencia**.
+
+```
+precio = LEAST( CEIL(product_suppliers.cost * factor * 1.20),
+                competitor_prices.unit_price * factor )
+```
+
+| Migración | Qué hace |
+| --- | --- |
+| `00196` | Proveedor `frugasa` + `product_suppliers.cost` (precio **por kilo** de la lista) para 74 productos |
+| `00197` | Tabla **privada** `competitor_prices` + snapshot del 22-sep-2026 de los 74 |
+| `00198` | La regla de precio completa. Cambia a `por kilo` los 25 productos que se vendían por pieza/manojo/charola |
+| `00199` | `competitor_prices` pasa de uno-a-uno a **varios productos nuestros por producto del rival** (ciruelo rojo/negro comparten «Ciruela de temporada») |
+| `00200` | Alta de los 61 artículos que la tienda no tenía |
+
+Lo que no es obvio:
+
+- **`cost` es por kilo, no por unidad de venta.** La lista de FRUGASA no trae
+  columna de unidad; se verificó que es por kilo comparando contra el precio
+  *regular* de la competencia (el costo cae entre 25 % y 84 % del retail,
+  mediana ~55 %). El factor a la unidad de venta vive **solo** en `00198`, para
+  que la aritmética se lea en un lugar.
+- **El tope se compara siempre en la misma base física.** `unit_price` es el
+  precio del rival normalizado a kilo; si el rival solo lo vende por pieza o
+  manojo, `unit_price` queda `NULL` y **no hay tope**. Comparar nuestro kilo
+  contra su pieza es lo que prohíbe `src/lib/unit-price.ts`.
+- **El tope manda aunque quede por debajo del costo.** Fue una decisión
+  explícita (precio de entrada); los 22 artículos afectados están listados en
+  `docs/frugasa-comparativa.md` para que no se lean como un error de cálculo.
+- **`competitor_prices` no tiene políticas RLS y nombra al rival.** `00020`
+  prohíbe mencionar supermercados rivales en los datos **públicos** del
+  catálogo; esta tabla es interna y por eso `anon`/`authenticated` no la leen.
+  Está declarada en `src/lib/rls-declared.contract.test.ts`.
+- **La identidad de una fila de `competitor_prices` es la pareja (nuestro
+  producto, producto del rival)**, no el producto del rival solo: `ciruelo-rojo`
+  y `ciruelo-negro` comparten «Ciruela de temporada», y `arandano-fresco` con
+  `blue-berry` comparten «Arandano Alsuper». En producción la tabla nació
+  uno-a-uno y `00199` la corrigió; `00197` ya trae la restricción correcta, así
+  que `00199` es una no-op en una base nueva (se conserva porque es la que hizo
+  el cambio en producción).
+- **Las cinco migraciones se pueden re-ejecutar.** Verificado corriendo
+  `00196`–`00200` completas sobre la base ya migrada y comparando un snapshot de
+  los 536 productos antes y después: idéntico.
+- **El ciclo de refresco** de los topes es
+  `node scripts/alsuper-prices-sync.mjs` y luego re-aplicar `00198`.
+
 ## Privilegios de columna: qué puede leer la llave pública (`00192`, `00193`, `00195`)
 
 **Regla, y aplica a toda tabla nueva:** `anon` y `authenticated` reciben
