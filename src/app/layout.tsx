@@ -99,15 +99,11 @@ export const metadata: Metadata = {
       `Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Envío gratis desde ${freeShippingFrom}.`,
     images: ["https://resurte.me/opengraph-image"],
   },
-  icons: {
-    icon: [
-      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-48.png", sizes: "48x48", type: "image/png" },
-    ],
-    apple: [
-      { url: "/apple-icon.webp", sizes: "180x180", type: "image/webp" },
-    ],
-  },
+  // Sin bloque `icons`: los favicons salen de las convenciones de archivo de
+  // `src/app/` (favicon.ico multi-resolución, icon.png, apple-icon.png). Antes
+  // se declaraban rutas a mano (/favicon-32.png, /favicon-48.png,
+  // /apple-icon.webp) que quedaron huérfanas y devolvían 404, dejando el
+  // favicon por defecto de Next.js. Las convenciones no se pueden desincronizar.
   robots: {
     index: true,
     follow: true,
