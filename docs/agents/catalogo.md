@@ -53,14 +53,19 @@
   concurso** — nunca comparar kg contra piezas ni `500 g` contra `1 kg` a ojo.
   Las cards y la búsqueda global muestran `$/kg` como insignia y conservan el
   heurístico de mayoreo solo cuando el precio por unidad no es calculable.
-- Precio de venta con proveedor (00196–00200): la regla vive **solo** en
-  `00198` — `LEAST(CEIL(costo * factor * 1.20), tope * factor)`, donde `factor`
-  es el peso de una unidad de venta y el tope sale de la tabla **privada**
+- Precio de venta con proveedor (00196–00202): la regla vigente vive en
+  `00202` — `LEAST(CEIL(costo_kg * kg * margen), tope_kg * kg)`, donde `kg` es
+  el peso de una unidad de venta y el tope sale de la tabla **privada**
   `competitor_prices` (normalizada a kilo por `scripts/alsuper-prices-sync.mjs`).
   Nunca escribir el costo en `products.cost` ni en `description`, ni el nombre
   del rival en datos públicos (lo prohíbe `00020`). Si el rival no vende el
   equivalente por kilo, **no hay tope**: no se inventa una comparación.
-  Detalle y listas en `docs/frugasa-comparativa.md`.
+  **Son DOS restricciones, no una** (desde `00202`): `precio >= costo` y
+  `precio <= competencia`. Si el rival lo vende más barato de lo que nos cuesta
+  no existe precio válido y el producto se **oculta** — nunca se vende a
+  pérdida. Ojo con `product_suppliers.cost`: es **por kilo** para FRUGASA
+  (`00196`) y **por unidad de venta** para AB Foods (`00191`). Detalle en
+  `docs/precios-reglas.md`.
 - Mega-menú de categorías (N11): `category-mega-menu.tsx` carga `/api/categories`
   **solo al abrir por primera vez**, cierra con Escape (devolviendo el foco al
   disparador), con clic fuera y al cambiar de ruta, y avisa al header vía

@@ -1,5 +1,11 @@
 # Comparativa FRUGASA vs. tienda vs. competencia
 
+> ⚠️ **Documento histórico.** Describe la regla de `00198`, que dejaba vender por
+> debajo del costo cuando el tope de la competencia quedaba más abajo. Esa
+> decisión se revirtió el **1-oct-2026**: ver `docs/precios-reglas.md` y la
+> migración `00202`. El snapshot de la competencia aquí es del 22-sep y ya
+> derivó.
+>
 > Generado el **22-sep-2026** a partir de la lista de precios de FRUGASA
 > (`Precios 1853`, RESTAURANT 2, vigente al 18-sep-2026) y del catalogo de la
 > tienda al momento de aplicar las migraciones `00196`-`00200`.
@@ -19,7 +25,9 @@ precio = LEAST( CEIL(costo_frugasa_por_kilo * factor * 1.20),
 Decisiones del dueno que estan codificadas en `00198`:
 
 1. El 20 % es un **margen sobre costo**, no "20 % del precio".
-2. El **tope manda aunque quede por debajo del costo** (precio de entrada).
+2. ~~El **tope manda aunque quede por debajo del costo** (precio de entrada).~~
+   **Revertido por `00202`**: esos productos ahora se ocultan en vez de venderse
+   a pérdida.
 3. Los productos que se vendian por pieza, manojo o charola **pasan a venderse
    por kilo**: es la unica forma de comparar contra una lista que es por kilo
    sin inventar el peso de una pieza (`src/lib/unit-price.ts` lo prohibe).

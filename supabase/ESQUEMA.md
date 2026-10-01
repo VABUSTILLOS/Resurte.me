@@ -229,9 +229,19 @@ Lo que no es obvio:
   precio del rival normalizado a kilo; si el rival solo lo vende por pieza o
   manojo, `unit_price` queda `NULL` y **no hay tope**. Comparar nuestro kilo
   contra su pieza es lo que prohíbe `src/lib/unit-price.ts`.
-- **El tope manda aunque quede por debajo del costo.** Fue una decisión
-  explícita (precio de entrada); los 22 artículos afectados están listados en
-  `docs/frugasa-comparativa.md` para que no se lean como un error de cálculo.
+- **El tope manda, pero sin vender a pérdida (`00202`).** La regla vigente son
+  dos restricciones a la vez: `precio >= costo` y `precio <= competencia`. Si el
+  rival lo vende más barato de lo que nos cuesta **no existe precio válido** y el
+  producto se **oculta** (22 artículos de FRUGASA, 1-oct-2026). La decisión
+  anterior —vender a pérdida como precio de entrada— quedó revertida. Detalle en
+  `docs/precios-reglas.md`.
+- **AB Foods también lleva tope desde `00202`.** `00191` lo publicó sin tope;
+  ahora sus 51 artículos se comparan contra la competencia igual que los de
+  FRUGASA (5 bajaron de precio).
+- **`product_suppliers.cost` no tiene una base única, y es una trampa:**
+  `frugasa` lo guarda **por kilo** (`00196`) y `ab-foods` **por unidad de venta**
+  (`00191`). Cualquier cálculo que los trate igual está mal. Unificar la base
+  exigiría reescribir `00191`, así que `00202` convive con las dos y lo documenta.
 - **`competitor_prices` no tiene políticas RLS y nombra al rival.** `00020`
   prohíbe mencionar supermercados rivales en los datos **públicos** del
   catálogo; esta tabla es interna y por eso `anon`/`authenticated` no la leen.
