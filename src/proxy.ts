@@ -1,69 +1,20 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { buildStaticCspHeader } from "@/lib/csp"
+import { detectCityFromHeaders } from "@/lib/geo-city"
 import { updateSession } from "@/lib/supabase/middleware"
 
 const VALID_SLUGS = MEXICO_CITIES.map((c) => c.slug)
 
-// Vercel Edge proporciona geo en el request (no está en los tipos de Next.js)
-interface GeoInfo {
-  city?: string
-  country?: string
-  region?: string
-  latitude?: string
-  longitude?: string
-  timezone?: string
-}
-
-type RequestWithGeo = NextRequest & { geo?: GeoInfo }
-
-// Mapa de códigos de ciudad de Vercel Edge → nuestros slugs
-const GEO_CITY_TO_SLUG: Record<string, string> = {
-  "Mexico City": "cdmx",
-  "Guadalajara": "guadalajara",
-  "Monterrey": "monterrey",
-  "Puebla": "puebla",
-  "Toluca": "toluca",
-  "Querétaro": "queretaro",
-  "León": "leon",
-  "Tijuana": "tijuana",
-  "Mérida": "merida",
-  "San Luis Potosí": "san-luis-potosi",
-  "Aguascalientes": "aguascalientes",
-  "Hermosillo": "hermosillo",
-  "Saltillo": "saltillo",
-  "Culiacán": "culiacan",
-  "Morelia": "morelia",
-  "Chihuahua": "chihuahua",
-  "Veracruz": "veracruz",
-  "Villahermosa": "villahermosa",
-  "Cancún": "cancun",
-  "Torreón": "torreon",
-}
-
-// Mapa de country+region a nuestros slugs (fallback para regiones cercanas)
-const GEO_REGION_TO_SLUG: Record<string, string> = {
-  "MX-DIF": "cdmx",
-  "MX-CMX": "cdmx",
-  "MX-JAL": "guadalajara",
-  "MX-NLE": "monterrey",
-  "MX-PUE": "puebla",
-  "MX-MEX": "toluca",
-  "MX-QUE": "queretaro",
-  "MX-GUA": "leon",
-  "MX-BCN": "tijuana",
-  "MX-YUC": "merida",
-  "MX-SLP": "san-luis-potosi",
-  "MX-AGU": "aguascalientes",
-  "MX-SON": "hermosillo",
-  "MX-COA": "saltillo",
-  "MX-SIN": "culiacan",
-  "MX-MIC": "morelia",
-  "MX-CHH": "chihuahua",
-  "MX-VER": "veracruz",
-  "MX-TAB": "villahermosa",
-  "MX-ROO": "cancun",
-}
+const CITY_COOKIE = "city-slug"
+/**
+ * Origen de `city-slug`: `manual` (el visitante eligió en el selector) o
+ * `auto` (geolocalización por IP). Solo una elección manual se respeta por
+ * encima de la detección: así una IP mal geolocalizada —o un dato viejo—
+ * no deja al visitante atado a la ciudad equivocada durante 30 días.
+ */
+const CITY_SOURCE_COOKIE = "city-source"
+const CITY_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 
 const SKIP_PATHS = ["/_next", "/api", "/favicon.ico", "/auth", "/admin", "/static"]
 
@@ -71,24 +22,12 @@ function isPublicPath(pathname: string): boolean {
   return SKIP_PATHS.some((p) => pathname.startsWith(p))
 }
 
-/**
- * Detecta la ciudad del visitante usando Vercel Edge geolocation.
- */
-function detectCityFromGeo(request: RequestWithGeo): string | null {
-  const city = request.geo?.city
-  if (city && GEO_CITY_TO_SLUG[city]) {
-    return GEO_CITY_TO_SLUG[city]
-  }
-  // Fallback: usar código de región (ej: MX-JAL → guadalajara)
-  const country = request.geo?.country
-  const region = request.geo?.region
-  if (country === "MX" && region) {
-    const key = `MX-${region}`
-    if (GEO_REGION_TO_SLUG[key]) {
-      return GEO_REGION_TO_SLUG[key]
-    }
-  }
-  return null
+function setCityCookie(response: NextResponse, slug: string, source: "auto" | "manual") {
+  response.cookies.set(CITY_COOKIE, slug, { maxAge: CITY_COOKIE_MAX_AGE, path: "/" })
+  response.cookies.set(CITY_SOURCE_COOKIE, source, {
+    maxAge: CITY_COOKIE_MAX_AGE,
+    path: "/",
+  })
 }
 
 /** Copia las cookies de auth de Supabase a una response existente */
@@ -186,23 +125,35 @@ export async function proxy(request: NextRequest) {
 
   // Root path — attempt IP detection
   if (pathname === "/") {
-    const cookieSlug = request.cookies.get("city-slug")?.value
-    if (cookieSlug && VALID_SLUGS.includes(cookieSlug)) {
-      const redirect = NextResponse.redirect(new URL(`/${cookieSlug}`, request.url))
+    const cookieSlug = request.cookies.get(CITY_COOKIE)?.value
+    const cookieSource = request.cookies.get(CITY_SOURCE_COOKIE)?.value
+    const savedSlug =
+      cookieSlug && VALID_SLUGS.includes(cookieSlug) ? cookieSlug : null
+
+    // Elección explícita del visitante: manda sobre la IP.
+    if (cookieSource === "manual" && savedSlug) {
+      const redirect = NextResponse.redirect(new URL(`/${savedSlug}`, request.url))
       copyAuthCookies(supabaseResponse, redirect)
       return redirect
     }
-    // Try IP geolocation
-    const detectedSlug = detectCityFromGeo(request)
+
+    // Detección por IP (cabeceras x-vercel-ip-*): define la ciudad del
+    // visitante en cada entrada a la raíz, salvo que haya elegido una.
+    const detectedSlug = detectCityFromHeaders(request.headers)
     if (detectedSlug) {
       const response = NextResponse.redirect(new URL(`/${detectedSlug}`, request.url))
-      response.cookies.set("city-slug", detectedSlug, {
-        maxAge: 60 * 60 * 24 * 30,
-        path: "/",
-      })
+      setCityCookie(response, detectedSlug, "auto")
       copyAuthCookies(supabaseResponse, response)
       return response
     }
+
+    // Sin geolocalización disponible: se conserva la última ciudad conocida.
+    if (savedSlug) {
+      const redirect = NextResponse.redirect(new URL(`/${savedSlug}`, request.url))
+      copyAuthCookies(supabaseResponse, redirect)
+      return redirect
+    }
+
     // No se pudo detectar — mostrar landing con selector
     return supabaseResponse
   }
@@ -211,10 +162,12 @@ export async function proxy(request: NextRequest) {
   const segments = pathname.split("/").filter(Boolean)
   const citySlug = segments[0] ?? ""
 
-  // Valid city slug → set cookie and continue (preserves auth cookies)
+  // Valid city slug → set cookie and continue (preserves auth cookies).
+  // No se marca como `manual`: navegar a una ciudad no es elegirla, así que
+  // la próxima visita a la raíz vuelve a resolverla por IP.
   if (citySlug && VALID_SLUGS.includes(citySlug)) {
-    supabaseResponse.cookies.set("city-slug", citySlug, {
-      maxAge: 60 * 60 * 24 * 30,
+    supabaseResponse.cookies.set(CITY_COOKIE, citySlug, {
+      maxAge: CITY_COOKIE_MAX_AGE,
       path: "/",
     })
     return supabaseResponse

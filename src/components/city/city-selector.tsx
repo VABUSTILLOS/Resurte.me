@@ -43,7 +43,7 @@ export function CitySelector({ onClose }: CitySelectorProps) {
     : CITIES_BY_STATE
 
   const handleSelect = (slug: string) => {
-    setCity(slug)
+    setCity(slug, { manual: true })
     onClose()
     router.push(`/${slug}`)
   }

@@ -20,7 +20,7 @@ interface CityProviderProps {
 
 interface CityContextValue {
   city: City | null
-  setCity: (slug: string) => void
+  setCity: (slug: string, options?: { manual?: boolean }) => void
   cities: typeof MEXICO_CITIES
   isLoading: boolean
   isDetecting: boolean
@@ -30,14 +30,24 @@ interface CityContextValue {
 
 const CityContext = createContext<CityContextValue | null>(null)
 
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+
 function getCityFromCookie(): string | null {
   if (typeof document === "undefined") return null
   const match = document.cookie.match(/(?:^|;\s*)city-slug=([^;]*)/)
   return match && match[1] ? decodeURIComponent(match[1]) : null
 }
 
-function setCityCookie(slug: string) {
-  document.cookie = `city-slug=${slug};max-age=${60 * 60 * 24 * 30};path=/`
+/**
+ * `manual: true` marca la elección en el selector para que el proxy la respete
+ * por encima de la geolocalización por IP (`city-source=manual`). El resto de
+ * escrituras dejan el origen intacto: navegar a una ciudad no es elegirla.
+ */
+function setCityCookie(slug: string, manual = false) {
+  document.cookie = `city-slug=${slug};max-age=${COOKIE_MAX_AGE};path=/`
+  if (manual) {
+    document.cookie = `city-source=manual;max-age=${COOKIE_MAX_AGE};path=/`
+  }
 }
 
 function getCityFromLocalStorage(): string | null {
@@ -111,11 +121,11 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
     })
   }, [])
 
-  const setCity = useCallback((slug: string) => {
+  const setCity = useCallback((slug: string, options?: { manual?: boolean }) => {
     const found = MEXICO_CITIES.find((c) => c.slug === slug)
     if (found) {
       setCityState(found as City)
-      setCityCookie(slug)
+      setCityCookie(slug, options?.manual === true)
       setCityLocalStorage(slug)
     }
   }, [])
@@ -152,7 +162,9 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
 
         if (closestCity) {
           setCityState(closestCity as City)
-          setCityCookie(closestCity.slug)
+          // Detección por GPS a petición del visitante: más precisa que la IP,
+          // así que se marca como elección para que el proxy no la pise.
+          setCityCookie(closestCity.slug, true)
           setCityLocalStorage(closestCity.slug)
         } else {
           setDetectionError("No pudimos determinar tu ciudad.")
