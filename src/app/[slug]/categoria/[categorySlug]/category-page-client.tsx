@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, ShoppingBag } from "lucide-react"
 import { ProductCard } from "@/components/product/product-card"
@@ -27,9 +27,12 @@ export function CategoryPageClient({ citySlug, cityName, category, products: ini
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(initialProducts.length < totalCount)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
   const handleLoadMore = () => {
     if (loadingMore || !hasMore) return
+    setLoadError(false)
     setLoadingMore(true)
     const nextPage = page + 1
     loadMoreCategoryProducts(category.id, nextPage, citySlug)
@@ -38,9 +41,38 @@ export function CategoryPageClient({ citySlug, cityName, category, products: ini
         setPage(nextPage)
         setHasMore(more)
       })
-      .catch(() => {})
+      .catch(() => setLoadError(true))
       .finally(() => setLoadingMore(false))
   }
+
+  // El observer del centinela se registra una vez por tanda, así que llama
+  // siempre a la versión vigente de `handleLoadMore` (con el `page`/`hasMore`
+  // actuales) en vez de a la del render en que se creó el observer.
+  const loadMoreRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    loadMoreRef.current = handleLoadMore
+  })
+
+  // Scroll infinito: el centinela al final del listado pide la tanda siguiente
+  // antes de que el usuario llegue al botón. `rootMargin` generoso para que la
+  // carga arranque mientras aún quedan cards en pantalla; el efecto se vuelve a
+  // registrar en cada tanda (deps) para encadenar cargas cuando la tanda no
+  // alcanza a llenar el viewport.
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel || !hasMore || loadingMore || loadError) return
+    if (typeof IntersectionObserver === "undefined") return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMoreRef.current()
+      },
+      { rootMargin: "600px 0px" }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, loadError, page])
 
   return (
     <div className="min-h-screen bg-[#faf8f5]">
@@ -99,7 +131,7 @@ export function CategoryPageClient({ citySlug, cityName, category, products: ini
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {products.map((product, idx) => (
-                <ScrollReveal key={product.id} direction="scale" delay={idx * 0.04} className="h-full">
+                <ScrollReveal key={product.id} direction="scale" delay={Math.min(idx * 0.04, 0.3)} className="h-full">
                   <ProductCard
                     product={product}
                     citySlug={citySlug}
@@ -109,18 +141,48 @@ export function CategoryPageClient({ citySlug, cityName, category, products: ini
             </div>
 
             {hasMore && (
-              <div className="mt-8 text-center">
-                <button
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  className="btn-pill btn-pill-outline inline-flex items-center gap-2 disabled:opacity-50"
-                >
-                  {loadingMore
-                    ? "Cargando…"
-                    : `Cargar más (${totalCount - products.length} restantes)`}
-                </button>
+              <div ref={sentinelRef} aria-hidden="true" className="h-px" />
+            )}
+
+            {loadingMore && (
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <CategoryCardSkeleton key={i} />
+                ))}
               </div>
             )}
+
+            {hasMore && (
+              <div className="mt-8 text-center">
+                {loadError ? (
+                  <>
+                    <p className="text-sm text-[#6b6b6b] mb-3">
+                      No pudimos cargar más productos.
+                    </p>
+                    <button
+                      onClick={handleLoadMore}
+                      className="btn-pill btn-pill-outline inline-flex items-center gap-2"
+                    >
+                      Reintentar
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="btn-pill btn-pill-outline inline-flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {loadingMore
+                      ? "Cargando…"
+                      : `Cargar más (${totalCount - products.length} restantes)`}
+                  </button>
+                )}
+              </div>
+            )}
+
+            <span role="status" className="sr-only">
+              {loadingMore ? "Cargando más productos…" : ""}
+            </span>
           </>
         )}
 
@@ -134,6 +196,20 @@ export function CategoryPageClient({ citySlug, cityName, category, products: ini
             Ver todas las categorías
           </Link>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** Placeholder de una card mientras llega la siguiente tanda del scroll infinito. */
+function CategoryCardSkeleton() {
+  return (
+    <div className="bg-white rounded-xl border border-[#e0dbd2] overflow-hidden animate-pulse motion-reduce:animate-none">
+      <div className="aspect-[4/3] sm:aspect-square bg-[#f0ede6]" />
+      <div className="p-3 space-y-2">
+        <div className="h-3 bg-[#f0ede6] rounded w-1/3" />
+        <div className="h-4 bg-[#f0ede6] rounded w-3/4" />
+        <div className="h-5 bg-[#f0ede6] rounded w-1/2" />
       </div>
     </div>
   )

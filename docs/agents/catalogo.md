@@ -32,6 +32,18 @@
   fuente única de la sección "También te puede interesar"; descarta el propio
   producto, los no visibles y los agotados, y cae a la misma categoría cuando
   el admin no eligió relacionados. El array lo escribe solo el admin.
+- Scroll infinito de categoría (C15): `/[ciudad]/categoria/[slug]` acumula tandas
+  de 24 (`loadMoreCategoryProducts`) con un `IntersectionObserver` sobre un
+  centinela al final del listado (`rootMargin: 600px 0px`). El observer se
+  re-registra en cada tanda para encadenar cargas cuando la tanda no llena el
+  viewport y llama siempre a la versión vigente de `handleLoadMore` vía ref
+  (`loadMoreRef`) — **no** mover esa asignación al cuerpo del render: escribe
+  durante render y `react-hooks/refs` lo bloquea. El botón "Cargar más" se
+  conserva como fallback accesible y como salida de error: una tanda fallida
+  detiene el auto-scroll (`loadError`) y el botón pasa a "Reintentar", para no
+  reintentar en bucle. El `delay` del `ScrollReveal` de las cards va acotado
+  (`Math.min(idx * 0.04, 0.3)`): sin tope, las cards 100+ acumulaban un
+  `transition-delay` de segundos al llegar por scroll.
 - La búsqueda de ciudades es insensible a acentos (`fold()` con NFD).
 - Precio por unidad (C13): `unit-price.ts` es la fuente única. `parsePresentation`
   normaliza el texto libre de `products.unit` (`por kilo`, `500 g`, `1 l`,
