@@ -63,7 +63,9 @@
   **Son DOS restricciones, no una** (desde `00202`): `precio >= costo` y
   `precio <= competencia`. Si el rival lo vende más barato de lo que nos cuesta
   no existe precio válido y el producto se **oculta** — nunca se vende a
-  pérdida. Ojo con `product_suppliers.cost`: es **por kilo** para FRUGASA
+  pérdida. Ocultar por SQL **debe** borrar `publish_at`/`unpublish_at`: el job
+  `scheduled-publishing` republica lo que tenga fecha vencida y el producto
+  volvería al aire solo (`00203` cierra ese hueco). Ojo con `product_suppliers.cost`: es **por kilo** para FRUGASA
   (`00196`) y **por unidad de venta** para AB Foods (`00191`). Detalle en
   `docs/precios-reglas.md`.
 - Mega-menú de categorías (N11): `category-mega-menu.tsx` carga `/api/categories`

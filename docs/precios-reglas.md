@@ -21,6 +21,14 @@ cuesta— no hay precio válido: subir rompe B, bajar rompe A. Esos productos se
 **ocultan** y se reactivan desde `/admin/productos` cuando cambie el costo o el
 precio del rival.
 
+**Ocultar también borra la publicación programada** (`publish_at` /
+`unpublish_at`), y eso no es cosmético: el job `scheduled-publishing` del cron
+diario hace `is_visible = true` en todo lo que tenga `publish_at` vencido, así
+que un producto oculto con fecha pendiente **volvería al aire solo**, a un
+precio por debajo del costo. El panel no tiene ese problema porque
+`validateProductPatch` limpia la programación al togglear visibilidad; el SQL de
+una migración no pasa por esa validación. Lo cierra `00203`.
+
 ## Resumen
 
 | | |
