@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { detectCityFromHeaders, foldGeoName } from "@/lib/geo-city"
+import { detectCityFromHeaders, foldGeoName, nearestCitySlugTo } from "@/lib/geo-city"
 
 function headers(init: Record<string, string>): Headers {
   return new Headers(init)
@@ -73,5 +73,14 @@ describe("detectCityFromHeaders", () => {
 
   it("devuelve null sin cabeceras de geolocalización (dev local)", () => {
     expect(detectCityFromHeaders(headers({}))).toBeNull()
+  })
+})
+
+describe("nearestCitySlugTo", () => {
+  it("resuelve la ciudad cubierta más cercana a unas coordenadas", () => {
+    // Chihuahua capital y su periferia (Delicias, Cuauhtémoc)
+    expect(nearestCitySlugTo(28.6353, -106.0889)).toBe("chihuahua")
+    expect(nearestCitySlugTo(28.19, -105.47)).toBe("chihuahua")
+    expect(nearestCitySlugTo(19.4326, -99.1332)).toBe("cdmx")
   })
 })

@@ -11,6 +11,7 @@ import {
 } from "react"
 
 import { MEXICO_CITIES } from "@/lib/cities"
+import { nearestCitySlugTo } from "@/lib/geo-city"
 import type { City } from "@/types"
 
 interface CityProviderProps {
@@ -25,17 +26,32 @@ interface CityContextValue {
   isLoading: boolean
   isDetecting: boolean
   detectionError: string | null
-  requestBrowserLocation: () => void
+  requestBrowserLocation: () => Promise<City | null>
+  /** Origen de la ciudad actual: `auto` (IP), `manual` (elección/GPS) o null. */
+  citySource: CitySource | null
 }
 
 const CityContext = createContext<CityContextValue | null>(null)
 
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 
-function getCityFromCookie(): string | null {
+/** `auto` = la puso la geolocalización por IP; `manual` = la eligió el visitante. */
+export type CitySource = "auto" | "manual"
+
+function readCookie(name: string): string | null {
   if (typeof document === "undefined") return null
-  const match = document.cookie.match(/(?:^|;\s*)city-slug=([^;]*)/)
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`))
   return match && match[1] ? decodeURIComponent(match[1]) : null
+}
+
+function getCityFromCookie(): string | null {
+  return readCookie("city-slug")
+}
+
+/** Origen con el que el proxy marcó la ciudad (cookie `city-source`). */
+export function getCitySourceFromCookie(): CitySource | null {
+  const value = readCookie("city-source")
+  return value === "auto" || value === "manual" ? value : null
 }
 
 /**
@@ -87,6 +103,10 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
   const isLoading = city === null
   const [isDetecting, setIsDetecting] = useState(false)
   const [detectionError, setDetectionError] = useState<string | null>(null)
+  // Origen de la ciudad: lo fija la cookie que escribe el proxy (IP) o el
+  // propio visitante (selector / ubicación). Arranca en null para que el
+  // primer render no dependa de cookies (hydration determinista).
+  const [citySource, setCitySource] = useState<CitySource | null>(null)
 
   // Persist the selected city so subsequent visits keep it.
   // Prioridad: cookie > localStorage. Si hay cookie, esa manda y además se
@@ -97,6 +117,7 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
   // inicial es siempre el default para que server y cliente coincidan).
   useEffect(() => {
     const cookieSlug = getCityFromCookie()
+    const cookieSource = getCitySourceFromCookie()
     const lsSlug = getCityFromLocalStorage()
     let effective = cookieSlug || lsSlug || DEFAULT_CITY_SLUG
     // Auto-sanear valores inválidos: si el slug persistido ya no existe en el
@@ -107,12 +128,10 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
     if (!cookieSlug) {
       setCityCookie(effective)
     }
-    if (lsSlug !== effective) {
-      setCityLocalStorage(effective)
-    }
     // Diferido a microtask: adoptar la ciudad persistida tras el mount sin
     // setState síncrono dentro del efecto (evita renders en cascada).
     void Promise.resolve().then(() => {
+      setCitySource(cookieSource)
       setCityState((current) => {
         if (current?.slug === effective) return current
         const found = MEXICO_CITIES.find((c) => c.slug === effective)
@@ -126,66 +145,61 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
     if (found) {
       setCityState(found as City)
       setCityCookie(slug, options?.manual === true)
+      if (options?.manual) setCitySource("manual")
       setCityLocalStorage(slug)
     }
   }, [])
 
   /**
-   * Solicita la ubicación del navegador y encuentra la ciudad más cercana.
+   * Solicita la ubicación del navegador y devuelve la ciudad más cercana
+   * (o null si no se pudo resolver). La ciudad detectada se marca como
+   * elección: el GPS es más preciso que la IP y no debe ser pisado por ella.
    */
-  const requestBrowserLocation = useCallback(() => {
+  const requestBrowserLocation = useCallback(async (): Promise<City | null> => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setDetectionError("Tu navegador no soporta geolocalización.")
-      return
+      return null
     }
 
     setIsDetecting(true)
     setDetectionError(null)
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords
-
-        // Encontrar la ciudad más cercana por distancia euclidiana simple
-        let closestCity: (typeof MEXICO_CITIES)[0] | null = null
-        let minDistance = Infinity
-
-        for (const c of MEXICO_CITIES) {
-          const dLat = latitude - c.lat
-          const dLng = longitude - c.lng
-          const dist = dLat * dLat + dLng * dLng // squared distance
-          if (dist < minDistance) {
-            minDistance = dist
-            closestCity = c
+    const position = await new Promise<GeolocationPosition | null>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (result) => resolve(result),
+        (error) => {
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              setDetectionError("Permiso de ubicación denegado. Selecciona tu ciudad manualmente.")
+              break
+            case error.TIMEOUT:
+              setDetectionError("Tiempo de espera agotado. Intenta de nuevo o selecciona manualmente.")
+              break
+            default:
+              setDetectionError("No pudimos obtener tu ubicación. Selecciona tu ciudad manualmente.")
           }
-        }
+          resolve(null)
+        },
+        { timeout: 10000, maximumAge: 60000 }
+      )
+    })
 
-        if (closestCity) {
-          setCityState(closestCity as City)
-          // Detección por GPS a petición del visitante: más precisa que la IP,
-          // así que se marca como elección para que el proxy no la pise.
-          setCityCookie(closestCity.slug, true)
-          setCityLocalStorage(closestCity.slug)
-        } else {
-          setDetectionError("No pudimos determinar tu ciudad.")
-        }
-        setIsDetecting(false)
-      },
-      (error) => {
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            setDetectionError("Permiso de ubicación denegado. Selecciona tu ciudad manualmente.")
-            break
-          case error.TIMEOUT:
-            setDetectionError("Tiempo de espera agotado. Intenta de nuevo o selecciona manualmente.")
-            break
-          default:
-            setDetectionError("No pudimos obtener tu ubicación. Selecciona tu ciudad manualmente.")
-        }
-        setIsDetecting(false)
-      },
-      { timeout: 10000, maximumAge: 60000 }
-    )
+    setIsDetecting(false)
+    if (!position) return null
+
+    const slug = nearestCitySlugTo(position.coords.latitude, position.coords.longitude)
+    const closestCity = slug ? MEXICO_CITIES.find((c) => c.slug === slug) : undefined
+    if (!closestCity) {
+      setDetectionError("No pudimos determinar tu ciudad.")
+      return null
+    }
+
+    const detected = closestCity as City
+    setCityState(detected)
+    setCityCookie(detected.slug, true)
+    setCitySource("manual")
+    setCityLocalStorage(detected.slug)
+    return detected
   }, [])
 
   const value = useMemo<CityContextValue>(
@@ -197,8 +211,17 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
       isDetecting,
       detectionError,
       requestBrowserLocation,
+      citySource,
     }),
-    [city, setCity, isLoading, isDetecting, detectionError, requestBrowserLocation]
+    [
+      city,
+      setCity,
+      isLoading,
+      isDetecting,
+      detectionError,
+      requestBrowserLocation,
+      citySource,
+    ]
   )
 
   return <CityContext.Provider value={value}>{children}</CityContext.Provider>

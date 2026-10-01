@@ -9,6 +9,7 @@ import { Header } from "@/components/layout/header"
 import { FooterForRoute } from "@/components/layout/FooterForRoute"
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { CityDetector } from "@/components/city/city-detector"
+import { CityLocationPrompt } from "@/components/city/city-location-prompt"
 import { GuestClaim } from "@/components/auth/guest-claim"
 import { CartDrawer, MobileCartBar } from "@/components/cart/cart-drawer"
 import { CheckoutOverlays } from "@/components/checkout/checkout-overlays"
@@ -185,6 +186,7 @@ export default async function RootLayout({
               <main id="main-content" tabIndex={-1} className="flex-1 outline-none"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
               <FooterForRoute />
               <CityDetector />
+              <CityLocationPrompt />
               {/* Reclama el trabajo anónimo al aterrizar con sesión. Va aquí y
                   no en `/auth/callback` porque esa es una ruta de servidor y el
                   `guest_token` vive en `localStorage`: Google y el enlace de

@@ -88,7 +88,8 @@ function decodeCityHeader(value: string): string {
   }
 }
 
-function nearestCitySlug(lat: number, lng: number): string | null {
+/** Ciudad cubierta más cercana a unas coordenadas (distancia euclidiana). */
+export function nearestCitySlugTo(lat: number, lng: number): string | null {
   let closest: string | null = null
   let minDistance = Number.POSITIVE_INFINITY
   for (const city of MEXICO_CITIES) {
@@ -136,7 +137,7 @@ export function detectCityFromHeaders(headers: Headers): string | null {
     const lat = readNumber(headers, "x-vercel-ip-latitude")
     const lng = readNumber(headers, "x-vercel-ip-longitude")
     if (lat !== null && lng !== null) {
-      return nearestCitySlug(lat, lng)
+      return nearestCitySlugTo(lat, lng)
     }
   }
 
