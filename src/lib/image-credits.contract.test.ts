@@ -8,7 +8,7 @@ import { IMAGE_CREDITS, exigeAtribucion } from "@/content/image-credits"
  *
  * POR QUÉ ESTO NO ES UN DETALLE DE CORTESÍA
  * -----------------------------------------
- * **7 de las 9 fotos de AB Foods son CC BY o CC BY-SA**, y esas licencias
+ * **La única foto de AB Foods que queda es CC BY-SA**, y esa licencia
  * condicionan el uso a atribuir. Una CC BY sin atribuir no es una licencia: es
  * una infracción, y en un catálogo comercial no es un riesgo teórico.
  *
@@ -68,12 +68,21 @@ const FOTOS_REEMPLAZADAS_POR_IA = new Set([
   "/images/products/ab-foods/queso-crema-krol-barra-136kg-foto.webp",
   "/images/products/ab-foods/queso-crema-reny-picot-caja-8kg-foto.webp",
   "/images/products/ab-foods/queso-crema-reny-picot-136kg-foto.webp",
+  // Lote 3 (00207): hamburguesas, camarones y tender de Pilgrim's.
+  "/images/products/ab-foods/camaron-4150-foto.webp",
+  "/images/products/ab-foods/camaron-cocido-100200-foto.webp",
+  "/images/products/ab-foods/camaron-cocido-4150-foto.webp",
+  "/images/products/ab-foods/hamburguesa-bm-arrachera-caja-30pzs-foto.webp",
+  "/images/products/ab-foods/hamburguesa-bm-mezquite-caja-30pzs-foto.webp",
+  "/images/products/ab-foods/hamburguesa-bm-sirloin-caja-30pzs-foto.webp",
+  "/images/products/ab-foods/hamburguesa-empanizada-pilgrims-foto.webp",
+  "/images/products/ab-foods/tender-empanizado-pilgrims-foto.webp",
 ])
 
 describe("contrato de créditos de las fotos de AB Foods", () => {
-  it("hay 9 fotos publicadas y 9 créditos", () => {
-    expect(fotosPublicadas().length, "faltan fotos en public/images/products/ab-foods").toBe(9)
-    expect(IMAGE_CREDITS.length, "el registro no cubre las 9 fotos").toBe(9)
+  it("hay 1 foto publicada y 1 crédito", () => {
+    expect(fotosPublicadas().length, "faltan fotos en public/images/products/ab-foods").toBe(1)
+    expect(IMAGE_CREDITS.length, "el registro no cubre la foto restante").toBe(1)
   })
 
   it("cada foto publicada tiene crédito", () => {

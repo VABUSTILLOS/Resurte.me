@@ -1,0 +1,170 @@
+[
+  {
+    "slug": "tender-empanizado-pilgrims",
+    "name": "Tender empanizado Pilgrim's",
+    "description": "Tender de pechuga empanizado, listo para freír. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/ab-foods/tender-empanizado-pilgrims-foto.webp"
+  },
+  {
+    "slug": "hamburguesa-bm-sirloin-caja-30pzs",
+    "name": "Hamburguesa BM sirloin (caja 30 pzs de 150 g)",
+    "description": "Hamburguesa de sirloin de 150 g, lista para asar. Caja 30 piezas.",
+    "unit": "caja",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/ab-foods/hamburguesa-bm-sirloin-caja-30pzs-foto.webp"
+  },
+  {
+    "slug": "hamburguesa-empanizada-pilgrims",
+    "name": "Hamburguesa empanizada Pilgrim's",
+    "description": "Hamburguesa de pollo empanizada. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/ab-foods/hamburguesa-empanizada-pilgrims-foto.webp"
+  },
+  {
+    "slug": "hamburguesa-bm-mezquite-caja-30pzs",
+    "name": "Hamburguesa BM mezquite (caja 30 pzs de 150 g)",
+    "description": "Hamburguesa de 150 g con sazón mezquite. Caja 30 piezas.",
+    "unit": "caja",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/ab-foods/hamburguesa-bm-mezquite-caja-30pzs-foto.webp"
+  },
+  {
+    "slug": "hamburguesa-bm-arrachera-caja-30pzs",
+    "name": "Hamburguesa BM arrachera (caja 30 pzs de 150 g)",
+    "description": "Hamburguesa de arrachera de 150 g, lista para asar a la parrilla o plancha. Caja 30 piezas.",
+    "unit": "caja",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/ab-foods/hamburguesa-bm-arrachera-caja-30pzs-foto.webp"
+  },
+  {
+    "slug": "camaron-cocido-4150",
+    "name": "Camarón cocido 41/50",
+    "description": "Camarón cocido talla 41/50, listo para servir en frío. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/ab-foods/camaron-cocido-4150-foto.webp"
+  },
+  {
+    "slug": "camaron-cocido-100200",
+    "name": "Camarón cocido 100/200",
+    "description": "Camarón cocido talla 100/200, ideal para coctel, tostadas y preparaciones. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/ab-foods/camaron-cocido-100200-foto.webp"
+  },
+  {
+    "slug": "camaron-4150",
+    "name": "Camarón 41/50",
+    "description": "Camarón crudo talla 41/50, limpio y listo para cocinar. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/ab-foods/camaron-4150-foto.webp"
+  },
+  {
+    "slug": "uva-negra",
+    "name": "Uva Negra",
+    "description": "Uva negra sin semilla, dulce y firme, para mesa, ensaladas y tablas de quesos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "tuna-fruta",
+    "name": "Tuna (fruta)",
+    "description": "Tuna fresca, el fruto del nopal, dulce y con semillas comestibles. Para aguas frescas y postres. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "te-de-limon",
+    "name": "Té de Limón",
+    "description": "Hierba de té de limón (zacate de limón) fresca, para infusiones y aguas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "poro",
+    "name": "Poro",
+    "description": "Poro fresco, de sabor suave entre cebolla y ajo, para caldos y guisos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "melon-honeydew",
+    "name": "Melón Honeydew",
+    "description": "Melón Honeydew de pulpa verde pálida y sabor dulce, para ensaladas y jugos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "manzana-golden",
+    "name": "Manzana Golden",
+    "description": "Manzana Golden de pulpa dulce, para postres, ensaladas y repostería. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "kiwi",
+    "name": "Kiwi",
+    "description": "Kiwi maduro, dulce y ácido, para ensaladas de fruta, postres y jugos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "jicama",
+    "name": "Jícama",
+    "description": "Jícama fresca y crujiente, para ensaladas, snacks y guarniciones. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "frambuesa",
+    "name": "Frambuesa",
+    "description": "Frambuesa fresca para postres, mermeladas, coctelería y panadería. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/frutos-rojos.webp"
+  },
+  {
+    "slug": "esparrago",
+    "name": "Espárrago",
+    "description": "Espárrago fresco de tallo delgado, para asar, saltear o gratinar. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "ensalada-primavera-mr-lucky",
+    "name": "Ensalada Primavera Mr. Lucky",
+    "description": "Ensalada primavera lista para servir, con mezcla de verduras frescas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "ensalada-cesar-mr-lucky",
+    "name": "Ensalada César Mr. Lucky",
+    "description": "Ensalada César lista para servir, con aderezo incluido. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "arandano-fresco",
+    "name": "Arándano Fresco",
+    "description": "Arándano fresco para postres, ensaladas, panadería y bebidas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/arandanos.webp"
+  }
+]
