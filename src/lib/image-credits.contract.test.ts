@@ -106,7 +106,7 @@ describe("contrato de créditos de las fotos de AB Foods", () => {
     const sql = readFileSync(MIGRACION, "utf8")
     const enSql = [...sql.matchAll(/'(\/images\/products\/ab-foods\/[^']+)'/g)]
       .map((m) => m[1])
-      .filter((r) => !FOTOS_REEMPLAZADAS_POR_IA.has(r))
+      .filter((r): r is string => typeof r === "string" && !FOTOS_REEMPLAZADAS_POR_IA.has(r))
       .sort()
     const enRegistro = IMAGE_CREDITS.map((c) => c.archivo).sort()
     expect(enSql).toEqual(enRegistro)
