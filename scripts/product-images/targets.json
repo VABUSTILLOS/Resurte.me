@@ -1,0 +1,666 @@
+[
+  {
+    "slug": "acelga",
+    "name": "Acelga",
+    "description": "Hoja de acelga fresca, de tallo firme y hoja verde. Se usa en caldos, guisos y ensaladas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/generic/verduras-congeladas-500g.webp"
+  },
+  {
+    "slug": "achiote",
+    "name": "Achiote",
+    "description": "Semillas de achiote para dar color natural a las comidas.",
+    "unit": "bolsa 50 g",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/achiote.webp"
+  },
+  {
+    "slug": "aguacate-chunky-caja-7264kg",
+    "name": "Aguacate chunky (caja 7.264 kg, 8/2 lb)",
+    "description": "Aguacate congelado en cubos, listo para preparar guacamole y salsas sin desperdicio. Caja 7.264 kg (8 bolsas de 2 lb).",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/ab-foods/aguacate-chunky-caja-7264kg-foto.webp"
+  },
+  {
+    "slug": "ala-iqf-pilgrims-caja-12kg",
+    "name": "Ala 1-2 IQF Pilgrim's (caja 12 kg)",
+    "description": "Alitas de pollo corte 1-2 ultracongeladas (IQF), se separan sin pegarse. Caja 12 kg, precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/108.webp"
+  },
+  {
+    "slug": "ala-adobada-bolsa-5kg",
+    "name": "Ala adobada 1-2 (bolsa 5 kg)",
+    "description": "Alitas de pollo adobadas corte 1-2, marinadas y listas para cocinar. Bolsa 5 kg, precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/108.webp"
+  },
+  {
+    "slug": "ala-botanera-bolsa-5kg",
+    "name": "Ala botanera 1-2 (bolsa 5 kg)",
+    "description": "Alitas de pollo corte 1-2 con sazón botanera. Bolsa 5 kg, precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/108.webp"
+  },
+  {
+    "slug": "ala-habanero-bolsa-5kg",
+    "name": "Ala habanero 1-2 (bolsa 5 kg)",
+    "description": "Alitas de pollo corte 1-2 con sazón habanero. Bolsa 5 kg, precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/108.webp"
+  },
+  {
+    "slug": "albahaca",
+    "name": "Albahaca",
+    "description": "Albahaca seca en hoja, para salsas, guisos y aderezos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/albahaca-fresca.webp"
+  },
+  {
+    "slug": "alfalfa-germinado",
+    "name": "Alfalfa Germinado",
+    "description": "Alfalfa germinada fresca y crujiente, para ensaladas, sandwiches y garnituras. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/germinado-de-soya.webp"
+  },
+  {
+    "slug": "almendras-500g",
+    "name": "Almendras 500g",
+    "description": "Almendras enteras sin cáscara. Para panadería fina, mazapanes y repostería.",
+    "unit": "500g",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/almendras.webp"
+  },
+  {
+    "slug": "amaranto",
+    "name": "Amaranto",
+    "description": "Amaranto en grano, para barras, postres y botanas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/generic/garbanzo-1kg.webp"
+  },
+  {
+    "slug": "anis",
+    "name": "Anís",
+    "description": "Anís en semilla, para panadería, infusiones y dulces. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/canela-en-polvo.webp"
+  },
+  {
+    "slug": "aros-cebolla-bolsa-907g",
+    "name": "Aros de cebolla empanizados (bolsa 907 g)",
+    "description": "Aros de cebolla empanizados, listos para freír. Bolsa 907 g.",
+    "unit": "bolsa",
+    "category": "Congelados",
+    "currentImage": "/images/products/recipe/aros-de-cebolla.webp"
+  },
+  {
+    "slug": "arrachera-premium-sukarne",
+    "name": "Arrachera premium SuKarne",
+    "description": "Arrachera premium de res, lista para asar. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/116.webp"
+  },
+  {
+    "slug": "arroz-blanco-1kg",
+    "name": "Arroz Blanco 1kg",
+    "description": "Arroz blanco de grano largo, cocción pareja. Rendimiento alto para cocina de volumen.",
+    "unit": "1 kg",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/51.webp"
+  },
+  {
+    "slug": "avena",
+    "name": "Avena",
+    "description": "Avena en hojuela, para desayunos, repostería y granola. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/generic/arroz-integral-1kg.webp"
+  },
+  {
+    "slug": "boneless-buffalo-freskecito",
+    "name": "Boneless buffalo Freskecito",
+    "description": "Boneless de pechuga de pollo con sazón buffalo. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/wiki-199.webp"
+  },
+  {
+    "slug": "boneless-pechuga-pilgrims",
+    "name": "Boneless de pechuga Pilgrim's",
+    "description": "Boneless de pechuga de pollo empanizado, listo para freír. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/wiki-199.webp"
+  },
+  {
+    "slug": "boneless-natural-freskecito",
+    "name": "Boneless natural Freskecito",
+    "description": "Boneless de pechuga de pollo natural, sin empanizar. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/wiki-199.webp"
+  },
+  {
+    "slug": "cacahuate-enchilado",
+    "name": "Cacahuate Enchilado",
+    "description": "Cacahuate tostado con chile en polvo, botana lista para servir. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/162.webp"
+  },
+  {
+    "slug": "cacahuate-japones",
+    "name": "Cacahuate Japonés",
+    "description": "Cacahuate japonés con cubierta crocante, botana y topping de postres. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/162.webp"
+  },
+  {
+    "slug": "cacahuate-natural-tostado",
+    "name": "Cacahuate Natural Tostado",
+    "description": "Cacahuate natural tostado sin sal, para botana, salsas y repostería. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/162.webp"
+  },
+  {
+    "slug": "calabaza",
+    "name": "Calabaza",
+    "description": "Calabaza de castilla para cremas, guisos y postres. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/generic/verduras-congeladas-500g.webp"
+  },
+  {
+    "slug": "canela-en-polvo",
+    "name": "Canela en Polvo",
+    "description": "Canela molida para postres, arroz con leche y repostería.",
+    "unit": "frasco 100 g",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/canela-en-polvo.webp"
+  },
+  {
+    "slug": "carne-al-pastor-100",
+    "name": "Carne al pastor 100% carne",
+    "description": "Carne de cerdo al pastor 100% carne, marinada. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/wiki-214.webp"
+  },
+  {
+    "slug": "cebolla-amarilla",
+    "name": "Cebolla Amarilla",
+    "description": "Cebolla amarilla de bulbo grande, base de guisos, caldos y salsas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/cebolla-cambray.webp"
+  },
+  {
+    "slug": "cebolla-cambray",
+    "name": "Cebolla Cambray",
+    "description": "Cebollas cambray tiernas para asar al carbón.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/cebolla-cambray.webp"
+  },
+  {
+    "slug": "champinon",
+    "name": "Champiñón",
+    "description": "Champiñón blanco fresco, firme. Para salteados, cremas, salsas y guarniciones.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/50.webp"
+  },
+  {
+    "slug": "chicharo",
+    "name": "Chícharo",
+    "description": "Chícharo fresco en vaina, dulce y tierno, para guisos, caldos y ensaladas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/generic/verduras-congeladas-500g.webp"
+  },
+  {
+    "slug": "chile-cascabel",
+    "name": "Chile Cascabel",
+    "description": "Chile cascabel seco, de picor bajo y notas tostadas, para salsas y adobos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/chiles-secos-surtidos.webp"
+  },
+  {
+    "slug": "chile-chiltepin",
+    "name": "Chile Chiltepín",
+    "description": "Chile chiltepín seco, muy picante, para salsas y molcajete. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/chiles-secos-surtidos.webp"
+  },
+  {
+    "slug": "chile-colorin",
+    "name": "Chile Colorín",
+    "description": "Chile colorín seco, de color rojo intenso y picor suave, para salsas y moles. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/chiles-secos-surtidos.webp"
+  },
+  {
+    "slug": "chile-de-la-tierra",
+    "name": "Chile De la Tierra",
+    "description": "Chile de la tierra seco, para salsas tradicionales y guisos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/chiles-secos-surtidos.webp"
+  },
+  {
+    "slug": "chile-mirasol",
+    "name": "Chile Mirasol",
+    "description": "Chile mirasol seco, de picor medio, para salsas y adobos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/chiles-secos-surtidos.webp"
+  },
+  {
+    "slug": "chile-morita",
+    "name": "Chile Morita",
+    "description": "Chile morita seco, ahumado y de picor medio, para salsas y adobos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/chiles-secos-surtidos.webp"
+  },
+  {
+    "slug": "chile-pasado",
+    "name": "Chile Pasado",
+    "description": "Chile pasado seco, de sabor ahumado, para caldos y guisos del norte. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/chiles-secos-surtidos.webp"
+  },
+  {
+    "slug": "ciruela-pasa",
+    "name": "Ciruela Pasa",
+    "description": "Ciruela pasa sin hueso, para repostería, guisos y botanas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/pasas.webp"
+  },
+  {
+    "slug": "consome-de-pollo-1kg",
+    "name": "Consomé de Pollo 1kg",
+    "description": "Consomé de pollo en polvo, bote 1 kg. Base rápida para caldos, arroces y sopas.",
+    "unit": "1 kg",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/83.webp"
+  },
+  {
+    "slug": "costilla-back-rib",
+    "name": "Costilla back rib de puerco",
+    "description": "Costilla back rib de cerdo. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/121.webp"
+  },
+  {
+    "slug": "curcuma",
+    "name": "Cúrcuma",
+    "description": "Cúrcuma molida, para guisos, adobos y bebidas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/canela-en-polvo.webp"
+  },
+  {
+    "slug": "ejote",
+    "name": "Ejote",
+    "description": "Ejote fresco de vaina tierna, para guisar, saltear o ensalada. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/generic/verduras-congeladas-500g.webp"
+  },
+  {
+    "slug": "epazote",
+    "name": "Epazote",
+    "description": "Epazote fresco, hierba mexicana esencial. Para frijoles, quesadillas y caldos tradicionales.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/34.webp"
+  },
+  {
+    "slug": "filete-tilapia-35",
+    "name": "Filete de tilapia 3-5",
+    "description": "Filete de tilapia talla 3-5. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/126.webp"
+  },
+  {
+    "slug": "fresa",
+    "name": "Fresa",
+    "description": "Fresa de Irapuato, rojo intenso y perfume floral. Para repostería, salsas y decoración.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/8.webp"
+  },
+  {
+    "slug": "frijol-negro-1kg",
+    "name": "Frijol Negro 1kg",
+    "description": "Frijol negro de parcela, grano parejo y cocción uniforme. Sabor terroso para frijoles de olla.",
+    "unit": "1 kg",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/53.webp"
+  },
+  {
+    "slug": "germinado-de-soya",
+    "name": "Germinado de Soya",
+    "description": "Germinado de soya fresco para salteados y ramen.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/germinado-de-soya.webp"
+  },
+  {
+    "slug": "haba",
+    "name": "Haba",
+    "description": "Haba seca, para guisos, sopas y botanas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/generic/garbanzo-1kg.webp"
+  },
+  {
+    "slug": "hierbabuena-fresca",
+    "name": "Hierbabuena Fresca",
+    "description": "Hierbabuena fresca para mojitos, tés y coctelería.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/hierbabuena-fresca.webp"
+  },
+  {
+    "slug": "hoja-de-laurel",
+    "name": "Hoja de Laurel",
+    "description": "Hojas de laurel secas para guisos y caldos.",
+    "unit": "bolsa 20 g",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/hoja-de-laurel.webp"
+  },
+  {
+    "slug": "jamaica",
+    "name": "Jamaica",
+    "description": "Flor de jamaica seca, para aguas frescas, salsas y postres. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/154.webp"
+  },
+  {
+    "slug": "jengibre-fresco",
+    "name": "Jengibre Fresco",
+    "description": "Raíz de jengibre fresco para cocina asiática.",
+    "unit": "por 100 g",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/jengibre-fresco.webp"
+  },
+  {
+    "slug": "jitomate-cherry",
+    "name": "Jitomate Cherry",
+    "description": "Jitomate cherry dulce para ensaladas y bowls.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/jitomate-cherry.webp"
+  },
+  {
+    "slug": "kale-organico-1kg",
+    "name": "Kale Orgánico 1kg",
+    "description": "Kale (col rizada) orgánico fresco. Para ensaladas, jugos y bowls. Por kilo.",
+    "unit": "kg",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/wiki-210.webp"
+  },
+  {
+    "slug": "lenteja-1kg",
+    "name": "Lenteja 1kg",
+    "description": "Lenteja de grano mediano, cocción rápida. Para sopas y guarniciones de alto rendimiento.",
+    "unit": "1 kg",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/57.webp"
+  },
+  {
+    "slug": "maiz-rosero",
+    "name": "Maíz Rosero",
+    "description": "Maíz rosero en grano, para esquites, sopas y guisos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/maiz-tierno.webp"
+  },
+  {
+    "slug": "mango-ataulfo",
+    "name": "Mango Ataúlfo",
+    "description": "Mango Ataúlfo de Chiapas, carne sin fibra y dulzor de miel. Para salsas, postres y barra.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/10.webp"
+  },
+  {
+    "slug": "mejorana-fresca",
+    "name": "Mejorana Fresca",
+    "description": "Mejorana fresca, aromática y de sabor suave, para carnes, caldos y aderezos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/tomillo-fresco.webp"
+  },
+  {
+    "slug": "menta-fresca",
+    "name": "Menta Fresca",
+    "description": "Menta fresca para infusiones, coctelería, postres y platillos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/hierbabuena-fresca.webp"
+  },
+  {
+    "slug": "nuez-de-castilla",
+    "name": "Nuez de Castilla",
+    "description": "Nuez de castilla para nogada y repostería.",
+    "unit": "bolsa 200 g",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/nuez-de-castilla.webp"
+  },
+  {
+    "slug": "nugget-pechuga-pilgrims",
+    "name": "Nugget de pechuga Pilgrim's",
+    "description": "Nugget de pechuga de pollo empanizado. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/186.webp"
+  },
+  {
+    "slug": "oregano-molido-100g",
+    "name": "Orégano Molido 100g",
+    "description": "Orégano mexicano molido. Para pozole, birria, menudos y caldos tradicionales.",
+    "unit": "100 g",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/75.webp"
+  },
+  {
+    "slug": "papa-francesa-14-payette-caja-1224kg",
+    "name": "Papa francesa 1/4 Payette (caja 12.24 kg)",
+    "description": "Papa a la francesa corte 1/4, congelada, para freír. Caja 12.24 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/generic/papas-a-la-francesa-1kg.webp"
+  },
+  {
+    "slug": "papa-francesa-38-payette-caja-1361kg",
+    "name": "Papa francesa 3/8 Payette (caja 13.61 kg)",
+    "description": "Papa a la francesa corte 3/8, congelada, para freír. Caja 13.61 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/generic/papas-a-la-francesa-1kg.webp"
+  },
+  {
+    "slug": "pasas",
+    "name": "Pasas",
+    "description": "Pasas para moles, rellenos y picadillo tradicional.",
+    "unit": "bolsa 200 g",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/pasas.webp"
+  },
+  {
+    "slug": "pechuga-sin-hueso-br",
+    "name": "Pechuga de pollo sin hueso BR",
+    "description": "Pechuga de pollo sin hueso. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/105.webp"
+  },
+  {
+    "slug": "pechuga-grill-fc-pilgrims",
+    "name": "Pechuga grill FC Pilgrim's",
+    "description": "Pechuga de pollo a la parrilla, fileteada y lista para servir. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/105.webp"
+  },
+  {
+    "slug": "pechuga-picante-emp-pilgrims",
+    "name": "Pechuga picante empanizada Pilgrim's",
+    "description": "Pechuga de pollo picante empanizada. Precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/106.webp"
+  },
+  {
+    "slug": "pechuga-sh-am-soles-caja-10kg",
+    "name": "Pechuga sin hueso AM Soles (caja 10 kg)",
+    "description": "Pechuga de pollo sin hueso de libre pastoreo. Caja 10 kg, precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/105.webp"
+  },
+  {
+    "slug": "pechuga-sh-br-soles-caja-10kg",
+    "name": "Pechuga sin hueso BR Soles (caja 10 kg)",
+    "description": "Pechuga de pollo sin hueso. Caja 10 kg, precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/105.webp"
+  },
+  {
+    "slug": "pechuga-sh-pilgrims-caja-12kg",
+    "name": "Pechuga sin hueso Pilgrim's (caja 12 kg)",
+    "description": "Pechuga de pollo sin hueso congelada. Caja 12 kg, precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/105.webp"
+  },
+  {
+    "slug": "pera",
+    "name": "Pera",
+    "description": "Pera fresca para ensaladas, postres y guarniciones.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/pera.webp"
+  },
+  {
+    "slug": "pimenton",
+    "name": "Pimentón",
+    "description": "Pimentón español ahumado para carnes y embutidos.",
+    "unit": "frasco 100 g",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/pimenton.webp"
+  },
+  {
+    "slug": "pimiento-morron",
+    "name": "Pimiento Morrón",
+    "description": "Pimiento morrón de colores para pizzas y asados.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/pimiento-morron.webp"
+  },
+  {
+    "slug": "platano-macho",
+    "name": "Plátano Macho",
+    "description": "Plátano macho grande, para freír, hornear o cocer. Base de guarniciones calientes.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/7.webp"
+  },
+  {
+    "slug": "pollo-entero-congelado-pilgrims-caja-145kg",
+    "name": "Pollo entero congelado Pilgrim's (caja 14.5 kg)",
+    "description": "Pollo entero congelado. Caja 14.5 kg, precio por kilo.",
+    "unit": "kilo",
+    "category": "Carnes, Aves y Pescados",
+    "currentImage": "/images/products/generic/pollo-entero.webp"
+  },
+  {
+    "slug": "romero-fresco",
+    "name": "Romero Fresco",
+    "description": "Romero fresco en rama para marinadas y asados.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/romero-fresco.webp"
+  },
+  {
+    "slug": "sal-de-mar-fina-1kg",
+    "name": "Sal de Mar Fina 1kg",
+    "description": "Sal de mar refinada, grano fino. El sazón base de toda cocina.",
+    "unit": "1 kg",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/71.webp"
+  },
+  {
+    "slug": "semilla-chia-1kg",
+    "name": "Semilla de Chía 1kg",
+    "description": "Semilla de chía negra. Superalimento para bowls, ensaladas y postres. Bolsa 1kg.",
+    "unit": "pz",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/wiki-211.webp"
+  },
+  {
+    "slug": "tamarindo",
+    "name": "Tamarindo",
+    "description": "Tamarindo en vaina, para aguas frescas, salsas y dulces. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/recipe/pasta-de-tamarindo.webp"
+  },
+  {
+    "slug": "tapioca",
+    "name": "Tapioca",
+    "description": "Tapioca en perla, para postres y bebidas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/generic/arroz-integral-1kg.webp"
+  },
+  {
+    "slug": "tomillo-fresco",
+    "name": "Tomillo Fresco",
+    "description": "Tomillo fresco para pollos, pescados y guisos.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/tomillo-fresco.webp"
+  },
+  {
+    "slug": "trigo-entero",
+    "name": "Trigo Entero",
+    "description": "Trigo entero en grano, para guisos, sopas y repostería. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/generic/arroz-integral-1kg.webp"
+  },
+  {
+    "slug": "zarzamora",
+    "name": "Zarzamora",
+    "description": "Zarzamora fresca para smoothies, bowls y repostería.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/recipe/zarzamora.webp"
+  }
+]

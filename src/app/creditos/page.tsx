@@ -6,7 +6,7 @@ import { IMAGE_CREDITS, exigeAtribucion } from "@/content/image-credits"
 /**
  * Créditos de las fotos de producto.
  *
- * No es una página de cortesía: **17 de las 22 fotos de AB Foods son CC BY o
+ * No es una página de cortesía: **17 de las 21 fotos de AB Foods son CC BY o
  * CC BY-SA**, y esas licencias exigen atribución. Publicar la foto sin decir de
  * quién es y bajo qué licencia la convierte en una infracción, así que esta
  * página es la mitad visible del cumplimiento y

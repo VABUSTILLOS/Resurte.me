@@ -3,7 +3,7 @@
  *
  * POR QUÉ ESTE ARCHIVO ES OBLIGATORIO Y NO UN DETALLE
  * ---------------------------------------------------
- * **17 de las 22 fotos de AB Foods exigen atribución** (CC BY o CC BY-SA). Una
+ * **17 de las 21 fotos de AB Foods exigen atribución** (CC BY o CC BY-SA). Una
  * licencia CC BY sin atribuir no es una licencia: es una infracción. Este
  * registro es la mitad verificable de la atribución —`/creditos` es la mitad
  * visible— y `src/lib/image-credits.contract.test.ts` comprueba que cada foto
@@ -37,15 +37,10 @@ export interface ImageCredit {
 }
 
 export const IMAGE_CREDITS: readonly ImageCredit[] = [
-  {
-    slug: "aguacate-chunky-caja-7264kg",
-    archivo: "/images/products/ab-foods/aguacate-chunky-caja-7264kg-foto.webp",
-    tituloCommons: "File:Guacamole in a bowl by Jon Sullivan (4 April 2004).jpg",
-    autor: "Jon Sullivan",
-    licencia: "Public domain",
-    licenciaUrl: "",
-    origenUrl: "https://commons.wikimedia.org/wiki/File:Guacamole_in_a_bowl_by_Jon_Sullivan_(4_April_2004).jpg",
-  },
+  // NOTA: aguacate-chunky-caja-7264kg ya no aparece aquí: su "-foto.webp"
+  // contenía AJOS (descarga mal rotulada — el crédito a Jon Sullivan era
+  // además incorrecto). La migración 00204 lo reapunta a una imagen generada
+  // por IA en /images/products/ai/, que no requiere atribución.
   {
     slug: "camaron-4150",
     archivo: "/images/products/ab-foods/camaron-4150-foto.webp",
