@@ -1,0 +1,322 @@
+[
+  {
+    "slug": "aguacate-hass",
+    "name": "Aguacate Hass",
+    "description": "Aguacate Hass de Michoacán, madurez perfecta. Pulpa cremosa para guacamole de servicio.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png"
+  },
+  {
+    "slug": "apio-palitos-aderezo-mr-lucky",
+    "name": "Apio en Palitos con Aderezo Mr. Lucky",
+    "description": "Palitos de apio listos para servir con aderezo. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "arandano-fresco",
+    "name": "Arándano Fresco",
+    "description": "Arándano fresco para postres, ensaladas, panadería y bebidas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/arandanos.webp"
+  },
+  {
+    "slug": "blue-berry",
+    "name": "Blue Berry",
+    "description": "Blue berry fresco, dulce y firme, para postres, panadería y ensaladas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/arandanos.webp"
+  },
+  {
+    "slug": "ajonjoli",
+    "name": "Ajonjolí",
+    "description": "Semilla de ajonjolí natural, para panadería, aderezos y guisos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": null
+  },
+  {
+    "slug": "chacal",
+    "name": "Chacal",
+    "description": "Jitomate chacal, de sabor intenso, para salsas y guisos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": null
+  },
+  {
+    "slug": "chile-caribe",
+    "name": "Chile Caribe",
+    "description": "Chile caribe fresco y picante, para salsas y escabeches. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/aji-dulce.webp"
+  },
+  {
+    "slug": "chile-chilaca",
+    "name": "Chile Chilaca",
+    "description": "Chile chilaca fresco, alargado y de sabor suave, para rajas, caldos y cremas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas y Verduras",
+    "currentImage": "/images/products/aji-dulce.webp"
+  },
+  {
+    "slug": "arroz-blanco-1kg",
+    "name": "Arroz Blanco 1kg",
+    "description": "Arroz blanco de grano largo, cocción pareja. Rendimiento alto para cocina de volumen.",
+    "unit": "1 kg",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/ai/arroz-blanco-1kg.webp"
+  },
+  {
+    "slug": "azucar-refinada-5kg",
+    "name": "Azúcar Refinada 5kg",
+    "description": "Azúcar estándar refinada. Uso diario en panadería y cocina.",
+    "unit": "5kg",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/azucar-refinada.webp"
+  },
+  {
+    "slug": "clavo",
+    "name": "Clavo",
+    "description": "Clavo entero de aroma intenso, para caldos, adobos, dulces y ponches. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": null
+  },
+  {
+    "slug": "coco-rayado",
+    "name": "Coco Rayado",
+    "description": "Coco rayado seco, para repostería, panadería y postres. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": null
+  },
+  {
+    "slug": "cocoa-polvo-1kg",
+    "name": "Cocoa en Polvo 1kg",
+    "description": "Cocoa en polvo alcalina. Para pasteles, brownies y repostería profesional.",
+    "unit": "1kg",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/cocoa-polvo.webp"
+  },
+  {
+    "slug": "comino-molido",
+    "name": "Comino Molido 500g",
+    "description": "Comino molido puro, especia fundamental en cocina mexicana.",
+    "unit": "500g",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/comino.webp"
+  },
+  {
+    "slug": "dedos-queso-bolsa-181kg",
+    "name": "Dedos de queso (bolsa 1.81 kg)",
+    "description": "Dedos de queso empanizados, listos para freír o freidora de aire. Bolsa 1.81 kg.",
+    "unit": "bolsa",
+    "category": "Congelados",
+    "currentImage": "/images/products/ab-foods/dedos-queso-bolsa-181kg-foto.webp"
+  },
+  {
+    "slug": "gragea",
+    "name": "Gragea",
+    "description": "Gragea de colores, para decorar pasteles, galletas y postres. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": null
+  },
+  {
+    "slug": "granola",
+    "name": "Granola",
+    "description": "Granola de avena con frutos secos, para desayunos, yogur y postres. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": null
+  },
+  {
+    "slug": "linaza",
+    "name": "Linaza",
+    "description": "Semilla de linaza, para panadería, licuados y botanas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/semillas-girasol.webp"
+  },
+  {
+    "slug": "papa-conquest-14-caja-1633kg",
+    "name": "Papa Conquest 1/4 (caja 16.33 kg)",
+    "description": "Papa a la francesa Conquest corte 1/4, de alto rendimiento y baja absorción de aceite. Caja 16.33 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/papas-fritas-congeladas.webp"
+  },
+  {
+    "slug": "papa-conquest-delivery-38-sc-caja-1361kg",
+    "name": "Papa Conquest Delivery 3/8 sin cáscara (caja 13.61 kg)",
+    "description": "Papa Conquest para reparto, corte 3/8 sin cáscara: se mantiene crujiente más tiempo. Caja 13.61 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/papas-fritas-congeladas.webp"
+  },
+  {
+    "slug": "papa-conquest-delivery-teja-65-caja-1361kg",
+    "name": "Papa Conquest Delivery teja 6/5 (caja 13.61 kg)",
+    "description": "Papa Conquest corte teja 6/5 para reparto, congelada. Caja 13.61 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/ab-foods/papa-conquest-delivery-teja-65-caja-1361kg-foto.webp"
+  },
+  {
+    "slug": "papa-curly-savory-caja-1361kg",
+    "name": "Papa curly Savory (caja 13.61 kg)",
+    "description": "Papa curly en espiral, congelada, para freír. Caja 13.61 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/ab-foods/papa-curly-savory-caja-1361kg-foto.webp"
+  },
+  {
+    "slug": "papa-dulce-recta-38-caja-680kg",
+    "name": "Papa dulce recta 3/8 (caja 6.80 kg)",
+    "description": "Papa dulce (camote) en tiras rectas corte 3/8, congelada. Caja 6.80 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/ab-foods/papa-dulce-recta-38-caja-680kg-foto.webp"
+  },
+  {
+    "slug": "papa-gajo-10-cut-65-caja-1361kg",
+    "name": "Papa gajo 10 cut 6/5 (caja 13.61 kg)",
+    "description": "Papa en gajo corte 10 cut 6/5, congelada, para freír. Caja 13.61 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/ab-foods/papa-gajo-10-cut-65-caja-1361kg-foto.webp"
+  },
+  {
+    "slug": "papa-hash-brown-patty-caja-952kg",
+    "name": "Papa hash brown patty (caja 9.52 kg)",
+    "description": "Hash brown en disco para desayuno, congelado. Caja 9.52 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/ab-foods/papa-hash-brown-patty-caja-952kg-foto.webp"
+  },
+  {
+    "slug": "papa-megacrunch-14-caja-1224kg",
+    "name": "Papa Megacrunch 1/4 (caja 12.24 kg)",
+    "description": "Papa Megacrunch corte 1/4, extra crujiente y de larga duración en mostrador. Caja 12.24 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/papas-fritas-congeladas.webp"
+  },
+  {
+    "slug": "papa-ondulada-38-payette-caja-1361kg",
+    "name": "Papa ondulada 3/8 Payette (caja 13.61 kg)",
+    "description": "Papa ondulada corte 3/8, congelada, para freír. Caja 13.61 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/ab-foods/papa-ondulada-38-payette-caja-1361kg-foto.webp"
+  },
+  {
+    "slug": "papa-rallada-hash-brown-caja-816kg",
+    "name": "Papa rallada hash brown (caja 8.16 kg)",
+    "description": "Papa rallada estilo hash brown, congelada. Caja 8.16 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/ab-foods/papa-rallada-hash-brown-caja-816kg-foto.webp"
+  },
+  {
+    "slug": "papa-rejilla-savory-caja-1224kg",
+    "name": "Papa rejilla Savory (caja 12.24 kg)",
+    "description": "Papa rejilla (waffle), congelada, para freír. Caja 12.24 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/ab-foods/papa-rejilla-savory-caja-1224kg-foto.webp"
+  },
+  {
+    "slug": "papa-select-38-cascara-caja-1361kg",
+    "name": "Papa Select 3/8 con cáscara (caja 13.61 kg)",
+    "description": "Papa a la francesa Select corte 3/8 con cáscara, congelada. Caja 13.61 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/papas-fritas-congeladas.webp"
+  },
+  {
+    "slug": "papa-select-38-sc-caja-1361kg",
+    "name": "Papa Select 3/8 sin cáscara (caja 13.61 kg)",
+    "description": "Papa a la francesa Select corte 3/8 sin cáscara, congelada. Caja 13.61 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/papas-fritas-congeladas.webp"
+  },
+  {
+    "slug": "papa-select-516-sc-caja-1361kg",
+    "name": "Papa Select 5/16 sin cáscara (caja 13.61 kg)",
+    "description": "Papa a la francesa Select corte 5/16 sin cáscara, congelada. Caja 13.61 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/papas-fritas-congeladas.webp"
+  },
+  {
+    "slug": "papa-thunder-38-sc-caja-1361kg",
+    "name": "Papa Thunder 3/8 con cáscara (caja 13.61 kg)",
+    "description": "Papa a la francesa Thunder corte 3/8 con cáscara, congelada. Caja 13.61 kg.",
+    "unit": "caja",
+    "category": "Congelados",
+    "currentImage": "/images/products/papas-fritas-congeladas.webp"
+  },
+  {
+    "slug": "pepita-de-calabaza",
+    "name": "Pepita de Calabaza",
+    "description": "Pepita de calabaza verde, para pipián, salsas y botanas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/semillas-girasol.webp"
+  },
+  {
+    "slug": "pepita-de-girasol",
+    "name": "Pepita de Girasol",
+    "description": "Pepita de girasol, para salsas, botanas y repostería. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/semillas-girasol.webp"
+  },
+  {
+    "slug": "piloncillo",
+    "name": "Piloncillo",
+    "description": "Piloncillo de caña, para café de olla, atoles y postres. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/papelon.webp"
+  },
+  {
+    "slug": "queso-crema-krol-barra-136kg",
+    "name": "Queso crema Krol barra 1.36 kg",
+    "description": "Queso crema para untar. Barra 1.36 kg.",
+    "unit": "pieza",
+    "category": "Lácteos y Huevos",
+    "currentImage": "/images/products/ab-foods/queso-crema-krol-barra-136kg-foto.webp"
+  },
+  {
+    "slug": "queso-crema-reny-picot-caja-8kg",
+    "name": "Queso crema Reny Picot (caja 8 kg)",
+    "description": "Queso crema tipo americano. Caja 8 kg.",
+    "unit": "caja",
+    "category": "Lácteos y Huevos",
+    "currentImage": "/images/products/ab-foods/queso-crema-reny-picot-caja-8kg-foto.webp"
+  },
+  {
+    "slug": "queso-crema-reny-picot-136kg",
+    "name": "Queso crema Reny Picot 1.36 kg",
+    "description": "Queso crema tipo americano. Pieza 1.36 kg.",
+    "unit": "pieza",
+    "category": "Lácteos y Huevos",
+    "currentImage": "/images/products/ab-foods/queso-crema-reny-picot-136kg-foto.webp"
+  },
+  {
+    "slug": "quinoa-1kg",
+    "name": "Quinoa 1kg",
+    "description": "Quinoa blanca orgánica. Proteína completa, base para bowls y ensaladas.",
+    "unit": "1kg",
+    "category": "Abarrotes",
+    "currentImage": "/images/products/quinoa-1kg.webp"
+  }
+]

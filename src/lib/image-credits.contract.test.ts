@@ -8,7 +8,7 @@ import { IMAGE_CREDITS, exigeAtribucion } from "@/content/image-credits"
  *
  * POR QUÉ ESTO NO ES UN DETALLE DE CORTESÍA
  * -----------------------------------------
- * **17 de las 21 fotos de AB Foods son CC BY o CC BY-SA**, y esas licencias
+ * **7 de las 9 fotos de AB Foods son CC BY o CC BY-SA**, y esas licencias
  * condicionan el uso a atribuir. Una CC BY sin atribuir no es una licencia: es
  * una infracción, y en un catálogo comercial no es un riesgo teórico.
  *
@@ -47,20 +47,33 @@ function fotosPublicadas(): string[] {
 }
 
 /**
- * Foto de ab-foods que la migración 00194 publicó pero que ya no lleva
+ * Fotos de ab-foods que la migración 00194 publicó pero que ya no llevan
  * crédito: el archivo del aguacate chunky contenía AJOS (descarga mal
- * rotulada; el crédito a Jon Sullivan era incorrecto) y la migración 00204 lo
- * reemplazó por una imagen generada por IA en /images/products/ai/, que no
- * requiere atribución. 00194 es histórica y no se reescribe; se excluye aquí.
+ * rotulada; el crédito a Jon Sullivan era incorrecto) y las migraciones 00204
+ * y 00206 reemplazaron 13 fotos Wikimedia por imágenes generadas por IA en
+ * /images/products/ai/, que no requieren atribución. 00194 es histórica y no
+ * se reescribe; se excluyen aquí.
  */
 const FOTOS_REEMPLAZADAS_POR_IA = new Set([
   "/images/products/ab-foods/aguacate-chunky-caja-7264kg-foto.webp",
+  "/images/products/ab-foods/dedos-queso-bolsa-181kg-foto.webp",
+  "/images/products/ab-foods/papa-conquest-delivery-teja-65-caja-1361kg-foto.webp",
+  "/images/products/ab-foods/papa-curly-savory-caja-1361kg-foto.webp",
+  "/images/products/ab-foods/papa-dulce-recta-38-caja-680kg-foto.webp",
+  "/images/products/ab-foods/papa-gajo-10-cut-65-caja-1361kg-foto.webp",
+  "/images/products/ab-foods/papa-hash-brown-patty-caja-952kg-foto.webp",
+  "/images/products/ab-foods/papa-ondulada-38-payette-caja-1361kg-foto.webp",
+  "/images/products/ab-foods/papa-rallada-hash-brown-caja-816kg-foto.webp",
+  "/images/products/ab-foods/papa-rejilla-savory-caja-1224kg-foto.webp",
+  "/images/products/ab-foods/queso-crema-krol-barra-136kg-foto.webp",
+  "/images/products/ab-foods/queso-crema-reny-picot-caja-8kg-foto.webp",
+  "/images/products/ab-foods/queso-crema-reny-picot-136kg-foto.webp",
 ])
 
 describe("contrato de créditos de las fotos de AB Foods", () => {
-  it("hay 21 fotos publicadas y 21 créditos", () => {
-    expect(fotosPublicadas().length, "faltan fotos en public/images/products/ab-foods").toBe(21)
-    expect(IMAGE_CREDITS.length, "el registro no cubre las 21 fotos").toBe(21)
+  it("hay 9 fotos publicadas y 9 créditos", () => {
+    expect(fotosPublicadas().length, "faltan fotos en public/images/products/ab-foods").toBe(9)
+    expect(IMAGE_CREDITS.length, "el registro no cubre las 9 fotos").toBe(9)
   })
 
   it("cada foto publicada tiene crédito", () => {

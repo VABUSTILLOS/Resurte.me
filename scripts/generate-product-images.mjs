@@ -26,7 +26,11 @@ const require = createRequire(import.meta.url)
 const sharp = require("sharp")
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
-const TARGETS_PATH = join(ROOT, "scripts/product-images/targets.json")
+const TARGETS_PATH = join(
+  ROOT,
+  "scripts/product-images",
+  process.argv.find((a) => a.startsWith("--targets="))?.slice(10) ?? "targets.json"
+)
 const MANIFEST_PATH = join(ROOT, "scripts/product-images/manifest.json")
 const OUT_DIR = join(ROOT, "public/images/products/ai")
 const PUBLIC_PREFIX = "/images/products/ai"
@@ -121,7 +125,9 @@ function extractResultUrl(record) {
 // ─── prompt ────────────────────────────────────────────────────────────────
 
 function buildPrompt(target, overrides) {
-  if (overrides[target.slug]) return overrides[target.slug]
+  const o = overrides[target.slug]
+  if (typeof o === "string") return o
+  if (o?.prompt) return o.prompt
   const desc = (target.description || "").replace(/\s+/g, " ").trim()
   const hint = desc ? ` (${desc.slice(0, 140)})` : ""
   return [
@@ -138,7 +144,10 @@ function buildPrompt(target, overrides) {
 // ─── pipeline por producto ─────────────────────────────────────────────────
 
 async function generateOne(target, overrides) {
-  const outFile = join(OUT_DIR, `${target.slug}.webp`)
+  // `file` en el override permite un nombre nuevo (p.ej. `-v2`) cuando el
+  // archivo ya se desplegó: `/images/**` se sirve con cache immutable.
+  const base = overrides[target.slug]?.file || target.slug
+  const outFile = join(OUT_DIR, `${base}.webp`)
   let lastError
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -152,7 +161,7 @@ async function generateOne(target, overrides) {
         .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
         .webp({ quality: 82 })
         .toFile(outFile)
-      return `${PUBLIC_PREFIX}/${target.slug}.webp`
+      return `${PUBLIC_PREFIX}/${base}.webp`
     } catch (err) {
       lastError = err
       console.warn(`  ⚠ ${target.slug} intento ${attempt}/${MAX_ATTEMPTS}: ${err.message}`)

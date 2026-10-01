@@ -17,8 +17,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..")
 const manifest = JSON.parse(
   readFileSync(join(ROOT, "scripts/product-images/manifest.json"), "utf8")
 )
+const targetsFile =
+  process.argv.find((a) => a.startsWith("--targets="))?.slice(10) ?? "targets.json"
 const targets = JSON.parse(
-  readFileSync(join(ROOT, "scripts/product-images/targets.json"), "utf8")
+  readFileSync(join(ROOT, "scripts/product-images", targetsFile), "utf8")
 )
 const targetSlugs = new Set(targets.map((t) => t.slug))
 
@@ -28,20 +30,27 @@ if (!/^\d{5}$/.test(numero || "") || !nombre) {
   process.exit(1)
 }
 
-// Slugs ya reapuntados por migraciones anteriores de esta serie (p.ej. 00204):
-// no se repiten para que cada migración sea exactamente su delta.
+// Slugs ya reapuntados por migraciones anteriores de esta serie (p.ej. 00204,
+// 00205): no se repiten para que cada migración sea exactamente su delta.
+// Si el manifiesto tiene una RUTA distinta para el mismo slug (p.ej. `-v2`
+// porque el archivo viejo ya se sirvió con cache immutable), sí se incluye.
 import { readdirSync } from "node:fs"
-const alreadyApplied = new Set()
+const alreadyApplied = new Map()
 for (const f of readdirSync(join(ROOT, "supabase/migrations"))) {
   if (!/^\d+_.*imagenes.*\.sql$/.test(f) || f.startsWith(numero)) continue
   const sql = readFileSync(join(ROOT, "supabase/migrations", f), "utf8")
-  for (const m of sql.matchAll(/^\s+\('([^']+)', '\/images\/products\/ai\//gm)) {
-    alreadyApplied.add(m[1])
+  for (const m of sql.matchAll(/^\s+\('([^']+)', '(\/images\/products\/ai\/[^']+)'\)/gm)) {
+    alreadyApplied.set(m[1], m[2])
   }
 }
 
 const rows = Object.entries(manifest)
-  .filter(([slug, ruta]) => targetSlugs.has(slug) && !alreadyApplied.has(slug) && existsSync(join(ROOT, "public", ruta)))
+  .filter(
+    ([slug, ruta]) =>
+      targetSlugs.has(slug) &&
+      alreadyApplied.get(slug) !== ruta &&
+      existsSync(join(ROOT, "public", ruta))
+  )
   .sort(([a], [b]) => a.localeCompare(b))
 
 if (rows.length === 0) {
