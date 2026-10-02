@@ -52,7 +52,7 @@ const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "521614533748
 const BUSINESS = {
   name: SITE_NAME,
   email: "hola@resurte.me",
-  privacyEmail: "privacidad@resurte.me",
+  privacyEmail: "hola@resurte.me",
   phoneLabel: "+52 1 614 533 7486",
   phoneHref: "tel:+526145337486",
   whatsappHref: `https://wa.me/${WHATSAPP_NUMBER}`,

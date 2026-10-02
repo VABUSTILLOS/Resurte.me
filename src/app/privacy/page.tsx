@@ -16,7 +16,7 @@ export default function PrivacyPage() {
             Política de <span className="text-[#0E7A0E]">privacidad</span>
           </h1>
           <p className="text-[#5C6068]">
-            Última actualización: enero 2026
+            Última actualización: octubre 2026
           </p>
         </div>
       </section>
@@ -44,10 +44,10 @@ export default function PrivacyPage() {
         <div>
           <h2 className="text-xl font-bold text-[#242529] mb-3">1. Responsable del tratamiento</h2>
           <p className="text-[#5C6068] leading-relaxed">
-            Resurte.me, con domicilio en Ciudad de México, es el responsable del
-            tratamiento de los datos personales que nos proporciones, conforme a
-            la Ley Federal de Protección de Datos Personales en Posesión de los
-            Particulares (LFPDPPP).
+            Resurte.me, con domicilio en Chihuahua, Chihuahua, México, es el
+            responsable del tratamiento de los datos personales que nos
+            proporciones, conforme a la Ley Federal de Protección de Datos
+            Personales en Posesión de los Particulares (LFPDPPP).
           </p>
         </div>
 
@@ -76,8 +76,8 @@ export default function PrivacyPage() {
           <p className="text-[#5C6068] leading-relaxed">
             Tienes derecho a Acceder, Rectificar, Cancelar y Oponerte al
             tratamiento de tus datos personales. Envía tu solicitud a{" "}
-            <a href="mailto:privacidad@resurte.me" className="text-[#0E7A0E] hover:underline">
-              privacidad@resurte.me
+            <a href="mailto:hola@resurte.me" className="text-[#0E7A0E] hover:underline">
+              hola@resurte.me
             </a>{" "}
             y la atenderemos en un plazo máximo de 20 días hábiles.
           </p>
