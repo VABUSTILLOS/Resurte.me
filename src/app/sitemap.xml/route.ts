@@ -26,6 +26,7 @@ export async function GET() {
     // bloqueadas en robots.txt — señales contradictorias para Google.
     { url: `${BASE_URL}/about`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE_URL}/contact`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${BASE_URL}/soporte`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${BASE_URL}/faq`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${BASE_URL}/preguntas`, changeFrequency: "weekly", priority: 0.8 },
     { url: `${BASE_URL}/ciudades`, changeFrequency: "weekly", priority: 0.8 },

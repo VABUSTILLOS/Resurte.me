@@ -38,6 +38,7 @@ const ROUTES = [
   "/comer",
   "/blog",
   "/restaurantes",
+  "/soporte",
   // Ciudad y sus derivadas
   "/cdmx",
   "/cdmx/carrito",

@@ -10,6 +10,7 @@ export const FOOTER_LINKS = {
     { label: "Trabaja con nosotros", href: "/careers" },
   ],
   Ayuda: [
+    { label: "Soporte", href: "/soporte" },
     { label: "Preguntas frecuentes", href: "/faq" },
     { label: "Contacto", href: "/contact" },
     { label: "Política de privacidad", href: "/privacy" },

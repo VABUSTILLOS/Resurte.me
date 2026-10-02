@@ -55,6 +55,7 @@ test.describe("accesibilidad WCAG (axe-core)", { tag: "@ci" }, () => {
     ["marketplace", "/comer"],
     ["blog", "/blog"],
     ["ciudad", "/cdmx"],
+    ["soporte", "/soporte"],
     ["carrito", "/cdmx/carrito"],
     ["busqueda", "/cdmx/buscar"],
     ["recompensas", "/recompensas"],

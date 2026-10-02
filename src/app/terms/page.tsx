@@ -89,7 +89,7 @@ export default function TermsPage() {
         </div>
 
         <div>
-          <h2 className="text-xl font-bold text-[#242529] mb-3">6. Devoluciones y reembolsos</h2>
+          <h2 id="devoluciones" className="text-xl font-bold text-[#242529] mb-3 scroll-mt-24">6. Devoluciones y reembolsos</h2>
           <p className="text-[#5C6068] leading-relaxed">
             Aceptamos reportes de productos en mal estado dentro de las 24 horas
             posteriores a la entrega. El reembolso o reposición se procesa en un
