@@ -1,0 +1,50 @@
+{
+  "camaron-cabeza-2030": {
+    "al_id": 385730,
+    "al_name": "Camaron Fresco Con Cabeza   Kg",
+    "format": "KG",
+    "price": 339.9,
+    "regular": 339.9,
+    "cap_kg": 339.9
+  },
+  "camaron-2125": {
+    "al_id": 397785,
+    "al_name": "Camaron Cocido Grande Con Cola   Kg",
+    "format": "KG",
+    "price": 379.9,
+    "regular": 379.9,
+    "cap_kg": 379.9
+  },
+  "camaron-4150-distmar": {
+    "al_id": 9167,
+    "al_name": "Camarón Crudo Mediano   Por Kg",
+    "format": "KG",
+    "price": 199.9,
+    "regular": 259.9,
+    "cap_kg": 199.9
+  },
+  "filete-tilapia-100-distmar": {
+    "al_id": 413123,
+    "al_name": "Filete De Tilapia Fresco   Kg",
+    "format": "KG",
+    "price": 269.9,
+    "regular": 269.9,
+    "cap_kg": 269.9
+  },
+  "filete-tilapia-comercial-50": {
+    "al_id": 413123,
+    "al_name": "Filete De Tilapia Fresco   Kg",
+    "format": "KG",
+    "price": 269.9,
+    "regular": 269.9,
+    "cap_kg": 269.9
+  },
+  "mojarra-importada": {
+    "al_id": 308227,
+    "al_name": "Filete Mojarra De Granja   Kg",
+    "format": "KG",
+    "price": 109.9,
+    "regular": 123.9,
+    "cap_kg": 109.9
+  }
+}

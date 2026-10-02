@@ -1,0 +1,146 @@
+[
+  {
+    "slug": "camaron-cabeza-2030",
+    "name": "Camarón con cabeza 20/30",
+    "description": "Camarón con cabeza talla 20/30, caja de 20 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "camaron-2125",
+    "name": "Camarón 21/25",
+    "description": "Camarón crudo talla 21/25, caja de 20 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "camaron-2630",
+    "name": "Camarón 26/30",
+    "description": "Camarón crudo talla 26/30, caja de 20 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "camaron-3135",
+    "name": "Camarón 31/35",
+    "description": "Camarón crudo talla 31/35, caja de 20 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "camaron-3640",
+    "name": "Camarón 36/40",
+    "description": "Camarón crudo talla 36/40, caja de 20 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "camaron-5160",
+    "name": "Camarón 51/60",
+    "description": "Camarón crudo talla 51/60, caja de 20 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "camaron-6170",
+    "name": "Camarón 61/70",
+    "description": "Camarón crudo talla 61/70, caja de 20 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "camaron-7190",
+    "name": "Camarón 71/90",
+    "description": "Camarón crudo talla 71/90, caja de 20 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "filete-guitarra",
+    "name": "Filete de guitarra",
+    "description": "Filete de pescado guitarra, bulto de 20 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "filete-tilapia-comercial-50",
+    "name": "Filete de tilapia comercial 50%",
+    "description": "Filete de tilapia comercial 50% glaseo, caja de 4.54 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "mojarra-importada",
+    "name": "Pescado mojarra importada",
+    "description": "Mojarra importada entera, caja de 10 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "pulpo-12",
+    "name": "Pulpo 1-2",
+    "description": "Pulpo talla 1-2, caja de 20 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "pulpo-24",
+    "name": "Pulpo 2-4",
+    "description": "Pulpo talla 2-4, caja de 20 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "pulpo-cocido-picado-500g",
+    "name": "Pulpo cocido picado (500 g)",
+    "description": "Pulpo cocido y picado, pieza de 500 g. Listo para coctel o tostadas.",
+    "unit": "pieza",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "calamar-lonja-filete",
+    "name": "Calamar lonja o filete",
+    "description": "Calamar en lonja o filete, bulto de 20 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "medallon-atun-mexicano",
+    "name": "Medallón de atún mexicano rebanado",
+    "description": "Medallón de atún mexicano rebanado, caja de 15 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "filete-salmon-premium",
+    "name": "Filete de salmón premium",
+    "description": "Filete de salmón premium, caja de 10 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  },
+  {
+    "slug": "atun-saku",
+    "name": "Atún saku",
+    "description": "Atún saku en bloque (grado sashimi), caja de 4.54 kg. Precio por kilo.",
+    "unit": "kilo",
+    "category": 4,
+    "currentImage": null
+  }
+]
