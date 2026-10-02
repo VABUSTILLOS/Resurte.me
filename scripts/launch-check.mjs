@@ -207,6 +207,92 @@ async function supabaseAuthConfig() {
   }
 }
 
+/** Ejecuta SQL de solo lectura por la API de administración. `null` si no se pudo. */
+async function supabaseQuery(sql) {
+  const tokens = supabaseTokenCandidates()
+  const ref = supabaseProjectRef()
+  if (tokens.length === 0 || !ref) return null
+
+  for (const token of tokens) {
+    try {
+      const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ query: sql }),
+        signal: AbortSignal.timeout(20_000),
+      })
+      if (!res.ok) continue
+      const rows = await res.json()
+      return Array.isArray(rows) ? rows : null
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+/**
+ * Fecha desde la que una cancelación de contra entrega ya es una regresión.
+ *
+ * El barrido de recuperación de pagos canceló los 4 pedidos contra entrega que
+ * existían antes de esta fecha (ver `docs/OPS.md §14.7`). Esas cuatro filas son
+ * el registro de lo que pasó y no deben reportarse como fallo nuevo; lo que sí
+ * importa es que no aparezca una quinta.
+ */
+const PAYMENT_RECOVERY_FIX_DATE = "2026-10-01"
+
+/**
+ * Canario del defecto que cancelaba los pedidos contra entrega.
+ *
+ * `checkAndSendPaymentReminders()` seleccionaba por `payment_status='pending'`
+ * sin mirar el método, y un pedido contra entrega nace `pending` porque se paga
+ * al recibir. El resultado fue que todo pedido en efectivo se cancelaba a las 72
+ * h. La firma es inconfundible y se puede buscar en la base: un pedido
+ * `cash_on_delivery` con `payment_status='pending'` cancelado entre 72 y 96
+ * horas después de crearse —la ventana del primer barrido diario tras el
+ * umbral—.
+ *
+ * Esto vive aquí y no solo en los tests a propósito: los tests prueban el código
+ * del repo, y este canario prueba lo que la base **tiene**. Si un despliegue
+ * viejo o una ruta que nadie recuerda reintroduce el defecto, la firma aparece
+ * en los datos aunque el código esté limpio.
+ */
+async function codSweepCanary() {
+  const rows = await supabaseQuery(
+    `select count(*)::int as n, max(updated_at)::date::text as ultima
+     from orders
+     where payment_method = 'cash_on_delivery'
+       and payment_status = 'pending'
+       and status = 'cancelled'
+       and updated_at - created_at between interval '72 hours' and interval '96 hours'`
+  )
+  if (!rows || rows.length === 0) return { measured: false, detail: "sin acceso de lectura a la base" }
+
+  const total = Number(rows[0]?.n ?? 0)
+  const ultima = rows[0]?.ultima ?? null
+  const posteriores = await supabaseQuery(
+    `select count(*)::int as n
+     from orders
+     where payment_method = 'cash_on_delivery'
+       and payment_status = 'pending'
+       and status = 'cancelled'
+       and updated_at - created_at between interval '72 hours' and interval '96 hours'
+       and updated_at >= date '${PAYMENT_RECOVERY_FIX_DATE}'`
+  )
+  const nuevas = Number(posteriores?.[0]?.n ?? 0)
+
+  return {
+    measured: true,
+    total,
+    ultima,
+    nuevas,
+    detail:
+      nuevas > 0
+        ? `${nuevas} pedido(s) contra entrega cancelado(s) por el barrido DESPUÉS del ${PAYMENT_RECOVERY_FIX_DATE}: el defecto volvió`
+        : `${total} cancelación(es) histórica(s) del defecto${ultima ? `, la última el ${ultima}` : ""}; ninguna desde el ${PAYMENT_RECOVERY_FIX_DATE}`,
+  }
+}
+
 // --- 1. Cobro: modo de la llave de Stripe -------------------------------------
 const stripe = await stripeKeyMode()
 if (stripe.mode === "live") {
@@ -274,16 +360,40 @@ if (!auth.measured) {
   record("smtp", "Registro por email con SMTP propio", null, auth.detail, false)
 } else if (auth.smtpConfigured) {
   record("smtp", "Registro por email con SMTP propio", true, `smtp_host=${auth.smtpHost}`)
+} else if (auth.autoconfirm) {
+  // El alta funciona (no depende del correo), pero la recuperación de
+  // contraseña sigue necesitando el correo. No es un bloqueador para vender; sí
+  // es una deuda que no debe volverse invisible.
+  record(
+    "smtp",
+    "Registro por email con SMTP propio",
+    false,
+    "confirmación por correo DESACTIVADA (autoconfirm): el alta entra sin correo, " +
+      "pero «olvidé mi contraseña» NO funciona y los correos de pedido no salen. Falta SMTP propio",
+    false
+  )
 } else {
   const limit = auth.emailRateLimit === null ? "?" : auth.emailRateLimit
   record(
     "smtp",
     "Registro por email con SMTP propio",
     false,
-    auth.autoconfirm
-      ? "sin SMTP, pero la confirmación por correo está desactivada (autoconfirm): el alta no depende del correo"
-      : `sin SMTP: la confirmación depende del correo por defecto de Supabase, limitado a ${limit} correos por hora`,
-    !auth.autoconfirm
+    `sin SMTP y con confirmación obligatoria: el alta depende del correo por defecto de Supabase, limitado a ${limit} correos por hora`,
+    true
+  )
+}
+
+// --- 6. Canario: el barrido no debe cancelar pedidos contra entrega -----------
+const canary = await codSweepCanary()
+if (!canary.measured) {
+  record("cod-sweep", "Contra entrega a salvo del barrido de impagos", null, canary.detail, false)
+} else {
+  record(
+    "cod-sweep",
+    "Contra entrega a salvo del barrido de impagos",
+    canary.nuevas === 0,
+    canary.detail,
+    canary.nuevas > 0
   )
 }
 

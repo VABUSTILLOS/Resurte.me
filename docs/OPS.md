@@ -1620,8 +1620,8 @@ fuera.
 |---|---|---|
 | ¿Se pueden cobrar tarjetas reales? | **No** | El bundle de producción hornea `loadStripe("pk_test_…")`: modo test. La llave se validó contra la API de Stripe (crea token con tarjeta de prueba) y es válida, de test. |
 | ¿Los pedidos y compras se guardan? | **Sí** | `orders`: 23 filas, 14 con `stripe_payment_intent_id`, 9 `paid`+`confirmed`. `profiles`: 4. |
-| ¿Se puede registrar un usuario? | **A medias** | `disable_signup=false`, `external_google_enabled=true`, pero `mailer_autoconfirm=false` y **`smtp_host`/`smtp_user`/`smtp_pass` vacíos**: la confirmación depende del correo por defecto de Supabase, con `rate_limit_email_sent=2` por hora. |
-| ¿Se puede iniciar sesión? | **Sí** | `POST /auth/v1/token` responde 400 `invalid_credentials` con credenciales falsas (comportamiento correcto). 3 de 4 usuarios están confirmados. |
+| ¿Se puede registrar un usuario? | **Sí, desde el 01-oct-2026** | `mailer_autoconfirm=true` (la confirmación por correo está desactivada) y `disable_signup=false`: el alta devuelve **sesión inmediata**. Antes era "a medias" — ver §14.7. |
+| ¿Se puede iniciar sesión? | **Sí** | `POST /auth/v1/token` responde 400 `invalid_credentials` con credenciales falsas (comportamiento correcto) y 200 con las válidas. |
 | ¿El sitio está arriba? | **Sí** | 200 en `/`, `/auth/login`, `/auth/register`, `/cart`, `/admin`, `/panel`, `/r/mr-fresh`. Supabase `ACTIVE_HEALTHY`. Ledger de migraciones al día. Cron `/api/cron/daily` fail-closed (401 sin secreto). |
 
 Apagado en producción (no está en Vercel): Resend (`RESEND_API_KEY`),
@@ -1704,8 +1704,10 @@ valor real; no te fíes del "ok" del doctor.
    `payment_intent.canceled`, `payment_intent.refunded`, `charge.refunded`,
    `charge.dispute.created`. (`account.updated` es de Connect.)
 
-5. **SMTP propio en Supabase** (§8.1) y decidir la política de confirmación
-   (§8.1). Sin SMTP, el registro por email sigue a 2 correos por hora.
+5. **SMTP propio en Supabase** (§8.1). Desde el 01-oct-2026 la confirmación por
+   correo está **desactivada**, así que el alta ya no depende de él — pero
+   **«olvidé mi contraseña» sí**, y los correos transaccionales de pedido
+   también. Es lo que falta para cerrar el tema, no un bloqueador para vender.
 
 6. **`RESEND_API_KEY` en Vercel Production** (§8.0) para los correos de pedido.
 
@@ -1758,6 +1760,96 @@ cerrar este cabo, mirar *Vercel → Cron Jobs → última ejecución*.
   correos por hora y creado un usuario en producción).
 - FoodOS no se midió a fondo (fuera de alcance): se anotó que tiene 1 restaurante
   activo, 0 pedidos y ninguna cuenta de Stripe conectada.
+
+### 14.7 El barrido de impagos cancelaba los pedidos contra entrega
+
+> Corregido el 01-oct-2026. Medido con `npm run launch:check` (canario
+> `cod-sweep`) y con la consulta comparada en §14.7.3.
+
+#### 14.7.1 Qué pasaba
+
+`checkAndSendPaymentReminders()` (`src/lib/workflows.ts`) —el barrido de
+recuperación de pagos que corre dentro del cron diario— seleccionaba por
+`payment_status = 'pending'` **sin mirar el método de pago**:
+
+```js
+.from("orders").select("id, created_at, status, coupon_code")
+.eq("payment_status", "pending")
+.neq("status", "cancelled")
+```
+
+Un pedido **contra entrega nace `pending` por diseño**: el cliente paga al
+recibir, no antes. Así que el barrido lo leía como un impago, le mandaba un
+recordatorio de "paga tu pedido" y, pasadas 72 h, lo cancelaba.
+
+Los 4 pedidos contra entrega que existían se cancelaron a las **87, 83, 83 y 81
+horas** de crearse — la ventana del primer barrido diario después del umbral:
+
+| Pedido | Creado | Cancelado | Horas |
+|---|---|---|---|
+| 1 | 04-ago 17:02 | 08-ago 08:27 | 87 |
+| 6 | 07-ago 21:43 | 11-ago 08:59 | 83 |
+| 7 | 07-ago 22:06 | 11-ago 08:59 | 83 |
+| 20 | 01-sep 03:44 | 04-sep 12:53 | 81 |
+
+#### 14.7.2 Por qué nadie lo vio
+
+El repo **ya tenía la regla escrita en otros tres sitios**, cada uno con su
+propia copia: `abandoned-cart.ts` (`ABANDONED_CART_EXCLUDED_METHODS`),
+`whatsapp-automations-engine.ts` (`.not("payment_method","eq","cash_on_delivery")`)
+y `reconcile-payments.ts` (`.eq("payment_method","card")`). El barrido de pagos
+era el único que se había olvidado, y **no tenía ningún test**: la lógica de
+dinero estaba probada en todas partes menos en la ruta que cancelaba pedidos
+reales.
+
+#### 14.7.3 El arreglo
+
+La regla vive ahora en un solo módulo, `src/lib/payment-recovery.ts`
+(`PAYMENT_RECOVERY_EXCLUDED_METHODS` + `isPaymentRecoverable()` +
+`applyPaymentRecoveryFilter()`), con la misma forma que `abandoned-cart.ts`: el
+predicado de JS y la condición de PostgREST en el mismo archivo, para que no
+puedan discrepar. Se aplica **en dos capas** —el filtro de la consulta y el guard
+del bucle— porque el `.limit(500)` hace que la exclusión en SQL sea necesaria y
+el guard impide que un refactor futuro del `select` reintroduzca el defecto en
+silencio.
+
+Sobre los datos reales de producción, simulando el estado previo a la
+cancelación:
+
+| Lógica | Pedidos contra entrega que barre |
+|---|---|
+| Antes | **4** (los cancelaba) |
+| Después | **0** |
+
+Los tests que fijan el contrato: `src/lib/payment-recovery.test.ts` (12 casos) y
+`src/lib/workflows-payment-recovery.test.ts` (6 casos, con cliente Supabase
+falso). Se comprobó que **fallan sin el arreglo** — 3 de ellos sin el guard y 1
+sin el filtro de la consulta—, así que son regresiones de verdad y no aserciones
+que pasan por casualidad.
+
+#### 14.7.4 El canario
+
+`npm run launch:check` trae una comprobación `cod-sweep` que busca la firma del
+defecto **en los datos**, no en el código: pedidos `cash_on_delivery` con
+`payment_status='pending'` cancelados entre 72 y 96 horas después de crearse. Las
+4 cancelaciones históricas se reportan como registro de lo que pasó; lo que
+marca el fallo es una **quinta** posterior al 01-oct-2026. Está ahí y no solo en
+los tests porque los tests prueban el código del repo y el canario prueba lo que
+la base tiene: un despliegue viejo o una ruta olvidada reintroducirían el defecto
+sin tocar el código.
+
+#### 14.7.5 Lo que queda abierto
+
+- Los 4 pedidos cancelados **no se resucitaron**: son del periodo de pruebas,
+  anteriores a la operación, y su cancelación es un registro veraz.
+- El ciclo completo del contra entrega (marcar pagado en `/admin/pedidos` y
+  recorrer `confirmed → preparing → out_for_delivery → delivered`) **no se ha
+  recorrido nunca de punta a punta**. El endpoint existe y está validado, pero
+  exige sesión de administrador; la primera pasada real la tiene que hacer el
+  operador.
+- El recordatorio de pago ahora **no** se le manda al cliente contra entrega. Un
+  mensaje útil para ese caso sería otro ("tu pedido está en camino, paga al
+  recibir"), pero eso es una decisión de producto, no un defecto.
 
 ---
 

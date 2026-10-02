@@ -24,6 +24,11 @@ import { sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/order-em
 import type { OrderStatus, PaymentStatus } from "@/types"
 import { logger } from "@/lib/logger"
 import { applyOrderCancellationEffects } from "@/lib/order-cancellation"
+import {
+  applyPaymentRecoveryFilter,
+  isPaymentRecoverable,
+  PAYMENT_RECOVERY_CANCEL_HOURS,
+} from "@/lib/payment-recovery"
 import type { WorkflowType } from "@/lib/workflow-types"
 
 // ============================================================
@@ -566,6 +571,9 @@ interface PendingPaymentOrder {
   id: number
   created_at: string
   status: OrderStatus
+  /** Decide si el pedido entra en la recuperación (ver `payment-recovery.ts`). */
+  payment_status: string | null
+  payment_method: string | null
   coupon_code?: string | null
 }
 
@@ -601,23 +609,30 @@ export async function checkAndSendPaymentReminders(): Promise<{
   // cap the batch so an unbounded `select("*")` can't grow without limit).
   // `coupon_code` es opcional: se reintenta sin ella si la migración 00114 no
   // está aplicada, para que un desfase de esquema no tumbe los recordatorios.
+  //
+  // `payment_method` viaja en el select porque el bucle decide con él: sin ese
+  // dato, `isPaymentRecoverable()` no puede distinguir un impago real de un
+  // pedido contra entrega, que nace `pending` y no es un impago. Ver
+  // `src/lib/payment-recovery.ts`.
   let orders: PendingPaymentOrder[] | null = null
   let fetchError: { message: string } | null = null
 
-  const fullPending = await supabase
-    .from("orders")
-    .select("id, created_at, status, coupon_code")
-    .eq("payment_status", "pending")
-    .neq("status", "cancelled")
-    .limit(500)
-
-  if (fullPending.error?.code === "42703") {
-    const retry = await supabase
+  const fullPending = await applyPaymentRecoveryFilter(
+    supabase
       .from("orders")
-      .select("id, created_at, status")
+      .select("id, created_at, status, payment_status, coupon_code, payment_method")
       .eq("payment_status", "pending")
       .neq("status", "cancelled")
-      .limit(500)
+  ).limit(500)
+
+  if (fullPending.error?.code === "42703") {
+    const retry = await applyPaymentRecoveryFilter(
+      supabase
+        .from("orders")
+        .select("id, created_at, status, payment_status, payment_method")
+        .eq("payment_status", "pending")
+        .neq("status", "cancelled")
+    ).limit(500)
     orders = (retry.data as PendingPaymentOrder[] | null) ?? null
     fetchError = retry.error ? { message: retry.error.message } : null
   } else {
@@ -633,11 +648,17 @@ export async function checkAndSendPaymentReminders(): Promise<{
   const now = new Date()
 
   for (const order of orders || []) {
+    // Segundo cinturón, y no una repetición de la consulta: si un refactor
+    // futuro toca el `select` de arriba y se lleva el filtro por delante, el
+    // bucle seguiría cancelando pedidos contra entrega en silencio. Aquí la
+    // decisión se toma con la misma regla que la consulta usa para filtrar.
+    if (!isPaymentRecoverable(order)) continue
+
     const created = new Date(order.created_at)
     const hoursSinceCreation = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60))
 
     // Check if we should cancel very old unpaid orders (>72 hours)
-    if (hoursSinceCreation >= 72) {
+    if (hoursSinceCreation >= PAYMENT_RECOVERY_CANCEL_HOURS) {
       try {
         // El estado se escribe condicionalmente sobre el que se leyó: si dos
         // ejecuciones del cron se solapan, solo una gana y la cascada no se

@@ -372,6 +372,24 @@ describe("useCheckoutOrder · flujo onPaid", () => {
     })
   })
 
+  it("contra entrega se guarda sin tocar Stripe: el pedido se crea y va directo a confirmación", async () => {
+    // El requisito literal de la tienda: un pedido en efectivo tiene que
+    // guardarse sin pasar por Stripe. Si algún día el checkout exigiera un
+    // PaymentIntent para todos los métodos, esto lo cazaría — y con Stripe en
+    // modo test (docs/OPS.md §14.1) el cliente contra entrega se quedaría sin
+    // poder comprar.
+    fetchMock.mockResolvedValue(jsonResponse(ORDER_RESPONSE))
+    const opts = makeOptions()
+    await (await mount(opts)).handlePlaceOrder("cash_on_delivery")
+
+    const calls = fetchMock.mock.calls.map((c) => c[0])
+    expect(calls.filter((c) => c === "/api/orders")).toHaveLength(1)
+    expect(calls).not.toContain("/api/payments/stripe/create-intent")
+    expect(opts.onPaid).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: 101, paymentIntentId: "" })
+    )
+  })
+
   it("handlePlaceOrder con orden fallida no invoca onPaid", async () => {
     fetchMock.mockResolvedValue(jsonResponse({ error: "sin stock" }, false))
     const opts = makeOptions()
