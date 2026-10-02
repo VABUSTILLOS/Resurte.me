@@ -1,0 +1,498 @@
+{
+  "alita-adobada-iqf-caja-12kg": {
+    "al_id": 458060,
+    "al_name": "Alitas Buffalo  Pilgrims 600 g",
+    "format": "600 GR",
+    "price": 188.9,
+    "regular": 209.9,
+    "cap_kg": 314.83
+  },
+  "alita-natural-iqf-caja-12kg": {
+    "al_id": 458060,
+    "al_name": "Alitas Buffalo  Pilgrims 600 g",
+    "format": "600 GR",
+    "price": 188.9,
+    "regular": 209.9,
+    "cap_kg": 314.83
+  },
+  "muslo-bate": {
+    "al_id": 510919,
+    "al_name": "MUSLO DE POLLO POSTA XILIMORITA  ALCO 600 GRAMOS",
+    "format": "600 GR",
+    "price": 71.9,
+    "regular": 71.9,
+    "cap_kg": 119.83
+  },
+  "pechuga-media-mariposa": {
+    "al_id": 369833,
+    "al_name": "Pechuga De Pollo Sin Hueso Premium   Kg",
+    "format": "KG",
+    "price": 99.9,
+    "regular": 119.9,
+    "cap_kg": 99.9
+  },
+  "pechuga-chica-brazilena": {
+    "al_id": 369833,
+    "al_name": "Pechuga De Pollo Sin Hueso Premium   Kg",
+    "format": "KG",
+    "price": 99.9,
+    "regular": 119.9,
+    "cap_kg": 99.9
+  },
+  "nuggets-pollo-caja-10kg": {
+    "al_id": 347922,
+    "al_name": "Nuggets De Pollo  Tyson 500 g",
+    "format": "500 GR",
+    "price": 99.9,
+    "regular": 99.9,
+    "cap_kg": 199.8
+  },
+  "nuggets-enchiladas-caja-10kg": {
+    "al_id": 347922,
+    "al_name": "Nuggets De Pollo  Tyson 500 g",
+    "format": "500 GR",
+    "price": 99.9,
+    "regular": 99.9,
+    "cap_kg": 199.8
+  },
+  "bonel-americano": {
+    "al_id": 386927,
+    "al_name": "Pollo Bufalo Boneless  Tyson 600 g",
+    "format": "600 GR",
+    "price": 229.9,
+    "regular": 229.9,
+    "cap_kg": 383.17
+  },
+  "bonel-freskesito": {
+    "al_id": 386927,
+    "al_name": "Pollo Bufalo Boneless  Tyson 600 g",
+    "format": "600 GR",
+    "price": 229.9,
+    "regular": 229.9,
+    "cap_kg": 383.17
+  },
+  "tender-cocido": {
+    "al_id": 353834,
+    "al_name": "Tender De Pollo Empanizado  Tyson 700 g",
+    "format": "700 GR",
+    "price": 204.9,
+    "regular": 204.9,
+    "cap_kg": 292.71
+  },
+  "pechuga-empanizada": {
+    "al_id": 529714,
+    "al_name": "PECHUGA EMPANIZADA PICANTE  PILGRIMS 700 GRAMOS",
+    "format": "700 GR",
+    "price": 224.9,
+    "regular": 249.9,
+    "cap_kg": 321.29
+  },
+  "pollo-empanizado-kfc-caja-1361kg": {
+    "al_id": 353834,
+    "al_name": "Tender De Pollo Empanizado  Tyson 700 g",
+    "format": "700 GR",
+    "price": 204.9,
+    "regular": 204.9,
+    "cap_kg": 292.71
+  },
+  "filete-tilapia-weber": {
+    "al_id": 472305,
+    "al_name": "FILETE DE TILAPIA EMPANIZADO   1 KILOGRAM",
+    "format": "KG",
+    "price": 152.9,
+    "regular": 152.9,
+    "cap_kg": 152.9
+  },
+  "camaron-4150-mediano-weber": {
+    "al_id": 9167,
+    "al_name": "Camarón Crudo Mediano   Por Kg",
+    "format": "KG",
+    "price": 209.9,
+    "regular": 259.9,
+    "cap_kg": 209.9
+  },
+  "camaron-cocido-weber": {
+    "al_id": 513844,
+    "al_name": "CAMARON COCIDO FRESCO TODO MARISCO 350 GRAMOS",
+    "format": "350 GR",
+    "price": 149.9,
+    "regular": 179.9,
+    "cap_kg": 428.29
+  },
+  "al-pastor-salchicha-medio-kg": {
+    "al_id": 495679,
+    "al_name": "Cerdo Al Pastor Alsuper Kg",
+    "format": "KG",
+    "price": 139.9,
+    "regular": 159.9,
+    "cap_kg": 139.9
+  },
+  "al-pastor-bolsa-5kg": {
+    "al_id": 495679,
+    "al_name": "Cerdo Al Pastor Alsuper Kg",
+    "format": "KG",
+    "price": 139.9,
+    "regular": 159.9,
+    "cap_kg": 139.9
+  },
+  "chamorro-puerco": {
+    "al_id": 9209,
+    "al_name": "Chamorro De Puerco    Kg",
+    "format": "KG",
+    "price": 84.9,
+    "regular": 99.9,
+    "cap_kg": 84.9
+  },
+  "costilla-back-rib-tira-larga": {
+    "al_id": 456134,
+    "al_name": "Costilla Parrillera    Kg",
+    "format": "KG",
+    "price": 149.9,
+    "regular": 179.9,
+    "cap_kg": 149.9
+  },
+  "costilla-back-rib-tira-corta": {
+    "al_id": 456134,
+    "al_name": "Costilla Parrillera    Kg",
+    "format": "KG",
+    "price": 149.9,
+    "regular": 179.9,
+    "cap_kg": 149.9
+  },
+  "costilla-puerco-cargada": {
+    "al_id": 421784,
+    "al_name": "Costilla De Puerco Para Guisar    Kg",
+    "format": "KG",
+    "price": 169.9,
+    "regular": 169.9,
+    "cap_kg": 169.9
+  },
+  "costilla-puerco-cargada-cortada": {
+    "al_id": 421784,
+    "al_name": "Costilla De Puerco Para Guisar    Kg",
+    "format": "KG",
+    "price": 169.9,
+    "regular": 169.9,
+    "cap_kg": 169.9
+  },
+  "espinazo": {
+    "al_id": 12346,
+    "al_name": "Espinazo De Puerco    Kg",
+    "format": "KG",
+    "price": 49.9,
+    "regular": 54.9,
+    "cap_kg": 49.9
+  },
+  "espinazo-cargado": {
+    "al_id": 12346,
+    "al_name": "Espinazo De Puerco    Kg",
+    "format": "KG",
+    "price": 49.9,
+    "regular": 54.9,
+    "cap_kg": 49.9
+  },
+  "lomo-natural-puerco": {
+    "al_id": 409729,
+    "al_name": "Chuleta De Lomo De Puerco    Kg",
+    "format": "KG",
+    "price": 94.9,
+    "regular": 129.9,
+    "cap_kg": 94.9
+  },
+  "lomo-natural-cortado": {
+    "al_id": 409729,
+    "al_name": "Chuleta De Lomo De Puerco    Kg",
+    "format": "KG",
+    "price": 94.9,
+    "regular": 129.9,
+    "cap_kg": 94.9
+  },
+  "manitas-puerco": {
+    "al_id": 12345,
+    "al_name": "Patitas O Manitas De Puerco    Kg",
+    "format": "KG",
+    "price": 89.9,
+    "regular": 119.9,
+    "cap_kg": 89.9
+  },
+  "manteca-puerco": {
+    "al_id": 462642,
+    "al_name": "Manteca De Cerdo Los Corrales 470 g",
+    "format": "470 GR",
+    "price": 56.9,
+    "regular": 56.9,
+    "cap_kg": 121.06
+  },
+  "tocino-rebanado": {
+    "al_id": 453622,
+    "al_name": "Tocino Ahumado Rebanado Nayar 500 Gr",
+    "format": "500 GR",
+    "price": 89.9,
+    "regular": 109.9,
+    "cap_kg": 179.8
+  },
+  "chicharron-prensado": {
+    "al_id": 450747,
+    "al_name": "Chicharron Prensado   Muma 350 g",
+    "format": "350 GR",
+    "price": 129.9,
+    "regular": 129.9,
+    "cap_kg": 371.14
+  },
+  "pierna-puerco-natural": {
+    "al_id": 49510,
+    "al_name": "Pierna Deshuesada De Puerco Premium    Kg",
+    "format": "KG",
+    "price": 104.9,
+    "regular": 159.9,
+    "cap_kg": 104.9
+  },
+  "pierna-puerco-natural-cortada": {
+    "al_id": 49510,
+    "al_name": "Pierna Deshuesada De Puerco Premium    Kg",
+    "format": "KG",
+    "price": 104.9,
+    "regular": 159.9,
+    "cap_kg": 104.9
+  },
+  "pierna-puerco-cubicada": {
+    "al_id": 49510,
+    "al_name": "Pierna Deshuesada De Puerco Premium    Kg",
+    "format": "KG",
+    "price": 104.9,
+    "regular": 159.9,
+    "cap_kg": 104.9
+  },
+  "carne-molida-90-10": {
+    "al_id": 494535,
+    "al_name": "Carne Molida De Pavo   Parson 500 g",
+    "format": "500 GR",
+    "price": 99.9,
+    "regular": 99.9,
+    "cap_kg": 199.8
+  },
+  "carne-molida-pulpa-natural": {
+    "al_id": 494535,
+    "al_name": "Carne Molida De Pavo   Parson 500 g",
+    "format": "500 GR",
+    "price": 99.9,
+    "regular": 99.9,
+    "cap_kg": 199.8
+  },
+  "carne-molida-pulpa-extralimp": {
+    "al_id": 494535,
+    "al_name": "Carne Molida De Pavo   Parson 500 g",
+    "format": "500 GR",
+    "price": 99.9,
+    "regular": 99.9,
+    "cap_kg": 199.8
+  },
+  "carne-molida-economica": {
+    "al_id": 494535,
+    "al_name": "Carne Molida De Pavo   Parson 500 g",
+    "format": "500 GR",
+    "price": 99.9,
+    "regular": 99.9,
+    "cap_kg": 199.8
+  },
+  "carne-molida-especial": {
+    "al_id": 494535,
+    "al_name": "Carne Molida De Pavo   Parson 500 g",
+    "format": "500 GR",
+    "price": 99.9,
+    "regular": 99.9,
+    "cap_kg": 199.8
+  },
+  "carne-molida-de-pulpa": {
+    "al_id": 494535,
+    "al_name": "Carne Molida De Pavo   Parson 500 g",
+    "format": "500 GR",
+    "price": 99.9,
+    "regular": 99.9,
+    "cap_kg": 199.8
+  },
+  "pulpa-bola": {
+    "al_id": 463475,
+    "al_name": "Milanesa De Pulpa Bola     Kg",
+    "format": "KG",
+    "price": 239.9,
+    "regular": 359.9,
+    "cap_kg": 239.9
+  },
+  "pulpa-negra": {
+    "al_id": 337645,
+    "al_name": "Pulpa Negra  Picada    Kg",
+    "format": "KG",
+    "price": 304.9,
+    "regular": 379.9,
+    "cap_kg": 304.9
+  },
+  "pulpa-sirloin-cubicada-1x1": {
+    "al_id": 455617,
+    "al_name": "Carne Para Hamburguesa De Sirloin   Revuelta 1.32 Kg",
+    "format": "1.32 KG",
+    "price": 346.9,
+    "regular": 346.9,
+    "cap_kg": 262.8
+  },
+  "pulpa-milanesa": {
+    "al_id": 431478,
+    "al_name": "Milanesa De Res  Verdes Motivos 400 g",
+    "format": "400 GR",
+    "price": 214.9,
+    "regular": 214.9,
+    "cap_kg": 537.25
+  },
+  "pozole-dona-conchita-10pzs": {
+    "al_id": 416002,
+    "al_name": "Pozole  Chata 710 g",
+    "format": "710 GR",
+    "price": 64.6,
+    "regular": 69.9,
+    "cap_kg": 90.99
+  },
+  "menudo-mexicano": {
+    "al_id": 357062,
+    "al_name": "Menudo Supremo     0.5 Lt",
+    "format": "0.5 LT",
+    "price": 89.9,
+    "regular": 104.9,
+    "cap_kg": 179.8
+  },
+  "menudo-mexicano-cortado": {
+    "al_id": 357062,
+    "al_name": "Menudo Supremo     0.5 Lt",
+    "format": "0.5 LT",
+    "price": 89.9,
+    "regular": 104.9,
+    "cap_kg": 179.8
+  },
+  "menudo-americano": {
+    "al_id": 357062,
+    "al_name": "Menudo Supremo     0.5 Lt",
+    "format": "0.5 LT",
+    "price": 89.9,
+    "regular": 104.9,
+    "cap_kg": 179.8
+  },
+  "menudo-americano-cortado": {
+    "al_id": 357062,
+    "al_name": "Menudo Supremo     0.5 Lt",
+    "format": "0.5 LT",
+    "price": 89.9,
+    "regular": 104.9,
+    "cap_kg": 179.8
+  },
+  "aguja-engorda": {
+    "al_id": 12253,
+    "al_name": "Aguja Norteña Grill Choice Kg",
+    "format": "KG",
+    "price": 259.9,
+    "regular": 369.9,
+    "cap_kg": 259.9
+  },
+  "diezmillo-c-h-engorda": {
+    "al_id": 435598,
+    "al_name": "Diezmillo Sin Hueso   Black Angus Kg",
+    "format": "KG",
+    "price": 369.9,
+    "regular": 369.9,
+    "cap_kg": 369.9
+  },
+  "t-bone-engorda": {
+    "al_id": 221958,
+    "al_name": "T-Bone  Grill Choice 1 Kg",
+    "format": "KG",
+    "price": 369.9,
+    "regular": 399.9,
+    "cap_kg": 369.9
+  },
+  "chuleta-cero": {
+    "al_id": 47274,
+    "al_name": "Chuleta Ahumada De Puerco    Kg",
+    "format": "KG",
+    "price": 119.9,
+    "regular": 149.9,
+    "cap_kg": 119.9
+  },
+  "chuleta-siete": {
+    "al_id": 47274,
+    "al_name": "Chuleta Ahumada De Puerco    Kg",
+    "format": "KG",
+    "price": 119.9,
+    "regular": 149.9,
+    "cap_kg": 119.9
+  },
+  "diezmillo-c-h-chuleta": {
+    "al_id": 435598,
+    "al_name": "Diezmillo Sin Hueso   Black Angus Kg",
+    "format": "KG",
+    "price": 369.9,
+    "regular": 369.9,
+    "cap_kg": 369.9
+  },
+  "chuleta-lomo": {
+    "al_id": 47274,
+    "al_name": "Chuleta Ahumada De Puerco    Kg",
+    "format": "KG",
+    "price": 119.9,
+    "regular": 149.9,
+    "cap_kg": 119.9
+  },
+  "t-bone-engorda-premium": {
+    "al_id": 221958,
+    "al_name": "T-Bone  Grill Choice 1 Kg",
+    "format": "KG",
+    "price": 369.9,
+    "regular": 399.9,
+    "cap_kg": 369.9
+  },
+  "tuetano-hueso-cortar": {
+    "al_id": 13800,
+    "al_name": "Hueso Tuetano    Kg",
+    "format": "KG",
+    "price": 149.9,
+    "regular": 149.9,
+    "cap_kg": 149.9
+  },
+  "tuetano-hueso-canoa": {
+    "al_id": 13800,
+    "al_name": "Hueso Tuetano    Kg",
+    "format": "KG",
+    "price": 149.9,
+    "regular": 149.9,
+    "cap_kg": 149.9
+  },
+  "chamberete": {
+    "al_id": 9191,
+    "al_name": "Chamberete Con Hueso    Kg",
+    "format": "KG",
+    "price": 149.9,
+    "regular": 359.9,
+    "cap_kg": 149.9
+  },
+  "chamberete-cortado": {
+    "al_id": 9191,
+    "al_name": "Chamberete Con Hueso    Kg",
+    "format": "KG",
+    "price": 149.9,
+    "regular": 359.9,
+    "cap_kg": 149.9
+  },
+  "desebrada-aldilla": {
+    "al_id": 515287,
+    "al_name": "DESHEBRADA DE POLLO ORGANICA COCIDA AIRES DE CAMPO 500 GRAMOS",
+    "format": "500 GR",
+    "price": 242.9,
+    "regular": 242.9,
+    "cap_kg": 485.8
+  },
+  "brisket-deshuesado": {
+    "al_id": 14035,
+    "al_name": "Brisket  Entero    Kg",
+    "format": "KG",
+    "price": 289.9,
+    "regular": 289.9,
+    "cap_kg": 289.9
+  }
+}
