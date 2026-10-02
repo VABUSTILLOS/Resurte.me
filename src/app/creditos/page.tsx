@@ -6,11 +6,11 @@ import { IMAGE_CREDITS, exigeAtribucion } from "@/content/image-credits"
 /**
  * Créditos de las fotos de producto.
  *
- * No es una página de cortesía: **la única foto de AB Foods que queda es CC BY-SA
- * CC BY-SA**, y esas licencias exigen atribución. Publicar la foto sin decir de
- * quién es y bajo qué licencia la convierte en una infracción, así que esta
- * página es la mitad visible del cumplimiento y
- * `src/content/image-credits.ts` es la mitad verificable.
+ * Las fotos de Wikimedia Commons (migración 00194) fueron reemplazadas entre
+ * oct-2026 por imágenes generadas en casa (migraciones 00204–00210), así que
+ * ya no queda ninguna imagen que exija atribución. La página se mantiene para
+ * explicarlo y por si vuelve a entrar material con licencia: en ese caso su
+ * entrada se agrega a `src/content/image-credits.ts` y vuelve a listarse aquí.
  *
  * Estática a propósito: sin `cookies()` ni `headers()`, para no romper el
  * prerender de la ruta.
@@ -33,8 +33,9 @@ export default function CreditosPage() {
             Créditos de <span className="text-[#0E7A0E]">imágenes</span>
           </h1>
           <p className="text-[#5C6068] max-w-2xl mx-auto">
-            Las fotografías de producto que no son nuestras vienen de Wikimedia Commons y se
-            usan bajo su licencia original. Aquí está el autor y la licencia de cada una.
+            Todas las fotografías de producto del catálogo son propias o generadas para
+            Resurte.me: ya no usamos material de terceros que exija atribución. Esta página
+            queda como registro de esa política.
           </p>
         </div>
       </section>
@@ -44,73 +45,78 @@ export default function CreditosPage() {
           <p className="text-sm text-[#242529] flex items-start gap-2">
             <Camera className="w-4 h-4 text-[#0E7A0E] mt-0.5 flex-shrink-0" />
             <span>
-              Son fotos reales del <strong>tipo</strong> de alimento, no del producto exacto: unas
-              papas curly, no la caja de 13.61 kg de un proveedor concreto. No usamos el material
-              gráfico de otras marcas porque sería engañoso.
+              Hasta septiembre de 2026 usamos algunas fotos de Wikimedia Commons con su
+              atribución (CC BY / CC BY-SA). Desde octubre de 2026 el catálogo completo usa
+              imágenes propias o generadas para Resurte.me, sin material de terceros y sin
+              atribuciones pendientes.
             </span>
           </p>
         </div>
 
-        <h2 className="text-xl font-bold text-[#242529] mb-1">Con atribución obligatoria</h2>
-        <p className="text-sm text-[#5C6068] mb-4">
-          {conAtribucion.length} imágenes bajo licencias Creative Commons que exigen nombrar al
-          autor y enlazar la licencia.
-        </p>
-        <ul className="space-y-3 mb-10">
-          {conAtribucion.map((c) => (
-            <li key={c.slug} className="border border-[#e0dbd2] rounded-[12px] p-3">
-              <p className="text-sm font-semibold text-[#242529]">{c.slug}</p>
-              <p className="text-xs text-[#5C6068] mt-1">
-                {c.autor} ·{" "}
-                {c.licenciaUrl ? (
-                  <a
-                    href={c.licenciaUrl}
-                    className="underline hover:text-[#0E7A0E]"
-                    rel="license noopener noreferrer"
-                    target="_blank"
-                  >
-                    {c.licencia}
-                  </a>
-                ) : (
-                  <span>{c.licencia}</span>
-                )}{" "}
-                ·{" "}
-                <a
-                  href={c.origenUrl}
-                  className="underline hover:text-[#0E7A0E]"
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  {c.tituloCommons}
-                </a>
-              </p>
-            </li>
-          ))}
-        </ul>
+        {IMAGE_CREDITS.length > 0 && (
+          <>
+            <h2 className="text-xl font-bold text-[#242529] mb-1">Con atribución obligatoria</h2>
+            <p className="text-sm text-[#5C6068] mb-4">
+              {conAtribucion.length} imágenes bajo licencias Creative Commons que exigen nombrar
+              al autor y enlazar la licencia.
+            </p>
+            <ul className="space-y-3 mb-10">
+              {conAtribucion.map((c) => (
+                <li key={c.slug} className="border border-[#e0dbd2] rounded-[12px] p-3">
+                  <p className="text-sm font-semibold text-[#242529]">{c.slug}</p>
+                  <p className="text-xs text-[#5C6068] mt-1">
+                    {c.autor} ·{" "}
+                    {c.licenciaUrl ? (
+                      <a
+                        href={c.licenciaUrl}
+                        className="underline hover:text-[#0E7A0E]"
+                        rel="license noopener noreferrer"
+                        target="_blank"
+                      >
+                        {c.licencia}
+                      </a>
+                    ) : (
+                      <span>{c.licencia}</span>
+                    )}{" "}
+                    ·{" "}
+                    <a
+                      href={c.origenUrl}
+                      className="underline hover:text-[#0E7A0E]"
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      {c.tituloCommons}
+                    </a>
+                  </p>
+                </li>
+              ))}
+            </ul>
 
-        <h2 className="text-xl font-bold text-[#242529] mb-1">Sin atribución</h2>
-        <p className="text-sm text-[#5C6068] mb-4">
-          {sinAtribucion.length} imágenes en dominio público o CC0. Se listan igual, por
-          trazabilidad.
-        </p>
-        <ul className="space-y-3">
-          {sinAtribucion.map((c) => (
-            <li key={c.slug} className="border border-[#e0dbd2] rounded-[12px] p-3">
-              <p className="text-sm font-semibold text-[#242529]">{c.slug}</p>
-              <p className="text-xs text-[#5C6068] mt-1">
-                {c.autor} · {c.licencia} ·{" "}
-                <a
-                  href={c.origenUrl}
-                  className="underline hover:text-[#0E7A0E]"
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  {c.tituloCommons}
-                </a>
-              </p>
-            </li>
-          ))}
-        </ul>
+            <h2 className="text-xl font-bold text-[#242529] mb-1">Sin atribución</h2>
+            <p className="text-sm text-[#5C6068] mb-4">
+              {sinAtribucion.length} imágenes en dominio público o CC0. Se listan igual, por
+              trazabilidad.
+            </p>
+            <ul className="space-y-3">
+              {sinAtribucion.map((c) => (
+                <li key={c.slug} className="border border-[#e0dbd2] rounded-[12px] p-3">
+                  <p className="text-sm font-semibold text-[#242529]">{c.slug}</p>
+                  <p className="text-xs text-[#5C6068] mt-1">
+                    {c.autor} · {c.licencia} ·{" "}
+                    <a
+                      href={c.origenUrl}
+                      className="underline hover:text-[#0E7A0E]"
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      {c.tituloCommons}
+                    </a>
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
 
         <p className="text-xs text-[#5C6068] mt-10">
           ¿Falta un crédito o crees que una imagen no debería estar aquí?{" "}

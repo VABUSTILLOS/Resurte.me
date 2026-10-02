@@ -1,0 +1,26 @@
+[
+  {
+    "slug": "cordon-bleu-mini",
+    "name": "Cordon bleu mini",
+    "description": "Mini pechugas rellenas de jamón y queso, empanizadas.",
+    "unit": "por kilo",
+    "category": "Carnes",
+    "currentImage": "/images/products/ab-foods/cordon-bleu-mini-foto.webp"
+  },
+  {
+    "slug": "sandia",
+    "name": "Sandía",
+    "description": "Sandía fresca, dulce y jugosa. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas",
+    "currentImage": "takeapp"
+  },
+  {
+    "slug": "toronja",
+    "name": "Toronja",
+    "description": "Toronja fresca, jugosa y ligeramente amarga. Precio por kilo.",
+    "unit": "por kilo",
+    "category": "Frutas",
+    "currentImage": "takeapp"
+  }
+]

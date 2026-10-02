@@ -6,30 +6,26 @@ import { IMAGE_CREDITS, exigeAtribucion } from "@/content/image-credits"
 /**
  * Contrato de la atribución de las fotos de producto.
  *
- * POR QUÉ ESTO NO ES UN DETALLE DE CORTESÍA
- * -----------------------------------------
- * **La única foto de AB Foods que queda es CC BY-SA**, y esa licencia
- * condicionan el uso a atribuir. Una CC BY sin atribuir no es una licencia: es
- * una infracción, y en un catálogo comercial no es un riesgo teórico.
+ * CONTEXTO ACTUAL (oct-2026)
+ * --------------------------
+ * Las 22 fotos Wikimedia de 00194 fueron reemplazadas por imágenes generadas
+ * en casa (migraciones 00204, 00206, 00207 y 00210) y **ya no queda ninguna
+ * foto que exija atribución**: `IMAGE_CREDITS` está vacío a propósito. La
+ * página `/creditos` lo explica y vuelve a listar si algún día entra material
+ * con licencia.
  *
- * La atribución tiene dos mitades y las dos tienen que existir:
+ * Lo que el contrato sigue vigilando:
  *
- *   1. **Visible** — `/creditos` (`src/app/creditos/page.tsx`) lista autor,
- *      licencia y enlace al archivo original.
- *   2. **Verificable** — este registro. Una página puede quedarse sin una foto
- *      por un `filter` mal puesto y nadie lo nota; un test sí.
- *
- * El contrato vigila cuatro formas de romperlo:
- *
- *   1. **Publicar una foto sin entrada.** Se descubre un `.webp` en
- *      `public/images/products/ab-foods/` que nadie acredita.
- *   2. **Dejar una entrada muerta.** El registro apunta a un archivo que ya no
- *      existe (se renombró, se borró): la página mostraría un crédito falso.
- *   3. **Atribuir a medias.** Licencia que exige atribución con autor vacío o
- *      sin enlace a la licencia.
- *   4. **Desincronizar el SQL del código.** La migración `00194` es la que
- *      reapunta `products.image_url`; si lista archivos distintos de los que el
- *      registro acredita, la tienda sirve una foto que nadie acredita.
+ *   1. **Que no vuelva una foto sin acreditar.** Si reaparece un `-foto.webp`
+ *      en `public/images/products/ab-foods/`, tiene que tener entrada.
+ *   2. **Que no queden entradas muertas.** El registro no puede acreditar
+ *      archivos que no existen.
+ *   3. **Atribución completa.** Si hay entradas con licencia que la exige,
+ *      traen autor y enlace a la licencia.
+ *   4. **Desincronizar el SQL del código.** La migración `00194` es
+ *      histórica y no se reescribe; todas sus rutas quedaron excluidas en
+ *      `FOTOS_REEMPLAZADAS_POR_IA`. Si alguien agrega una foto a 00194, el
+ *      test exige su crédito.
  *
  * Sin base de datos: el contrato lee archivos, igual que
  * `db-function-grants.contract.test.ts`.
@@ -49,10 +45,10 @@ function fotosPublicadas(): string[] {
 /**
  * Fotos de ab-foods que la migración 00194 publicó pero que ya no llevan
  * crédito: el archivo del aguacate chunky contenía AJOS (descarga mal
- * rotulada; el crédito a Jon Sullivan era incorrecto) y las migraciones 00204
- * y 00206 reemplazaron 13 fotos Wikimedia por imágenes generadas por IA en
- * /images/products/ai/, que no requieren atribución. 00194 es histórica y no
- * se reescribe; se excluyen aquí.
+ * rotulada; el crédito a Jon Sullivan era incorrecto) y las migraciones 00204,
+ * 00206, 00207 y 00210 reemplazaron las 22 fotos Wikimedia por imágenes
+ * generadas en casa en /images/products/ai/, que no requieren atribución.
+ * 00194 es histórica y no se reescribe; se excluyen aquí.
  */
 const FOTOS_REEMPLAZADAS_POR_IA = new Set([
   "/images/products/ab-foods/aguacate-chunky-caja-7264kg-foto.webp",
@@ -77,12 +73,14 @@ const FOTOS_REEMPLAZADAS_POR_IA = new Set([
   "/images/products/ab-foods/hamburguesa-bm-sirloin-caja-30pzs-foto.webp",
   "/images/products/ab-foods/hamburguesa-empanizada-pilgrims-foto.webp",
   "/images/products/ab-foods/tender-empanizado-pilgrims-foto.webp",
+  // Última (00210): cordon bleu mini. Con esta el registro queda vacío.
+  "/images/products/ab-foods/cordon-bleu-mini-foto.webp",
 ])
 
 describe("contrato de créditos de las fotos de AB Foods", () => {
-  it("hay 1 foto publicada y 1 crédito", () => {
-    expect(fotosPublicadas().length, "faltan fotos en public/images/products/ab-foods").toBe(1)
-    expect(IMAGE_CREDITS.length, "el registro no cubre la foto restante").toBe(1)
+  it("ya no quedan fotos Wikimedia publicadas ni créditos", () => {
+    expect(fotosPublicadas(), "reaparecieron fotos -foto.webp en ab-foods").toEqual([])
+    expect(IMAGE_CREDITS.length, "el registro debería estar vacío").toBe(0)
   })
 
   it("cada foto publicada tiene crédito", () => {
@@ -117,11 +115,14 @@ describe("contrato de créditos de las fotos de AB Foods", () => {
     expect(aMedias, `atribución incompleta: ${aMedias.join(", ")}`).toEqual([])
   })
 
-  it("hay al menos una licencia que exige atribución (el contrato no es vacío)", () => {
-    // Si algún día todas las fotos fueran CC0, esta prueba avisa de que el
-    // contrato dejó de comprobar lo que dice comprobar.
-    const conAtribucion = IMAGE_CREDITS.filter((c) => exigeAtribucion(c.licencia))
-    expect(conAtribucion.length).toBeGreaterThan(0)
+  it("si algún día vuelven entradas, ninguna licencia que exija atribución queda a medias", () => {
+    // Una CC BY sin enlace a la licencia no cumple: la licencia obliga a
+    // enlazarla para que quien la lea pueda conocer sus términos. Con el
+    // registro vacío la prueba pasa en vacío a propósito.
+    const aMedias = IMAGE_CREDITS.filter(
+      (c) => exigeAtribucion(c.licencia) && (!c.licenciaUrl || c.autor.trim().length === 0)
+    ).map((c) => `${c.slug} (${c.licencia})`)
+    expect(aMedias, `atribución incompleta: ${aMedias.join(", ")}`).toEqual([])
   })
 
   it("la migración 00194 lista exactamente las mismas rutas que el registro", () => {

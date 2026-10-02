@@ -1663,16 +1663,22 @@ valor real; no te fíes del "ok" del doctor.
 ### 14.4 Checklist de arranque (lo que solo puede hacer el operador)
 
 1. **Stripe en modo live.** En el dashboard, modo live: `pk_live_…`, `sk_live_…`
-   y el signing secret `whsec_…`. Colocarlas en Vercel → Production:
+   y el signing secret `whsec_…` del endpoint de webhook. Las tres variables de
+   Vercel están marcadas **Secret**, así que no se pueden leer ni editar; se
+   reemplazan con `vercel env update`, que conserva el tipo y pide el valor por
+   entrada estándar (nunca queda en el historial del shell):
 
    ```bash
-   vercel env rm NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY production
-   vercel env add NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY production   # pk_live_…
-   vercel env rm STRIPE_SECRET_KEY production
-   vercel env add STRIPE_SECRET_KEY production                    # sk_live_…
-   vercel env rm STRIPE_WEBHOOK_SECRET production
-   vercel env add STRIPE_WEBHOOK_SECRET production                # whsec_… live
+   vercel env update NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY production --sensitive  # pk_live_…
+   vercel env update STRIPE_SECRET_KEY production --sensitive                   # sk_live_…
+   vercel env update STRIPE_WEBHOOK_SECRET production --sensitive               # whsec_… live
    ```
+
+   ⚠️ El `whsec_` de live **no es el de test**: cada endpoint tiene el suyo. Es el
+   punto más delicado del corte — ver §14.8.
+
+   ⚠️ No agregar `ALLOW_LIVE_STRIPE` en Vercel: esa válvula es solo para la
+   máquina local (§3).
 
 2. **Redesplegar.** `NEXT_PUBLIC_*` se hornea en el build: cambiar la variable
    sin volver a desplegar deja el sitio con `pk_test_…`.
@@ -1850,6 +1856,49 @@ sin tocar el código.
 - El recordatorio de pago ahora **no** se le manda al cliente contra entrega. Un
   mensaje útil para ese caso sería otro ("tu pedido está en camino, paga al
   recibir"), pero eso es una decisión de producto, no un defecto.
+
+### 14.8 El corte a llaves live: qué mirar si algo falla
+
+> Procedimiento vigente. La medición que originó esto está en §14.1.
+
+El pedido se marca **pagado únicamente por el webhook**. El cliente, al confirmar
+el pago, no llama a ningún endpoint propio: navega a la confirmación y el estado
+lo escribe Stripe. Eso hace que un `whsec_` equivocado sea el fallo característico
+de este corte, y que su síntoma sea engañoso: **Stripe cobra la tarjeta y el
+pedido se queda en "pendiente"**.
+
+#### Cómo se diagnostica
+
+No hace falta adivinar. `src/app/api/webhooks/stripe/route.ts` registra el error
+de firma antes de devolver 400:
+
+```
+Stripe webhook signature error: No signatures found matching the expected signature for payload
+```
+
+Esa línea en los logs de Vercel significa exactamente "el `STRIPE_WEBHOOK_SECRET`
+desplegado no es el del endpoint". Se ve con:
+
+```bash
+vercel logs <url-del-despliegue> | grep -i "signature error"
+```
+
+Y del lado de Stripe, *Developers → Webhooks → el endpoint → Recent deliveries*
+muestra cada intento con su código: 200 es firma correcta; 400 es lo de arriba.
+
+#### Por qué un `whsec_` mal puesto no pierde dinero
+
+Stripe reintenta la entrega durante **3 días** con retroceso exponencial, y el
+cron diario tiene una reconciliación (`src/lib/reconcile-payments.ts`) que vuelve
+a consultar el pago en Stripe y corrige el estado por su cuenta. El costo del
+error es que el cliente ve "pendiente" un rato, no un cobro sin pedido. Aun así,
+se corrige en cuanto se detecta: no se deja "porque se arregla solo".
+
+#### Criterio de aceptación del corte
+
+Un pedido pagado con tarjeta real pasa a **pagado sin esperar al cron**. Si
+pasados unos minutos sigue pendiente, el `whsec_` está mal: se rehace el endpoint
+live, se actualiza la variable y se redespliega.
 
 ---
 

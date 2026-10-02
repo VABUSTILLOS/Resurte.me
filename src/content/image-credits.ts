@@ -1,23 +1,19 @@
 /**
  * Créditos de las fotos de producto que vienen de Wikimedia Commons.
  *
- * POR QUÉ ESTE ARCHIVO ES OBLIGATORIO Y NO UN DETALLE
- * ---------------------------------------------------
- * **La única foto de AB Foods que queda exige atribución** (CC BY-SA). Una
- * licencia CC BY sin atribuir no es una licencia: es una infracción. Este
- * registro es la mitad verificable de la atribución —`/creditos` es la mitad
- * visible— y `src/lib/image-credits.contract.test.ts` comprueba que cada foto
- * publicada tenga entrada, que el archivo exista y que ninguna licencia que
- * exija atribución quede sin autor y sin enlace a la licencia.
+ * ESTADO ACTUAL: VACÍO A PROPÓSITO
+ * --------------------------------
+ * Las 22 fotos de la migración 00194 fueron reemplazadas entre el 1 y el
+ * 2-oct-2026 por imágenes generadas en casa (migraciones 00204, 00206, 00207
+ * y 00210), así que ya no hay ninguna imagen que exija atribución. El
+ * registro se mantiene —y su contrato en
+ * `src/lib/image-credits.contract.test.ts`— por si vuelve a entrar material
+ * con licencia: la entrada se agrega aquí y `/creditos` vuelve a listarla.
  *
- * Los datos NO se escribieron a mano: los emite `bajar_fotos.py` leyendo
- * `extmetadata` de la API de Commons en el momento de descargar, así que el
- * autor y la licencia son los que declara el archivo, no los que recordaba
- * quien lo bajó.
- *
- * Estas fotos son del **tipo** de alimento, no del SKU exacto: unas papas curly,
- * no «Papa Curly Savory caja 13.61 kg». Es lo que se puede obtener con licencia
- * clara sin usar el material del proveedor ni el de la competencia.
+ * Cuando había datos, NO se escribieron a mano: los emitía `bajar_fotos.py`
+ * leyendo `extmetadata` de la API de Commons en el momento de descargar, así
+ * que el autor y la licencia eran los que declaraba el archivo, no los que
+ * recordaba quien lo bajó.
  */
 export interface ImageCredit {
   /** Slug del producto en `products.slug`. */
@@ -37,22 +33,9 @@ export interface ImageCredit {
 }
 
 export const IMAGE_CREDITS: readonly ImageCredit[] = [
-  // NOTA: 21 productos de 00194 ya no aparecen aquí porque las migraciones
-  // 00204, 00206 y 00207 los reapuntaron a imágenes generadas por IA en
-  // /images/products/ai/ (sin atribución), a petición del usuario. El archivo
-  // del aguacate chunky contenía AJOS (descarga mal rotulada — el crédito a
-  // Jon Sullivan era además incorrecto); los otros 20 (papas, quesos crema,
-  // dedos de queso, hamburguesas, camarones y tender) se reemplazaron por
-  // consistencia de catálogo.
-  {
-    slug: "cordon-bleu-mini",
-    archivo: "/images/products/ab-foods/cordon-bleu-mini-foto.webp",
-    tituloCommons: "File:Schnitzel Cordon bleu.JPG",
-    autor: "Thomas Richter, User:THOMAS",
-    licencia: "CC BY-SA 3.0",
-    licenciaUrl: "http://creativecommons.org/licenses/by-sa/3.0/",
-    origenUrl: "https://commons.wikimedia.org/wiki/File:Schnitzel_Cordon_bleu.JPG",
-  },
+  // Vacío a propósito: los 22 productos de 00194 fueron reapuntados a
+  // imágenes generadas en casa (00204, 00206, 00207, 00210). Ver el bloque
+  // de documentación al inicio del archivo.
 ]
 
 /** Licencias que **no** exigen atribución. Cualquier otra sí. */
