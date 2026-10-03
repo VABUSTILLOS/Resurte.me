@@ -1,0 +1,2018 @@
+[
+  {
+    "slug": "manzana-verde",
+    "name": "Manzana Verde",
+    "description": "Manzana verde Granny Smith. Ácida y crocante, ideal para pays, ensaladas y guarniciones.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "platano-tabasco",
+    "name": "Plátano Tabasco",
+    "description": "Plátano Tabasco maduro, dulzor natural y textura cremosa. Para postres y licuados.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "mango-manila",
+    "name": "Mango Manila",
+    "description": "Mango Manila pequeño, intenso aroma y sabor. Perfecto para salsas mango-habanero.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "papa-cambray",
+    "name": "Papa Cambray",
+    "description": "Papa cambray pequeña, piel fina. Para asar enteras, guarnición gourmet.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "hongo-portobello",
+    "name": "Hongo Portobello",
+    "description": "Hongo Portobello grande y carnoso. Para asar, rellenar o como sustituto de carne.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "arroz-blanco-5kg",
+    "name": "Arroz Blanco 5kg",
+    "description": "Arroz blanco costal de 5 kg. Ideal para cocinas de alto volumen y fondas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "frijol-negro-5kg",
+    "name": "Frijol Negro 5kg",
+    "description": "Costal de frijol negro 5 kg. Para cocinas que sirven frijoles diario.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "frijol-bayo-1kg",
+    "name": "Frijol Bayo 1kg",
+    "description": "Frijol bayo de grano suave. Cremoso al cocerse, para frijoles refritos de carta.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "frijol-peruano-1kg",
+    "name": "Frijol Peruano 1kg",
+    "description": "Frijol peruano amarillo claro, textura mantecosa. Favorito en cocina del norte.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "garbanzo-1kg",
+    "name": "Garbanzo 1kg",
+    "description": "Garbanzo grande de buena cocción. Para caldos, potajes y hummus.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "aceite-canola-1l",
+    "name": "Aceite de Canola 1L",
+    "description": "Aceite vegetal de canola, punto de humo alto y sabor neutro. Para freidora y cocina diaria.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "aceite-canola-5l",
+    "name": "Aceite de Canola 5L",
+    "description": "Garrafa 5 litros de aceite de canola. Máximo rendimiento para cocinas de volumen.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "aceite-de-maiz-1l",
+    "name": "Aceite de Maíz 1L",
+    "description": "Aceite de maíz 100% puro, ideal para freír. Sabor ligero, no enmascara.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "aceite-de-oliva-1l",
+    "name": "Aceite de Oliva 1L",
+    "description": "Aceite de oliva extra virgen. Para aderezos, pescados, pastas y servicio gourmet.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "manteca-vegetal",
+    "name": "Manteca Vegetal",
+    "description": "Manteca vegetal Inca para freír y repostería. Estable a altas temperaturas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pasta-spaghetti-500g",
+    "name": "Pasta Spaghetti 500g",
+    "description": "Pasta spaghetti de sémola, cuerpo firme al dente. No se sobrecocina.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pasta-codito-500g",
+    "name": "Pasta Codito 500g",
+    "description": "Pasta codito / elbow. Para sopas aguadas y ensaladas frías de pasta.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pasta-fideo-500g",
+    "name": "Pasta Fideo 500g",
+    "description": "Fideo delgado para sopa aguada o seca. Base de la clásica sopa de fideo mexicana.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "harina-de-maiz-1kg",
+    "name": "Harina de Maíz 1kg",
+    "description": "Harina de maíz nixtamalizado Maseca. Para tortillas, tamales, sopes y gorditas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "harina-de-trigo-1kg",
+    "name": "Harina de Trigo 1kg",
+    "description": "Harina de trigo todo uso. Para repostería, capeados, salsas madre y panadería.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "azucar-estandar-1kg",
+    "name": "Azúcar Estándar 1kg",
+    "description": "Azúcar refinada estándar, disolución rápida. Para repostería, bebidas y salsas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "azucar-glass-500g",
+    "name": "Azúcar Glass 500g",
+    "description": "Azúcar glass impalpable para repostería fina, glaseados y decoración.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "sal-gruesa-1kg",
+    "name": "Sal Gruesa 1kg",
+    "description": "Sal de mar en grano grueso. Para carnes asadas, pescados a la sal y cocciones lentas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pimienta-negra-molida-100g",
+    "name": "Pimienta Negra Molida 100g",
+    "description": "Pimienta negra molida fresca. Para sazonar carnes, sopas y salsas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "comino-molido-100g",
+    "name": "Comino Molido 100g",
+    "description": "Comino molido puro, aroma intenso. Especia clave en cocina mexicana y tex-mex.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "salsa-valentina-370ml",
+    "name": "Salsa Valentina 370ml",
+    "description": "Salsa picante clásica mexicana. Para botanas, frutas, mariscos y micheladas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "salsa-maggi-200ml",
+    "name": "Salsa Maggi 200ml",
+    "description": "Salsa sazonadora líquida Maggi. Umami instantáneo para caldos, carnes y salsas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "salsa-de-soya-500ml",
+    "name": "Salsa de Soya 500ml",
+    "description": "Salsa de soya fermentada. Para marinados, salteados orientales y salsas fusión.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "salsa-inglesa-250ml",
+    "name": "Salsa Inglesa 250ml",
+    "description": "Salsa inglesa / Worcestershire para micheladas, clamatos, carnes y salsas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "catsup-1kg",
+    "name": "Catsup 1kg",
+    "description": "Catsup de jitomate en sobre de 1 kg. Para hamburguesas, hot dogs y papas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "mayonesa-1kg",
+    "name": "Mayonesa 1kg",
+    "description": "Mayonesa con huevo en formato de 1 kg. Para salsas, aderezos y servicio.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "mostaza-400g",
+    "name": "Mostaza 400g",
+    "description": "Mostaza amarilla clásica. Para hot dogs, sándwiches, aderezos y marinados.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "consome-de-res-1kg",
+    "name": "Consomé de Res 1kg",
+    "description": "Consomé de res en polvo, bote 1 kg. Para birria, caldos de res y guisados.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "vinagre-blanco-1l",
+    "name": "Vinagre Blanco 1L",
+    "description": "Vinagre blanco destilado. Para escabeches, salsas, conservas y limpieza.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "vinagre-de-manzana-1l",
+    "name": "Vinagre de Manzana 1L",
+    "description": "Vinagre de manzana orgánico. Para aderezos, marinados y vinagretas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "mole-dona-maria-500g",
+    "name": "Mole Doña María 500g",
+    "description": "Pasta de mole poblano lista para diluir. Base para mole de servicio en restaurante.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "maicena-500g",
+    "name": "Maicena 500g",
+    "description": "Fécula de maíz para espesar salsas, atoles y postres. Rendimiento profesional.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "leche-entera-lala-1l",
+    "name": "Leche Entera Lala 1L",
+    "description": "Leche entera pasteurizada. Para salsas bechamel, cremas, postres y servicio de mesa.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "leche-descremada-1l",
+    "name": "Leche Descremada 1L",
+    "description": "Leche semidescremada, menos grasa. Para smoothies, licuados y cocina ligera.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "leche-evaporada-360ml",
+    "name": "Leche Evaporada 360ml",
+    "description": "Leche evaporada Carnation. Para cremas, salsas y postres clásicos mexicanos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "media-crema-240ml",
+    "name": "Media Crema 240ml",
+    "description": "Media crema Nestlé. Para salsas cremosas, enchiladas y pastas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "leche-condensada-370ml",
+    "name": "Leche Condensada 370ml",
+    "description": "Leche condensada azucarada La Lechera. Para flanes, pays y postres fríos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "huevo-blanco-18pz",
+    "name": "Huevo Blanco 18pz",
+    "description": "leche-entera",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "huevo-blanco-caja-30pz",
+    "name": "Huevo Blanco Caja 30pz",
+    "description": "Caja de 30 huevos blancos. Para cocinas con alto consumo diario.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "huevo-rojo-18pz",
+    "name": "Huevo Rojo 18pz",
+    "description": "Huevo rojo de gallina criolla, yema más intensa. Favorito en cocina tradicional.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-oaxaca-400g",
+    "name": "Queso Oaxaca 400g",
+    "description": "Queso Oaxaca artesanal, hebra larga y sabor lácteo limpio. Fundido perfecto para quesadillas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-fresco-500g",
+    "name": "Queso Fresco 500g",
+    "description": "Queso fresco de vaca, textura granular y sabor lácteo suave. Para enchiladas, frijoles y ensaladas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-panela-400g",
+    "name": "Queso Panela 400g",
+    "description": "Queso panela suave, no se derrite. Para asar a la plancha, ensaladas y botanas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-manchego-400g",
+    "name": "Queso Manchego 400g",
+    "description": "Queso tipo manchego semicurado. Para sándwiches gourmet, tablas y gratinados.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-crema-200g",
+    "name": "Queso Crema 200g",
+    "description": "Queso crema Philadelphia. Para cheesecakes, dips, salsas y bagels.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "yogurt-natural-1l",
+    "name": "Yogurt Natural 1L",
+    "description": "Yogurt natural sin azúcar. Para aderezos, marinados, smoothies y salsas frías.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "crema-acida-1l",
+    "name": "Crema Ácida 1L",
+    "description": "Crema ácida espesa, sabor lácteo limpio. Para enchiladas, chilaquiles, cremas y dips.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "mantequilla-sin-sal-200g",
+    "name": "Mantequilla sin Sal 200g",
+    "description": "Mantequilla 100% leche de vaca, sin sal. Para repostería, salsas y cocina fina.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pechuga-pollo",
+    "name": "Pechuga de Pollo",
+    "description": "Pechuga de pollo fresca sin piel. Jugosa y magra, para plancha, empanizado o relleno.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "milanesa-de-pollo",
+    "name": "Milanesa de Pollo",
+    "description": "Milanesa de pechuga aplanada. Lista para empanizar, freír o asar en pocos minutos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pierna-muslo-pollo",
+    "name": "Pierna y Muslo de Pollo",
+    "description": "Pierna con muslo de pollo fresco. Jugosa y sabrosa, para horno, asador o guisos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "alitas-de-pollo",
+    "name": "Alitas de Pollo",
+    "description": "Alitas de pollo frescas, partidas. Para alitas fritas, asadas o en salsa BBQ.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pollo-entero",
+    "name": "Pollo Entero",
+    "description": "Pollo entero fresco sin menudencias. Para rostizado, caldos y cocina de volumen.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "bistec-de-res",
+    "name": "Bistec de Res",
+    "description": "Bistec de res seleccionado, marmoleo parejo y sabor profundo. Para asar o plancha.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "milanesa-de-res",
+    "name": "Milanesa de Res",
+    "description": "Milanesa de res aplanada, corte delgado y parejo. Lista para empanizar o asar rápido.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "carne-molida-80-20",
+    "name": "Carne Molida 80/20",
+    "description": "Carne molida de res 80% magra. Textura uniforme para hamburguesas, albóndigas y rellenos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "diezmillo-de-res",
+    "name": "Diezmillo de Res",
+    "description": "Diezmillo para cocción lenta. Perfecto para birria, caldos, deshebrada y barbacoa.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "falda-de-res",
+    "name": "Falda de Res",
+    "description": "Falda de res para cocción prolongada. Ideal para caldos de res, cocido y guisos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "costilla-de-res",
+    "name": "Costilla de Res",
+    "description": "Costilla de res en tira, marmoleo generoso. Para asar, hornear o guisar.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "t-bone",
+    "name": "T-Bone",
+    "description": "Corte T-Bone de res con hueso, dos cortes en uno. Espectacular a la parrilla.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chuleta-de-cerdo",
+    "name": "Chuleta de Cerdo",
+    "description": "Chuleta de cerdo ahumada de corte parejo. Para asar, freír o guisar.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "lomo-de-cerdo",
+    "name": "Lomo de Cerdo",
+    "description": "Lomo de cerdo magro, corte entero. Para hornear, rebanar y servicio en frío.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "costilla-de-cerdo",
+    "name": "Costilla de Cerdo",
+    "description": "Costilla de cerdo baby back. Para asar con BBQ, hornear o cocción lenta.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "jamon-de-pierna",
+    "name": "Jamón de Pierna",
+    "description": "Jamón de pierna de cerdo rebanado. Para sándwiches, tortas, croquetas y ensaladas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "filete-de-tilapia",
+    "name": "Filete de Tilapia",
+    "description": "Filete de tilapia fresco de agua dulce, carne blanca firme. Para empanizar, asar o al mojo.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "filete-de-basa",
+    "name": "Filete de Basa",
+    "description": "Filete de basa blanco, textura suave y sabor neutro. Para capear, asar o cocinar al vapor.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "camaron-pacotilla",
+    "name": "Camarón Pacotilla",
+    "description": "Camarón pacotilla del Pacífico, pelado y crudo. Tamaño mediano para cocteles, tacos y al mojo.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "camaron-u12-u15",
+    "name": "Camarón U12-U15",
+    "description": "Camarón jumbo U12-U15, tamaño extra grande. Para platillos premium: al ajillo, empanizado.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "mojarra-entera",
+    "name": "Mojarra Entera",
+    "description": "Mojarra fresca entera, eviscerada. Para freír entera, al mojo de ajo o a la talla.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "huachinango-entero",
+    "name": "Huachinango Entero",
+    "description": "Huachinango del Golfo entero, eviscerado. El pescado más noble de la cocina mexicana: zarandeado, frito, al horno.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "camaron-seco",
+    "name": "Camarón Seco",
+    "description": "Camarón seco pequeño para caldos, sopa de camarón, tortitas y salsas tradicionales.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pan-bimbo-blanco",
+    "name": "Pan Bimbo Blanco",
+    "description": "Pan de caja blanco de miga suave, estructura firme. Para sándwiches, tortas y tostadas francesas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pan-integral",
+    "name": "Pan Integral",
+    "description": "Pan de caja integral con fibra. Para sándwiches saludables y tostadas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pan-hot-dog",
+    "name": "Pan para Hot Dog",
+    "description": "Pan para hot dog suave, corte lateral. Para hot dogs, dogos y salchichas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pan-hamburguesa",
+    "name": "Pan para Hamburguesa",
+    "description": "Pan para hamburguesa con ajonjolí. Suave, esponjoso y dorado.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "tortillas-maiz",
+    "name": "Tortillas de Maíz",
+    "description": "Tortillas de maíz nixtamalizado, hechas al día. Aroma de molino, sabor auténtico.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "tortillas-de-harina",
+    "name": "Tortillas de Harina",
+    "description": "harina-de-maiz-1kg",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pan-de-ajo",
+    "name": "Pan de Ajo",
+    "description": "Pan de ajo con mantequilla y perejil listo para hornear. Guarnición clásica para pastas y carnes.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "coca-cola-25l",
+    "name": "Coca-Cola 2.5L",
+    "description": "Refresco Coca-Cola botella 2.5L. La más vendida para servicio en restaurante.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "coca-cola-light-25l",
+    "name": "Coca-Cola Light 2.5L",
+    "description": "Coca-Cola sin azúcar 2.5L. Opción ligera para el comensal que cuida calorías.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "sprite-2l",
+    "name": "Sprite 2L",
+    "description": "Refresco Sprite lima-limón. Refrescante y versátil.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "fanta-naranja-2l",
+    "name": "Fanta Naranja 2L",
+    "description": "Refresco Fanta sabor naranja. Favorito para comidas informales.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "sidral-mundet-2l",
+    "name": "Sidral Mundet 2L",
+    "description": "Refresco de manzana Sidral Mundet. El acompañante clásico de la comida mexicana.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "agua-bonafont-15l",
+    "name": "Agua Bonafont 1.5L",
+    "description": "Agua purificada Bonafont, mineralización ligera. Para servicio de mesa y cocina.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "agua-mineral-15l",
+    "name": "Agua Mineral 1.5L",
+    "description": "Agua mineral con gas Peñafiel. Para bebidas preparadas y servicio.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "agua-mineral-saborizada-15l",
+    "name": "Agua Mineral Saborizada 1.5L",
+    "description": "Peñafiel sabor limón o naranja. Sin azúcar, refrescante y ligera.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "jugo-jumex-1l",
+    "name": "Jugo Jumex 1L",
+    "description": "Jugo o néctar de frutas Jumex. Para barra de jugos, smoothies y cocina.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "concentrado-jamaica-1l",
+    "name": "Concentrado Jamaica 1L",
+    "description": "Concentrado de flor de jamaica para aguas frescas. Rinde hasta 10 litros.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "concentrado-horchata-1l",
+    "name": "Concentrado Horchata 1L",
+    "description": "Concentrado de horchata de arroz. Rinde hasta 10 litros. Sabor tradicional.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cerveza-corona-355ml",
+    "name": "Cerveza Corona 355ml",
+    "description": "Cerveza clara Corona Extra. La cerveza mexicana más reconocida del mundo.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cerveza-modelo-355ml",
+    "name": "Cerveza Modelo Especial 355ml",
+    "description": "cerveza-victoria-355ml",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cerveza-victoria-355ml",
+    "name": "Cerveza Victoria 355ml",
+    "description": "Cerveza tipo Vienna Victoria, maltosa y acaramelada. Maridaje perfecto con comida mexicana.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cerveza-pacifico-355ml",
+    "name": "Cerveza Pacífico 355ml",
+    "description": "Cerveza clara tipo Pilsner Pacífico. Refrescante, estilo costa para mariscos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "sabritas-clasicas-170g",
+    "name": "Sabritas Clásicas 170g",
+    "description": "Papas fritas saladas clásicas. El snack mexicano por excelencia.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "totopos-200g",
+    "name": "Totopos 200g",
+    "description": "Totopos de maíz para nachos, chilaquiles y botana con guacamole.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cacahuate-salado-200g",
+    "name": "Cacahuate Salado 200g",
+    "description": "Cacahuate tostado y salado. Para botana de barra y servicio de mesa.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "galletas-marias-200g",
+    "name": "Galletas Marías 200g",
+    "description": "Galletas Marías clásicas Gamesa. Para postres, pay de queso y botana.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "galletas-saladas-200g",
+    "name": "Galletas Saladas 200g",
+    "description": "Galletas saladas tipo soda. Para botana, dips y cocina (empanizado, bases).",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chocolate-abuelita",
+    "name": "Chocolate Abuelita",
+    "description": "Chocolate de mesa Abuelita en tableta. Para chocolate caliente, mole y postres tradicionales.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cloro-1l",
+    "name": "Cloro 1L",
+    "description": "Cloro blanqueador concentrado Cloralex. Desinfección profunda para cocinas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cloro-5l",
+    "name": "Cloro 5L",
+    "description": "Garrafa de cloro 5 litros. Para cocinas de alto volumen con limpieza constante.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "jabon-zote-400g",
+    "name": "Jabón Zote 400g",
+    "description": "Jabón de lavandería Zote en barra. Poder desengrasante para utensilios y trapos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "detergente-liquido-1l",
+    "name": "Detergente Líquido 1L",
+    "description": "Detergente líquido para ropa de cocina. Limpia mandiles, trapos y uniformes.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "detergente-en-polvo-1kg",
+    "name": "Detergente en Polvo 1kg",
+    "description": "Detergente en polvo para lavadora. Limpieza profunda de textiles de cocina.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "desengrasante-1l",
+    "name": "Desengrasante 1L",
+    "description": "Desengrasante concentrado para campanas, estufas, azulejos y superficies de acero.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "limpiador-multiusos-500ml",
+    "name": "Limpiador Multiusos 500ml",
+    "description": "Limpiador desinfectante con aroma pino. Superficies impecables en un paso.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "limpiavidrios-500ml",
+    "name": "Limpiavidrios 500ml",
+    "description": "Limpiador de vidrios sin rayas. Para vitrinas, espejos y ventanas de restaurante.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "jabon-lavaplatos-750ml",
+    "name": "Jabón Lavaplatos 750ml",
+    "description": "Jabón líquido lavaplatos concentrado. Desengrasa y rinde más lavadas por gota.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "fibras-para-trastes-3pz",
+    "name": "Fibras para Trastes 3pz",
+    "description": "Fibras verdes multiusos. Para lavar ollas, sartenes y utensilios.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "bolsas-de-basura-50pz",
+    "name": "Bolsas de Basura 50pz",
+    "description": "Bolsas de basura negras tamaño estándar. Resistentes, no se rompen.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "servilletas-100pz",
+    "name": "Servilletas 100pz",
+    "description": "Servilletas de papel blanco. Para servicio de mesa, desechables y económicas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "papel-de-cocina-2pz",
+    "name": "Papel de Cocina 2pz",
+    "description": "Rollo de papel absorbente para cocina. Para limpieza rápida y secado.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "guantes-de-latex-100pz",
+    "name": "Guantes de Látex Caja 100pz",
+    "description": "Guantes desechables de látex para manipulación de alimentos. Higiene profesional.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "verduras-congeladas-500g",
+    "name": "Verduras Congeladas 500g",
+    "description": "Mix de verduras: zanahoria, chícharo, elote y ejote. Listas en minutos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "papas-a-la-francesa-1kg",
+    "name": "Papas a la Francesa 1kg",
+    "description": "Papas pre-fritas congeladas. Para freidora, horno o air fryer.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "helado-vainilla-1l",
+    "name": "Helado Vainilla 1L",
+    "description": "Helado cremoso de vainilla. Para postres, batidos y flotantes.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "paletas-de-hielo-12pz",
+    "name": "Paletas de Hielo 12pz",
+    "description": "Paletas de hielo surtidas (fresa, uva, limón). Refrescantes para servicio y postre.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "filete-tilapia-congelado-1kg",
+    "name": "Filete de Tilapia Congelado 1kg",
+    "description": "Filete de tilapia IQF congelado individualmente. Descongela por pieza.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "camaron-congelado-1kg",
+    "name": "Camarón Congelado 1kg",
+    "description": "Camarón mediano IQF congelado. Listo para descongelar y cocinar.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "nuggets-de-pollo-1kg",
+    "name": "Nuggets de Pollo 1kg",
+    "description": "Nuggets de pechuga de pollo empanizados. Listos para freír u hornear.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "deditos-de-pescado-1kg",
+    "name": "Deditos de Pescado 1kg",
+    "description": "Deditos de pescado empanizados. Para freír u hornear. Rinden para menú infantil.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pan-brioche",
+    "name": "Pan Brioche",
+    "description": "Pan brioche suave con mantequilla.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-cheddar-rebanado",
+    "name": "Queso Cheddar Rebanado",
+    "description": "Rebanadas de queso cheddar americano.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "salchicha-jumbo",
+    "name": "Salchicha Jumbo",
+    "description": "Salchicha estilo Frankfurt jumbo para hot dogs.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pepinillos-encurtidos",
+    "name": "Pepinillos Encurtidos",
+    "description": "Pepinillos enteros encurtidos en salmuera.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chiles-jalapenos-encurtidos",
+    "name": "Chiles Jalapeños Encurtidos",
+    "description": "Jalapeños en escabeche tatemados.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "papas-congeladas",
+    "name": "Papas Congeladas",
+    "description": "Papas pre-fritas congeladas para freír.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "aceite-vegetal",
+    "name": "Aceite Vegetal",
+    "description": "Aceite vegetal para freír y cocinar.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "aros-de-cebolla",
+    "name": "Aros de Cebolla",
+    "description": "Aros de cebolla empanizados congelados.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "salsa-bbq",
+    "name": "Salsa BBQ",
+    "description": "Salsa barbacoa ahumada estilo Kansas City.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "frijoles-refritos",
+    "name": "Frijoles Refritos",
+    "description": "Frijoles refritos tradicionales listos para servir.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "huevo-fresco",
+    "name": "Huevo Fresco",
+    "description": "Huevo blanco fresco de gallina para cocina diaria.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "aderezo-ranch",
+    "name": "Aderezo Ranch",
+    "description": "Aderezo ranch cremoso para ensaladas y dips.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pierna-de-cerdo",
+    "name": "Pierna de Cerdo",
+    "description": "Pierna de cerdo fresca para carnitas y guisos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "achiote-en-pasta",
+    "name": "Achiote en Pasta",
+    "description": "Pasta de achiote concentrada para cochinita pibil.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chiles-secos-surtidos",
+    "name": "Chiles Secos Surtidos",
+    "description": "Chiles secos variados para moles y adobos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chile-guajillo",
+    "name": "Chile Guajillo",
+    "description": "Chile guajillo seco de sabor afrutado para adobos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "manteca-de-cerdo",
+    "name": "Manteca de Cerdo",
+    "description": "Manteca de cerdo pura para fritura tradicional.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "flor-de-calabaza",
+    "name": "Flor de Calabaza",
+    "description": "Flor de calabaza fresca para quesadillas y sopas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chile-chipotle",
+    "name": "Chile Chipotle",
+    "description": "Chipotles en adobo para salsas y guisos ahumados.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "alga-nori",
+    "name": "Alga Nori",
+    "description": "Hojas de alga nori tostada para sushi rolls.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "jengibre-encurtido",
+    "name": "Jengibre Encurtido",
+    "description": "Jengibre rosado encurtido para sushi (gari).",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "huesos-de-cerdo",
+    "name": "Huesos de Cerdo",
+    "description": "Huesos de cerdo para caldo de ramen tonkotsu.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "fideos-ramen",
+    "name": "Fideos Ramen",
+    "description": "Fideos para ramen estilo japonés, cocción rápida.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "carne-de-cerdo-molida",
+    "name": "Carne de Cerdo Molida",
+    "description": "Carne de cerdo molida para gyoza y dumplings.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "col-china",
+    "name": "Col China",
+    "description": "Col china (hakusai) para ramen, salteados y kimchi.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pasta-wonton",
+    "name": "Pasta Wonton",
+    "description": "Cuadros de pasta fina para wonton y dumplings.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pasta-de-tamarindo",
+    "name": "Pasta de Tamarindo",
+    "description": "Concentrado de tamarindo para salsas agridulces.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "salsa-de-anguila",
+    "name": "Salsa de Anguila",
+    "description": "Salsa dulce de anguila (unagi) para sushi glaze.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pure-de-tomate-enlatado",
+    "name": "Puré de Tomate Enlatado",
+    "description": "Puré de tomate italiano para salsas y bases.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-mozzarella",
+    "name": "Queso Mozzarella",
+    "description": "Queso mozzarella fresco para pizzas, ideal para fundir.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "albahaca-fresca",
+    "name": "Albahaca Fresca",
+    "description": "Albahaca fresca italiana de hoja grande para pesto y pizzas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "champinones-frescos",
+    "name": "Champiñones Frescos",
+    "description": "Champiñones frescos rebanados para pizzas y salteados.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pasta-fettuccine",
+    "name": "Pasta Fettuccine",
+    "description": "Pasta larga fettuccine de sémola de trigo.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-parmesano",
+    "name": "Queso Parmesano",
+    "description": "Queso parmesano añejo para rallar fresco.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "crema-para-batir",
+    "name": "Crema para Batir",
+    "description": "Crema para batir con 35% de grasa para salsas y repostería.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-gorgonzola",
+    "name": "Queso Gorgonzola",
+    "description": "Queso azul italiano gorgonzola DOP cremoso.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-provolone",
+    "name": "Queso Provolone",
+    "description": "Queso provolone semiduro para sándwiches y gratinados.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pasta-para-lasana",
+    "name": "Pasta para Lasaña",
+    "description": "Láminas de pasta para lasaña, precocción.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pure-de-jitomate",
+    "name": "Puré de Jitomate",
+    "description": "Puré de jitomate concentrado para salsas italianas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-mascarpone",
+    "name": "Queso Mascarpone",
+    "description": "Queso mascarpone cremoso para tiramisú y postres.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cafe-espresso",
+    "name": "Café Espresso",
+    "description": "Café espresso en grano tostado italiano.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cocoa-en-polvo",
+    "name": "Cocoa en Polvo",
+    "description": "Cocoa en polvo sin azúcar para repostería y moles.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "salsa-buffalo",
+    "name": "Salsa Buffalo",
+    "description": "Salsa picante estilo buffalo para alitas clásicas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-azul",
+    "name": "Queso Azul",
+    "description": "Queso azul para aderezo de alitas y ensaladas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pan-molido",
+    "name": "Pan Molido",
+    "description": "Pan molido fino para empanizar pollo y croquetas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "papas-cambray",
+    "name": "Papas Cambray",
+    "description": "Papas cambray gourmet para asar enteras.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "miel-de-abeja",
+    "name": "Miel de Abeja",
+    "description": "Miel de abeja 100% natural para aderezos y glaseados.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-asadero",
+    "name": "Queso Asadero",
+    "description": "Queso asadero para fundir en quesadillas y chiles rellenos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chile-mulato",
+    "name": "Chile Mulato",
+    "description": "Chile mulato seco para moles oscuros tradicionales.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chile-ancho",
+    "name": "Chile Ancho",
+    "description": "Chile ancho seco de sabor dulce y terroso para adobos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chile-pasilla",
+    "name": "Chile Pasilla",
+    "description": "Chile pasilla seco ahumado para moles y salsas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chocolate-de-mesa",
+    "name": "Chocolate de Mesa",
+    "description": "Chocolate de mesa para mole poblano y chocolate caliente.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "maiz-cacahuazintle",
+    "name": "Maíz Cacahuazintle",
+    "description": "Maíz cacahuazintle de grano grande para pozole.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-de-cabra",
+    "name": "Queso de Cabra",
+    "description": "Queso de cabra fresco para ensaladas y entradas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "masa-para-tamal",
+    "name": "Masa para Tamal",
+    "description": "Masa de maíz preparada para tamales.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "hoja-de-maiz",
+    "name": "Hoja de Maíz",
+    "description": "Hojas de maíz secas para tamales.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "caldo-de-pollo",
+    "name": "Caldo de Pollo",
+    "description": "Caldo de pollo concentrado para sopas y arroces.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "filete-de-pescado-blanco",
+    "name": "Filete de Pescado Blanco",
+    "description": "Filete de pescado blanco del día para ceviches y frituras.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "jugo-de-tomate",
+    "name": "Jugo de Tomate",
+    "description": "Jugo de tomate sazonado para coctelería y micheladas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "salsa-picante",
+    "name": "Salsa Picante",
+    "description": "Salsa picante mexicana para mariscos y botanas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "sal-de-grano",
+    "name": "Sal de Grano",
+    "description": "Sal de grano para terminar carnes asadas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "costillas-de-cerdo",
+    "name": "Costillas de Cerdo",
+    "description": "Costillas de cerdo frescas para asador y BBQ.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "azucar-mascabado",
+    "name": "Azúcar Mascabado",
+    "description": "Azúcar mascabado sin refinar para rubs y adobos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cebolla-en-polvo",
+    "name": "Cebolla en Polvo",
+    "description": "Cebolla en polvo para sazonadores y rubs.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "suadero-de-res",
+    "name": "Suadero de Res",
+    "description": "Suadero de res para tacos de plancha.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "salsa-verde",
+    "name": "Salsa Verde",
+    "description": "Salsa verde mexicana de tomate y chile serrano.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "harina-para-hot-cakes",
+    "name": "Harina para Hot Cakes",
+    "description": "Mezcla preparada para hot cakes esponjosos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "miel-de-maple",
+    "name": "Miel de Maple",
+    "description": "Miel de maple pura para hotcakes, waffles y crepas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cafe-en-grano",
+    "name": "Café en Grano",
+    "description": "Café en grano de altura para espresso y americano.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "atun-fresco",
+    "name": "Atún Fresco",
+    "description": "Atún fresco en lomo para poke bowls y tataki.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pan-para-crutones",
+    "name": "Pan para Crutones",
+    "description": "Cubos de pan sazonado para crutones de ensalada César.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "aceituna-kalamata",
+    "name": "Aceituna Kalamata",
+    "description": "Aceitunas kalamata griegas para ensaladas mediterráneas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-feta",
+    "name": "Queso Feta",
+    "description": "Queso feta griego en salmuera para ensaladas frescas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "tortilla-integral",
+    "name": "Tortilla Integral",
+    "description": "Tortillas de harina integral para wraps saludables.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "yogur-griego",
+    "name": "Yogur Griego",
+    "description": "Yogur griego natural sin azúcar para bowls y aderezos.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chispas-de-chocolate",
+    "name": "Chispas de Chocolate",
+    "description": "Chispas de chocolate semiamargo para galletas y repostería.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "yemas-de-huevo",
+    "name": "Yemas de Huevo",
+    "description": "Yemas de huevo pasteurizadas para cremas y repostería.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pan-pita",
+    "name": "Pan Pita",
+    "description": "Pan pita estilo árabe para shawarma y falafel.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "eneldo-fresco",
+    "name": "Eneldo Fresco",
+    "description": "Eneldo fresco para tzatziki y cocina griega.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pasta-filo",
+    "name": "Pasta Filo",
+    "description": "Hojas de pasta filo para baklava y pasteles.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "harina-pan",
+    "name": "Harina PAN",
+    "description": "Harina de maíz precocida para arepas auténticas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "maiz-tierno",
+    "name": "Maíz Tierno",
+    "description": "Maíz tierno en grano para cachapas y arepas dulces.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-de-mano",
+    "name": "Queso de Mano",
+    "description": "Queso blanco venezolano de mano para arepas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "queso-blanco",
+    "name": "Queso Blanco",
+    "description": "Queso blanco duro para rallar, estilo llanero.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "frijoles-rojos",
+    "name": "Frijoles Rojos",
+    "description": "Frijoles rojos para pabellón criollo y sopas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cerveza-clara",
+    "name": "Cerveza Clara",
+    "description": "Cerveza clara tipo lager para micheladas y servicio.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chile-en-polvo",
+    "name": "Chile en Polvo",
+    "description": "Chile en polvo con limón para botanas y micheladas.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "jalapenos-en-escabeche",
+    "name": "Jalapeños en Escabeche",
+    "description": "Jalapeños en escabeche para botanear.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "tequila-blanco",
+    "name": "Tequila Blanco",
+    "description": "Tequila blanco joven para coctelería y barra.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "licor-de-naranja",
+    "name": "Licor de Naranja",
+    "description": "Licor de naranja triple sec para margaritas y coctelería.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "ron-blanco",
+    "name": "Ron Blanco",
+    "description": "Ron blanco para mojitos, cuba libre y coctelería.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "servilleta-mesa-economica-caja",
+    "name": "Servilleta de mesa económica (caja institucional)",
+    "description": "Caja institucional. Cotizar: piezas por caja y medidas. Ref. 1 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "contenedor-llevar-una-division-caja",
+    "name": "Contenedor para llevar de una división (caja)",
+    "description": "Caja. Cotizar: material, capacidad y tipo de cierre. Ref. 2 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "bolsa-basura-grande-uso-rudo",
+    "name": "Bolsa de basura grande uso rudo (paquete)",
+    "description": "Paquete. Cotizar: medida y espesor (calibre). Ref. 3 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "papel-aluminio-alimentario-rollo",
+    "name": "Papel aluminio alimentario (rollo)",
+    "description": "Rollo. Cotizar: ancho, longitud y espesor. Ref. 5 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "vaso-caliente-12oz-caja",
+    "name": "Vaso caliente de 12 oz (caja)",
+    "description": "Caja. Cotizar: material y diámetro. Par con tapa vaso-caliente-12oz. Ref. 6 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "tapa-vaso-caliente-12oz-caja",
+    "name": "Tapa para vaso caliente de 12 oz (caja)",
+    "description": "Caja. Compatibilidad comprobada con vaso-caliente-12oz-caja. Ref. 7 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "bolsa-kraft-mediana-llevar",
+    "name": "Bolsa kraft mediana para llevar (paquete)",
+    "description": "Paquete. Cotizar: dimensiones y resistencia. Ref. 8 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "papel-envolver-burritos",
+    "name": "Papel alimentario para envolver burritos (paquete)",
+    "description": "Paquete. Cotizar: medida y resistencia a grasa. Ref. 9 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "recipiente-salsa-2oz-caja",
+    "name": "Recipiente para salsa de 2 oz (caja)",
+    "description": "Caja. Cotizar: material y unidades. Par con tapa-recipiente-salsa-2oz. Ref. 12 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "tapa-recipiente-salsa-2oz-caja",
+    "name": "Tapa para recipiente de salsa de 2 oz (caja)",
+    "description": "Caja. Compatibilidad comprobada con recipiente-salsa-2oz-caja. Ref. 13 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "toalla-papel-manos-caja",
+    "name": "Toalla de papel para manos (caja)",
+    "description": "Caja. Cotizar: formato compatible con dispensador. Ref. 14 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "vaso-frio-16oz-caja",
+    "name": "Vaso frío de 16 oz (caja)",
+    "description": "Caja. Cotizar: material y diámetro. Par con tapa-vaso-frio-16oz. Ref. 15 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "tapa-vaso-frio-16oz-caja",
+    "name": "Tapa para vaso frío de 16 oz (caja)",
+    "description": "Caja. Compatibilidad comprobada con vaso-frio-16oz-caja. Ref. 16 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "contenedor-llevar-tres-divisiones-caja",
+    "name": "Contenedor para llevar de tres divisiones (caja)",
+    "description": "Caja. Cotizar: material, capacidad y tipo de cierre. Ref. 19 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pelicula-adherente-alimentaria-rollo",
+    "name": "Película adherente alimentaria (rollo)",
+    "description": "Rollo. Cotizar: ancho y longitud. Ref. 21 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "papel-higienico-institucional-caja",
+    "name": "Papel higiénico institucional (caja)",
+    "description": "Caja. Cotizar: metros por rollo y compatibilidad con dispensador. Ref. 23 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "tenedor-desechable-caja",
+    "name": "Tenedor desechable (caja)",
+    "description": "Caja. Cotizar: material y piezas. Ref. 30 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cuchara-desechable-caja",
+    "name": "Cuchara desechable (caja)",
+    "description": "Caja. Cotizar: material y piezas. Ref. 31 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "portavasos-carton-paquete",
+    "name": "Portavasos de cartón (paquete)",
+    "description": "Paquete. Cotizar: capacidad y compatibilidad con vasos de 12/16 oz. Ref. 46 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "lavatrastes-liquido-garrafa",
+    "name": "Lavatrastes líquido (garrafa)",
+    "description": "Garrafa. Cotizar: volumen y dilución. Ref. 4 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "desengrasante-cocina-garrafa",
+    "name": "Desengrasante de cocina (garrafa)",
+    "description": "Garrafa. Cotizar: superficies admitidas y dilución. Ref. 11 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "jabon-liquido-manos-garrafa",
+    "name": "Jabón líquido para manos (garrafa)",
+    "description": "Garrafa. Cotizar: volumen y compatibilidad con dispensador. Ref. 20 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "limpiador-pisos-garrafa",
+    "name": "Limpiador de pisos (garrafa)",
+    "description": "Garrafa. Cotizar: volumen y dilución. Ref. 22 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "fibra-lavado-utensilios-paquete",
+    "name": "Fibra para lavado de utensilios (paquete)",
+    "description": "Paquete. Cotizar: abrasividad y superficies admitidas. Ref. 27 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "aceite-vegetal-institucional",
+    "name": "Aceite vegetal para cocinar (envase institucional)",
+    "description": "Envase institucional. Cotizar: tipo de aceite y litros. Ref. 10 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "azucar-estandar-saco",
+    "name": "Azúcar estándar (saco o paquete)",
+    "description": "Saco o paquete. Cotizar: kilogramos. Ref. 18 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "frijol-pinto-seco-saco",
+    "name": "Frijol pinto seco (saco)",
+    "description": "Saco. Cotizar: kilogramos y calidad. Ref. 24 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "arroz-blanco-saco",
+    "name": "Arroz blanco (saco)",
+    "description": "Saco. Cotizar: kilogramos y tipo de grano. Ref. 25 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "consome-pollo-bote-institucional",
+    "name": "Consomé o sazonador de pollo (bote institucional)",
+    "description": "Bote institucional. Cotizar: peso y rendimiento. Ref. 36 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pure-tomate-institucional",
+    "name": "Puré de tomate (envase institucional)",
+    "description": "Envase institucional. Cotizar: peso y composición. Ref. 37 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cafe-grano-espresso-1kg",
+    "name": "Café en grano para espresso (bolsa 1 kg)",
+    "description": "Bolsa de 1 kg. Cotizar: perfil de tueste y fecha de tueste. Ref. 17 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "leche-entera-uht-caja",
+    "name": "Leche entera UHT (caja)",
+    "description": "Caja. Cotizar: unidades, litros por unidad y caducidad. Ref. 34 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "azucar-sobres-caja",
+    "name": "Azúcar en sobres (caja)",
+    "description": "Caja. Cotizar: piezas y gramos por sobre. Ref. 47 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chocolate-polvo-bebidas-bolsa",
+    "name": "Chocolate en polvo para bebidas (bolsa institucional)",
+    "description": "Bolsa institucional. Cotizar: peso y rendimiento. Ref. 48 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "jarabe-vainilla-bebidas-botella",
+    "name": "Jarabe de vainilla para bebidas (botella)",
+    "description": "Botella. Cotizar: volumen y rendimiento. Ref. 49 del plan de arranque.",
+    "unit": "",
+    "category": null,
+    "currentImage": null
+  }
+]

@@ -199,6 +199,9 @@ async function main() {
     const hidden = JSON.parse(
       readFileSync(join(ROOT, "scripts/product-images/targets-hidden.json"), "utf8")
     )
+    const hiddenAll = existsSync(join(ROOT, "scripts/product-images/targets-hidden-all.json"))
+      ? JSON.parse(readFileSync(join(ROOT, "scripts/product-images/targets-hidden-all.json"), "utf8"))
+      : []
     const weber = JSON.parse(
       readFileSync(join(ROOT, "scripts/product-images/manifest.json"), "utf8")
     )
@@ -207,9 +210,10 @@ async function main() {
     for (const slug of extra) {
       if (items.some((i) => i.slug === slug)) continue
       const h = hidden.find((t) => t.slug === slug)
+      const ha = hiddenAll.find((t) => t.slug === slug)
       const w = WEBER_ITEMS.find((t) => t.slug === slug)
       const dm = DISTMAR_ITEMS.find((t) => t.slug === slug)
-      const base = h || w || dm
+      const base = h || ha || w || dm
       if (!base) {
         console.warn(`  ⚠ --extra: ${slug} no está en targets-hidden ni en las listas de proveedores`)
         continue
@@ -217,7 +221,7 @@ async function main() {
       items.push({
         slug,
         name: base.name,
-        categoryName: base.category === 4 ? "Carnes, Aves y Pescados" : base.category === 9 ? "Congelados" : base.category === 2 ? "Abarrotes" : "Frutas y Verduras",
+        categoryName: base.category === 4 ? "Carnes, Aves y Pescados" : base.category === 9 ? "Congelados" : base.category === 2 ? "Abarrotes" : base.categoryName || "Abarrotes",
         imageUrl: weber[slug] || null,
         imageUrlFallback: true,
       })

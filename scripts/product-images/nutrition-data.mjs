@@ -31,6 +31,14 @@ const B = {
   zinc: ["Fuente de zinc", "escudo"],
   hidrata: ["Alto contenido de agua", "gota"],
   saciedad: ["Ayuda a la saciedad", "musculo"],
+  usoDesinfeccion: ["Desinfección profunda", "escudo"],
+  usoLimpieza: ["Limpieza efectiva", "gota"],
+  usoCocina: ["Esencial en cocina", "hoja"],
+  usoRinde: ["Rendimiento alto", "rayo"],
+  usoAlimentos: ["Conserva alimentos", "hoja"],
+  usoPractico: ["Práctico y desechable", "escudo"],
+  usoResistente: ["Resistente y durable", "escudo"],
+  usoHigiene: ["Higiene garantizada", "gota"],
 }
 
 const b = (...keys) => keys.map((k) => B[k])
@@ -78,10 +86,63 @@ const TIPOS = {
 
   // Lácteos
   quesoCrema: [250, 6, 24, 3, b("calcio", "proteinas", "huesos", "energia")],
+
+  // Bebidas y otros
+  refresco: [42, 0, 0, 10.6, b("hidrata", "energia", "bajoCal", "digestion")],
+  cerveza: [43, 0.5, 0, 3.6, b("hidrata", "energia", "bajoCal", "digestion")],
+  agua: [0, 0, 0, 0, b("hidrata", "bajoCal", "digestion", "energia")],
+  jugo: [45, 0.6, 0.1, 10.5, b("vitaminaC", "hidrata", "energia", "antioxidantes")],
+  cafe: [2, 0.3, 0, 0, b("energia", "antioxidantes", "digestion", "b12")],
+  pan: [265, 9, 3.2, 49, b("energia", "fibra", "saciedad", "hierro")],
+  tortilla: [218, 5.7, 2.8, 44, b("energia", "calcio", "fibra", "saciedad")],
+  queso: [350, 24, 27, 2, b("calcio", "proteinas", "huesos", "energia")],
+  leche: [60, 3.2, 3.3, 4.8, b("calcio", "huesos", "proteinas", "b12")],
+  huevo: [143, 12.6, 9.5, 0.7, b("proteinas", "b12", "ojos", "saciedad")],
+  yogurt: [61, 3.5, 3.3, 4.7, b("digestion", "calcio", "proteinas", "huesos")],
+  mantequilla: [717, 0.9, 81, 0.1, b("energia", "ojos", "huesos", "saciedad")],
+  salsa: [60, 1.5, 1, 11, b("bajoCal", "antioxidantes", "vitaminaC", "energia")],
+  vinagre: [18, 0, 0, 0.9, b("bajoCal", "digestion", "energia", "antioxidantes")],
+  chocolate: [480, 5, 22, 60, b("energia", "antioxidantes", "hierro", "saciedad")],
+  chocolateMesa: [480, 5, 22, 60, b("energia", "antioxidantes", "hierro", "saciedad")],
+  miel: [304, 0.3, 0, 82, b("energia", "antioxidantes", "inmune", "digestion")],
+  helado: [207, 3.5, 11, 24, b("calcio", "energia", "huesos", "saciedad")],
+  botana: [520, 7, 30, 52, b("energia", "saciedad", "proteinas", "fibra")],
+  limpiezaProd: [0, 0, 0, 0, b("usoDesinfeccion", "usoLimpieza", "usoRinde", "usoHigiene")],
+  empaqueProd: [0, 0, 0, 0, b("usoAlimentos", "usoPractico", "usoResistente", "usoCocina")],
 }
 
 // ── Reglas por patrón de slug (la primera que coincide gana) ────────────────
 const REGLAS = [
+  // Limpieza y empaques (no comestibles: beneficios de uso)
+  [/^(cloro|jabon|detergente|desengrasante|limpiador|limpiavidrios|fibras|bolsas-de-basura|guantes|lavatrastes|fibra-lavado|toalla-papel|papel-higienico)/, TIPOS.limpiezaProd],
+  [/^(servilleta|contenedor|bolsa-basura|bolsa-kraft|papel-aluminio|papel-envolver|vaso-|tapa-|recipiente-salsa|pelicula|tenedor|cuchara|portavasos|servilletas|papel-de-cocina)/, TIPOS.empaqueProd],
+  // Bebidas
+  [/coca-cola|sprite|fanta|sidral|refresco/, TIPOS.refresco],
+  [/cerveza|tequila|ron-blanco|licor/, TIPOS.cerveza],
+  [/agua-bonafont|agua-mineral/, TIPOS.agua],
+  [/jugo|concentrado/, TIPOS.jugo],
+  [/cafe/, TIPOS.cafe],
+  // Pan y tortillas
+  [/pan-|pan$|masa-para-tamal|hoja-de-maiz/, TIPOS.pan],
+  [/tortilla/, TIPOS.tortilla],
+  // Lácteos
+  [/queso-crema/, TIPOS.quesoCrema],
+  [/queso/, TIPOS.queso],
+  [/leche|media-crema|crema-acida|crema-para-batir/, TIPOS.leche],
+  [/yogurt|yogur/, TIPOS.yogurt],
+  [/mantequilla/, TIPOS.mantequilla],
+  [/huevo/, TIPOS.huevo],
+  // Salsas y condimentos
+  [/salsa|catsup|mayonesa|mostaza|aderezo|mole/, TIPOS.salsa],
+  [/vinagre/, TIPOS.vinagre],
+  // Botanas y dulces
+  [/sabritas|totopos|galletas|chispas/, TIPOS.botana],
+  [/chocolate/, TIPOS.chocolate],
+  [/miel/, TIPOS.miel],
+  [/helado|paletas/, TIPOS.helado],
+  // Aceites
+  [/aceite|manteca/, TIPOS.oleaginosa],
+
   // Camarones (todas las tallas)
   [/^camaron/, TIPOS.camaron],
   // Pescados
