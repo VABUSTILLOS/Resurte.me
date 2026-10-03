@@ -124,123 +124,131 @@ export const ProductCard = memo(function ProductCard({
   }
 
   return (
-    <div className="product-card group relative flex flex-col h-full" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 250px" }}>
-      <Link
-        href={`/${citySlug}/producto/${product.slug}`}
-        className="flex-1 flex flex-col relative bg-white rounded-xl border border-[#e0dbd2] overflow-hidden hover:shadow-[0_2px_20px_rgba(0,0,0,0.07)] focus-visible:ring-2 focus-visible:ring-[#0E7A0E] focus-visible:ring-offset-1 transition-all duration-300 ease-out hover:-translate-y-0.5"
-      >
-        {/* Product image — Erewhon-style image swap on hover */}
-        <div className={cn("aspect-[4/3] sm:aspect-[3/2] lg:aspect-[5/3] bg-[#faf8f5] relative overflow-hidden", secondaryImage && "product-card-img-swap")}>
-          {product.image_url ? (
-            <>
-              <Image
-                src={product.image_url}
-                alt={product.name}
-                fill
-                priority={priority}
-                placeholder="blur"
-                blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23faf8f5' width='400' height='300'/%3E%3C/svg%3E"
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                className="object-contain p-1.5 sm:p-2 product-card-img-primary"
-              />
-              {secondaryImage && (
+    <div className="product-card group relative flex flex-col h-full">
+      {/* `content-visibility: auto` implica contención de pintura: recorta todo
+          desborde de su caja. Por eso vive en este envoltorio (imagen + ficha,
+          que es lo caro de renderizar) y NO en `.product-card`: el botón de
+          acción flota medio card por debajo del borde (`sm:-bottom-2`) y si
+          queda dentro del contenedor con contención se ve cortado. No mover
+          este estilo al div de arriba. */}
+      <div className="flex-1 flex flex-col" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 250px" }}>
+        <Link
+          href={`/${citySlug}/producto/${product.slug}`}
+          className="flex-1 flex flex-col relative bg-white rounded-xl border border-[#e0dbd2] overflow-hidden hover:shadow-[0_2px_20px_rgba(0,0,0,0.07)] focus-visible:ring-2 focus-visible:ring-[#0E7A0E] focus-visible:ring-offset-1 transition-all duration-300 ease-out hover:-translate-y-0.5"
+        >
+          {/* Product image — Erewhon-style image swap on hover */}
+          <div className={cn("aspect-[4/3] sm:aspect-[3/2] lg:aspect-[5/3] bg-[#faf8f5] relative overflow-hidden", secondaryImage && "product-card-img-swap")}>
+            {product.image_url ? (
+              <>
                 <Image
-                  src={secondaryImage}
-                  alt={`${product.name} - vista 2`}
+                  src={product.image_url}
+                  alt={product.name}
                   fill
-                  loading="lazy"
+                  priority={priority}
                   placeholder="blur"
                   blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23faf8f5' width='400' height='300'/%3E%3C/svg%3E"
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                  className="object-contain p-1.5 sm:p-2 product-card-img-secondary"
+                  className="object-contain p-1.5 sm:p-2 product-card-img-primary"
                 />
-              )}
-            </>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">
-              🛒
-            </div>
-          )}
+                {secondaryImage && (
+                  <Image
+                    src={secondaryImage}
+                    alt={`${product.name} - vista 2`}
+                    fill
+                    loading="lazy"
+                    placeholder="blur"
+                    blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23faf8f5' width='400' height='300'/%3E%3C/svg%3E"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="object-contain p-1.5 sm:p-2 product-card-img-secondary"
+                  />
+                )}
+              </>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">
+                🛒
+              </div>
+            )}
 
-          {/* Multi-image indicator */}
-          {product.images && product.images.length > 1 && (
-            <div className="absolute bottom-2 right-2 bg-black/55 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full backdrop-blur-sm z-10">
-              +{product.images.length - 1}
-            </div>
-          )}
+            {/* Multi-image indicator */}
+            {product.images && product.images.length > 1 && (
+              <div className="absolute bottom-2 right-2 bg-black/55 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full backdrop-blur-sm z-10">
+                +{product.images.length - 1}
+              </div>
+            )}
 
-          {/* Discount badge — Erewhon-style pill */}
-          {hasDiscount && (
-            <div className="absolute top-2 left-2 bg-[#de3534] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10" aria-label={`${discountPercent}% de descuento`}>
-              -{discountPercent}%
-            </div>
-          )}
-
-          {/* Low stock badge */}
-          {lowStock && !hasDiscount && (
-            <div className="absolute top-2 left-2 bg-amber-700 text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10" role="status">
-              Pocas unidades
-            </div>
-          )}
-
-          {/* Out of stock overlay */}
-          {outOfStock && (
-            <div className="absolute inset-0 bg-white/75 flex items-center justify-center backdrop-blur-[1px] z-10" role="alert">
-              <span className="text-sm font-semibold text-[#6b6b6b] bg-white px-4 py-1.5 rounded-full shadow-sm">
-                Agotado
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Product info */}
-        <div className="p-2.5 pb-1.5 sm:p-3 sm:pb-2 flex-1 flex flex-col">
-          {product.unit && (
-            <p className="text-[10px] sm:text-[11px] text-[#0E7A0E] font-medium mb-0.5 sm:mb-1 uppercase tracking-wide">
-              {product.unit}
-            </p>
-          )}
-          {product.brand && (
-            <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] mb-0.5">{product.brand}</p>
-          )}
-          {/* Scanning-friendly tagline — last sentence of description as a use-case hint */}
-          <p className="text-[11px] text-[var(--text-secondary)] mb-0.5 line-clamp-1 italic">
-            {tagline ?? "Abasto directo, sin mínimo de compra"}
-          </p>
-          <h3 className="text-[13px] sm:text-sm text-[#1a1a1a] font-medium line-clamp-2 leading-tight group-hover:text-[#0E7A0E] transition-colors duration-200">
-            {product.name}
-          </h3>
-
-          <div className="flex items-center gap-2 mt-1.5 sm:mt-2">
-            <span className="text-sm sm:text-base font-bold text-[#1a1a1a]">
-              ${price.toFixed(2)}
-            </span>
+            {/* Discount badge — Erewhon-style pill */}
             {hasDiscount && (
-              <span className="text-xs sm:text-sm text-[var(--text-secondary)] line-through">
-                ${product.price.toFixed(2)}
-              </span>
+              <div className="absolute top-2 left-2 bg-[#de3534] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10" aria-label={`${discountPercent}% de descuento`}>
+                -{discountPercent}%
+              </div>
+            )}
+
+            {/* Low stock badge */}
+            {lowStock && !hasDiscount && (
+              <div className="absolute top-2 left-2 bg-amber-700 text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10" role="status">
+                Pocas unidades
+              </div>
+            )}
+
+            {/* Out of stock overlay */}
+            {outOfStock && (
+              <div className="absolute inset-0 bg-white/75 flex items-center justify-center backdrop-blur-[1px] z-10" role="alert">
+                <span className="text-sm font-semibold text-[#6b6b6b] bg-white px-4 py-1.5 rounded-full shadow-sm">
+                  Agotado
+                </span>
+              </div>
             )}
           </div>
 
-          {hasDiscount && product.sale_price != null && (
-            <p className="text-[10px] sm:text-[11px] text-[#0E7A0E] font-medium mt-0.5">
-              Ahorras ${(product.price - product.sale_price).toFixed(2)}
+          {/* Product info */}
+          <div className="p-2.5 pb-1.5 sm:p-3 sm:pb-2 flex-1 flex flex-col">
+            {product.unit && (
+              <p className="text-[10px] sm:text-[11px] text-[#0E7A0E] font-medium mb-0.5 sm:mb-1 uppercase tracking-wide">
+                {product.unit}
+              </p>
+            )}
+            {product.brand && (
+              <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] mb-0.5">{product.brand}</p>
+            )}
+            {/* Scanning-friendly tagline — last sentence of description as a use-case hint */}
+            <p className="text-[11px] text-[var(--text-secondary)] mb-0.5 line-clamp-1 italic">
+              {tagline ?? "Abasto directo, sin mínimo de compra"}
             </p>
-          )}
+            <h3 className="text-[13px] sm:text-sm text-[#1a1a1a] font-medium line-clamp-2 leading-tight group-hover:text-[#0E7A0E] transition-colors duration-200">
+              {product.name}
+            </h3>
 
-          {/* Precio por unidad real cuando la presentación es comparable;
-              si no, se mantiene la pista genérica de mayoreo. */}
-          {perUnit ? (
-            <p className="text-[10px] sm:text-[11px] text-[#0E7A0E] font-medium mt-0.5">
-              {formatUnitPrice(perUnit)}
-            </p>
-          ) : product.unit && (["por kilo", "por pieza", "charola"].some(u => product.unit?.includes(u))) ? (
-            <p className="text-[10px] text-[#0E7A0E] font-medium mt-0.5">
-              💰 Precio de mayoreo — compra más y ahorra
-            </p>
-          ) : null}
-        </div>
-      </Link>
+            <div className="flex items-center gap-2 mt-1.5 sm:mt-2">
+              <span className="text-sm sm:text-base font-bold text-[#1a1a1a]">
+                ${price.toFixed(2)}
+              </span>
+              {hasDiscount && (
+                <span className="text-xs sm:text-sm text-[var(--text-secondary)] line-through">
+                  ${product.price.toFixed(2)}
+                </span>
+              )}
+            </div>
+
+            {hasDiscount && product.sale_price != null && (
+              <p className="text-[10px] sm:text-[11px] text-[#0E7A0E] font-medium mt-0.5">
+                Ahorras ${(product.price - product.sale_price).toFixed(2)}
+              </p>
+            )}
+
+            {/* Precio por unidad real cuando la presentación es comparable;
+                si no, se mantiene la pista genérica de mayoreo. */}
+            {perUnit ? (
+              <p className="text-[10px] sm:text-[11px] text-[#0E7A0E] font-medium mt-0.5">
+                {formatUnitPrice(perUnit)}
+              </p>
+            ) : product.unit && (["por kilo", "por pieza", "charola"].some(u => product.unit?.includes(u))) ? (
+              <p className="text-[10px] text-[#0E7A0E] font-medium mt-0.5">
+                💰 Precio de mayoreo — compra más y ahorra
+              </p>
+            ) : null}
+          </div>
+        </Link>
+      </div>
 
       {/* Favorito (lista de resurtido) — fuera del Link para no anidar
           interactivos; posicionado sobre la esquina de la imagen. */}

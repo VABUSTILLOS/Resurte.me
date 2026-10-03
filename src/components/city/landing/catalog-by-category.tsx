@@ -44,7 +44,11 @@ export function CatalogByCategory({
             const remaining = total - preview.length
 
             return (
-              <div key={cat.id} className="mb-10 sm:mb-14 last:mb-0 product-grid-section">
+              /* mb-5/9 + el padding-bottom de `.product-grid-section` (20px)
+                 conservan la separación de 40/56px entre categorías; ese
+                 padding es lo que deja ver el botón flotante de la última
+                 fila, que se desborda por debajo de la card. */
+              <div key={cat.id} className="mb-5 sm:mb-9 last:mb-0 product-grid-section">
                 {/* Category header with "Ver Todo" */}
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">

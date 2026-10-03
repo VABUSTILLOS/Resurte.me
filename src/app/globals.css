@@ -511,6 +511,14 @@ label[for] {
 .product-grid-section {
   content-visibility: auto;
   contain-intrinsic-size: auto 500px;
+  /* La contención de pintura recorta al padding box: el botón de acción de la
+     última fila flota por debajo de la card (8px ya asentado, hasta 16px
+     mientras entra con el `translateY(8px)` del reveal) y quedaba cortado por
+     el borde inferior de la sección. Este colchón lo deja dentro del área que
+     sí se pinta; el margen entre categorías se descuenta en
+     `catalog-by-category.tsx` (mb-5 sm:mb-9) para conservar la separación
+     visible de 40/56px. */
+  padding-bottom: 1.25rem;
 }
 
 /* ============================================

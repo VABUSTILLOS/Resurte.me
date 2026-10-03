@@ -9,7 +9,18 @@
 
 ## Invariantes
 - `ProductCard` está envuelta en `React.memo` y usa `content-visibility: auto` — no
-  quitar; el catálogo renderiza cientos de cards.
+  quitar; el catálogo renderiza cientos de cards. Vive en el **envoltorio interno**
+  (imagen + ficha), no en `.product-card`: `content-visibility: auto` implica
+  contención de pintura, que recorta al padding box, y el botón de acción flota 8px
+  por debajo del borde inferior de la card (`sm:-bottom-2`), así que dentro de un
+  contenedor con contención aparece cortado por abajo. Por lo mismo,
+  `.product-grid-section` (globals.css) lleva `padding-bottom: 1.25rem` y su margen
+  bajó a `mb-5 sm:mb-9` —el colchón deja el desborde de la última fila dentro del
+  área que sí se pinta, y el margen recortado conserva la separación visible de
+  40/56px entre categorías—. Mover cualquiera de los dos reintroduce el recorte.
+  Medido con escaneo de píxeles de la franja de desborde a 1280px y 375px
+  (`/chihuahua`, `/catalogo/chihuahua`, `/chihuahua/buscar`): el botón se pinta
+  hasta su última fila en la primera, la de en medio y la última card.
 - La acción del card tiene 3 estados mutuamente excluyentes: **stepper − N +** (ya
   en carrito, siempre visible), **quick-add** (disponible), **Avísame/spacer**
   (agotado). Los tres ocupan el mismo slot para no desacomodar el grid 2-col.
