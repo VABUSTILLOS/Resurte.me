@@ -1,0 +1,186 @@
+[
+  {
+    "slug": "chile-chiltepin",
+    "name": "Chile Chiltepín",
+    "description": "Chile chiltepín seco, muy picante, para salsas y molcajete. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "ciruelo-rojo",
+    "name": "Ciruelo Rojo",
+    "description": "Ciruelo rojo, dulce y jugoso, para postres, ensaladas y aguas frescas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "ciruelo-negro",
+    "name": "Ciruelo Negro",
+    "description": "Ciruelo negro de pulpa dulce y firme, para postres y ensaladas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "durazno",
+    "name": "Durazno",
+    "description": "Durazno de hueso, dulce y jugoso, para postres, ensaladas y aguas frescas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "nuez-de-castilla",
+    "name": "Nuez de Castilla",
+    "description": "Nuez de castilla entera, para repostería, botanas y ensaladas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chile-cascabel",
+    "name": "Chile Cascabel",
+    "description": "Chile cascabel seco, de picor bajo y notas tostadas, para salsas y adobos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "jitomate-bola",
+    "name": "Jitomate Bola",
+    "description": "Jitomate bola fresco, firme y jugoso, para salsas, guisos y ensaladas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "camote-amarillo",
+    "name": "Camote Amarillo",
+    "description": "Camote amarillo de pulpa dulce, ideal para hornear, freír o puré. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "uvas-rojas",
+    "name": "Uvas Rojas",
+    "description": "Uva roja sin semilla, dulce y firme, para mesa, ensaladas y tablas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "uvas-verdes",
+    "name": "Uvas Verdes",
+    "description": "Uva verde sin semilla, dulce y crujiente, para mesa y ensaladas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "mandarina",
+    "name": "Mandarina",
+    "description": "Mandarina dulce y fácil de pelar, para mesa, jugos y postres. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pina-miel",
+    "name": "Piña Miel",
+    "description": "Piña miel dulce y jugosa, para mesa, jugos y aguas frescas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pera",
+    "name": "Pera",
+    "description": "Pera dulce y firme, para mesa, postres y ensaladas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "chile-serrano",
+    "name": "Chile Serrano",
+    "description": "Chile serrano fresco y picante, para salsas, guacamole y guisos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "guayaba",
+    "name": "Guayaba",
+    "description": "Guayaba dulce y aromática, para aguas frescas, postres y mermeladas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "manzana-roja",
+    "name": "Manzana Roja",
+    "description": "Manzana roja dulce y crujiente, para mesa, postres y ensaladas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "apio",
+    "name": "Apio",
+    "description": "Apio fresco de tallo crujiente, para caldos, ensaladas y snacks. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "jitomate-saladet",
+    "name": "Jitomate Saladet",
+    "description": "Jitomate saladet (roma), firme y carnoso, para salsas y guisos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "cebolla-blanca",
+    "name": "Cebolla Blanca",
+    "description": "Cebolla blanca de bulbo firme, para guisos, salsas y curtidos. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "nopal",
+    "name": "Nopal",
+    "description": "Nopal en penca limpio, para asar, guisar o ensaladas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "germinado-de-soya",
+    "name": "Germinado de Soya",
+    "description": "Germinado de soya fresco y crujiente, para ensaladas, wok y garnituras. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "pimiento-morron",
+    "name": "Pimiento Morrón",
+    "description": "Pimiento morrón verde, dulce y carnoso, para rajas, guisos y ensaladas. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  },
+  {
+    "slug": "corazon-puerco",
+    "name": "Corazón de puerco",
+    "description": "Corazón de cerdo, para guisos y menudería. Precio por kilo.",
+    "unit": "por kilo",
+    "category": null,
+    "currentImage": null
+  }
+]

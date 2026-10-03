@@ -116,6 +116,7 @@ const REGLAS = [
   [/manzana|pera/, [55, 0.3, 0.2, 14, b("fibra", "digestion", "bajoCal", "antioxidantes")]],
   [/kiwi/, [61, 1.1, 0.5, 15, b("vitaminaC", "inmune", "fibra", "digestion")]],
   [/tuna-fruta/, [41, 0.7, 0.5, 10, b("fibra", "antioxidantes", "bajoCal", "hidrata")]],
+  [/ciruelo-rojo|ciruelo-negro/, [46, 0.7, 0.3, 11.5, b("vitaminaC", "fibra", "bajoCal", "antioxidantes")]],
   [/ciruela-pasa|pasas/, [290, 2.5, 0.5, 72, b("fibra", "digestion", "energia", "hierro")]],
   // Verduras concretas
   [/acelga|espinaca|kale|lechuga|ensalada/, TIPOS.verduraHoja],
@@ -158,6 +159,11 @@ const REGLAS = [
   [/pepita|linaza|chia/, TIPOS.semilla],
   [/azucar|piloncillo/, TIPOS.azucar],
   [/sal-de-mar/, [0, 0, 0, 0, b("digestion", "hidrata", "energia", "saciedad")]],
+  // Mascotas (ocultos por default)
+  [/alimento-perro/, [350, 24, 12, 42, b("proteinas", "huesos", "energia", "saciedad")]],
+  [/premio-hueso/, [380, 15, 10, 55, b("proteinas", "energia", "huesos", "saciedad")]],
+  // Corazón de puerco (oculto: OpenAI rechazó la foto)
+  [/corazon-puerco/, [110, 17, 4, 0.5, b("proteinas", "hierro", "b12", "zinc")]],
   [/canela|comino|curcuma|oregano|pimienta|pimenton|clavo|anis|achiote|chile-colorin|chile-de-la-tierra|chile-mirasol|chile-morita|chile-pasado/, TIPOS.especia],
   [/cocoa/, [390, 20, 14, 50, b("antioxidantes", "energia", "hierro", "fibra")]],
   [/coco-rayado/, [660, 7, 65, 24, b("energia", "fibra", "corazon", "saciedad")]],

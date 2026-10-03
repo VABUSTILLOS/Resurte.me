@@ -156,6 +156,16 @@ async function assetProducto(item) {
   const file = join(TMP, item.slug + ".png")
   if (existsSync(file)) return file
   let buf
+  if (!url) {
+    // Sin foto (p. ej. corazon-puerco): fondo verde sólido en la zona de foto.
+    const out = await sharp({
+      create: { width: SIZE, height: 640, channels: 3, background: "#264c18" },
+    })
+      .png()
+      .toBuffer()
+    writeFileSync(file, out)
+    return file
+  }
   if (url.startsWith("/")) {
     buf = readFileSync(join(ROOT, "public", url))
   } else {
@@ -176,12 +186,45 @@ async function assetProducto(item) {
 async function main() {
   const args = process.argv.slice(2)
   const only = args.find((a) => a.startsWith("--only="))?.slice(7).split(",").filter(Boolean)
+  // Slugs extra no presentes en el feed (productos OCULTOS): el feed solo
+  // trae visibles, así que se construye su item desde targets-hidden.json.
+  const extra = args.find((a) => a.startsWith("--extra="))?.slice(8).split(",").filter(Boolean)
   mkdirSync(OUT_DIR, { recursive: true })
   mkdirSync(TMP, { recursive: true })
 
   const feed = JSON.parse(readFileSync(FEED_PATH, "utf8"))
-  const items = feed.items.filter((i) => i.imageUrl && (!only || only.includes(i.slug)))
-  console.log(`Productos: ${items.length}${only ? " (muestra)" : ""}`)
+  const items = feed.items.filter((i) => (!only || only.includes(i.slug)))
+
+  if (extra?.length) {
+    const hidden = JSON.parse(
+      readFileSync(join(ROOT, "scripts/product-images/targets-hidden.json"), "utf8")
+    )
+    const weber = JSON.parse(
+      readFileSync(join(ROOT, "scripts/product-images/manifest.json"), "utf8")
+    )
+    const { DISTMAR_ITEMS } = await import("./product-images/distmar-items.mjs")
+    const { WEBER_ITEMS } = await import("./product-images/weber-items.mjs")
+    for (const slug of extra) {
+      if (items.some((i) => i.slug === slug)) continue
+      const h = hidden.find((t) => t.slug === slug)
+      const w = WEBER_ITEMS.find((t) => t.slug === slug)
+      const dm = DISTMAR_ITEMS.find((t) => t.slug === slug)
+      const base = h || w || dm
+      if (!base) {
+        console.warn(`  ⚠ --extra: ${slug} no está en targets-hidden ni en las listas de proveedores`)
+        continue
+      }
+      items.push({
+        slug,
+        name: base.name,
+        categoryName: base.category === 4 ? "Carnes, Aves y Pescados" : base.category === 9 ? "Congelados" : base.category === 2 ? "Abarrotes" : "Frutas y Verduras",
+        imageUrl: weber[slug] || null,
+        imageUrlFallback: true,
+      })
+    }
+  }
+
+  console.log(`Productos: ${items.length}${only ? " (muestra)" : ""}${extra ? " (+ocultos)" : ""}`)
 
   let hechas = 0
   const errores = []
