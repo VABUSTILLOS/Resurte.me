@@ -143,6 +143,8 @@ const REGLAS = [
   // Aceites
   [/aceite|manteca/, TIPOS.oleaginosa],
 
+  [/surimi/, [95, 12, 1, 7, b("proteinas", "bajoCal", "omega3", "energia")]],
+  [/carbon-vegetal/, [0, 0, 0, 0, b("usoCocina", "usoRinde", "usoResistente", "usoPractico")]],
   // Camarones (todas las tallas)
   [/^camaron/, TIPOS.camaron],
   // Pescados

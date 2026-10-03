@@ -202,6 +202,9 @@ async function main() {
     const hiddenAll = existsSync(join(ROOT, "scripts/product-images/targets-hidden-all.json"))
       ? JSON.parse(readFileSync(join(ROOT, "scripts/product-images/targets-hidden-all.json"), "utf8"))
       : []
+    const hiddenArchive = existsSync(join(ROOT, "scripts/product-images/targets-hidden-archive.json"))
+      ? JSON.parse(readFileSync(join(ROOT, "scripts/product-images/targets-hidden-archive.json"), "utf8"))
+      : []
     const weber = JSON.parse(
       readFileSync(join(ROOT, "scripts/product-images/manifest.json"), "utf8")
     )
@@ -211,9 +214,10 @@ async function main() {
       if (items.some((i) => i.slug === slug)) continue
       const h = hidden.find((t) => t.slug === slug)
       const ha = hiddenAll.find((t) => t.slug === slug)
+      const har = hiddenArchive.find((t) => t.slug === slug)
       const w = WEBER_ITEMS.find((t) => t.slug === slug)
       const dm = DISTMAR_ITEMS.find((t) => t.slug === slug)
-      const base = h || ha || w || dm
+      const base = h || ha || har || w || dm
       if (!base) {
         console.warn(`  ⚠ --extra: ${slug} no está en targets-hidden ni en las listas de proveedores`)
         continue

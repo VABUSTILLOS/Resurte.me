@@ -1,0 +1,626 @@
+[
+  {
+    "slug": "queso-cheddar-rebanado-200g",
+    "name": "Queso Cheddar Rebanado 200g",
+    "description": "Queso tipo cheddar americano en rebanadas. Ideal para hamburguesas y sandwiches.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/queso-cheddar.webp"
+  },
+  {
+    "slug": "queso-amarillo-americano-200g",
+    "name": "Queso Amarillo Americano 200g",
+    "description": "Queso americano fundente para hamburguesas clásicas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/queso-americano.webp"
+  },
+  {
+    "slug": "papas-fritas-congeladas",
+    "name": "Papas Fritas Congeladas 2.5kg",
+    "description": "Papas prefritas congeladas. Alto rendimiento, dorado uniforme.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/papas-fritas-congeladas.webp"
+  },
+  {
+    "slug": "mostaza-3l",
+    "name": "Mostaza 3.8L",
+    "description": "Mostaza americana en galón. Para aderezos, salsas y servicio directo.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/mostaza.webp"
+  },
+  {
+    "slug": "pepinillos-1kg",
+    "name": "Pepinillos Encurtidos 1kg",
+    "description": "Pepinillos agridulces en rodajas para hamburguesas y hot dogs.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/recipe/pepinillos.webp"
+  },
+  {
+    "slug": "lechuga-iceberg",
+    "name": "Lechuga Iceberg",
+    "description": "Lechuga fresca, ideal para hamburguesas gourmet y ensaladas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/lechuga-iceberg.webp"
+  },
+  {
+    "slug": "crema-mexicana-1l",
+    "name": "Crema Mexicana 1L",
+    "description": "Crema ácida estilo mexicano. Textura suave y sabor inconfundible.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/crema-mexicana.webp"
+  },
+  {
+    "slug": "chile-guajillo-seco",
+    "name": "Chile Guajillo Seco 500g",
+    "description": "Chile guajillo seco para salsas, adobos y moles mexicanos.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/recipe/chile-guajillo.webp"
+  },
+  {
+    "slug": "chile-ancho-seco",
+    "name": "Chile Ancho Seco 500g",
+    "description": "Chile ancho seco, base fundamental de moles y adobos mexicanos.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/recipe/chile-ancho.webp"
+  },
+  {
+    "slug": "chile-arbol-seco",
+    "name": "Chile de Árbol Seco 250g",
+    "description": "Chile de árbol seco, picante intenso para salsas taqueras.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/chile-arbol.webp"
+  },
+  {
+    "slug": "manteca-cerdo-1kg",
+    "name": "Manteca de Cerdo 1kg",
+    "description": "Manteca de cerdo premium para frijoles refritos y cocina tradicional.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/manteca-cerdo.webp"
+  },
+  {
+    "slug": "pasta-achiote",
+    "name": "Pasta de Achiote 200g",
+    "description": "Pasta de achiote concentrada. Para cochinita pibil y adobos yucatecos.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/recipe/achiote.webp"
+  },
+  {
+    "slug": "arroz-sushi-5kg",
+    "name": "Arroz para Sushi 5kg",
+    "description": "Arroz grano corto especial para sushi. Alto contenido de almidón.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/arroz-sushi.webp"
+  },
+  {
+    "slug": "alga-nori-50hojas",
+    "name": "Alga Nori 50 Hojas",
+    "description": "Alga nori dorada para sushi rolls. Paquete de 50 hojas completas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/recipe/alga-nori.webp"
+  },
+  {
+    "slug": "salsa-soya-5l",
+    "name": "Salsa Soya 5L",
+    "description": "Salsa de soya fermentada en garrafa de 5 litros. Formato institucional.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/salsa-soya.webp"
+  },
+  {
+    "slug": "sriracha-740ml",
+    "name": "Sriracha 740ml",
+    "description": "Salsa picante estilo tailandesa. Para sushi rolls, alitas y fusiones asiáticas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/sriracha.webp"
+  },
+  {
+    "slug": "wasabi-polvo-250g",
+    "name": "Wasabi en Polvo 250g",
+    "description": "Wasabi en polvo para reconstituir. Para sushi y platillos japoneses.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/wasabi.webp"
+  },
+  {
+    "slug": "vinagre-arroz-1l",
+    "name": "Vinagre de Arroz 1.8L",
+    "description": "Vinagre de arroz sazonado para sushi. Listo para usar.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/vinagre-arroz.webp"
+  },
+  {
+    "slug": "aceite-ajonjoli-500ml",
+    "name": "Aceite de Ajonjolí 500ml",
+    "description": "Aceite de ajonjolí tostado. Toque final para sushi, ramen y salteados.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/aceite-ajonjoli.webp"
+  },
+  {
+    "slug": "queso-mozzarella-1kg",
+    "name": "Queso Mozzarella Rallado 1kg",
+    "description": "Mozzarella rallada para pizza. Excelente fundencia e hilo perfecto.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/mozzarella.webp"
+  },
+  {
+    "slug": "pepperoni-1kg",
+    "name": "Pepperoni Rebanado 1kg",
+    "description": "Pepperoni de cerdo y res en rebanadas para pizza. Sabor ahumado intenso.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/recipe/pepperoni.webp"
+  },
+  {
+    "slug": "pure-tomate-3kg",
+    "name": "Puré de Tomate Enlatado 3kg",
+    "description": "Puré de tomate concentrado para salsas base de pizza. Lata institucional.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/pure-tomate.webp"
+  },
+  {
+    "slug": "salsa-pomodoro-2kg",
+    "name": "Salsa Pomodoro 2.5kg",
+    "description": "Salsa pomodoro lista para pizza y pasta. Hecha con tomates italianos.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/salsa-pomodoro.webp"
+  },
+  {
+    "slug": "aceitunas-negras-1kg",
+    "name": "Aceitunas Negras 1kg",
+    "description": "Aceitunas negras rebanadas para pizza y ensaladas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/aceitunas-negras.webp"
+  },
+  {
+    "slug": "levadura-instantanea-500g",
+    "name": "Levadura Instantánea 500g",
+    "description": "Levadura instantánea para panadería y pizza. Alta actividad.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/recipe/levadura.webp"
+  },
+  {
+    "slug": "harina-fuerza-5kg",
+    "name": "Harina de Fuerza 5kg",
+    "description": "Harina de trigo de fuerza (W300+). Alto contenido de gluten para pizza artesanal.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/harina-fuerza.webp"
+  },
+  {
+    "slug": "cajas-pizza-25pz",
+    "name": "Cajas para Pizza 30x30cm 25pz",
+    "description": "Cajas de cartón corrugado para pizza mediana. Empaque profesional.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/cajas-pizza.webp"
+  },
+  {
+    "slug": "aderezo-blue-cheese-1l",
+    "name": "Aderezo Blue Cheese 1L",
+    "description": "Aderezo de queso azul cremoso. Clásico acompañante de alitas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/aderezo-bluecheese.webp"
+  },
+  {
+    "slug": "ajo-en-polvo-500g",
+    "name": "Ajo en Polvo 500g",
+    "description": "Ajo en polvo puro. Sazonador esencial para pollo frito y empanizados.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/ajo-polvo.webp"
+  },
+  {
+    "slug": "arroz-morelos-5kg",
+    "name": "Arroz Morelos 5kg",
+    "description": "Arroz grano largo de Morelos. El más rendidor para fondas y arroz a la mexicana.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/arroz-morelos.webp"
+  },
+  {
+    "slug": "tostadas-maiz-20pz",
+    "name": "Tostadas de Maíz 20pz",
+    "description": "Tostadas de maíz crujientes. Base para ceviche, aguachile y mariscos.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/generic/tostadas.webp"
+  },
+  {
+    "slug": "salsa-huichol-500ml",
+    "name": "Salsa Huichol 500ml",
+    "description": "Salsa picante estilo Nayarit. Infaltable en mariscos y micheladas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/salsa-huichol.webp"
+  },
+  {
+    "slug": "surimi-1kg",
+    "name": "Surimi 1kg",
+    "description": "Surimi premium de primera calidad. Para ensaladas, sushi y mariscos.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/recipe/surimi.webp"
+  },
+  {
+    "slug": "carbon-vegetal-5kg",
+    "name": "Carbón Vegetal 5kg",
+    "description": "Carbón vegetal de mezquite. Alta duración y calor uniforme.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/carbon.webp"
+  },
+  {
+    "slug": "pimienta-negra-gruesa",
+    "name": "Pimienta Negra Gruesa 500g",
+    "description": "Pimienta negra molida gruesa. Costra perfecta para cortes de carne.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/pimienta-gruesa.webp"
+  },
+  {
+    "slug": "cebollitas-cambray",
+    "name": "Cebollitas Cambray 500g",
+    "description": "Cebollitas cambray frescas. Acompañamiento clásico para asados y parrilladas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/cebollitas-cambray.webp"
+  },
+  {
+    "slug": "aceite-oliva-1l",
+    "name": "Aceite de Oliva Extra Virgen 1L",
+    "description": "Aceite de oliva extra virgen. Para marinar, cocinar y terminar cortes.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/aceite-oliva.webp"
+  },
+  {
+    "slug": "cafe-grano-1kg",
+    "name": "Café en Grano Chiapas 1kg",
+    "description": "Café 100% arábica de Chiapas. Tueste medio, notas achocolatadas y cítricas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/cafe-grano.webp"
+  },
+  {
+    "slug": "jarabe-vainilla-1l",
+    "name": "Jarabe de Vainilla 1L",
+    "description": "Jarabe saborizante de vainilla para cafés, lattes y frappés.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/jarabe-vainilla.webp"
+  },
+  {
+    "slug": "jarabe-caramelo-1l",
+    "name": "Jarabe de Caramelo 1L",
+    "description": "Jarabe sabor caramelo macchiato para cafés y bebidas especiales.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/jarabe-caramelo.webp"
+  },
+  {
+    "slug": "chocolate-polvo-1kg",
+    "name": "Chocolate en Polvo 1kg",
+    "description": "Chocolate en polvo para chocolate caliente y frappés. Alto porcentaje de cocoa.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/chocolate-polvo.webp"
+  },
+  {
+    "slug": "harina-hotcakes-1kg",
+    "name": "Harina para Hot Cakes 1kg",
+    "description": "Harina preparada para hot cakes esponjosos. Solo agregar agua o leche.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/harina-hotcakes.webp"
+  },
+  {
+    "slug": "miel-maple-500ml",
+    "name": "Miel de Maple 500ml",
+    "description": "Miel de maple grado A. Para hot cakes, waffles y crepas dulces.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/miel-maple.webp"
+  },
+  {
+    "slug": "filtros-cafe-100pz",
+    "name": "Filtros de Café #4 100pz",
+    "description": "Filtros de papel blanqueados para cafetera. Tamaño estándar.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/filtros-cafe.webp"
+  },
+  {
+    "slug": "vinagre-balsamico-500ml",
+    "name": "Vinagre Balsámico 500ml",
+    "description": "Vinagre balsámico de Módena. Para aderezos y reducciones.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/vinagre-balsamico.webp"
+  },
+  {
+    "slug": "garbanzo-lata-3kg",
+    "name": "Garbanzo en Lata 3kg",
+    "description": "Garbanzos cocidos en lata. Para ensaladas, hummus y poke bowls.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/garbanzo-lata.webp"
+  },
+  {
+    "slug": "arandanos-500g",
+    "name": "Arándanos Deshidratados 500g",
+    "description": "Arándanos deshidratados azucarados. Toque dulce para ensaladas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/arandanos.webp"
+  },
+  {
+    "slug": "semillas-girasol-500g",
+    "name": "Semillas de Girasol 500g",
+    "description": "Semillas de girasol peladas. Crujiente y nutritivo topping para bowls.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/semillas-girasol.webp"
+  },
+  {
+    "slug": "aderezo-cesar-1l",
+    "name": "Aderezo César 1L",
+    "description": "Aderezo César institucional. Cremoso, con queso parmesano y anchoas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/aderezo-cesar.webp"
+  },
+  {
+    "slug": "azucar-glass-1kg",
+    "name": "Azúcar Glass 1kg",
+    "description": "Azúcar glass impalpable. Para glaseados, fondant y decoración.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/azucar-glass.webp"
+  },
+  {
+    "slug": "polvo-hornear-500g",
+    "name": "Polvo para Hornear 500g",
+    "description": "Polvo para hornear de doble acción. Rendimiento profesional.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/polvo-hornear.webp"
+  },
+  {
+    "slug": "bicarbonato-500g",
+    "name": "Bicarbonato de Sodio 500g",
+    "description": "Bicarbonato de sodio grado alimenticio. Para panadería y repostería.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/bicarbonato.webp"
+  },
+  {
+    "slug": "nuez-pecana-500g",
+    "name": "Nuez Pecana 500g",
+    "description": "Nuez pecana en mitades. Para pays, panes, ensaladas y bowls.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/nuez-pecana.webp"
+  },
+  {
+    "slug": "harina-pastel-1kg",
+    "name": "Harina Preparada para Pastel 1kg",
+    "description": "Harina preparada para pastel de vainilla. Base lista para crear.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/harina-pastel.webp"
+  },
+  {
+    "slug": "leche-polvo-1kg",
+    "name": "Leche en Polvo 1kg",
+    "description": "Leche entera en polvo. Para panadería, repostería y bases de helado.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/leche-polvo.webp"
+  },
+  {
+    "slug": "frutos-rojos-congelados",
+    "name": "Frutos Rojos Congelados 1kg",
+    "description": "Mezcla de frambuesa, zarzamora y arándano. Para smoothies, bowls y repostería.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/frutos-rojos.webp"
+  },
+  {
+    "slug": "jocoque-1kg",
+    "name": "Jocoque 1kg",
+    "description": "Jocoque natural estilo libanés. Para tacos árabes, shawarma y aderezos.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/recipe/jocoque.webp"
+  },
+  {
+    "slug": "carne-cerdo-trompo",
+    "name": "Carne de Cerdo para Trompo 3kg",
+    "description": "Carne de cerdo adobada lista para trompo. Sabor tradicional árabe-mexicano.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/carne-trompo.webp"
+  },
+  {
+    "slug": "garbanzo-seco-5kg",
+    "name": "Garbanzo Seco 5kg",
+    "description": "Garbanzo seco calibre grande. Para hummus, falafel y guisos.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/garbanzo-seco.webp"
+  },
+  {
+    "slug": "sumac-250g",
+    "name": "Sumac 250g",
+    "description": "Sumac molido. Especia cítrica árabe. Para carnes, ensaladas y aderezos.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/sumac.webp"
+  },
+  {
+    "slug": "zaatar-250g",
+    "name": "Za'atar 250g",
+    "description": "Za'atar — mezcla de especias del Medio Oriente con tomillo, sésamo y sumac.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/zaatar.webp"
+  },
+  {
+    "slug": "yogurt-griego-1l",
+    "name": "Yogurt Griego Natural 1L",
+    "description": "Yogurt griego natural sin azúcar. Para tzatziki, aderezos y marinados.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/yogurt-griego.webp"
+  },
+  {
+    "slug": "bulgur-1kg",
+    "name": "Bulgur 1kg",
+    "description": "Bulgur de trigo. Base para tabule, kibbeh y guarniciones del Medio Oriente.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/bulgur.webp"
+  },
+  {
+    "slug": "cardamomo-100g",
+    "name": "Cardamomo Molido 100g",
+    "description": "Cardamomo verde molido. Para café árabe, postres y marinados.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/cardamomo.webp"
+  },
+  {
+    "slug": "queso-costeno-500g",
+    "name": "Queso Costeño 500g",
+    "description": "Queso costeño colombiano. Salado y duro, para rallar sobre arepas y patacones.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/queso-costeno.webp"
+  },
+  {
+    "slug": "carne-mechada-1kg",
+    "name": "Carne Mechada 1kg",
+    "description": "Carne de res cocida y deshebrada, lista para rellenar arepas y cachapas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/carne-mechada.webp"
+  },
+  {
+    "slug": "chorizo-colombiano-500g",
+    "name": "Chorizo Colombiano 500g",
+    "description": "Chorizo colombiano premium. Para bandeja paisa, arepas y picadas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/chorizo-colombiano.webp"
+  },
+  {
+    "slug": "dulce-leche-1kg",
+    "name": "Dulce de Leche 1kg",
+    "description": "Dulce de leche/arequipe. Para obleas, postres latinos y repostería.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/dulce-leche.webp"
+  },
+  {
+    "slug": "obleas-12pz",
+    "name": "Obleas 12pz",
+    "description": "Obleas redondas crocantes. Tradicional bocadillo colombiano y venezolano.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/obleas.webp"
+  },
+  {
+    "slug": "suero-costeno-1l",
+    "name": "Suero Costeño 1L",
+    "description": "Suero costeño fermentado. Acompañante para arepas, patacones y carimañolas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/suero-costeno.webp"
+  },
+  {
+    "slug": "aji-dulce-500g",
+    "name": "Ají Dulce 500g",
+    "description": "Ají dulce fresco. Ingrediente base para sofritos y rellenos latinos.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/aji-dulce.webp"
+  },
+  {
+    "slug": "papelon-1kg",
+    "name": "Papelón 1kg",
+    "description": "Panela/papelón en bloque. Endulzante natural para bebidas típicas y guarapo.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/papelon.webp"
+  },
+  {
+    "slug": "coca-cola-2-5l",
+    "name": "Coca-Cola 2.5L",
+    "description": "Refresco Coca-Cola en formato familiar. El más vendido para restaurantes.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/coca-cola.webp"
+  },
+  {
+    "slug": "pepsi-2-5l",
+    "name": "Pepsi 2.5L",
+    "description": "Refresco Pepsi formato grande. Opción complementaria a Coca-Cola.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/pepsi.webp"
+  },
+  {
+    "slug": "clamato-1l",
+    "name": "Clamato 1.89L",
+    "description": "Clamato preparado para micheladas y clamatos. Formato institucional.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/clamato.webp"
+  },
+  {
+    "slug": "tajin-500g",
+    "name": "Tajín Clásico 500g",
+    "description": "Tajín clásico en polvo. Escarchador de micheladas y botanas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/tajin.webp"
+  },
+  {
+    "slug": "chamoy-1l",
+    "name": "Chamoy 1L",
+    "description": "Chamoy líquido para micheladas, mangonadas y botanas. Sabor intenso.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/chamoy.webp"
+  },
+  {
+    "slug": "escarchado-michelada",
+    "name": "Escarchado para Michelada 500g",
+    "description": "Mezcla de sal, chile y limón deshidratado. Escarchado premium para micheladas.",
+    "unit": "",
+    "category": null,
+    "currentImage": "/images/products/escarchado-michelada.webp"
+  }
+]
