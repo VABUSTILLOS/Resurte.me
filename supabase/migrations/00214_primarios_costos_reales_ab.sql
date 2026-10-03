@@ -14,7 +14,7 @@
 --   Dedos de queso .......... $369.90/bolsa 1.81 kg
 --
 -- Con los costos reales, los primarios correctos (menor costo/kg) son:
---   papa-gajo        AB 40.40  < Weber 48.90  < Distmar 54.33
+--   papa-gajo        Weber 48.90 < AB 53.63 ($729.90) < Distmar 54.33
 --   select-516       AB 42.61  < Distmar 45.37
 --   select-38        Distmar 37.44 < AB 42.61
 --   conquest-14      Distmar 46.69 < AB 50.21
@@ -25,6 +25,11 @@
 --   ondulada         Weber 36.90 < Distmar 37.44 < AB 40.40
 --   hashbrown        Weber 59.90 < AB 77.19
 --   aros             Weber 85.90 < Distmar 95.87 < AB 115.66
+--
+-- NOTA: las columnas `cost` de AB Foods en la tabla _prov_kg son de
+-- REFERENCIA para el kg; el ranking usa siempre `product_suppliers.cost`
+-- (fuente única), así que aunque una referencia difiera, el primario sale
+-- del costo real almacenado.
 --
 -- Idempotente: fija is_primary y precio a su valor correcto; re-ejecutar
 -- deja el mismo estado.
@@ -50,7 +55,7 @@ BEGIN
   INSERT INTO _prov_kg (slug, proveedor, kg, cost, kg_tienda) VALUES
     ('papa-gajo-10-cut-65-caja-1361kg',      'carnes-weber', 13.6100, 665.53, 13.6100),
     ('papa-gajo-10-cut-65-caja-1361kg',      'distmar',      13.6200, 739.99, 13.6100),
-    ('papa-gajo-10-cut-65-caja-1361kg',      'ab-foods',     13.6100, 549.90, 13.6100),
+    ('papa-gajo-10-cut-65-caja-1361kg',      'ab-foods',     13.6100, 729.90, 13.6100),
     ('papa-select-516-sc-caja-1361kg',       'distmar',      13.6200, 617.99, 13.6100),
     ('papa-select-516-sc-caja-1361kg',       'ab-foods',     13.6100, 579.90, 13.6100),
     ('papa-select-38-sc-caja-1361kg',        'distmar',      13.6200, 509.99, 13.6100),
