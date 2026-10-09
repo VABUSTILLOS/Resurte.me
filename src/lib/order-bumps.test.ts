@@ -151,34 +151,34 @@ describe("detectCollectionsInCart", () => {
 })
 
 describe("resolveBumpPricing", () => {
-  it("calcula el precio con descuento a partir del precio base y la regla", () => {
+  it("cobra el precio de catálogo: el bump no lleva descuento propio", () => {
     const result = resolveBumpPricing({
       bumpItems: [{ product_id: 100, quantity: 1 }],
       basePriceByProduct: new Map([[100, 25]]),
-      discountPctByProduct: new Map([[100, 0.1]]),
+      activeRuleProductIds: new Set([100]),
     })
-    expect(result).toEqual({ ok: true, pricesByProduct: new Map([[100, 22.5]]) })
+    expect(result).toEqual({ ok: true, pricesByProduct: new Map([[100, 25]]) })
   })
 
   it("usa sale_price como base si existe", () => {
     const result = resolveBumpPricing({
       bumpItems: [{ product_id: 100, quantity: 2 }],
       basePriceByProduct: new Map([[100, 30]]), // sale_price gana
-      discountPctByProduct: new Map([[100, 0.25]]),
+      activeRuleProductIds: new Set([100]),
     })
-    expect(result).toEqual({ ok: true, pricesByProduct: new Map([[100, 22.5]]) })
+    expect(result).toEqual({ ok: true, pricesByProduct: new Map([[100, 30]]) })
   })
 
   it("redondea a 2 decimales", () => {
     const result = resolveBumpPricing({
       bumpItems: [{ product_id: 100, quantity: 1 }],
-      basePriceByProduct: new Map([[100, 33.33]]),
-      discountPctByProduct: new Map([[100, 0.1]]),
+      basePriceByProduct: new Map([[100, 7.777]]),
+      activeRuleProductIds: new Set([100]),
     })
-    expect(result).toEqual({ ok: true, pricesByProduct: new Map([[100, 30]]) })
+    expect(result).toEqual({ ok: true, pricesByProduct: new Map([[100, 7.78]]) })
   })
 
-  it("rechaza un bump sin regla activa (no se puede inventar el descuento)", () => {
+  it("rechaza un bump sin regla activa (no se puede inventar el artículo especial)", () => {
     const result = resolveBumpPricing({
       bumpItems: [
         { product_id: 100, quantity: 1 },
@@ -188,7 +188,7 @@ describe("resolveBumpPricing", () => {
         [100, 25],
         [999, 40],
       ]),
-      discountPctByProduct: new Map([[100, 0.1]]),
+      activeRuleProductIds: new Set([100]),
     })
     expect(result).toEqual({ ok: false, missingProductId: 999 })
   })
@@ -197,7 +197,7 @@ describe("resolveBumpPricing", () => {
     const result = resolveBumpPricing({
       bumpItems: [],
       basePriceByProduct: new Map(),
-      discountPctByProduct: new Map(),
+      activeRuleProductIds: new Set(),
     })
     expect(result).toEqual({ ok: true, pricesByProduct: new Map() })
   })
@@ -407,13 +407,13 @@ describe("resolveBumps", () => {
     expect(await resolveBumps({ items: [{ product_id: 1, quantity: 2 }] })).toEqual([])
   })
 
-  it("devuelve bumps con precio descontado y excluye productos del carrito", async () => {
+  it("devuelve bumps al precio de catálogo y excluye productos del carrito", async () => {
     vi.mocked(createServiceClient).mockResolvedValue(makeSupabase({}) as never)
     const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 2 }] })
     expect(bumps).toHaveLength(1)
     expect(bumps[0]?.trigger_type).toBe("perishables")
-    expect(bumps[0]?.price).toBeCloseTo(22.5, 2) // 25 * 0.9
-    expect(bumps[0]?.original_price).toBe(25)
+    // El artículo especial se cobra al precio de catálogo: sin descuento propio.
+    expect(bumps[0]?.price).toBeCloseTo(25, 2)
     expect(bumps[0]?.ruleId).toBe(1)
   })
 
@@ -424,14 +424,13 @@ describe("resolveBumps", () => {
     expect(bumps).toEqual([])
   })
 
-  it("usa sale_price cuando existe para el precio original y descontado", async () => {
+  it("usa sale_price como precio del bump", async () => {
     const supabase = makeSupabase({
       bumpProducts: { 100: product({ id: 100, sale_price: 20 }) },
     })
     vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
     const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
-    expect(bumps[0]?.original_price).toBe(20)
-    expect(bumps[0]?.price).toBeCloseTo(18, 2) // 20 * 0.9
+    expect(bumps[0]?.price).toBeCloseTo(20, 2)
   })
 
   it("ignora sale_price si la oferta ya venció (00107)", async () => {
@@ -446,8 +445,7 @@ describe("resolveBumps", () => {
     })
     vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
     const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
-    expect(bumps[0]?.original_price).toBe(25)
-    expect(bumps[0]?.price).toBeCloseTo(22.5, 2) // 25 * 0.9
+    expect(bumps[0]?.price).toBeCloseTo(25, 2)
   })
 
   it("usa sale_price si la ventana de la oferta está vigente (00107)", async () => {
@@ -463,7 +461,7 @@ describe("resolveBumps", () => {
     })
     vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
     const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
-    expect(bumps[0]?.original_price).toBe(20)
+    expect(bumps[0]?.price).toBeCloseTo(20, 2)
   })
 
   it("omite bumps cuyo producto está agotado", async () => {
@@ -521,7 +519,7 @@ describe("resolveBumps", () => {
     expect(bumps[0]?.isRecipeMatch).toBe(true)
     expect(bumps[0]?.badgeLabel).toBe("Sugerido para tu receta / pedido")
     expect(bumps[0]?.collection_slug).toBe("taquerias-antojitos")
-    expect(bumps[0]?.price).toBeCloseTo(31.5, 2) // 35 * 0.9
+    expect(bumps[0]?.price).toBeCloseTo(35, 2) // precio de catálogo
   })
 
   it("omite el bump de colección si su producto ya está en el carrito", async () => {
@@ -570,7 +568,7 @@ describe("resolveBumps", () => {
     expect(bumps[0]?.product.id).toBe(900)
     expect(bumps[0]?.isRecipeMatch).toBe(true)
     expect(bumps[0]?.collection_slug).toBe("taquerias-antojitos")
-    expect(bumps[0]?.price).toBeCloseTo(27, 2) // 30 * 0.9 (descuento dinámico 10%)
+    expect(bumps[0]?.price).toBeCloseTo(30, 2) // precio de catálogo (sin descuento)
     // Verifica que el motor registró la regla para que POST /api/orders valide.
     expect((supabase as unknown as { __insertBumpRules: ReturnType<typeof vi.fn> }).__insertBumpRules).toHaveBeenCalled()
   })

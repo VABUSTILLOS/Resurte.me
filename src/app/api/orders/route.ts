@@ -308,16 +308,17 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Precios de order bumps (server-side, nunca del cliente) ──
-    // Los items tipo "bump" se validan contra bump_rules activos: el precio
-    // con descuento lo calcula el servidor. Si no hay regla activa para el
-    // producto, el bump se rechaza (no se puede inventar un descuento).
+    // Los items tipo "bump" se validan contra bump_rules activos y se cobran al
+    // precio de catálogo: los artículos especiales NO llevan descuento propio.
+    // Si no hay regla activa para el producto, el bump se rechaza (un cliente no
+    // puede convertir cualquier producto del catálogo en artículo especial).
     const bumpItems = items.filter((i) => i.item_type === "bump")
     const bumpPriceByProduct = new Map<number, number>()
     if (bumpItems.length > 0) {
       const bumpProductIds = [...new Set(bumpItems.map((i) => i.product_id))]
       const { data: bumpRules, error: bumpErr } = await supabase
         .from("bump_rules")
-        .select("product_id, discount_pct")
+        .select("product_id")
         .eq("is_active", true)
         .in("product_id", bumpProductIds)
 
@@ -329,9 +330,9 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const discountPctByProduct = new Map<number, number>()
+      const activeRuleProductIds = new Set<number>()
       for (const r of bumpRules ?? []) {
-        discountPctByProduct.set(r.product_id, Number(r.discount_pct))
+        activeRuleProductIds.add(r.product_id)
       }
 
       const basePriceByProduct = new Map<number, number>()
@@ -343,7 +344,7 @@ export async function POST(request: NextRequest) {
       const pricing = resolveBumpPricing({
         bumpItems,
         basePriceByProduct,
-        discountPctByProduct,
+        activeRuleProductIds,
       })
       if (!pricing.ok) {
         return NextResponse.json(
@@ -357,7 +358,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Recalcular subtotal con precios reales (sale_price gana si existe;
-    // bump usa el precio con descuento de bump_rules)
+    // el bump usa el mismo precio de catálogo, sin descuento propio)
     const realSubtotal = items.reduce((sum, item) => {
       const db = getDbProduct(item.product_id)
       const unitPrice =

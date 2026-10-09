@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service"
-import { round2 } from "@/lib/money"
-import { bumpUnitPrice, type BumpRuleRow, type BumpProduct } from "@/lib/order-bumps"
+import { applyDiscount, round2 } from "@/lib/money"
+import { type BumpRuleRow, type BumpProduct } from "@/lib/order-bumps"
 import { resolveEffectivePrice } from "@/lib/sale-window"
 
 /**
@@ -64,7 +64,9 @@ function toOffer(rule: BumpRuleRow, product: BumpProduct): UpsellOffer {
     description: rule.description,
     discount_pct: rule.discount_pct,
     product,
-    price: bumpUnitPrice(base, rule.discount_pct),
+    // El descuento de `bump_rules` es exclusivo de esta oferta post-compra: los
+    // order bumps del carrito se venden al precio de catálogo.
+    price: applyDiscount(base, rule.discount_pct),
     original_price: round2(base),
     quantity: 1,
   }

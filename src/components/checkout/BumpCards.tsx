@@ -384,11 +384,6 @@ export function BumpCards({
                             <Sparkles className="w-3 h-3" />
                             {bump.badgeLabel}
                           </span>
-                        ) : bump.discount_pct > 0 ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-full px-2 py-0.5 shrink-0">
-                            <Check className="w-3 h-3" />
-                            Ahorra {Math.round(bump.discount_pct * 100)}% al agregar ahora
-                          </span>
                         ) : null}
                       </div>
                       <p className="text-sm font-semibold text-gray-900 leading-tight mt-1">
@@ -401,16 +396,6 @@ export function BumpCards({
                         <span className="text-sm font-bold text-brand-700">
                           ${bump.price.toFixed(2)}
                         </span>
-                        {bump.original_price > bump.price && (
-                          <span className="text-xs text-gray-400 line-through">
-                            ${bump.original_price.toFixed(2)}
-                          </span>
-                        )}
-                        {bump.discount_pct > 0 && (
-                          <span className="text-[10px] font-semibold text-white bg-brand-600 px-1.5 py-0.5 rounded">
-                            -{Math.round(bump.discount_pct * 100)}%
-                          </span>
-                        )}
                       </div>
                     </div>
                     <div

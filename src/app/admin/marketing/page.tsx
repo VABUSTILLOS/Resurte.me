@@ -162,9 +162,12 @@ function MarketingContent() {
     }
   }
 
+  // `bump_rules.discount_pct` ya no descuenta el artículo especial del carrito:
+  // los order bumps se cobran al precio de catálogo. Solo lo usa la oferta
+  // 1-click post-compra (`upsell-offers.ts`).
   const editDiscount = async (rule: BumpRule) => {
     const input = window.prompt(
-      `Descuento para "${rule.title}" (0-1, ej. 0.10 = 10%)`,
+      `Descuento de la oferta 1-click post-compra para "${rule.title}" (0-1, ej. 0.10 = 10%).\nNo afecta al artículo especial del carrito.`,
       String(rule.discount_pct),
     )
     if (input === null) return
@@ -385,6 +388,7 @@ function MarketingContent() {
               <button
                 type="button"
                 onClick={() => void editDiscount(rule)}
+                title="Descuento de la oferta 1-click post-compra (no aplica al artículo especial del carrito)"
                 className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1"
               >
                 <Percent className="w-3 h-3" />

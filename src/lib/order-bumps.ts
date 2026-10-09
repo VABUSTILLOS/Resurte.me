@@ -51,7 +51,7 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/service"
-import { applyDiscount } from "@/lib/money"
+import { round2 } from "@/lib/money"
 import { MAX_BUMPS, MAX_BUMPS_REQUEST_LIMIT } from "@/lib/checkout-config"
 import { logger } from "@/lib/logger"
 import { getAllRecipes } from "@/lib/recipes"
@@ -109,18 +109,15 @@ export interface BumpProduct {
   is_visible?: boolean
 }
 
-/** Bump listo para el drawer (precio con descuento incluido). */
+/** Bump listo para el drawer. Se vende al precio de catálogo, sin descuento. */
 export interface OrderBump {
   ruleId: number
   trigger_type: BumpTriggerType
   title: string
   description: string
-  discount_pct: number
   product: BumpProduct
-  /** Precio efectivo: sale_price ?? price, con descuento aplicado. */
+  /** Precio efectivo: sale_price ?? price. El bump no lleva descuento propio. */
   price: number
-  /** Precio original (antes del descuento). */
-  original_price: number
   /** true si el bump proviene de una colección/receta detectada en el carrito. */
   isRecipeMatch?: boolean
   /** Texto del badge a mostrar en BumpCards (ej. "Sugerido para tu receta / pedido"). */
@@ -201,13 +198,16 @@ function effectivePrice(product: BumpProduct): number {
   return resolveEffectivePrice(product) ?? product.price
 }
 
-function discountPrice(product: BumpProduct, discountPct: number): number {
-  return applyDiscount(effectivePrice(product), discountPct)
-}
-
-/** Precio de bump a partir de un precio base y el % de descuento. */
-export function bumpUnitPrice(basePrice: number, discountPct: number): number {
-  return applyDiscount(basePrice, discountPct)
+/**
+ * Precio unitario de un order bump: el de catálogo, sin descuento.
+ *
+ * Los order bumps **no llevan descuento propio**: el cliente paga por el
+ * artículo especial exactamente lo que pagaría comprándolo suelto
+ * (`sale_price ?? price`). El `discount_pct` de `bump_rules` ya no participa
+ * aquí; solo lo usa la oferta 1-click post-compra (`upsell-offers.ts`).
+ */
+export function bumpUnitPrice(basePrice: number): number {
+  return round2(basePrice)
 }
 
 export interface BumpPricingInput {
@@ -215,8 +215,8 @@ export interface BumpPricingInput {
   bumpItems: { product_id: number; quantity: number }[]
   /** Precio base por producto (sale_price ?? price) desde la BD. */
   basePriceByProduct: Map<number, number>
-  /** Descuentos activos por producto desde `bump_rules`. */
-  discountPctByProduct: Map<number, number>
+  /** Productos con una regla de bump activa: es el único requisito del bump. */
+  activeRuleProductIds: Set<number>
 }
 
 export type BumpPricingResult =
@@ -224,19 +224,19 @@ export type BumpPricingResult =
   | { ok: false; missingProductId: number }
 
 /**
- * Valida que cada bump item tenga una regla activa y calcula su precio con
- * descuento. Si algún producto no tiene regla activa, el bump se rechaza
- * (no se puede inventar un descuento). Misma fórmula que POST /api/orders.
+ * Valida que cada bump item tenga una regla activa y devuelve su precio de
+ * catálogo. Si algún producto no tiene regla activa, el bump se rechaza: un
+ * cliente no puede convertir un producto cualquiera en "artículo especial".
+ * Misma fórmula que POST /api/orders.
  */
 export function resolveBumpPricing(input: BumpPricingInput): BumpPricingResult {
   const pricesByProduct = new Map<number, number>()
   for (const item of input.bumpItems) {
     const base = input.basePriceByProduct.get(item.product_id)
-    const discountPct = input.discountPctByProduct.get(item.product_id)
-    if (base === undefined || discountPct === undefined) {
+    if (base === undefined || !input.activeRuleProductIds.has(item.product_id)) {
       return { ok: false, missingProductId: item.product_id }
     }
-    pricesByProduct.set(item.product_id, bumpUnitPrice(base, discountPct))
+    pricesByProduct.set(item.product_id, bumpUnitPrice(base))
   }
   return { ok: true, pricesByProduct }
 }
@@ -504,10 +504,8 @@ function buildBump(rule: BumpRuleRow, product: BumpProduct): OrderBump {
     trigger_type: rule.trigger_type,
     title: rule.title,
     description: rule.description,
-    discount_pct: rule.discount_pct,
     product,
-    price: discountPrice(product, rule.discount_pct),
-    original_price: effectivePrice(product),
+    price: effectivePrice(product),
     isRecipeMatch: isRecipe || isAffinity,
     badgeLabel: isAffinity
       ? "Ideal con tu pedido"

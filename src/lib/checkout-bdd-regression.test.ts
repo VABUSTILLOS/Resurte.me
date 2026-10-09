@@ -90,11 +90,11 @@ describe("BDD — retrocompatibilidad de la orden estándar", () => {
     expect(matched).toEqual([])
   })
 
-  it("un bump sin regla activa no puede inventarse el descuento", () => {
+  it("un bump sin regla activa no puede convertirse en artículo especial", () => {
     const result = resolveBumpPricing({
       bumpItems: [{ product_id: 100, quantity: 1 }],
       basePriceByProduct: new Map([[100, 25]]),
-      discountPctByProduct: new Map(), // sin regla activa → sin descuento
+      activeRuleProductIds: new Set(), // sin regla activa → no es un bump válido
     })
     expect(result).toEqual({ ok: false, missingProductId: 100 })
   })
@@ -312,13 +312,16 @@ describe("BDD — afinidad por ingrediente", () => {
     expect(afinidad({ cart: [catalogo[0]!] })).toHaveLength(0)
   })
 
-  it("el descuento de afinidad es el mismo 10% que el de receta", () => {
+  it("el bump se cobra al precio de catálogo: no hereda el descuento de la regla", () => {
+    // `bump_rules.discount_pct` (10% en las reglas de afinidad y de receta) solo
+    // lo usa la oferta 1-click post-compra; el artículo especial del carrito se
+    // cobra al precio de catálogo.
     const pricing = resolveBumpPricing({
       bumpItems: [{ product_id: 100, quantity: 1 }],
       basePriceByProduct: new Map([[100, 100]]),
-      discountPctByProduct: new Map([[100, 0.1]]),
+      activeRuleProductIds: new Set([100]),
     })
-    expect(pricing).toEqual({ ok: true, pricesByProduct: new Map([[100, 90]]) })
-    expect(bumpUnitPrice(100, 0.1)).toBe(90)
+    expect(pricing).toEqual({ ok: true, pricesByProduct: new Map([[100, 100]]) })
+    expect(bumpUnitPrice(100)).toBe(100)
   })
 })

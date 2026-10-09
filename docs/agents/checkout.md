@@ -87,6 +87,20 @@
   `.neq("trigger_type", "ingredient_affinity")` — esas reglas existen para el
   carrito, no para upsells 1-click. `POST /api/orders` valida bumps por
   `product_id` + `is_active`, así que las reglas de afinidad pasan sin cambios.
+- **Los order bumps no llevan descuento propio**: un artículo especial se cobra
+  al precio de catálogo (`sale_price ?? price`), exactamente lo que costaría
+  comprarlo suelto. `bumpUnitPrice(basePrice)` ya no recibe un porcentaje y
+  `resolveBumpPricing` solo usa `bump_rules` como **portero** (¿el producto tiene
+  una regla activa?), no como fuente de precio: sin regla activa el bump se
+  rechaza con el 400 "El artículo especial X no está disponible", para que un
+  cliente no pueda convertir cualquier producto del catálogo en artículo
+  especial. `OrderBump` ya no expone `discount_pct` ni `original_price`, así que
+  `BumpCards` no pinta "Ahorra X%", tachado ni chip de porcentaje.
+  **`bump_rules.discount_pct` sigue existiendo, pero solo lo usa la oferta
+  1-click post-compra** (`upsell-offers.ts` → `applyDiscount`): por eso el botón
+  "%" de `/admin/marketing` avisa que es el descuento del upsell y no del
+  carrito. No reintroduzcas el descuento en el camino del bump: la fuente de
+  precio del carrito es `bumpUnitPrice`/`resolveBumpPricing`.
 - **Cantidades editables (piso 0 + confirmación)**: `OrderItemsList` (checkout) y
   `QuantityStepper` (exportado para `ReviewStep`) son la única UI de +/− del
   pedido. `MIN_ITEM_QUANTITY` es 0: el "−" baja hasta 0 y ya en 0 pide
