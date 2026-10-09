@@ -53,9 +53,10 @@ const JUSTIFICATIONS: Record<string, string> = {
   "ignoreDependencies:supabase":
     "Es el CLI del flujo de migraciones documentado en `docs/OPS.md` " +
     "(`npx supabase db push`, `migration new`, `login`): 12 invocaciones. Uso real, no código.",
-  "ignoreDependencies:vercel":
-    "Es el CLI de los runbooks de operación de `docs/OPS.md` " +
-    "(`vercel redeploy`, `vercel api`, `vercel metrics`). Uso real, no código.",
+  // `vercel` ya NO está en la lista: `scripts/launch-check.mjs` lo invoca con un
+  // literal (`npx vercel api`), así que knip ve el uso por sí solo y la excepción
+  // quedó redundante. Antes sí hacía falta porque el CLI solo aparecía en los
+  // runbooks de `docs/OPS.md`, que knip no analiza.
 
   "src/lib/ai/kie-ai.ts":
     "`pollTaskUntilComplete` se declara en su docstring como API cómoda para usos " +
@@ -145,7 +146,12 @@ describe("contrato de configuración de knip", () => {
   it("la allowlist está congelada (ratchet)", () => {
     // Igualdad exacta: la lista solo puede encoger. Añadir una entrada exige
     // editar este test, y editarlo exige escribir su justificación abajo.
-    expect(KNIP.ignoreDependencies?.slice().sort()).toEqual(["sharp", "supabase", "vercel"])
+    //
+    // `vercel` se retiró el 08-oct-2026: `scripts/launch-check.mjs` lo invoca con
+    // un literal (`npx vercel api`), así que knip ve el uso por sí solo. La
+    // entrada existía porque el CLI solo aparecía en los runbooks de
+    // `docs/OPS.md`, que knip no analiza; eso dejó de ser cierto.
+    expect(KNIP.ignoreDependencies?.slice().sort()).toEqual(["sharp", "supabase"])
 
     // `src/app/admin/actions.ts` ya NO está aquí: la ronda 11 le puso interfaz a
     // las cinco escrituras huérfanas y borró `LeadTimelineSource`, así que la

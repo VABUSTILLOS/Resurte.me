@@ -147,6 +147,77 @@ existe el ciclo completo con voucher simulado. La tabla de eventos → estado
 (`processing` → `paid` / `expired`) está en `docs/OPS.md §9` («Métodos de pago
 locales asíncronos»).
 
+### 1.3 Activar la cuenta de Stripe (la constancia de situación fiscal)
+
+**Esto va antes que todo lo demás de esta sección.** Ni Connect ni OXXO/SPEI ni
+los cobros con tarjeta funcionan en modo live mientras la cuenta no esté
+activada, y Stripe México no la activa sin la **Constancia de Situación Fiscal
+(CSF)** del SAT.
+
+- **Costo:** gratis.
+- **Tiempo:** de minutos a días, según la revisión de Stripe.
+- **Depende de:** tu constancia vigente y que los datos coincidan.
+- **Cómo se hace:** se sube **solo** desde el Dashboard, en
+  `dashboard.stripe.com/settings/actualizacion-fiscal`. Por correo o por un
+  enlace de soporte no cuenta.
+- **Por qué falla:** casi siempre porque el RFC, el nombre legal, el régimen
+  fiscal o el código postal de la constancia **no coinciden** con lo capturado en
+  Stripe. Stripe lee el QR del PDF y compara carácter por carácter.
+
+El detalle completo —las 10 causas de rechazo ordenadas por probabilidad, las dos
+pantallas donde se corrigen los datos, cómo regenerar la constancia en el SAT, y
+el RFC de quien emite las facturas de las comisiones— está en
+**`docs/OPS.md §14.9`**.
+
+> Nota de secuencia: esto es independiente de §1.1 (Connect). Connect se activa
+> además en *Settings → Connect*, pero **la activación de la cuenta es requisito
+> previo** para cualquiera de las dos.
+
+#### «En mi otro proyecto sí puedo cobrar y no me piden nada»
+
+Es la pregunta que aparece sola, y la respuesta es que **el requisito fiscal no
+es del proyecto: es de la cuenta de Stripe**.
+
+Stripe no verifica código ni repositorios; verifica **cuentas**. Cada proyecto
+apunta a una cuenta con sus propias llaves. Dos proyectos con el mismo código se
+comportan distinto si apuntan a cuentas distintas. Y una cuenta **ya verificada
+no vuelve a pedir documentos**.
+
+Las tres explicaciones posibles, todas compatibles entre sí:
+
+1. **El otro proyecto usa otra cuenta**, ya activada. Lo más común.
+2. **Es la misma cuenta y cambiaste los datos fiscales.** Stripe exige volver a
+   subir la constancia **cada vez que cambia** el RFC, el régimen o el domicilio
+   fiscal (§14.9.2).
+3. **La otra cuenta está registrada en otro país.** El requisito de la constancia
+   es específico de cuentas con entidad mexicana; una cuenta de EE.UU. nunca la
+   pide, y aun así puede cobrar tarjetas mexicanas.
+
+**Cómo se comprueba, en dos pasos:**
+
+1. En el Dashboard de Stripe, el **selector de cuenta** (arriba a la izquierda).
+   Si hay más de una cuenta, son cuentas distintas.
+2. Con la llave de cada proyecto:
+
+   ```bash
+   npm run stripe:check -- --key sk_live_…
+   ```
+
+   Imprime el **ID de cuenta y el país**. La cuenta de Resurte.me termina en
+   `ErXUVDJ3U0`; un ID distinto significa otra cuenta.
+
+**Consecuencia práctica:** si la cuenta que ya cobra es de la **misma persona o
+empresa**, se puede usar aquí y desbloquea el arranque hoy — solo hay que cambiar
+las llaves de Vercel. Si es de **otro negocio**, no se mezclan: todo caería en la
+misma contabilidad y las facturas de comisiones de Stripe saldrían a nombre del
+otro negocio.
+
+> Dato medido el 08-oct-2026: el proyecto `hustlealliance` de la misma cuenta de
+> Vercel usa **Checkout alojado** (tiene `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+> y `STRIPE_PRICE_*`, sin llave publicable). Es un montaje distinto al de
+> Resurte.me, que sí usa Stripe.js en el navegador — pero eso **no** es lo que
+> decide si piden la constancia. Lo decide la cuenta.
+
 ---
 
 ## 2. Wallet — tarjeta de lealtad en el teléfono
@@ -481,6 +552,7 @@ operar, con su `impact` en español listo para el panel.
 
 | Bloqueo | Costo | Tiempo | Depende de |
 |---|---|---|---|
+| **Activar la cuenta de Stripe (CSF)** | **Gratis** | minutos a días | **tú + tu constancia fiscal + revisión de Stripe** |
 | **Rotar Postgres** | — | minutos | **sólo tú** |
 | **e2e autenticado** | **Gratis** | minutos | **sólo tú** |
 | **Accesibilidad** | **Gratis** | trabajo | **nadie: ya está desbloqueado** |
@@ -494,6 +566,9 @@ operar, con su `impact` en español listo para el panel.
 
 ### Orden recomendado
 
+0. **Activar la cuenta de Stripe con la constancia fiscal** (§1.3). Es requisito
+   previo de los cobros con tarjeta en live y de todo lo demás de §1: sin la
+   cuenta activada, las llaves `sk_live_…` no sirven de nada.
 1. **Rotar la contraseña de Postgres** (§0). Riesgo vivo, minutos, sin costo.
 2. **Crear el usuario de prueba del e2e** (§4). Gratis, minutos, y desbloquea la
    verificación de todo lo demás.

@@ -332,8 +332,34 @@ const webhook = await get("/api/webhooks/stripe", {
 })
 // 400 es el resultado bueno: el endpoint existe y rechaza lo que no trae firma
 // válida. Un 404 significa que no está desplegado; un 500, que revienta.
-if (webhook.status === 400) {
-  record("webhook", "Webhook de Stripe desplegado y validando firma", true, "POST sin firma → 400")
+//
+// El cuerpo importa tanto como el código, y esto se aprendió a golpes: el
+// 08-oct-2026 se renombró `STRIPE_SECRET_KEY` por accidente (se editó el campo
+// del nombre en vez del valor) y la variable desapareció. El despliegue en curso
+// siguió sano —conserva su instantánea de variables— pero **el siguiente
+// despliegue** habría dejado el cobro con tarjeta y el webhook rotos, sin más
+// señal que un 400 igual al de siempre. El endpoint devuelve el mensaje real en
+// el cuerpo, así que se puede distinguir "falta configurar" de "firma inválida".
+const webhookBody = webhook.body ?? ""
+const missingConfig = /is not defined|no está configurado/i.test(webhookBody)
+
+if (missingConfig) {
+  const varName = /([A-Z][A-Z0-9_]{4,})/.exec(webhookBody)?.[1] ?? "una variable de Stripe"
+  record(
+    "webhook",
+    "Webhook de Stripe desplegado y validando firma",
+    false,
+    `el despliegue no tiene configurada ${varName}: el webhook y el cobro con tarjeta fallarán. ` +
+      `Respuesta: ${webhookBody.slice(0, 120)}`,
+    true
+  )
+} else if (webhook.status === 400) {
+  record(
+    "webhook",
+    "Webhook de Stripe desplegado y validando firma",
+    true,
+    "POST sin firma → 400 (rechaza lo que no está firmado)"
+  )
 } else {
   record(
     "webhook",
@@ -383,6 +409,75 @@ if (!auth.measured) {
   )
 }
 
+/**
+ * Auditoría de la configuración de Stripe en Vercel.
+ *
+ * POR QUÉ EXISTE: la sonda del webhook (arriba) mira el despliegue **en curso**,
+ * y ese conserva su instantánea de variables. Así que puede reportar todo verde
+ * mientras la configuración del proyecto está rota y **el siguiente despliegue**
+ * va a fallar. Pasó exactamente eso el 08-oct-2026: se renombró
+ * `STRIPE_SECRET_KEY` por accidente y el sitio seguía sano, con la mina armada
+ * para el próximo deploy.
+ *
+ * Mira nombres y fechas, nunca valores: las tres variables están marcadas
+ * `sensitive` y Vercel no las devuelve.
+ */
+const STRIPE_ENV_VARS = [
+  "STRIPE_SECRET_KEY",
+  "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+]
+
+function vercelProjectId() {
+  const path = join(process.cwd(), ".vercel", "project.json")
+  if (!existsSync(path)) return null
+  try {
+    return JSON.parse(readFileSync(path, "utf8")).projectId ?? null
+  } catch {
+    return null
+  }
+}
+
+async function vercelStripeEnvAudit() {
+  const projectId = vercelProjectId()
+  if (!projectId) return { measured: false, detail: "sin .vercel/project.json (proyecto no vinculado)" }
+
+  let payload
+  try {
+    const raw = execFileSync("npx", ["vercel", "api", `/v9/projects/${projectId}/env`], {
+      encoding: "utf8",
+      timeout: 90_000,
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+    payload = JSON.parse(raw.slice(raw.indexOf("{")))
+  } catch {
+    return { measured: false, detail: "no se pudo consultar la API de Vercel (¿sesión caducada?)" }
+  }
+
+  const envs = payload.envs ?? []
+  const names = envs.map((e) => e.key)
+  const missing = STRIPE_ENV_VARS.filter((name) => !names.includes(name))
+
+  // El error de captura que ya ocurrió dos veces: pegar la llave en el campo del
+  // NOMBRE en vez del valor. Crea una variable inútil y deja la llave en claro.
+  const strayKeys = names.filter(
+    (name) => /^(sk|pk|rk|whsec)_/.test(name) || !/^[A-Za-z0-9_]+$/.test(name)
+  )
+
+  const problemas = []
+  if (missing.length > 0) {
+    problemas.push(`falta(n) ${missing.join(", ")}: el próximo despliegue rompería el cobro con tarjeta`)
+  }
+  if (strayKeys.length > 0) {
+    problemas.push(
+      `${strayKeys.length} variable(s) con nombre de llave (${strayKeys.map((n) => `${n.slice(0, 14)}…`).join(", ")}): ` +
+        `la llave se pegó en el campo del NOMBRE, no del valor`
+    )
+  }
+
+  return { measured: true, missing, strayKeys, total: envs.length, problems: problemas }
+}
+
 // --- 6. Canario: el barrido no debe cancelar pedidos contra entrega -----------
 const canary = await codSweepCanary()
 if (!canary.measured) {
@@ -394,6 +489,22 @@ if (!canary.measured) {
     canary.nuevas === 0,
     canary.detail,
     canary.nuevas > 0
+  )
+}
+
+// --- 7. Configuración de Stripe en Vercel (mira el próximo despliegue) --------
+const envAudit = await vercelStripeEnvAudit()
+if (!envAudit.measured) {
+  record("stripe-env", "Configuración de Stripe en Vercel", null, envAudit.detail, false)
+} else {
+  record(
+    "stripe-env",
+    "Configuración de Stripe en Vercel",
+    envAudit.problems.length === 0,
+    envAudit.problems.length === 0
+      ? `las 3 variables están puestas (${envAudit.total} en total, sin nombres sospechosos)`
+      : envAudit.problems.join("; "),
+    envAudit.problems.length > 0
   )
 }
 

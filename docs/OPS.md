@@ -1663,10 +1663,25 @@ valor real; no te fíes del "ok" del doctor.
 ### 14.4 Checklist de arranque (lo que solo puede hacer el operador)
 
 1. **Stripe en modo live.** En el dashboard, modo live: `pk_live_…`, `sk_live_…`
-   y el signing secret `whsec_…` del endpoint de webhook. Las tres variables de
-   Vercel están marcadas **Secret**, así que no se pueden leer ni editar; se
-   reemplazan con `vercel env update`, que conserva el tipo y pide el valor por
-   entrada estándar (nunca queda en el historial del shell):
+   y el signing secret `whsec_…` del endpoint de webhook.
+
+   **Antes de pegarlas en Vercel, valida la secreta:**
+
+   ```bash
+   npm run stripe:check -- --key sk_live_…
+   ```
+
+   Contesta las cuatro preguntas que importan sin tocar nada: si la llave es
+   válida, si es de live o de prueba, **si la cuenta está activada**
+   (`charges_enabled`) y si coincide con la publicable configurada. Sale 1 si hay
+   cualquier problema. Atrapa los dos errores que ya se cometieron una vez: pegar
+   la llave equivocada o a medias, y pegar una cuenta sin activar.
+
+   Las tres variables de Vercel están marcadas **Secret**, así que no se pueden
+   leer ni editar; se reemplazan con `vercel env update`, que conserva el tipo y
+   pide el valor por entrada estándar (nunca queda en el historial del shell).
+   **El nombre lo pone el comando: tú pegas la llave como VALOR.** Pegarla en el
+   campo del nombre crea una variable inútil y deja la llave expuesta en claro:
 
    ```bash
    vercel env update NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY production --sensitive  # pk_live_…
@@ -1886,6 +1901,78 @@ vercel logs <url-del-despliegue> | grep -i "signature error"
 Y del lado de Stripe, *Developers → Webhooks → el endpoint → Recent deliveries*
 muestra cada intento con su código: 200 es firma correcta; 400 es lo de arriba.
 
+#### 14.8.1 El otro 400: la variable que falta
+
+No todo 400 significa "firma inválida". El endpoint devuelve el mensaje real en el
+cuerpo, y hay dos familias:
+
+| Cuerpo de la respuesta | Qué significa |
+|---|---|
+| `No stripe-signature header value was provided.` | **Sano**: el endpoint existe y rechaza lo que no está firmado |
+| `No signatures found matching the expected signature…` | **Sano**: la firma no cuadra (el caso de arriba) |
+| `STRIPE_SECRET_KEY is not defined` | **Roto**: el despliegue no tiene la llave secreta |
+| `STRIPE_WEBHOOK_SECRET no está configurado` | **Roto**: falta el secreto del webhook |
+
+`npm run launch:check` distingue las dos familias y marca la segunda como
+bloqueador, nombrando la variable que falta. Existe por un incidente concreto: el
+08-oct-2026 se **renombró** `STRIPE_SECRET_KEY` por accidente —se editó el campo
+del nombre en vez del valor— y la variable desapareció. El despliegue en curso
+siguió sano, porque conserva su instantánea de variables, pero el siguiente
+habría roto el cobro con tarjeta **con el mismo 400 de siempre**. La sonda
+convierte esa mina silenciosa en un fallo visible.
+
+> Regla práctica: **un 400 no basta como señal.** Hay que leer el cuerpo.
+
+#### 14.8.2 Incidente del 08-oct-2026: el despliegue que se llevó la mina
+
+El mismo día, horas después de escribirse lo de arriba, la mina explotó y sirvió
+para validar la sonda en el mundo real.
+
+**Qué pasó.** Al editar `STRIPE_SECRET_KEY` en Vercel se cambió el campo del
+**nombre** en vez del valor, así que la variable quedó renombrada y
+`STRIPE_SECRET_KEY` desapareció. El despliegue en curso siguió sano —conserva su
+instantánea de variables— y durante unos minutos el sitio funcionó con
+normalidad. Después entró un despliegue nuevo que tomó la configuración
+incompleta, y el cobro con tarjeta se rompió.
+
+**Alcance medido, no supuesto:**
+
+| Qué | Estado |
+|---|---|
+| La tienda | Arriba: `/`, `/cart`, `/auth/login`, `/auth/register`, `/cdmx` en 200 |
+| Pago contra entrega | Funcionando — `src/app/api/orders/route.ts` no toca Stripe |
+| Registro y login | Funcionando |
+| Cobro con tarjeta | Roto |
+| Webhook de Stripe | Roto (`{"error":"STRIPE_SECRET_KEY is not defined"}`) |
+
+**No se perdió dinero**, y eso no es suerte: el sitio ya estaba en modo prueba
+(§14.1), así que ninguna tarjeta real podía cobrarse antes tampoco. Lo que se
+perdió fue la capacidad de probar el cobro, no la de vender contra entrega.
+
+**Las dos lecciones:**
+
+1. **Editar una variable en Vercel puede renombrarla.** El campo del nombre y el
+   del valor están juntos, y cambiar el primero destruye la variable. Por eso el
+   camino recomendado es `vercel env add` / `vercel env update` desde la
+   terminal: el nombre lo pone el comando y solo se pega el valor (§14.4).
+2. **Un despliegue no es la configuración.** El despliegue en curso puede estar
+   sano mientras la configuración del proyecto está rota y el siguiente
+   despliegue va a fallar. Por eso `launch:check` mira las dos cosas: el
+   despliegue (sonda del webhook) y la configuración del proyecto (auditoría de
+   variables). Antes de esto solo miraba la primera, y reportaba verde con la
+   mina armada.
+
+**Hallazgo aparte, no corregido.** `src/app/api/payments/stripe/create-intent`
+devuelve el mensaje crudo del error al cliente en el `catch` genérico, así que un
+cliente que intentara pagar durante este incidente habría visto
+`STRIPE_SECRET_KEY is not defined`. No se tocó porque
+`create-intent/route.test.ts` **codifica ese comportamiento a propósito**
+(«500 ante un error genérico de Stripe» afirma el mensaje crudo), así que
+cambiarlo es una decisión de contrato, no un arreglo obvio. Queda anotado: el
+resto del repo mapea los errores técnicos a mensajes amigables antes de
+mostrarlos (`mapAuthError` en `src/app/auth/callback/route.ts`), y esta ruta es
+la excepción.
+
 #### Por qué un `whsec_` mal puesto no pierde dinero
 
 Stripe reintenta la entrega durante **3 días** con retroceso exponencial, y el
@@ -1899,6 +1986,134 @@ se corrige en cuanto se detecta: no se deja "porque se arregla solo".
 Un pedido pagado con tarjeta real pasa a **pagado sin esperar al cron**. Si
 pasados unos minutos sigue pendiente, el `whsec_` está mal: se rehace el endpoint
 live, se actualiza la variable y se redespliega.
+
+### 14.9 Activar la cuenta de Stripe en México: la Constancia de Situación Fiscal
+
+> Medido el 08-oct-2026. Bloquea el corte a llaves live (§14.4): sin la cuenta
+> activada, las llaves `sk_live_…` no sirven y los pasos siguientes no cambian
+> nada. Fuentes oficiales al final.
+
+#### 14.9.1 El requisito
+
+Stripe México no activa la cuenta sin la **Constancia de Situación Fiscal (CSF)**
+emitida por el SAT. Y no acepta ningún otro documento para verificar el estatus
+fiscal: ni el acuse de inscripción, ni la opinión de cumplimiento, ni un CFDI.
+La variante correcta es la **CSF *con* Cédula de Identificación Fiscal (CIF)**,
+que es la que trae CIF + QR + RFC + régimen + domicilio.
+
+Se sube **solo desde el Dashboard**, en
+`dashboard.stripe.com/settings/actualizacion-fiscal`. Un documento mandado por
+correo o por un enlace de soporte no cuenta.
+
+#### 14.9.2 Por qué se rechaza (en orden de probabilidad)
+
+| # | Causa | Arreglo |
+|---|---|---|
+| 1 | **Los datos no coinciden** entre la CSF y lo capturado en Stripe: RFC, nombre/razón social, **régimen fiscal** o **código postal** | Copiar **carácter por carácter** desde la CSF (acentos, puntos, espacios y sufijos como "S.A. de C.V." incluidos). El nombre debe coincidir exacto: cualquier diferencia mínima lo rechaza |
+| 2 | **La CSF está desactualizada** | Regenerarla hoy en el portal del SAT y comparar "lugar y fecha de emisión" |
+| 3 | **El PDF trae anotaciones, es combinado, o está cifrado** | Stripe lo documenta: quitar anotaciones o usar **"Imprimir → Guardar como PDF"** para aplanarlo. Es recomendación oficial de Stripe, no un truco |
+| 4 | **El QR no se lee** | Stripe **lee el QR**: nada de fotos, capturas ni recortes; el PDF nativo del SAT, a buena resolución |
+| 5 | **Documento equivocado** | Ver §14.9.1 |
+| 6 | **Formato o tamaño** | PDF (16 MB; 10 MB si viene combinado) |
+| 7 | **Régimen incompatible** con el tipo de empresa elegido en Stripe | Corregir el tipo en Stripe. **Nunca** cambiar el régimen ante el SAT para "pasar" un menú desplegable |
+| 8 | **Se subió por otro canal** | Solo el Dashboard |
+| 9 | **Límite por demasiados intentos** | *"You have tried to update your tax information too many times today"* → bloqueo de **24 horas**. Si se estuvo reintentando, esto explica el rechazo mejor que el archivo |
+| 10 | **Antigüedad de la CSF** | **No hay requisito publicado** por Stripe: solo pide que esté "actualizada" y legible. La regla de "menos de 30/90 días" es práctica bancaria, no de Stripe |
+
+#### 14.9.3 Dónde se corrige cada dato
+
+Son **dos pantallas distintas** y confundirlas es parte del problema:
+
+- `dashboard.stripe.com/settings/taxation` — **Datos fiscales**: nombre legal,
+  RFC, régimen fiscal, código postal. Aquí se corrige un desajuste con la CSF.
+- `dashboard.stripe.com/settings/update` — **Información de la empresa**:
+  dirección y titularidad. Si cambió el domicilio fiscal, esta va primero.
+
+Formato del RFC: **13 caracteres** en persona física, **12** en persona moral. Un
+RFC con longitud equivocada da su propio error de formato.
+
+#### 14.9.4 Regenerar la CSF en el SAT (es gratis)
+
+Portal del SAT → *Otros trámites y servicios* → **Genera tu Constancia de
+Situación Fiscal** → entrar con **RFC y contraseña** o **e.firma** → *Generar
+Constancia* → guardar el PDF **tal cual**, sin editarlo.
+
+- Disponible 24/7 los 365 días.
+- **Personas morales: solo por el portal** con e.firma o contraseña; no pueden
+  usar SAT ID ni SAT Móvil.
+- Si el PDF no abre, es que está cifrado: eso por sí solo lo hace inválido.
+- MarcaSAT: 55 627 22 728.
+
+#### 14.9.5 Dato para contabilidad
+
+Las facturas de las comisiones de Stripe las emite **STRIPE PAYMENTS MÉXICO,
+S. DE R.L. DE C.V. — RFC SPM1410037E8**, con los datos fiscales capturados
+durante la activación. Si esos datos están mal, las facturas salen mal: es la
+misma información que valida la CSF.
+
+#### 14.9.6 ¿La constancia bloquea el cobro, o solo la facturación?
+
+**No se asumió: se mide.** Son dos cosas distintas y conviene no confundirlas.
+
+- `charges_enabled` es lo que decide si la cuenta **puede cobrar**. Depende de que
+  `requirements.currently_due` esté vacío.
+- La constancia fiscal es la validación del **estatus fiscal contra el SAT**, que
+  Stripe pide para poder emitir las facturas de sus comisiones (§14.9.5).
+
+Puede que la constancia esté en la lista de requisitos y aun así la cuenta tenga
+`charges_enabled: true`, o al revés. **La única forma de saberlo es preguntarle a
+la API**, y eso es exactamente lo que hace el validador:
+
+```bash
+npm run stripe:check -- --key sk_live_…
+```
+
+Imprime `Cobros habilitados: sí/NO` y, si está bloqueado, el motivo
+(`disabled_reason`) y los requisitos pendientes por nombre. Si dice
+`Cobros habilitados: sí`, **la constancia no está bloqueando el cobro** y se puede
+avanzar al corte de §14.4 sin esperar a resolverla.
+
+> Por qué importa: dar por hecho que "me piden la constancia ⇒ no puedo cobrar"
+> puede retrasar el arranque semanas sin necesidad. Se mide, no se supone.
+
+#### 14.9.7 El asistente de activación no es el panel
+
+Un tropiezo real, medido el 08-oct-2026: se buscó el interruptor de **Test mode**
+en Stripe y no aparecía. La causa no era el interruptor.
+
+**Mientras la cuenta está en el asistente de activación, el panel normal no
+existe.** No hay interruptor de Test mode, no hay *Developers → API keys*, no hay
+llaves live. Solo está el formulario de alta pidiendo los datos del negocio y la
+constancia.
+
+Consecuencia práctica para el runbook de §14.4: **el paso 1 no se puede ejecutar
+antes de terminar la activación.** El orden real es:
+
+1. Terminar el asistente de activación — datos del negocio **y la constancia**.
+2. Recién entonces aparece el panel, con `Developers → API keys` y el interruptor
+   de Test mode.
+3. Recién entonces se pueden sacar `pk_live_…` / `sk_live_…` y validarlas con
+   `npm run stripe:check`.
+
+Buscar las llaves antes de este punto no es un problema de navegación: es que
+todavía no existen para esa cuenta. Si alguien reporta «no encuentro el botón»,
+la pregunta correcta no es dónde está, sino **en qué pantalla está**.
+
+> Y si aun así no aparece después de activar, la explicación alternativa es que
+> la cuenta ya esté en live sin interruptor visible (Stripe migró de «Test mode»
+> a un selector de *sandboxes*). En ambos casos, la captura de la pantalla
+> resuelve la duda en segundos; adivinar desde fuera, no.
+
+#### 14.9.8 Fuentes
+
+- `support.stripe.com/questions/accounts-from-mexico-update-your-tax-information?locale=es-419` (mod. 11-jun-2026) — requisitos textuales de la CSF.
+- `support.stripe.com/questions/required-information-to-open-your-stripe-account-in-mexico?locale=es-419` (mod. 18-sep-2026).
+- `support.stripe.com/questions/taxes-on-stripe-fees-for-mexico-based-businesses` (mod. 28-ago-2026).
+- `support.stripe.com/questions/accessing-tax-invoices-on-stripe-fees-for-accounts-based-in-mexico` (mod. 07-oct-2026) — emisor y RFC.
+- `support.stripe.com/questions/verify-your-tax-information-error-messages` (mod. 01-oct-2025) — coincidencia carácter por carácter.
+- `support.stripe.com/questions/you-have-tried-to-update-your-tax-information-too-many-times-today-…` (mod. 26-sep-2026) — bloqueo de 24 h.
+- `docs.stripe.com/file-upload` — validaciones de PDF y la recomendación de *Print to PDF*.
+- `gob.mx/sat/articulos/genera-tu-constancia-de-situacion-fiscal-csf` y `wwwmat.sat.gob.mx/aplicacion/53027/…` — contenido de la CSF y las 5 vías para generarla.
 
 ---
 
