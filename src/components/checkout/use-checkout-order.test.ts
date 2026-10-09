@@ -77,6 +77,14 @@ vi.mock("@/lib/utm", () => ({
   getStoredUtm: vi.fn(() => ({ source: "ig", medium: "story" })),
 }))
 
+/** `confirmPayment` de Stripe.js: el hook lo importa dinámicamente (3DS/SCA). */
+const stripeMock = vi.hoisted(() => ({
+  confirmPayment: vi.fn(async () => ({ error: null as null | { message: string } })),
+}))
+vi.mock("@stripe/stripe-js", () => ({
+  loadStripe: vi.fn(async () => ({ confirmPayment: stripeMock.confirmPayment })),
+}))
+
 import { useCheckoutOrder, type CheckoutOrderOptions } from "./use-checkout-order"
 import { saveGuestToken, saveLastAddress } from "@/lib/guest-address"
 import type { City, CartItem } from "@/types"
@@ -396,5 +404,114 @@ describe("useCheckoutOrder · flujo onPaid", () => {
     await (await mount(opts)).handlePlaceOrder("spei")
     expect(opts.onPaid).not.toHaveBeenCalled()
     expect(useRenderHook(opts).checkoutError).toBe("sin stock")
+  })
+})
+
+describe("useCheckoutOrder · handleExpressCheckout", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    hooks.states.length = 0
+    hooks.refs.length = 0
+    authState.user = { id: "u-1", email: "cliente@x.mx" }
+    stripeMock.confirmPayment.mockResolvedValue({ error: null })
+  })
+
+  /** Enruta por URL; cualquier otra (p. ej. saved-card) responde `{}`. */
+  function routeFetch(routes: Record<string, { body: unknown; ok?: boolean }>) {
+    fetchMock.mockImplementation(async (url: string) => {
+      const hit = routes[url]
+      if (!hit) return jsonResponse({})
+      return jsonResponse(hit.body, hit.ok ?? true)
+    })
+  }
+
+  it("cobro 1-click exitoso: devuelve 'paid' y dispara onPaid", async () => {
+    routeFetch({
+      "/api/orders": { body: ORDER_RESPONSE },
+      "/api/payments/stripe/express-checkout": {
+        body: { status: "succeeded", paymentIntentId: "pi_ok" },
+      },
+    })
+    const opts = makeOptions()
+    const r = await mount(opts)
+
+    expect(await r.handleExpressCheckout()).toBe("paid")
+    expect(opts.onPaid).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: 101, paymentIntentId: "pi_ok" })
+    )
+    // No se prepara el formulario: el pedido ya está pagado.
+    expect(useRenderHook(opts).showStripeForm).toBe(false)
+  })
+
+  it("tarjeta declinada: 'fallback' y deja el formulario de Stripe listo", async () => {
+    routeFetch({
+      "/api/orders": { body: ORDER_RESPONSE },
+      "/api/payments/stripe/express-checkout": { body: { status: "declined" } },
+      "/api/payments/stripe/create-intent": {
+        body: { clientSecret: "cs_retry", paymentIntentId: "pi_retry" },
+      },
+    })
+    const opts = makeOptions()
+    const r = await mount(opts)
+
+    expect(await r.handleExpressCheckout()).toBe("fallback")
+    expect(opts.onPaid).not.toHaveBeenCalled()
+    const after = useRenderHook(opts)
+    // El motivo es visible y el pago puede completarse: era exactamente lo que
+    // no pasaba cuando el botón vivía en un paso sin `checkoutError`.
+    expect(after.checkoutError).toMatch(/No pudimos cobrar con tu tarjeta guardada/)
+    expect(after.showStripeForm).toBe(true)
+    expect(after.stripeClientSecret).toBe("cs_retry")
+  })
+
+  it("sin tarjeta guardada: 'fallback', motivo propio y el botón se oculta", async () => {
+    routeFetch({
+      "/api/orders": { body: ORDER_RESPONSE },
+      "/api/payments/stripe/express-checkout": { body: { status: "no_saved_card" } },
+      "/api/payments/stripe/create-intent": { body: { clientSecret: "cs_2" } },
+    })
+    const opts = makeOptions()
+    const r = await mount(opts)
+
+    expect(await r.handleExpressCheckout()).toBe("fallback")
+    const after = useRenderHook(opts)
+    expect(after.savedCard?.hasSavedCard).toBe(false)
+    expect(after.checkoutError).toMatch(/No encontramos una tarjeta guardada/)
+  })
+
+  it("3DS que el banco no confirma: 'fallback' con el motivo del banco", async () => {
+    stripeMock.confirmPayment.mockResolvedValue({ error: { message: "Tu banco rechazó el pago" } })
+    routeFetch({
+      "/api/orders": { body: ORDER_RESPONSE },
+      "/api/payments/stripe/express-checkout": {
+        body: { status: "requires_action", clientSecret: "cs_3ds", paymentIntentId: "pi_3ds" },
+      },
+      "/api/payments/stripe/create-intent": { body: { clientSecret: "cs_3ds" } },
+    })
+    const opts = makeOptions()
+    const r = await mount(opts)
+
+    expect(await r.handleExpressCheckout()).toBe("fallback")
+    expect(opts.onPaid).not.toHaveBeenCalled()
+    const after = useRenderHook(opts)
+    expect(after.checkoutError).toBe("Tu banco rechazó el pago")
+    expect(after.showStripeForm).toBe(true)
+  })
+
+  it("si ni siquiera se puede crear la orden: 'fallback' con el error visible", async () => {
+    routeFetch({
+      "/api/orders": { body: { error: "El total no coincide con los precios del catálogo" }, ok: false },
+    })
+    const opts = makeOptions()
+    const r = await mount(opts)
+
+    expect(await r.handleExpressCheckout()).toBe("fallback")
+    expect(opts.onPaid).not.toHaveBeenCalled()
+    expect(fetchMock.mock.calls.map((c) => c[0])).not.toContain(
+      "/api/payments/stripe/express-checkout"
+    )
+    expect(useRenderHook(opts).checkoutError).toBe(
+      "El total no coincide con los precios del catálogo"
+    )
   })
 })

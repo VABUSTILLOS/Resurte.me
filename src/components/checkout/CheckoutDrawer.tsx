@@ -408,7 +408,14 @@ export function CheckoutDrawer() {
                 selectedAddressId !== null &&
                 isAddressValid && (
                   <button
-                    onClick={() => void handleExpressCheckout()}
+                    onClick={() => {
+                      // El fallo del 1-click deja listo el formulario de Stripe,
+                      // que vive en el paso de pago: sin avanzar, el usuario se
+                      // quedaba en este paso sin mensaje ni forma de pagar.
+                      void handleExpressCheckout().then((outcome) => {
+                        if (outcome === "fallback") setStep("payment")
+                      })
+                    }}
                     disabled={isProcessing || itemCount === 0}
                     className="w-full flex flex-col items-center gap-0.5 px-6 py-3 mb-3 bg-[#242529] text-white font-bold rounded-xl hover:bg-black disabled:opacity-70 transition-colors"
                   >
@@ -433,6 +440,15 @@ export function CheckoutDrawer() {
                     )}
                   </button>
                 )}
+
+              {/* Motivo del fallo del cobro rápido (o de crear la orden): el
+                  paso de pago también lo pinta, pero si el avance no aplica el
+                  usuario tiene que verlo aquí, junto al botón que lo provocó. */}
+              {checkoutError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-3 text-sm text-red-700">
+                  {checkoutError}
+                </div>
+              )}
 
               <button
                 onClick={() => {
@@ -581,6 +597,15 @@ export function CheckoutDrawer() {
 
           {step === "payment" && (
             <div className="space-y-5">
+              {/* Motivo del último fallo (cobro rápido rechazado, 3DS, red).
+                  Va FUERA del ternario: el formulario de Stripe y el resumen
+                  son ramas excluyentes, y el mensaje tiene que verse en las
+                  dos — el fallo del 1-click deja precisamente el formulario. */}
+              {checkoutError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+                  {checkoutError}
+                </div>
+              )}
               {showStripeForm && stripeClientSecret ? (
                 <StripeProvider clientSecret={stripeClientSecret}>
                   <StripePaymentForm
@@ -682,12 +707,6 @@ export function CheckoutDrawer() {
                       </span>
                     </span>
                   </label>
-
-                  {checkoutError && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
-                      {checkoutError}
-                    </div>
-                  )}
 
                   <div className="flex gap-3">
                     <button

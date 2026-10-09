@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test"
+import { hasAdminCredentials, signInAsAdmin } from "./support/session"
 
 /**
  * E2E del checkout drawer de alta conversión (mecánica SamCart/ThriveCart).
@@ -922,5 +923,84 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await deleteRequest
     await expect(group.getByRole("radio", { name: /Oficina/ })).toHaveCount(0)
     await expect(group.getByRole("radio", { name: /Casa/ })).toBeVisible()
+  })
+})
+
+/**
+ * Express 1-click ("Pedir al instante").
+ *
+ * El botón solo existe con sesión + tarjeta guardada + dirección en el libro,
+ * así que el bloque se salta sin credenciales reales (mismo criterio que
+ * e2e/support/session.ts: mejor saltado y visible que fingiendo verificar) y
+ * también si la cuenta no tiene los datos guardados.
+ *
+ * Lo que se mide es el arreglo del fallo mudo: cuando el cobro rápido no pasa,
+ * el motivo tiene que verse y el usuario tiene que quedar en el paso de pago
+ * (donde vive el formulario), no varado en el paso de revisión sin mensaje.
+ */
+test.describe("express 1-click (Pedir al instante)", { tag: "@ci" }, () => {
+  test("un cobro rechazado muestra el motivo y saca al usuario del paso de revisión", async ({
+    page,
+  }) => {
+    test.skip(!hasAdminCredentials(), "sin E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD")
+    test.skip(!(await signInAsAdmin(page)), "no se pudo iniciar sesión")
+
+    // Nada de esto debe tocar la BD ni Stripe: pedido, intent y lead de mentira.
+    await page.route("**/api/orders", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          orderId: 999999,
+          cashbackCredits: 0,
+          cashbackTier: null,
+          trackingToken: "e2e-express",
+        }),
+      })
+    )
+    await page.route("**/api/leads", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" })
+    )
+    await page.route("**/api/payments/stripe/saved-card", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ hasSavedCard: true, last4: "4242", brand: "visa" }),
+      })
+    )
+    await page.route("**/api/payments/stripe/express-checkout", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ status: "declined" }),
+      })
+    )
+    await page.route("**/api/payments/stripe/create-intent", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ clientSecret: "cs_e2e", paymentIntentId: "pi_e2e" }),
+      })
+    )
+
+    seedCart(page, [aguacate])
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
+    await openCheckoutDrawer(page)
+
+    const express = page.getByRole("button", { name: /Pedir al instante/ })
+    test.skip(
+      (await express.count()) === 0,
+      "la cuenta no tiene tarjeta guardada + dirección en el libro"
+    )
+
+    await express.click()
+
+    const drawer = page.getByLabel("Checkout", { exact: true })
+    await expect(
+      drawer.getByText(/No pudimos cobrar con tu tarjeta guardada/)
+    ).toBeVisible()
+    // Salió del paso de revisión: su botón ya no está (el formulario de pago
+    // es lo que el mensaje "completa el pago abajo" promete).
+    await expect(page.getByRole("button", { name: "Continuar al envío" })).toHaveCount(0)
   })
 })

@@ -70,6 +70,18 @@ export type CheckoutPaidInfo = {
   trackingToken?: string | null
 }
 
+/**
+ * Desenlace del cobro rápido 1-click (`handleExpressCheckout`).
+ *
+ * · `paid`     — el cargo se completó (o el 3DS se resolvió) y `onPaid` ya corrió.
+ * · `fallback` — no se cobró: la orden queda pendiente e intacta y el flujo
+ *   normal quedó listo (o no se pudo ni crear la orden). Quien monta el botón
+ *   decide qué hacer; el `CheckoutDrawer` avanza al paso de pago para que el
+ *   mensaje "completa el pago abajo" apunte al formulario de Stripe, que vive
+ *   ahí y no donde está el botón.
+ */
+export type ExpressCheckoutOutcome = "paid" | "fallback"
+
 export interface CheckoutOrderOptions {
   city: City | null
   address: AddressForm
@@ -664,8 +676,13 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
   )
 
   // ── Express Checkout: cobra con la tarjeta guardada (off-session) ──
-  const handleExpressCheckout = useCallback(async () => {
-    if (!city) return
+  //
+  // Devuelve el desenlace para que la superficie que monta el botón pueda
+  // reaccionar: el fallo prepara el formulario de Stripe, pero ese formulario
+  // vive en el paso de pago, así que quedarse donde está el botón deja al
+  // usuario sin mensaje ni forma de pagar (era el bug de "Pedir al instante").
+  const handleExpressCheckout = useCallback(async (): Promise<ExpressCheckoutOutcome> => {
+    if (!city) return "fallback"
     setIsProcessing(true)
     setCheckoutError(null)
 
@@ -676,7 +693,7 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
         const created = await createOrder("card")
         if (!created) {
           setIsProcessing(false)
-          return
+          return "fallback"
         }
         orderId = created.orderId
         cashback = created.cashback
@@ -693,13 +710,13 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
       if (!response.ok) {
         setCheckoutError(data.error || "No se pudo completar el pago rápido.")
         setIsProcessing(false)
-        return
+        return "fallback"
       }
 
       if (data.status === "succeeded") {
-        setSavedCard({ hasSavedCard: true })
+        setSavedCard((c) => ({ hasSavedCard: true, last4: c?.last4, brand: c?.brand }))
         handleStripeSuccess(data.paymentIntentId as string, { orderId, cashback })
-        return
+        return "paid"
       }
 
       if (data.status === "requires_action" && data.clientSecret) {
@@ -711,8 +728,8 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
         )
         if (!stripe) {
           setCheckoutError("No se pudo iniciar la verificación de tu banco.")
-          setIsProcessing(false)
-          return
+          await initializeCardPayment(orderId, cashback)
+          return "fallback"
         }
         const { error } = await stripe.confirmPayment({
           clientSecret: data.clientSecret,
@@ -722,12 +739,14 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
           setCheckoutError(
             error.message || "Tu banco no confirmó el pago. Intenta de nuevo."
           )
-          setIsProcessing(false)
-          return
+          // Deja el formulario listo para reintentar (create-intent reutiliza
+          // este mismo PaymentIntent, así que el reintento no duplica cargos).
+          await initializeCardPayment(orderId, cashback)
+          return "fallback"
         }
-        setSavedCard({ hasSavedCard: true })
+        setSavedCard((c) => ({ hasSavedCard: true, last4: c?.last4, brand: c?.brand }))
         handleStripeSuccess(data.paymentIntentId as string, { orderId, cashback })
-        return
+        return "paid"
       }
 
       // declined / no_saved_card / cualquier otro: fail-open, se cae al flujo
@@ -744,11 +763,13 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
       }
       // Inicializa el flujo normal con el mismo pedido ya creado.
       await initializeCardPayment(orderId, cashback)
+      return "fallback"
     } catch (err) {
       setCheckoutError(
         err instanceof Error ? err.message : "Error de conexión. Intenta de nuevo."
       )
       setIsProcessing(false)
+      return "fallback"
     }
   }, [city, createdOrderId, earnedCashback, createOrder, initializeCardPayment, handleStripeSuccess])
 
