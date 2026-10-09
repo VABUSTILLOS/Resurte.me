@@ -126,7 +126,10 @@ export default function CartPage() {
       {/* Barra de progreso hacia envío gratis (mecánica ThriveCart).
           Se actualiza en tiempo real al seleccionar order bumps. */}
       <div className="mb-6">
-        <FreeShippingProgress payableSubtotal={totals.payableSubtotal} />
+        <FreeShippingProgress
+          payableSubtotal={totals.payableSubtotal}
+          freeShipping={totals.freeShippingApplied}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

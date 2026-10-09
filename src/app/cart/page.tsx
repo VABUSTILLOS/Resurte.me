@@ -271,6 +271,7 @@ export default function CartPage() {
       <div className="mb-4">
         <FreeShippingProgress
           payableSubtotal={totals.payableSubtotal}
+          freeShipping={totals.freeShippingApplied}
         />
       </div>
 

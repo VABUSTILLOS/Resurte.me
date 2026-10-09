@@ -107,6 +107,33 @@
   Ninguna superficie publica la cifra a mano: la prosa interpola la constante y
   `commercial-facts.test.ts` falla si alguna la escribe literal. Al mover una de
   las dos, revisa también `bump_rules.subtotal_min` en Supabase.
+- **Cupón de envío gratis (`free_shipping`)**: tercer valor del ENUM
+  `discount_type` (migración `00219`). Regala la tarifa de envío **sin tocar el
+  subtotal** — un descuento de subtotal, en cambio, *sube* la barrera del envío
+  gratis porque baja el pagable. Semántica e invariantes:
+  - `discount_value` se guarda en `0`; `discountAmount` es `0` y su único efecto
+    es `deliveryFee = 0`, **aunque el pagable no llegue al umbral**.
+  - **Las reglas son las mismas que las de cualquier cupón**: `min_order`,
+    `max_uses` y `expires_at` se evalúan y se configuran igual. Lo único especial
+    del tipo es su *efecto* (regala el envío en vez de descontar subtotal); no lo
+    trates como una excepción sin reglas. El guardián de propiedad (`user_id`) no
+    vive en `coupon-rules` porque es una regla de seguridad, y lo aplican las rutas.
+  - Las reglas de elegibilidad viven **una sola vez** en
+    `src/lib/coupon-rules.ts` (`validateCouponEligibility` + `isFreeShippingCoupon`)
+    y las consumen tanto `POST /api/coupons/validate` como `POST /api/orders`.
+    No las vuelvas a copiar en una ruta: dos copias de una regla de dinero
+    divergen en el primer arreglo.
+  - El tipo se propaga por `calcCouponDiscount`, `validDeliveryFee(…,
+    freeShippingCoupon)` y `calcCheckoutTotals` (que expone `freeShippingApplied`
+    para que la barra de progreso no re-derive la condición). `parseCoupon` de
+    `cart-background-sync.ts` debe aceptarlo o el cupón no persiste ni sincroniza.
+  - En el admin (`/admin/marketing`) el formulario de alta expone **Valor,
+    Mín. pedido, Máx. usos y Expiración** para todos los tipos: `max_uses` es la
+    forma de acotar cuántas veces se puede canjear un cupón (`0` = ilimitado) y el
+    campo es obligatorio de mantener — sin él todo cupón nace ilimitado. Para
+    `free_shipping` solo se oculta el campo "Valor" (no descuenta productos) y
+    `validateCouponInput` fuerza `discount_value: 0`; sus reglas se editan con el
+    mismo formulario en línea que las de los demás.
 - El carrito persiste en localStorage con carga post-hidratación (`LOAD_CART`);
   no leer localStorage en el render inicial (mismatch #418).
 - El drawer es un diálogo: foco inicial, Escape, `aria-modal`, scroll lock del body
@@ -188,9 +215,14 @@
   seguimiento (10/60 s contra 30/60 s).
 
 ## Verificación
-`npm test` (payments, checkout-config, order-bumps, ingredient-affinity,
-checkout-bdd-regression) + `npx playwright test e2e/checkout-drawer.spec.ts` y un
-checkout de prueba E2E en móvil con cupón y bumps.
+`npm test` (payments, checkout-config, coupon-rules, order-bumps,
+ingredient-affinity, checkout-bdd-regression) + `npx playwright test
+e2e/checkout-drawer.spec.ts` y un checkout de prueba E2E en móvil con cupón y
+bumps. Para el cupón de envío gratis: `npx vitest run src/lib/coupon-rules.test.ts
+src/lib/checkout-config.test.ts` y, a mano, aplicar un código `free_shipping` con
+el carrito por debajo del umbral y comprobar que la fila "Envío" queda en
+`Gratis 🎉`, la barra dice "Tienes envío gratis" y `POST /api/orders` no rechaza
+por total mismatch.
 
 Para la reanudación del paso: `npx vitest run src/lib/checkout-resume.test.ts`
 (cubre `payment` → `review`, pasos corruptos y un `sessionStorage` hostil) y, a

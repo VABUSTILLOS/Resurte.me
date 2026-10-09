@@ -1618,7 +1618,7 @@ fuera.
 
 | Pregunta | Resultado | Cómo se midió |
 |---|---|---|
-| ¿Se pueden cobrar tarjetas reales? | **No** | El bundle de producción hornea `loadStripe("pk_test_…")`: modo test. La llave se validó contra la API de Stripe (crea token con tarjeta de prueba) y es válida, de test. |
+| ¿Se pueden cobrar tarjetas reales? | **Sí, desde el 08-oct-2026** | El bundle sirve `pk_live_…` y la app crea PaymentIntents live verificados contra Stripe (`livemode: True`, MXN). El detalle del corte está en §14.10. Antes era "No": ver la medición original abajo. |
 | ¿Los pedidos y compras se guardan? | **Sí** | `orders`: 23 filas, 14 con `stripe_payment_intent_id`, 9 `paid`+`confirmed`. `profiles`: 4. |
 | ¿Se puede registrar un usuario? | **Sí, desde el 01-oct-2026** | `mailer_autoconfirm=true` (la confirmación por correo está desactivada) y `disable_signup=false`: el alta devuelve **sesión inmediata**. Antes era "a medias" — ver §14.7. |
 | ¿Se puede iniciar sesión? | **Sí** | `POST /auth/v1/token` responde 400 `invalid_credentials` con credenciales falsas (comportamiento correcto) y 200 con las válidas. |
@@ -1677,16 +1677,39 @@ valor real; no te fíes del "ok" del doctor.
    cualquier problema. Atrapa los dos errores que ya se cometieron una vez: pegar
    la llave equivocada o a medias, y pegar una cuenta sin activar.
 
-   Las tres variables de Vercel están marcadas **Secret**, así que no se pueden
-   leer ni editar; se reemplazan con `vercel env update`, que conserva el tipo y
-   pide el valor por entrada estándar (nunca queda en el historial del shell).
+   Las tres variables de Vercel se reemplazan desde la terminal, que pide el
+   valor por entrada estándar y **nunca lo deja en el historial del shell**.
    **El nombre lo pone el comando: tú pegas la llave como VALOR.** Pegarla en el
-   campo del nombre crea una variable inútil y deja la llave expuesta en claro:
+   campo del nombre crea una variable inútil y deja la llave expuesta en claro.
+
+   ⚠️ **La publicable NO puede ser un Secreto.** Vercel lo rechaza con
+   `NEXT_PUBLIC_ exposes this value to anyone visiting your site, so … cannot be
+   a Secret` — y tiene razón: una llave publicable es pública por definición.
+   Pero la variable existente está guardada como *Secret* desde ago-2026, y un
+   Secreto **no se puede convertir** en Config (`secret_cannot_become_config`).
+   Hay que borrarla y volver a crearla como Config:
 
    ```bash
-   vercel env update NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY production --sensitive  # pk_live_…
-   vercel env update STRIPE_SECRET_KEY production --sensitive                   # sk_live_…
-   vercel env update STRIPE_WEBHOOK_SECRET production --sensitive               # whsec_… live
+   # 1. Publicable → Config (borrar y recrear; no acepta update)
+   vercel env rm NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY production --yes
+   vercel env add NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY production --type config \
+     --value "pk_live_…" --yes
+
+   # 2. Secreta y secreto del webhook → sí son Secret
+   vercel env update STRIPE_SECRET_KEY production --sensitive --value "sk_live_…" -y
+   vercel env update STRIPE_WEBHOOK_SECRET production --sensitive --value "whsec_…" -y
+   ```
+
+   `STRIPE_SECRET_KEY` no existe desde el 08-oct-2026 (§14.8.2): si el `update`
+   falla con «not found», usa `vercel env add … --sensitive` igual que arriba.
+
+   Verificar sin exponer valores (a un archivo aparte, **nunca** sobre
+   `.env.local`):
+
+   ```bash
+   vercel env pull /tmp/env-check.txt --environment=production --yes
+   grep -E "^NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY" /tmp/env-check.txt   # debe decir pk_live_
+   rm /tmp/env-check.txt
    ```
 
    ⚠️ El `whsec_` de live **no es el de test**: cada endpoint tiene el suyo. Es el
@@ -2115,10 +2138,84 @@ la pregunta correcta no es dónde está, sino **en qué pantalla está**.
 - `docs.stripe.com/file-upload` — validaciones de PDF y la recomendación de *Print to PDF*.
 - `gob.mx/sat/articulos/genera-tu-constancia-de-situacion-fiscal-csf` y `wwwmat.sat.gob.mx/aplicacion/53027/…` — contenido de la CSF y las 5 vías para generarla.
 
+## 15. El corte a llaves live: hecho el 08-oct-2026
+
+> Cierre del trabajo abierto en §14.1. **Producción cobra con tarjeta real.**
+
+### 15.1 Lo que quedó configurado
+
+| Variable (Vercel Production) | Valor | Tipo | Nota |
+|---|---|---|---|
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_live_…` | **Config** | No puede ser Secret — ver §14.4 |
+| `STRIPE_SECRET_KEY` | `sk_live_…` | Secret | |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_…` | Secret | Del endpoint live `we_1UOSxaErXUVDJ3U0HdgZCMKL` |
+
+**Webhook live:** `https://resurte.me/api/webhooks/stripe` con 7 eventos
+(`payment_intent.succeeded`, `.payment_failed`, `.processing`, `.requires_action`,
+`.canceled`, `charge.refunded`, `charge.dispute.created`).
+
+> `payment_intent.refunded` **no existe como evento en Stripe**: el `case` del
+> código es inalcanzable. Los reembolsos llegan por `charge.refunded`, que sí está
+> suscrito. No se tocó el código porque el caso es inofensivo, pero conviene
+> saberlo antes de "arreglar" la lista de eventos copiándola del `switch`.
+
+### 15.2 Cómo se verificó
+
+1. **El bundle sirve la llave live** — `npm run launch:check` reporta
+   `✅ Stripe en modo live — pk_live_…`. Es la única comprobación que no se puede
+   falsear: lee la llave del JavaScript desplegado.
+2. **La app crea cobros reales** — se llamó a
+   `POST /api/payments/stripe/create-intent` sobre el pedido 62 y respondió 200
+   con un `client_secret`. El PaymentIntent se verificó contra Stripe:
+
+   ```
+   pi_3UOT6fErXUVDJ3U00T4G0C39 · livemode: True · 77120 mxn · cuenta ErXUVDJ3U0
+   ```
+
+   Esto valida la llave **secreta**, que es lo que el bundle no puede probar.
+   Crear un PaymentIntent sin confirmarlo no mueve dinero.
+
+### 15.3 Lo que la cuenta ya tenía, medido
+
+Antes del corte se consultó la cuenta con el CLI de Stripe (`stripe accounts
+retrieve --live`):
+
+```
+acct_1BA8H7ErXUVDJ3U0 · MX · live
+charges_enabled : True        payouts_enabled : True
+disabled_reason : None        card_payments   : active
+```
+
+**La constancia fiscal nunca bloqueó el cobro** (§14.9.6). El problema era
+exclusivamente que el despliegue servía llaves de prueba.
+
+### 15.4 Lo que sigue pendiente
+
+- **SMTP propio** (§8.1). Es el único bloqueador que queda en `launch:check`:
+  «olvidé mi contraseña» no funciona y los correos de pedido no salen. No impide
+  cobrar.
+- **OXXO** ya está activo en la cuenta; habilitarlo en el checkout es trabajo
+  aparte. **SPEI no está activo** (`mx_bank_transfer_payments: unrequested`).
+
+### 15.5 Trampas que costaron tiempo real
+
+Están documentadas donde se encontraron, pero se listan juntas porque las tres se
+repitieron varias veces:
+
+1. **Editar una variable en Vercel puede renombrarla.** El campo del nombre y el
+   del valor están juntos. Usar `vercel env add`/`update`: el nombre lo pone el
+   comando. (§14.8.2)
+2. **`NEXT_PUBLIC_` no puede ser un Secreto**, y un Secreto no se convierte en
+   Config: hay que borrar y recrear. (§14.4)
+3. **El asistente de activación no es el panel.** Mientras la cuenta no está
+   activada no hay interruptor de Test mode ni API keys. (§14.9.7)
+
+Y una cuarta, de método: **validar una llave antes de pegarla** con
+`npm run stripe:check`. Las tres anteriores se habrían detectado en segundos.
+
 ---
 
 ## Referencias
-
 - `vercel.json` (crons + headers de seguridad), `src/app/api/cron/*`, `src/app/api/workflows/*`, `src/app/api/foodos/campaigns/run`.
 - Migraciones: `supabase/migrations/00039_rate_limits.sql`, `00042_cleanup_guest_addresses.sql`, `00043_pg_cron_cleanup_guest_addresses.sql`, `00044_pg_cron_purge_rate_limits.sql`, `00055_panel_entries.sql`, `00056_panel_entries_realtime.sql`, `00057_panel_rows.sql`, `00058_panel_members.sql`, `00082_foodos_payment_proofs.sql`, `00083_foodos_order_notifications.sql`, `00084_foodos_orders_updated_at.sql`, `00085_stripe_connect.sql`.
 - Pagos FoodOS: `src/lib/payments.ts` (creación del PI), `src/lib/stripe-webhook-handlers.ts` (transiciones de estado), `src/lib/reconcile-payments.ts` (caducidad de vouchers), `src/lib/foodos-notifications.ts` (avisos al comensal), `src/lib/foodos-payment-reminders.ts` (recordatorios y cancelación).

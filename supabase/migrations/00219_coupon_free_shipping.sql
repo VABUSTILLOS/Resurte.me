@@ -1,0 +1,23 @@
+-- ============================================================================
+-- 00219 — Tipo de cupón "envío gratis"
+--
+-- QUÉ AÑADE
+--   Un tercer valor al ENUM `discount_type` para que un cupón pueda regalar el
+--   envío a domicilio sin tocar el subtotal del pedido. Hasta ahora los cupones
+--   solo sabían restar (`percentage` / `fixed_amount`), y restar subtotal
+--   *sube* la barrera del envío gratis en lugar de bajarla.
+--
+-- POR QUÉ ES UNA MIGRACIÓN APARTE Y DE UNA SOLA SENTENCIA
+--   `ALTER TYPE … ADD VALUE` no puede usar el valor nuevo en la misma
+--   transacción que lo crea (mismo motivo que en 00153 y 00187). Aquí solo se
+--   añade el valor; ninguna fila se inserta ni se actualiza, así que no hay uso
+--   del valor en esta migración.
+--
+-- LO QUE NO HACE
+--   No toca `foodos_coupons` (su columna `type` es TEXT con su propio CHECK:
+--   el micrositio de restaurantes tiene un modelo de envío por sucursal y queda
+--   fuera de este cupón). No añade CHECK a `coupons.discount_value`: el tipo
+--   guarda 0 y la columna ya lo admite.
+-- ============================================================================
+
+ALTER TYPE discount_type ADD VALUE IF NOT EXISTS 'free_shipping';

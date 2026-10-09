@@ -90,7 +90,9 @@ export function CouponInput() {
               Cupón {coupon.code} aplicado
             </p>
             <p className="text-xs text-[#0E7A0E]">
-              Descuento de ${totals.discountAmount.toFixed(2)}
+              {coupon.discount_type === "free_shipping"
+                ? "Envío gratis aplicado"
+                : `Descuento de $${totals.discountAmount.toFixed(2)}`}
             </p>
           </div>
         </div>

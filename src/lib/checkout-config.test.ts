@@ -81,6 +81,13 @@ describe("checkout-config", () => {
     it("cae a la tarifa fija si recibe un valor inesperado", () => {
       expect(validDeliveryFee(2, 100, 12)).toBe(125)
     })
+
+    it("un cupón de envío gratis pone la tarifa en 0 aunque el subtotal no llegue", () => {
+      expect(validDeliveryFee(2, 100, 125, true)).toBe(0)
+      expect(validDeliveryFee(2, 100, 0, true)).toBe(0)
+      // Sin el cupón, el mismo pedido sí paga envío.
+      expect(validDeliveryFee(2, 100, 125, false)).toBe(125)
+    })
   })
 
   describe("calcCouponDiscount", () => {
@@ -109,6 +116,13 @@ describe("checkout-config", () => {
     it("aplica el descuento sobre el subtotal con bumps incluido (fórmula del servidor)", () => {
       // Carrito $420 + bump $80 → subtotal efectivo $500 → 10% = $50
       expect(calcCouponDiscount(420 + 80, pctCoupon)).toBe(50)
+    })
+
+    it("un cupón de envío gratis no descuenta subtotal", () => {
+      const freeShip = { discount_type: "free_shipping", discount_value: 0, min_order: 0 }
+      expect(calcCouponDiscount(250, freeShip)).toBe(0)
+      // Aunque el subtotal esté por debajo de un mínimo, el tipo no lo evalúa.
+      expect(calcCouponDiscount(50, { ...freeShip, min_order: 9999 })).toBe(0)
     })
   })
 
@@ -139,6 +153,14 @@ describe("checkout-config", () => {
       expect(p.remaining).toBe(FREE_SHIPPING_THRESHOLD)
       expect(p.percent).toBe(0)
       expect(p.message).toBe(`Agrega $${FREE_SHIPPING_THRESHOLD.toFixed(2)} más para envío gratis`)
+    })
+
+    it("un cupón de envío gratis muestra gratis aunque el subtotal no llegue", () => {
+      const p = freeShippingProgress(100, true)
+      expect(p.isFree).toBe(true)
+      expect(p.percent).toBe(100)
+      expect(p.remaining).toBe(0)
+      expect(p.message).toBe("🎉 Tienes envío gratis")
     })
   })
 
@@ -197,6 +219,21 @@ describe("checkout-config", () => {
       const t = calcCheckoutTotals(100, 0, null, 1, 0, 0)
       expect(t.deliveryFee).toBe(0)
       expect(t.total).toBe(100)
+    })
+
+    it("un cupón de envío gratis deja el descuento en 0 y regala el envío", () => {
+      const freeShip = { discount_type: "free_shipping", discount_value: 0, min_order: 0 }
+      const t = calcCheckoutTotals(420, 0, freeShip, 3, 0)
+      expect(t.discountAmount).toBe(0)
+      expect(t.payableSubtotal).toBe(420)
+      expect(t.deliveryFee).toBe(0)
+      expect(t.total).toBe(420)
+      expect(t.freeShippingApplied).toBe(true)
+    })
+
+    it("sin cupón de envío gratis, freeShippingApplied es false", () => {
+      expect(calcCheckoutTotals(420, 0, null, 3, 0).freeShippingApplied).toBe(false)
+      expect(calcCheckoutTotals(420, 0, pctCoupon, 3, 0).freeShippingApplied).toBe(false)
     })
 
     it("consistencia: descuento redondeado a 2 decimales", () => {

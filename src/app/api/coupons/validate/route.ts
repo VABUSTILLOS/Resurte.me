@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import type { AppliedCoupon } from "@/types"
 import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
+import { validateCouponEligibility } from "@/lib/coupon-rules"
 
 /**
  * POST /api/coupons/validate
@@ -49,17 +50,21 @@ export async function POST(request: NextRequest) {
     if (!coupon) {
       return NextResponse.json({ error: "El cupón no existe" }, { status: 400 })
     }
-    if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
-      return NextResponse.json({ error: "El cupón ha expirado" }, { status: 400 })
-    }
-    if (subtotal < Number(coupon.min_order)) {
-      return NextResponse.json(
-        { error: `Este cupón requiere un pedido mínimo de $${Number(coupon.min_order).toFixed(2)}` },
-        { status: 400 }
-      )
-    }
-    if (coupon.max_uses > 0 && coupon.used_count >= coupon.max_uses) {
-      return NextResponse.json({ error: "El cupón ya fue utilizado el máximo de veces" }, { status: 400 })
+
+    // Reglas de elegibilidad compartidas con POST /api/orders (una sola copia).
+    // Un cupón `free_shipping` sale `ok` sin evaluar mínimo, usos ni expiración.
+    const eligibility = validateCouponEligibility(
+      {
+        discount_type: coupon.discount_type,
+        min_order: Number(coupon.min_order),
+        max_uses: Number(coupon.max_uses),
+        used_count: Number(coupon.used_count),
+        expires_at: coupon.expires_at,
+      },
+      subtotal
+    )
+    if (!eligibility.ok) {
+      return NextResponse.json({ error: eligibility.error }, { status: 400 })
     }
 
     // Cupones personales (recompra/reactivación): solo su dueño puede aplicarlos.

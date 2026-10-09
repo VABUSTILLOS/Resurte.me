@@ -366,6 +366,46 @@ describe("/api/orders POST sesión, cupón y fallbacks", () => {
     const body = await res.json()
     expect(body.error).toContain("cupón")
   })
+
+  it("aplica un cupón de envío gratis: descuento 0 y envío 0", async () => {
+    const couponRow = {
+      id: 1,
+      code: "GRATIS",
+      discount_type: "free_shipping",
+      discount_value: 0,
+      min_order: 0,
+      max_uses: 10,
+      used_count: 3,
+      expires_at: null,
+      user_id: null,
+    }
+    const coupons = tableBuilder({ data: couponRow, error: null })
+    coupons.then = ((resolve: (v: unknown) => void) =>
+      resolve({ data: [{ id: 1 }], error: null })) as unknown as (typeof coupons)["then"]
+    const orders = tableBuilder({
+      data: { id: 7, cashback_credits: 0, cashback_tier: null, total: 100, restore_token: "tok" },
+      error: null,
+    })
+    mockFlow({ coupons, orders })
+
+    // subtotal 100, envío solicitado 125 → el cupón lo regala: total 100.
+    const res = await POST(
+      orderReq({ ...validBody, coupon_code: "gratis", delivery_fee: 125, total: 100 })
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.total).toBe(100)
+    expect(orders.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        discount: 0,
+        coupon_code: "GRATIS",
+        subtotal: 100,
+        delivery_fee: 0,
+        total: 100,
+      })
+    )
+  })
 })
 
 describe("/api/orders inventario (migración 00143)", () => {

@@ -116,6 +116,51 @@ describe("validateCouponInput", () => {
       }).ok,
     ).toBe(false)
   })
+
+  it("acepta un cupón de envío gratis: valor 0 y reglas configurables", () => {
+    // El tipo no descuenta subtotal (valor 0), pero su pedido mínimo, tope de
+    // usos y expiración se configuran igual que en cualquier otro cupón.
+    const result = validateCouponInput({
+      code: " enviogratis ",
+      discount_type: "free_shipping",
+      discount_value: 999,
+      min_order: 500,
+      max_uses: 10,
+      expires_at: "2026-01-01",
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value).toEqual({
+        code: "ENVIOGRATIS",
+        discount_type: "free_shipping",
+        discount_value: 0,
+        min_order: 500,
+        max_uses: 10,
+        expires_at: new Date("2026-01-01").toISOString(),
+      })
+    }
+  })
+
+  it("acepta un cupón de envío gratis sin discount_value", () => {
+    const result = validateCouponInput({ code: "GRATIS", discount_type: "free_shipping" })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.discount_value).toBe(0)
+      expect(result.value.max_uses).toBe(0)
+      expect(result.value.expires_at).toBeNull()
+    }
+  })
+
+  it("acepta y conserva un tope de usos al crear el cupón", () => {
+    const result = validateCouponInput({
+      code: "LIMITADO",
+      discount_type: "percentage",
+      discount_value: 10,
+      max_uses: 25,
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.max_uses).toBe(25)
+  })
 })
 
 describe("validateCouponPatch", () => {

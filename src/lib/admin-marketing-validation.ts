@@ -4,6 +4,12 @@
  * el contexto de Next.js.
  */
 
+import {
+  COUPON_DISCOUNT_TYPES,
+  FREE_SHIPPING_TYPE,
+  type CouponDiscountType,
+} from "./coupon-rules"
+
 export const BUMP_TRIGGER_TYPES = ["perishables", "snacks_drinks", "subtotal_threshold"] as const
 
 export interface BumpRuleInput {
@@ -160,7 +166,7 @@ export function validateAffinityPairPatch(
 
 export interface CouponInput {
   code: string
-  discount_type: "percentage" | "fixed_amount"
+  discount_type: CouponDiscountType
   discount_value: number
   min_order: number
   max_uses: number
@@ -175,15 +181,25 @@ export function validateCouponInput(
     return { ok: false, error: "code: 3-32 caracteres alfanuméricos (A-Z, 0-9, -, _)" }
   }
   const discountType = body.discount_type
-  if (discountType !== "percentage" && discountType !== "fixed_amount") {
-    return { ok: false, error: "discount_type debe ser percentage o fixed_amount" }
+  if (
+    typeof discountType !== "string" ||
+    !COUPON_DISCOUNT_TYPES.includes(discountType as never)
+  ) {
+    return { ok: false, error: `discount_type debe ser ${COUPON_DISCOUNT_TYPES.join(", ")}` }
   }
-  const discountValue = Number(body.discount_value)
-  if (!Number.isFinite(discountValue) || discountValue <= 0) {
-    return { ok: false, error: "discount_value debe ser positivo" }
-  }
-  if (discountType === "percentage" && discountValue > 100) {
-    return { ok: false, error: "discount_value porcentual no puede exceder 100" }
+
+  // El cupón de envío gratis no descuenta subtotal: su valor es siempre 0 y no
+  // se le pide uno. Las demás reglas —pedido mínimo, tope de usos y
+  // expiración— sí aplican y se configuran igual que en cualquier otro tipo.
+  const isFreeShipping = discountType === FREE_SHIPPING_TYPE
+  const discountValue = isFreeShipping ? 0 : Number(body.discount_value)
+  if (!isFreeShipping) {
+    if (!Number.isFinite(discountValue) || discountValue <= 0) {
+      return { ok: false, error: "discount_value debe ser positivo" }
+    }
+    if (discountType === "percentage" && discountValue > 100) {
+      return { ok: false, error: "discount_value porcentual no puede exceder 100" }
+    }
   }
   const minOrder = body.min_order === undefined ? 0 : Number(body.min_order)
   if (!Number.isFinite(minOrder) || minOrder < 0) {
@@ -206,7 +222,7 @@ export function validateCouponInput(
     ok: true,
     value: {
       code,
-      discount_type: discountType,
+      discount_type: discountType as CouponDiscountType,
       discount_value: discountValue,
       min_order: minOrder,
       max_uses: maxUses,

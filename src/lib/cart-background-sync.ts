@@ -106,7 +106,13 @@ function parseCoupon(value: unknown): AppliedCoupon | null {
   if (!isRecord(value)) return null
   const { code, discount_type, discount_value, min_order } = value
   if (typeof code !== "string" || code.length === 0) return null
-  if (discount_type !== "percentage" && discount_type !== "fixed_amount") return null
+  if (
+    discount_type !== "percentage" &&
+    discount_type !== "fixed_amount" &&
+    discount_type !== "free_shipping"
+  ) {
+    return null
+  }
   if (typeof discount_value !== "number" || !Number.isFinite(discount_value)) return null
   return {
     code,

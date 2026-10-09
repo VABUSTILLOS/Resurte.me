@@ -138,6 +138,22 @@ describe("parseCartSyncEntry", () => {
     })
   })
 
+  it("conserva un cupón de envío gratis", () => {
+    const parsed = parseCartSyncEntry({
+      queuedAt: NOW,
+      payload: {
+        items: [item(1)],
+        coupon: { code: "GRATIS", discount_type: "free_shipping", discount_value: 0 },
+      },
+    })
+    expect(parsed?.payload.coupon).toEqual({
+      code: "GRATIS",
+      discount_type: "free_shipping",
+      discount_value: 0,
+      min_order: 0,
+    })
+  })
+
   it("hace round-trip de lo serializado", () => {
     const entry = buildCartSyncEntry([item(1, 3)], coupon, NOW)
     expect(parseCartSyncEntry(JSON.parse(serializeCartSyncEntry(entry)))).toEqual(entry)

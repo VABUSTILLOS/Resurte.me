@@ -251,7 +251,7 @@ export interface WhatsAppAutomation {
 export interface Coupon {
   id: number
   code: string
-  discount_type: 'percentage' | 'fixed_amount'
+  discount_type: 'percentage' | 'fixed_amount' | 'free_shipping'
   discount_value: number
   min_order: number
   max_uses: number
@@ -283,7 +283,7 @@ export interface Cart {
 
 export interface AppliedCoupon {
   code: string
-  discount_type: 'percentage' | 'fixed_amount'
+  discount_type: 'percentage' | 'fixed_amount' | 'free_shipping'
   discount_value: number
   min_order: number
 }
@@ -291,7 +291,7 @@ export interface AppliedCoupon {
 /** Cupón personal de recompra/reactivación emitido para un usuario. */
 export interface RepurchaseCouponInfo {
   code: string
-  discount_type: 'percentage' | 'fixed_amount'
+  discount_type: 'percentage' | 'fixed_amount' | 'free_shipping'
   discount_value: number
   min_order: number
   expires_at: string

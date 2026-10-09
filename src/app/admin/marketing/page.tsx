@@ -22,7 +22,7 @@ interface BumpRule {
 interface Coupon {
   id: number
   code: string
-  discount_type: "percentage" | "fixed_amount"
+  discount_type: "percentage" | "fixed_amount" | "free_shipping"
   discount_value: number
   min_order: number
   max_uses: number
@@ -83,10 +83,10 @@ function MarketingContent() {
 
   // Form de cupón nuevo
   const [newCode, setNewCode] = useState("")
-  const [newType, setNewType] = useState<"percentage" | "fixed_amount">("percentage")
+  const [newType, setNewType] = useState<"percentage" | "fixed_amount" | "free_shipping">("percentage")
   const [newValue, setNewValue] = useState("10")
   const [newMinOrder, setNewMinOrder] = useState("0")
-  const [newMaxUses] = useState("0")
+  const [newMaxUses, setNewMaxUses] = useState("0")
   const [newExpires, setNewExpires] = useState("")
 
   const load = useCallback(async () => {
@@ -199,7 +199,9 @@ function MarketingContent() {
         body: JSON.stringify({
           code: newCode,
           discount_type: newType,
-          discount_value: Number(newValue),
+          // El cupón de envío gratis no descuenta subtotal (su valor es 0);
+          // el resto de reglas sí se configuran y se envían tal cual.
+          discount_value: newType === "free_shipping" ? 0 : Number(newValue),
           min_order: Number(newMinOrder) || 0,
           max_uses: Number(newMaxUses) || 0,
           expires_at: newExpires || null,
@@ -254,7 +256,11 @@ function MarketingContent() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          discount_value: Number(editValue),
+          // El cupón de envío gratis no tiene valor de descuento (y el PATCH
+          // exige uno positivo), así que se omite: solo se editan sus reglas.
+          ...(editingCoupon.discount_type === "free_shipping"
+            ? {}
+            : { discount_value: Number(editValue) }),
           min_order: Number(editMinOrder) || 0,
           max_uses: Number(editMaxUses) || 0,
           expires_at: editExpires ? new Date(`${editExpires}T23:59:59`).toISOString() : null,
@@ -409,7 +415,7 @@ function MarketingContent() {
           Cupones
         </h2>
 
-        <form onSubmit={(e) => void createCoupon(e)} className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4">
+        <form onSubmit={(e) => void createCoupon(e)} className="grid grid-cols-2 md:grid-cols-7 gap-2 mb-4">
           <input
             value={newCode}
             onChange={(e) => setNewCode(e.target.value.toUpperCase())}
@@ -419,24 +425,33 @@ function MarketingContent() {
           />
           <select
             value={newType}
-            onChange={(e) => setNewType(e.target.value as "percentage" | "fixed_amount")}
+            onChange={(e) =>
+              setNewType(e.target.value as "percentage" | "fixed_amount" | "free_shipping")
+            }
             className="text-sm border border-gray-200 rounded-lg px-2 py-1.5"
             aria-label="Tipo de descuento"
           >
             <option value="percentage">% Porcentaje</option>
             <option value="fixed_amount">$ Monto fijo</option>
+            <option value="free_shipping">🚚 Envío gratis</option>
           </select>
-          <input
-            value={newValue}
-            onChange={(e) => setNewValue(e.target.value)}
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="Valor"
-            required
-            className="text-sm border border-gray-200 rounded-lg px-2 py-1.5"
-            aria-label="Valor del descuento"
-          />
+          {newType === "free_shipping" ? (
+            <p className="col-span-2 md:col-span-1 self-center text-xs text-gray-500">
+              Regala el envío (no descuenta productos).
+            </p>
+          ) : (
+            <input
+              value={newValue}
+              onChange={(e) => setNewValue(e.target.value)}
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Valor"
+              required
+              className="text-sm border border-gray-200 rounded-lg px-2 py-1.5"
+              aria-label="Valor del descuento"
+            />
+          )}
           <input
             value={newMinOrder}
             onChange={(e) => setNewMinOrder(e.target.value)}
@@ -446,6 +461,16 @@ function MarketingContent() {
             placeholder="Mín. pedido"
             className="text-sm border border-gray-200 rounded-lg px-2 py-1.5"
             aria-label="Pedido mínimo"
+          />
+          <input
+            value={newMaxUses}
+            onChange={(e) => setNewMaxUses(e.target.value)}
+            type="number"
+            min="0"
+            step="1"
+            placeholder="Máx. usos"
+            className="text-sm border border-gray-200 rounded-lg px-2 py-1.5"
+            aria-label="Usos máximos (0 = ilimitado)"
           />
           <input
             value={newExpires}
@@ -472,16 +497,20 @@ function MarketingContent() {
             aria-label={`Editar cupón ${editingCoupon.code}`}
           >
             <span className="font-mono text-sm font-bold text-gray-900">{editingCoupon.code}</span>
-            <input
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              type="number"
-              min="0"
-              step="0.01"
-              required
-              aria-label="Valor del descuento"
-              className="w-24 text-sm border border-gray-200 rounded-lg px-2 py-1.5"
-            />
+            {editingCoupon.discount_type === "free_shipping" ? (
+              <span className="text-xs text-gray-500">🚚 Envío gratis</span>
+            ) : (
+              <input
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                aria-label="Valor del descuento"
+                className="w-24 text-sm border border-gray-200 rounded-lg px-2 py-1.5"
+              />
+            )}
             <input
               value={editMinOrder}
               onChange={(e) => setEditMinOrder(e.target.value)}
@@ -547,7 +576,9 @@ function MarketingContent() {
                 <span className="text-gray-600">
                   {c.discount_type === "percentage"
                     ? `${c.discount_value}%`
-                    : `$${Number(c.discount_value).toFixed(2)}`}
+                    : c.discount_type === "free_shipping"
+                      ? "🚚 Envío gratis"
+                      : `$${Number(c.discount_value).toFixed(2)}`}
                   {c.min_order > 0 && ` · mín. $${Number(c.min_order).toFixed(0)}`}
                 </span>
                 <span className="text-xs text-gray-600">

@@ -331,7 +331,10 @@ export function CheckoutDrawer() {
         <div className="flex-1 overflow-y-auto px-5 py-5">
           {step === "review" && (
             <div className="space-y-5">
-              <FreeShippingProgress payableSubtotal={payableSubtotal} />
+              <FreeShippingProgress
+                payableSubtotal={payableSubtotal}
+                freeShipping={totals.freeShippingApplied}
+              />
 
               {/* Items del carrito — primero el usuario revisa sus productos.
                   Cantidades editables con +/− (mínimo 1). */}

@@ -161,6 +161,47 @@ describe("POST /api/coupons/validate", () => {
     })
   })
 
+  it("200 con cupón de envío gratis (valor 0)", async () => {
+    couponsTable({
+      data: {
+        ...VALID_COUPON,
+        discount_type: "free_shipping",
+        discount_value: 0,
+        min_order: 0,
+        max_uses: 0,
+      },
+      error: null,
+    })
+    const res = await POST(req({ code: "GRATIS", subtotal: 50 }))
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toEqual({
+      code: "BIENVENIDO",
+      discount_type: "free_shipping",
+      discount_value: 0,
+      min_order: 0,
+    })
+  })
+
+  it("400 con cupón de envío gratis que agotó su tope de usos", async () => {
+    // El tope de usos aplica a todos los tipos, envío gratis incluido.
+    couponsTable({
+      data: {
+        ...VALID_COUPON,
+        discount_type: "free_shipping",
+        discount_value: 0,
+        min_order: 0,
+        max_uses: 10,
+        used_count: 10,
+      },
+      error: null,
+    })
+    const res = await POST(req({ code: "GRATIS", subtotal: 500 }))
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      error: "El cupón ya fue utilizado el máximo de veces",
+    })
+  })
+
   it("happy path devuelve el AppliedCoupon sin consumir el cupón", async () => {
     const builder = couponsTable({ data: VALID_COUPON, error: null })
     const res = await POST(req({ code: "BIENVENIDO", subtotal: 500 }))

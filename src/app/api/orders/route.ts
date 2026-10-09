@@ -8,6 +8,7 @@ import type { Coupon } from "@/types"
 import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { validDeliveryFee } from "@/lib/checkout-config"
+import { isFreeShippingCoupon, validateCouponEligibility } from "@/lib/coupon-rules"
 import { resolveBumpPricing } from "@/lib/order-bumps"
 import { insertAddressResilient } from "@/lib/orders-address"
 import { missingColumnName } from "@/lib/admin/order-selects"
@@ -401,23 +402,20 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-      if (found.expires_at && new Date(found.expires_at) < new Date()) {
-        return NextResponse.json(
-          { error: "El cupón ha expirado" },
-          { status: 400 }
-        )
-      }
-      if (realSubtotal < Number(found.min_order)) {
-        return NextResponse.json(
-          { error: `Este cupón requiere un pedido mínimo de $${Number(found.min_order).toFixed(2)}` },
-          { status: 400 }
-        )
-      }
-      if (found.max_uses > 0 && found.used_count >= found.max_uses) {
-        return NextResponse.json(
-          { error: "El cupón ya fue utilizado el máximo de veces" },
-          { status: 400 }
-        )
+      // Reglas compartidas con POST /api/coupons/validate (una sola copia).
+      // Un cupón `free_shipping` sale `ok` sin evaluar mínimo, usos ni expiración.
+      const eligibility = validateCouponEligibility(
+        {
+          discount_type: found.discount_type,
+          min_order: Number(found.min_order),
+          max_uses: Number(found.max_uses),
+          used_count: Number(found.used_count),
+          expires_at: found.expires_at,
+        },
+        realSubtotal
+      )
+      if (!eligibility.ok) {
+        return NextResponse.json({ error: eligibility.error }, { status: 400 })
       }
       // Cupones personales (recompra/reactivación): solo los puede usar su dueño.
       if (found.user_id && found.user_id !== userId) {
@@ -430,14 +428,23 @@ export async function POST(request: NextRequest) {
       coupon = found
       if (found.discount_type === "percentage") {
         discountAmount = Math.round((realSubtotal * Number(found.discount_value)) / 100 * 100) / 100
+      } else if (isFreeShippingCoupon(found)) {
+        // No toca el subtotal: su efecto es la tarifa de envío en 0 (abajo).
+        discountAmount = 0
       } else {
         discountAmount = Math.min(Number(found.discount_value), realSubtotal)
       }
     }
 
-    // Delivery fee: 0 si hay envío gratis (subtotal con descuento >= umbral) o
-    // no hay items; si no, solo 0 (recoger) o 125 MXN (envío), whitelist.
-    const computedDeliveryFee = validDeliveryFee(items.length, realSubtotal - discountAmount, delivery_fee)
+    // Delivery fee: 0 si hay envío gratis (subtotal con descuento >= umbral, o
+    // cupón `free_shipping`) o no hay items; si no, solo 0 (recoger) o 125 MXN
+    // (envío), whitelist.
+    const computedDeliveryFee = validDeliveryFee(
+      items.length,
+      realSubtotal - discountAmount,
+      delivery_fee,
+      isFreeShippingCoupon(coupon)
+    )
 
     // El checkout envía total = subtotal - descuento + envío. Se exige que
     // coincida con el monto recalculado server-side (el descuento solo se

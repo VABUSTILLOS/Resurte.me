@@ -184,7 +184,10 @@ export function CartDrawer() {
               y se actualiza en tiempo real al seleccionar order bumps. */}
           {cart.items.length > 0 && (
             <div className="pt-3 pb-1">
-              <FreeShippingProgress payableSubtotal={payableSubtotal} />
+              <FreeShippingProgress
+                payableSubtotal={payableSubtotal}
+                freeShipping={totals.freeShippingApplied}
+              />
             </div>
           )}
 
@@ -468,7 +471,7 @@ export function MobileCartBar() {
     DELIVERY_FEE_FLAT
   )
   const barTotal = totals.total
-  const fsBar = freeShippingProgress(totals.payableSubtotal)
+  const fsBar = freeShippingProgress(totals.payableSubtotal, totals.freeShippingApplied)
   const isMobile = useMediaQuery("(max-width: 640px)", true)
   // Badge de la barra: artículos del carrito + bumps seleccionados.
   const productCount = countOrderUnits(itemCount, selectedBumps)

@@ -6,6 +6,8 @@ import { freeShippingProgress, FREE_SHIPPING_THRESHOLD } from "@/lib/checkout-co
 interface FreeShippingProgressProps {
   /** Subtotal pagable (subtotal del carrito menos descuento del cupón). */
   payableSubtotal: number
+  /** El cupón aplicado regala el envío (tipo `free_shipping`). */
+  freeShipping?: boolean
 }
 
 /**
@@ -15,11 +17,11 @@ interface FreeShippingProgressProps {
  * contra FREE_SHIPPING_THRESHOLD y no muta ningún estado externo.
  *
  * Estados:
- *   · subtotal >= umbral → "🎉 Tienes envío gratis" (barra completa).
+ *   · cupón de envío gratis o subtotal >= umbral → "🎉 Tienes envío gratis".
  *   · subtotal < umbral  → "Agrega $X más para envío gratis".
  */
-export function FreeShippingProgress({ payableSubtotal }: FreeShippingProgressProps) {
-  const { percent, isFree, message } = freeShippingProgress(payableSubtotal)
+export function FreeShippingProgress({ payableSubtotal, freeShipping = false }: FreeShippingProgressProps) {
+  const { percent, isFree, message } = freeShippingProgress(payableSubtotal, freeShipping)
 
   return (
     <div className="bg-[#F6FDF6] border border-brand-100 rounded-xl px-4 py-3">
