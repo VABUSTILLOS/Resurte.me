@@ -121,6 +121,16 @@
   Ninguna superficie publica la cifra a mano: la prosa interpola la constante y
   `commercial-facts.test.ts` falla si alguna la escribe literal. Al mover una de
   las dos, revisa también `bump_rules.subtotal_min` en Supabase.
+- **Dónde se pone el cupón**: `CouponInput`
+  (`src/components/cart/coupon-input.tsx`) es el único input de cupón y se monta
+  en las cuatro superficies donde el cliente puede aplicarlo — `/cart`,
+  `/{ciudad}/carrito` y el **paso de revisión del checkout**, tanto en
+  `CheckoutDrawer` como en `ReviewStep` de `/[slug]/checkout`. Todas comparten el
+  estado de `cart-context` (`coupon` / `applyCoupon` / `removeCoupon`), así que
+  aplicarlo en una superficie vale en todas y el resumen de cada una se
+  recalcula solo. Si añades otra superficie de compra, **monta este componente**
+  en vez de escribir otro input: el `subtotal` con el que valida contra
+  `/api/coupons/validate` tiene que ser el mismo que el del carrito.
 - **Cupón de envío gratis (`free_shipping`)**: tercer valor del ENUM
   `discount_type` (migración `00219`). Regala la tarifa de envío **sin tocar el
   subtotal** — un descuento de subtotal, en cambio, *sube* la barrera del envío

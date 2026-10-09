@@ -3,6 +3,7 @@
 import { MapPin, Clock, ArrowLeft, ArrowRight } from "lucide-react"
 import type { City, CartItem } from "@/types"
 import { QuantityStepper } from "@/components/checkout/OrderItemsList"
+import { CouponInput } from "@/components/cart/coupon-input"
 import { getNextDays, type AddressForm, type ScheduleForm } from "./checkout-shared"
 
 interface ReviewStepProps {
@@ -171,6 +172,14 @@ export function ReviewStep({
             </li>
           ))}
         </ul>
+      </div>
+
+      {/* Cupón de descuento: el mismo componente que usan las páginas de
+          carrito y el mismo estado (`cart-context`), así que aplicarlo aquí o
+          allí es exactamente lo mismo. Va antes del total para que el cliente
+          vea el efecto en el resumen al instante. */}
+      <div className="mb-4">
+        <CouponInput />
       </div>
 
       {/* Total */}

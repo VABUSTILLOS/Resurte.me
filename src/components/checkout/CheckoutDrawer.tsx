@@ -25,6 +25,7 @@ import {
 import { AddressStep } from "@/components/checkout/AddressStep"
 import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
+import { CouponInput } from "@/components/cart/coupon-input"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { OrderItemsList } from "@/components/checkout/OrderItemsList"
 import { RemoveLineDialog } from "@/components/checkout/RemoveLineDialog"
@@ -363,6 +364,11 @@ export function CheckoutDrawer() {
                 onChange={setSelectedBumps}
                 revealNext
               />
+
+              {/* Cupón: mismo componente y mismo estado que el carrito
+                  (`cart-context`), así que lo aplicado aquí vale en todo el
+                  flujo — y viceversa. */}
+              <CouponInput />
 
               {/* Resumen */}
               <div className="bg-[#F7F5F0] rounded-xl p-4 space-y-2 text-sm">

@@ -75,6 +75,8 @@ test.describe("checkout público", { tag: "@ci" }, () => {
       page.getByRole("heading", { name: /Revisa tu pedido/i })
     ).toBeVisible()
     await expect(page.getByText("Aguacate Hass (caja 10 kg)").first()).toBeVisible()
+    // El cupón se aplica desde el propio checkout, no solo desde el carrito.
+    await expect(page.getByPlaceholder("Código de descuento")).toBeVisible()
     await page.getByRole("button", { name: "Continuar al pago", exact: true }).click()
 
     // STEP 4: PaymentStep — sin credenciales, solo validar que se renderiza

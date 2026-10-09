@@ -99,6 +99,9 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     const drawer = page.getByLabel("Checkout", { exact: true })
     await expect(drawer.getByText("🎉 Tienes envío gratis").filter({ visible: true })).toBeVisible()
     await expect(drawer.getByText("Gratis 🎉").filter({ visible: true })).toBeVisible()
+
+    // El cupón se aplica desde el propio checkout, no solo desde el carrito.
+    await expect(drawer.getByPlaceholder("Código de descuento")).toBeVisible()
   })
 
   test("subtotal menor al umbral muestra la barra con lo que falta", async ({ page }) => {
