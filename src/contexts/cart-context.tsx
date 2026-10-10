@@ -162,7 +162,9 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ...state,
         cart: { ...EMPTY_CART },
         coupon: null,
-        clearedAt: action.at,
+        // Vaciar un carrito ya vacío no es un vaciado deliberado: conserva la
+        // marca anterior en vez de fabricar una nueva.
+        clearedAt: state.cart.items.length > 0 ? action.at : state.clearedAt,
       }
 
     case "APPLY_COUPON":
