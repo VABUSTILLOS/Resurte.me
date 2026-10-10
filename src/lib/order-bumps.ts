@@ -53,7 +53,7 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { round2 } from "@/lib/money"
 import { isOfferableProduct } from "@/lib/published-product"
-import { MAX_BUMPS, MAX_BUMPS_REQUEST_LIMIT } from "@/lib/checkout-config"
+import { MAX_BUMPS, MAX_BUMPS_REQUEST_LIMIT, BUMP_MIN_PRICE_MXN } from "@/lib/checkout-config"
 import { logger } from "@/lib/logger"
 import { getAllRecipes } from "@/lib/recipes"
 import {
@@ -526,30 +526,45 @@ function isUsableBumpProduct(product: BumpProduct | null | undefined): product i
   return product !== null && product !== undefined && isOfferableProduct(product)
 }
 
+/**
+ * ¿Vale la pena ofrecerlo como artículo especial? Además de usable, tiene que
+ * pasar el **piso de precio** (`BUMP_MIN_PRICE_MXN`): un bump de $4 no es una
+ * oferta, es ruido. Es el predicado que usan TODOS los tiers, así que una regla
+ * del admin apuntando a un producto barato tampoco se sirve — y el panel lo dice.
+ */
+function isOfferableBumpProduct(product: BumpProduct | null | undefined): product is BumpProduct {
+  if (!isUsableBumpProduct(product)) return false
+  return effectivePrice(product) >= BUMP_MIN_PRICE_MXN
+}
+
 /** Motivo por el que una regla que disparó no pudo ofrecer su producto. */
 function unusableReason(product: BumpProduct | null | undefined): string {
   if (!product) return "product_not_found"
   if (product.is_visible === false) return "product_not_visible"
   if (product.stock_status === "out_of_stock") return "product_out_of_stock"
   if (effectivePrice(product) <= 0) return "product_sin_precio"
+  if (effectivePrice(product) < BUMP_MIN_PRICE_MXN) return "product_below_min_price"
   return "unusable"
 }
 
 /**
  * Cuántos candidatos se miran al buscar sustituto para una regla rota. Acota la
- * query: basta con los más baratos de la categoría para encontrar uno servible.
+ * query: basta con los más baratos **que pasan el piso** para encontrar uno
+ * servible.
  */
 const SUBSTITUTE_SCAN_LIMIT = 20
 
 /**
  * Sustituto usable para una regla cuyo producto dejó de ser ofrecible: el más
  * barato de la MISMA categoría (un bump es compra de impulso, así que lo barato
- * es lo correcto), visible, con existencia y con precio.
+ * es lo correcto **dentro del piso**), visible, con existencia y con precio
+ * (`>= BUMP_MIN_PRICE_MXN`).
  *
  * La categoría es la del producto roto a propósito: es el pasillo que el admin
  * eligió como complemento. Si el catálogo de ese pasillo está entero oculto
- * (caso real: `bebidas` y `botanas-dulces` sin un solo producto visible) no hay
- * sustituto posible y la regla se queda muda — pero ahora queda registrado.
+ * (caso real: `bebidas` y `botanas-dulces` sin un solo producto visible) o no
+ * queda nada por encima del piso, no hay sustituto posible y la regla se queda
+ * muda — pero queda registrado.
  */
 async function findSubstituteProduct(
   supabase: Awaited<ReturnType<typeof createServiceClient>>,
@@ -563,6 +578,9 @@ async function findSubstituteProduct(
     .eq("category_id", categoryId)
     .eq("is_visible", true)
     .neq("stock_status", "out_of_stock")
+    // El piso se filtra en la BD (el precio de lista) y se revalida en el loop
+    // con el precio efectivo: una ventana de oferta puede dejarlo por debajo.
+    .gte("price", BUMP_MIN_PRICE_MXN)
     .order("price", { ascending: true })
     .limit(SUBSTITUTE_SCAN_LIMIT)
   if (error) {
@@ -574,8 +592,7 @@ async function findSubstituteProduct(
   }
   for (const row of (data ?? []) as BumpProduct[]) {
     if (excluded.has(row.id)) continue
-    if (!isUsableBumpProduct(row)) continue
-    if (effectivePrice(row) <= 0) continue
+    if (!isOfferableBumpProduct(row)) continue
     return row
   }
   return null
@@ -832,8 +849,11 @@ async function resolveAffinityBumps(
   for (const candidate of candidates) {
     if (selected.length >= maxBumps) break
     const product = productMap.get(candidate.productId)
-    // Agotado, invisible o inexistente: se descarta el candidato, no el tier.
-    if (!isUsableBumpProduct(product)) continue
+    // Agotado, invisible, inexistente o por debajo del piso de precio
+    // (`BUMP_MIN_PRICE_MXN`): se descarta el candidato, no el tier. La afinidad
+    // sugiere el ingrediente que falta; si ese ingrediente es barato, el carrito
+    // igual merece una oferta, pero no una de $4.
+    if (!isOfferableBumpProduct(product)) continue
     selected.push({ product, reason: candidate.reason })
   }
   if (selected.length === 0) {
@@ -1031,7 +1051,13 @@ export async function resolveBumps(
     if (cartProductIds.has(rule.product_id)) continue
     if (recipeCandidates.length >= maxBumps) break
     const product = recipeProductMap.get(rule.product_id)
-    if (!isUsableBumpProduct(product)) continue
+    // Un producto por debajo del piso no se sirve: la regla queda muda pero
+    // registrada (el panel la marca con su precio), en vez de desaparecer en
+    // silencio como pasaba antes de K20.
+    if (!isOfferableBumpProduct(product)) {
+      diagnostics?.state?.droppedRules.push(`${rule.id}:${unusableReason(product)}`)
+      continue
+    }
     recipeCandidates.push(buildBump(rule, product))
   }
 
@@ -1073,16 +1099,17 @@ export async function resolveBumps(
     if (categoryCandidates.length >= maxBumps) break
     if (usedProductIds.has(rule.product_id)) continue
     const product = categoryProductMap.get(rule.product_id)
-    // Un bump de $0 no es una oferta: se trata como producto inservible.
-    if (isUsableBumpProduct(product) && effectivePrice(product) > 0) {
+    // Un bump de $0 o por debajo del piso no es una oferta: se trata como
+    // producto inservible y la regla se re-apunta.
+    if (isOfferableBumpProduct(product)) {
       usedProductIds.add(rule.product_id)
       categoryCandidates.push(buildBump(rule, product))
       continue
     }
     // La regla disparó pero su producto dejó de ser ofrecible (oculto, agotado,
-    // sin precio o inexistente). Antes se descartaba en silencio —el carrito se
-    // quedaba sin ofertas y no había rastro ni en logs ni en el panel—; ahora se
-    // re-apunta a un sustituto usable del mismo pasillo.
+    // sin precio, barato o inexistente). Antes se descartaba en silencio —el
+    // carrito se quedaba sin ofertas y no había rastro ni en logs ni en el
+    // panel—; ahora se re-apunta a un sustituto usable del mismo pasillo.
     // El sustituto NO puede ser un producto que ya está en el carrito (el
     // cliente lo agregaría dos veces) ni uno ya ofrecido en esta respuesta.
     const healExcluded = new Set<number>([...cartProductIds, ...usedProductIds])
@@ -1124,11 +1151,42 @@ export function sanitizeBumpLimit(limit: number | undefined | null): number {
 }
 
 /**
+ * Traduce una fila cruda de `get_products_by_collection` al producto del motor.
+ * Devuelve `null` si la fila no trae un `id` utilizable (el RPC devuelve
+ * `jsonb` sin tipos, así que todo se valida aquí).
+ */
+function bumpProductFromCollectionRow(row: Record<string, unknown>): BumpProduct | null {
+  if (typeof row?.id !== "number") return null
+  const saleWindow = {
+    sale_price: typeof row.sale_price === "number" ? row.sale_price : null,
+    sale_starts_at: typeof row.sale_starts_at === "string" ? row.sale_starts_at : null,
+    sale_ends_at: typeof row.sale_ends_at === "string" ? row.sale_ends_at : null,
+  }
+  return {
+    id: row.id,
+    name: typeof row.name === "string" ? row.name : "",
+    slug: typeof row.slug === "string" ? row.slug : "",
+    description: typeof row.description === "string" ? row.description : "",
+    image_url: typeof row.image_url === "string" ? row.image_url : "",
+    price: typeof row.price === "number" ? row.price : 0,
+    sale_price: resolveSalePrice(saleWindow),
+    stock_status: (row.stock_status as BumpProduct["stock_status"]) ?? "in_stock",
+    category_id: typeof row.category_id === "number" ? row.category_id : 0,
+    // La RPC ya filtra `WHERE p.is_visible = true`: se declara explícito para que
+    // el producto pase el predicado de "publicado en tienda" sin ambigüedad.
+    is_visible: true,
+    sale_starts_at: saleWindow.sale_starts_at,
+    sale_ends_at: saleWindow.sale_ends_at,
+  }
+}
+
+/**
  * Genera un bump dinámico para una colección de receta sin regla admin:
  * elige el primer producto complementario de la colección (vía RPC
- * get_products_by_collection) que no esté en el carrito, con stock y visible,
- * y lo registra como regla `recipe_collection` (1 por colección) para que
- * POST /api/orders pueda validarlo. Fail-open: devuelve null si algo falla.
+ * get_products_by_collection) que no esté en el carrito, con stock, visible y
+ * por encima del piso de precio, y lo registra como regla `recipe_collection`
+ * (1 por colección) para que POST /api/orders pueda validarlo. Fail-open:
+ * devuelve null si algo falla.
  */
 async function buildDynamicRecipeBump(
   supabase: Awaited<ReturnType<typeof createServiceClient>>,
@@ -1145,42 +1203,20 @@ async function buildDynamicRecipeBump(
   }
 
   const rows = collectionProducts as Record<string, unknown>[]
-  const candidate = rows.find(
-    (p) =>
-      typeof p?.id === "number" &&
-      !cartProductIds.has(p.id) &&
-      p.stock_status !== "out_of_stock" &&
-      p.is_visible !== false
-  )
-  if (!candidate) return null
+  // El candidato se elige entre los que pasan el piso de precio: la colección
+  // devuelve sus productos y el primero puede ser una especia de $10. La regla
+  // que se registra aquí **persiste**, así que elegir barato dejaría el bump
+  // barato para siempre.
+  const product = rows
+    .map((row) => bumpProductFromCollectionRow(row))
+    .find(
+      (p): p is BumpProduct =>
+        p !== null && !cartProductIds.has(p.id) && isOfferableBumpProduct(p)
+    )
+  if (!product) return null
 
   const collection = collections.find((c) => c.slug === collectionSlug)
-  const title =
-    typeof candidate.name === "string" ? candidate.name : "Complemento para tu pedido"
-
-  const saleWindow = {
-    sale_price: typeof candidate.sale_price === "number" ? candidate.sale_price : null,
-    sale_starts_at:
-      typeof candidate.sale_starts_at === "string" ? candidate.sale_starts_at : null,
-    sale_ends_at: typeof candidate.sale_ends_at === "string" ? candidate.sale_ends_at : null,
-  }
-
-  const product: BumpProduct = {
-    id: candidate.id as number,
-    name: typeof candidate.name === "string" ? candidate.name : "",
-    slug: typeof candidate.slug === "string" ? candidate.slug : "",
-    description: typeof candidate.description === "string" ? candidate.description : "",
-    image_url: typeof candidate.image_url === "string" ? candidate.image_url : "",
-    price: typeof candidate.price === "number" ? candidate.price : 0,
-    sale_price: resolveSalePrice(saleWindow),
-    stock_status: (candidate.stock_status as BumpProduct["stock_status"]) ?? "in_stock",
-    category_id: typeof candidate.category_id === "number" ? candidate.category_id : 0,
-    // La RPC ya filtra `WHERE p.is_visible = true`: se declara explícito para que
-    // el producto pase el predicado de "publicado en tienda" sin ambigüedad.
-    is_visible: true,
-    sale_starts_at: saleWindow.sale_starts_at,
-    sale_ends_at: saleWindow.sale_ends_at,
-  }
+  const title = product.name || "Complemento para tu pedido"
 
   const insertPayload = {
     trigger_type: "recipe_collection" as const,
@@ -1217,7 +1253,7 @@ async function buildDynamicRecipeBump(
       .select(BUMP_PRODUCT_COLUMNS)
       .eq("id", rule.product_id)
       .maybeSingle()
-    if (pErr || !isUsableBumpProduct(existingProduct as BumpProduct | null)) return null
+    if (pErr || !isOfferableBumpProduct(existingProduct as BumpProduct | null)) return null
     return buildBump(rule, existingProduct as BumpProduct)
   }
 

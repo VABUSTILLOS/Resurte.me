@@ -32,6 +32,19 @@ export const DELIVERY_FEE_FLAT = envNumber("NEXT_PUBLIC_DELIVERY_FEE_FLAT", 125)
 export const MAX_BUMPS = 3
 
 /**
+ * Precio mínimo (MXN) de un artículo especial del checkout.
+ *
+ * Un bump de $4 no es una oferta: es ruido en un pedido de $500 (el mínimo).
+ * El caso real: la regla `perishables` se re-apuntó a "Hoja de Laurel" ($4)
+ * cuando su producto se ocultó del catálogo, porque el sustituto se elegía
+ * **entre los más baratos del pasillo**. Desde aquí el motor no sirve ningún
+ * artículo por debajo de este piso, el re-apunte busca el más barato **que sí lo
+ * pasa**, y `/admin/marketing` marca en rojo las reglas cuyo producto quedó por
+ * debajo. Es la única perilla: se cambia aquí y se despliega.
+ */
+export const BUMP_MIN_PRICE_MXN = 50
+
+/**
  * Tope de seguridad del `limit` que un cliente puede pedir a la API pública
  * de bumps (`POST /api/cart/bumps`).
  *

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Copy, Megaphone, Pencil, Percent, Plus, Power, TicketPercent, Trash2, X } from "lucide-react"
 import { suggestDuplicateCode } from "@/lib/admin-marketing-validation"
+import { BUMP_MIN_PRICE_MXN } from "@/lib/checkout-config"
 import BumpAffinitySection, { type AffinityPair } from "@/components/admin/bump-affinity-section"
 
 interface BumpRule {
@@ -22,6 +23,8 @@ interface BumpRule {
   product_name: string | null
   product_is_visible: boolean | null
   product_stock_status: string | null
+  /** Precio efectivo del producto (sale_price vigente ?? price). */
+  product_price: number | null
 }
 
 interface Coupon {
@@ -387,8 +390,28 @@ function MarketingContent() {
                 </p>
                 <p className="text-xs text-gray-500 truncate">{rule.description}</p>
                 <p className="text-xs text-gray-600">
-                  {rule.product_name ?? `Producto #${rule.product_id}`} · orden {rule.display_order}
+                  {rule.product_name ?? `Producto #${rule.product_id}`}
+                  {rule.product_price !== null && ` · $${rule.product_price.toFixed(2)}`} · orden{" "}
+                  {rule.display_order}
                 </p>
+                {rule.is_active &&
+                  rule.product_price !== null &&
+                  rule.product_price < BUMP_MIN_PRICE_MXN && (
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      ⚠ Precio por debajo del mínimo del artículo especial ($
+                      {BUMP_MIN_PRICE_MXN}): la oferta no se muestra. El motor re-apunta la regla
+                      al producto más barato de su categoría que sí pasa el piso; si no hay
+                      ninguno, la regla queda muda.{" "}
+                      {rule.product_name && (
+                        <Link
+                          href={`/admin/productos?q=${encodeURIComponent(rule.product_name)}`}
+                          className="underline"
+                        >
+                          Ver en el catálogo
+                        </Link>
+                      )}
+                    </p>
+                  )}
                 {rule.is_active && rule.product_is_visible === false && (
                   <p className="text-xs text-amber-700 mt-0.5">
                     ⚠ Producto oculto del catálogo: la oferta no se puede mostrar. El motor

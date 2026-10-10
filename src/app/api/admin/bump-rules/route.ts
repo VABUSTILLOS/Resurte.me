@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { logAdminAction } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
 import { validateBumpRuleInput } from "@/lib/admin-marketing-validation"
+import { resolveEffectivePrice } from "@/lib/sale-window"
 
 export const runtime = "nodejs"
 
@@ -33,14 +34,26 @@ export async function GET() {
     // Dos queries en vez de un embed de PostgREST: el embed depende de que la FK
     // esté en la caché de esquema y, si no lo está, tumba la página entera.
     const productIds = [...new Set(rules.map((r) => r.product_id))]
-    const productById = new Map<number, { name: string; is_visible: boolean; stock_status: string }>()
+    const productById = new Map<
+      number,
+      { name: string; is_visible: boolean; stock_status: string; price: number | null }
+    >()
     if (productIds.length > 0) {
+      // El precio es lo que permite ver que una regla quedó apuntando a un
+      // producto de $4 (el defecto que re-apunta el motor): sin él, el panel
+      // mostraba el nombre y nada más. La ventana de oferta (00107) entra en el
+      // select porque el precio que se cobra es el efectivo.
       const { data: products } = await supabase
         .from("products")
-        .select("id, name, is_visible, stock_status")
+        .select("id, name, is_visible, stock_status, price, sale_price, sale_starts_at, sale_ends_at")
         .in("id", productIds)
       for (const p of products ?? []) {
-        productById.set(p.id, p)
+        productById.set(p.id, {
+          name: p.name,
+          is_visible: p.is_visible,
+          stock_status: p.stock_status,
+          price: resolveEffectivePrice(p),
+        })
       }
     }
 
@@ -52,6 +65,7 @@ export async function GET() {
           product_name: product?.name ?? null,
           product_is_visible: product?.is_visible ?? null,
           product_stock_status: product?.stock_status ?? null,
+          product_price: product?.price ?? null,
         }
       }),
     })

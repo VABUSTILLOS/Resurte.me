@@ -96,12 +96,30 @@
   `.neq("trigger_type", "ingredient_affinity")` — esas reglas existen para el
   carrito, no para upsells 1-click. `POST /api/orders` valida bumps por
   `product_id` + `is_active`, así que las reglas de afinidad pasan sin cambios.
+- **Un artículo especial por debajo del piso de precio no se ofrece.**
+  `BUMP_MIN_PRICE_MXN` (`src/lib/checkout-config.ts`, hoy **$50**) es el mínimo
+  MXN del bump y lo aplica **el mismo predicado en todos los tiers**
+  (`isOfferableBumpProduct`): un bump de $4 no es una oferta en un pedido de $500
+  (el mínimo de compra), es ruido. Nació del caso real que dejó el re-apunte de
+  abajo: la regla `perishables` se curó a "Hoja de Laurel" ($4) porque el
+  sustituto se elegía **entre los más baratos del pasillo**. Consecuencias, todas
+  deliberadas: el re-apunte busca el más barato **que sí pasa el piso** (el piso
+  se filtra en la BD con `.gte("price", …)` y se revalida con el precio efectivo,
+  porque una ventana de oferta puede dejarlo por debajo), el fallback dinámico de
+  recetas **no registra** una regla con producto barato (esa regla persiste, así
+  que elegir barato dejaba el bump barato para siempre), un candidato de afinidad
+  barato se descarta (el tier puede quedar mudo; los demás siguen) y una regla del
+  admin apuntando a un producto barato **no se sirve** y queda registrada con el
+  motivo `product_below_min_price` en `diagnostics.state.droppedRules`. El panel
+  `/admin/marketing` muestra el **precio** de cada regla y avisa "⚠ Precio por
+  debajo del mínimo" para que la configuración no vuelva a pudrirse en silencio.
 - **Una regla cuyo producto deja de ser ofrecible se re-apunta sola** (no se
   descarta en silencio). Si el `product_id` de una regla de categoría/umbral
-  queda **oculto, agotado, sin precio o inexistente**, el motor ya no la salta
-  muda: busca el producto usable **más barato de su misma categoría** (un bump es
-  compra de impulso, así que lo barato es lo correcto; nunca uno que ya esté en el
-  carrito) y **persiste el re-apunte** en `bump_rules` junto con el copy
+  queda **oculto, agotado, sin precio, por debajo del piso o inexistente**, el
+  motor ya no la salta muda: busca el producto usable **más barato de su misma
+  categoría que pase el piso** (un bump es compra de impulso, así que lo barato es
+  lo correcto **dentro del piso**; nunca uno que ya esté en el carrito) y
+  **persiste el re-apunte** en `bump_rules` junto con el copy
   (`title` = nombre del producto, `description` = su descripción, con respaldo si
   viene vacía). Persistir no es un adorno: `POST /api/orders` valida el artículo
   especial contra los `product_id` de las reglas activas, así que servir un
