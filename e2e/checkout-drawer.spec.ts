@@ -927,80 +927,62 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
 })
 
 /**
- * Express 1-click ("Pedir al instante").
+ * CTA de envío prioritario ("Obtén Envío Prioritario").
  *
- * El botón solo existe con sesión + tarjeta guardada + dirección en el libro,
- * así que el bloque se salta sin credenciales reales (mismo criterio que
- * e2e/support/session.ts: mejor saltado y visible que fingiendo verificar) y
- * también si la cuenta no tiene los datos guardados.
+ * Sustituye al antiguo express 1-click con tarjeta: ahora el atajo instantáneo
+ * del drawer crea el pedido **por transferencia SPEI**, que es lo que el negocio
+ * necesita (fondos el mismo día, sin comisión de Stripe).
  *
- * Lo que se mide es el arreglo del fallo mudo: cuando el cobro rápido no pasa,
- * el motivo tiene que verse y el usuario tiene que quedar en el paso de pago
- * (donde vive el formulario), no varado en el paso de revisión sin mensaje.
+ * El botón solo aparece con una dirección en el libro —es lo que permite pagar
+ * "en un clic"—, así que el bloque se salta sin credenciales reales (mismo
+ * criterio que e2e/support/session.ts: mejor saltado y visible que fingiendo
+ * verificar) y también si la cuenta no tiene direcciones guardadas.
  */
-test.describe("express 1-click (Pedir al instante)", { tag: "@ci" }, () => {
-  test("un cobro rechazado muestra el motivo y saca al usuario del paso de revisión", async ({
-    page,
-  }) => {
+test.describe("envío prioritario (Obtén Envío Prioritario)", { tag: "@ci" }, () => {
+  test("el atajo instantáneo crea el pedido por SPEI y no toca Stripe", async ({ page }) => {
     test.skip(!hasAdminCredentials(), "sin E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD")
     test.skip(!(await signInAsAdmin(page)), "no se pudo iniciar sesión")
 
-    // Nada de esto debe tocar la BD ni Stripe: pedido, intent y lead de mentira.
-    await page.route("**/api/orders", (route) =>
-      route.fulfill({
+    // Nada de esto debe tocar la BD ni Stripe: el pedido es de mentira.
+    const orderBodies: Record<string, unknown>[] = []
+    await page.route("**/api/orders", async (route) => {
+      orderBodies.push(JSON.parse(route.request().postData() ?? "{}"))
+      await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           orderId: 999999,
           cashbackCredits: 0,
           cashbackTier: null,
-          trackingToken: "e2e-express",
+          trackingToken: "e2e-prioritario",
         }),
       })
-    )
+    })
     await page.route("**/api/leads", (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: "{}" })
     )
-    await page.route("**/api/payments/stripe/saved-card", (route) =>
-      route.fulfill({
-        status: 200,
+    // Sonda: si el camino prioritario tocara Stripe, el test lo caza.
+    let stripeCalled = false
+    await page.route("**/api/payments/stripe/**", (route) => {
+      stripeCalled = true
+      return route.fulfill({
+        status: 500,
         contentType: "application/json",
-        body: JSON.stringify({ hasSavedCard: true, last4: "4242", brand: "visa" }),
+        body: JSON.stringify({ error: "el camino prioritario no usa Stripe" }),
       })
-    )
-    await page.route("**/api/payments/stripe/express-checkout", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ status: "declined" }),
-      })
-    )
-    await page.route("**/api/payments/stripe/create-intent", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ clientSecret: "cs_e2e", paymentIntentId: "pi_e2e" }),
-      })
-    )
+    })
 
     seedCart(page, [aguacate])
     await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await openCheckoutDrawer(page)
 
-    const express = page.getByRole("button", { name: /Pedir al instante/ })
-    test.skip(
-      (await express.count()) === 0,
-      "la cuenta no tiene tarjeta guardada + dirección en el libro"
-    )
+    const cta = page.getByRole("button", { name: /Obtén Envío Prioritario/ })
+    test.skip((await cta.count()) === 0, "la cuenta no tiene direcciones guardadas")
 
-    await express.click()
+    await cta.click()
 
-    const drawer = page.getByLabel("Checkout", { exact: true })
-    await expect(
-      drawer.getByText(/No pudimos cobrar con tu tarjeta guardada/)
-    ).toBeVisible()
-    // Salió del paso de revisión: su botón ya no está (el formulario de pago
-    // es lo que el mensaje "completa el pago abajo" promete).
-    await expect(page.getByRole("button", { name: "Continuar al envío" })).toHaveCount(0)
+    await expect.poll(() => orderBodies.length).toBeGreaterThan(0)
+    expect(orderBodies[0]).toMatchObject({ payment_method: "spei" })
+    expect(stripeCalled).toBe(false)
   })
 })

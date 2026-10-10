@@ -154,10 +154,10 @@ export function CheckoutDrawer() {
   )
 
   // ── Lógica compartida del pedido (sesión, direcciones, createOrder,
-  //    PaymentIntent, Express Checkout) — ver use-checkout-order.ts ──
+  //    PaymentIntent) — ver use-checkout-order.ts. El drawer ya no usa el
+  //    express con tarjeta: su CTA instantáneo es la transferencia SPEI. ──
   const {
     isLoggedIn,
-    savedCard,
     savedAddresses,
     selectedAddressId,
     setSelectedAddressId,
@@ -168,7 +168,6 @@ export function CheckoutDrawer() {
     deletingAddressId,
     captureLead,
     handlePlaceOrder,
-    handleExpressCheckout,
     handleStripeSuccess,
     handleStripeBack,
     stripeClientSecret,
@@ -407,46 +406,38 @@ export function CheckoutDrawer() {
                 </div>
               </div>
 
-              {/* Modo express 1-click (cliente recurrente con dirección y
-                  tarjeta guardadas): crea la orden con la dirección/horario
-                  preseleccionados y cobra off-session, sin recorrer los pasos. */}
-              {isLoggedIn === true &&
-                savedCard?.hasSavedCard &&
-                selectedAddressId !== null &&
-                isAddressValid && (
-                  <button
-                    onClick={() => {
-                      // El fallo del 1-click deja listo el formulario de Stripe,
-                      // que vive en el paso de pago: sin avanzar, el usuario se
-                      // quedaba en este paso sin mensaje ni forma de pagar.
-                      void handleExpressCheckout().then((outcome) => {
-                        if (outcome === "fallback") setStep("payment")
-                      })
-                    }}
-                    disabled={isProcessing || itemCount === 0}
-                    className="w-full flex flex-col items-center gap-0.5 px-6 py-3 mb-3 bg-[#242529] text-white font-bold rounded-xl hover:bg-black disabled:opacity-70 transition-colors"
-                  >
-                    <span className="flex items-center gap-2">
-                      {isProcessing ? (
-                        <>
-                          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Procesando...
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-4 h-4 text-yellow-400" />
-                          Pedir al instante
-                          {savedCard.last4 ? ` ··· ${savedCard.last4}` : ""}
-                        </>
-                      )}
-                    </span>
-                    {!isProcessing && (
-                      <span className="text-[11px] font-normal text-white/70 truncate max-w-full">
-                        {address.street} {address.number} · {schedule.date} {schedule.time}
-                      </span>
+              {/* Pago prioritario por transferencia: un clic con la dirección ya
+                  preseleccionada crea el pedido por SPEI (sin pasar por Stripe)
+                  y el cliente aterriza en la confirmación con la CLABE. Es el
+                  CTA que empuja la transferencia: fondos el mismo día y sin
+                  comisión, que es lo que cuida el margen. No exige tarjeta
+                  guardada — justo lo contrario. */}
+              {selectedAddressId !== null && isAddressValid && (
+                <button
+                  onClick={() => void handlePlaceOrder("spei")}
+                  disabled={isProcessing || itemCount === 0}
+                  className="w-full flex flex-col items-center gap-0.5 px-6 py-3 mb-3 bg-[#5B21B6] text-white font-bold rounded-xl hover:bg-[#4C1D95] disabled:opacity-70 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    {isProcessing ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Procesando...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4 text-yellow-400" />
+                        Obtén Envío Prioritario
+                      </>
                     )}
-                  </button>
-                )}
+                  </span>
+                  {!isProcessing && (
+                    <span className="text-[11px] font-normal text-white/80 truncate max-w-full">
+                      Paga por transferencia · {address.street} {address.number}
+                    </span>
+                  )}
+                </button>
+              )}
 
               {/* Motivo del fallo del cobro rápido (o de crear la orden): el
                   paso de pago también lo pinta, pero si el avance no aplica el
@@ -702,12 +693,16 @@ export function CheckoutDrawer() {
 
                   {paymentMethod === "spei" && <SpeiIncentive />}
 
-                  {/* Express Checkout: tarjeta guardada (solo sesión iniciada) */}
-                  {paymentMethod === "card" && isLoggedIn === true && savedCard?.hasSavedCard && (
+                  {/* Alternativa prioritaria: si eligió tarjeta, este botón le
+                      ofrece la transferencia en un clic (fondos el mismo día,
+                      sin comisión de Stripe). Cuando el selector ya está en
+                      SPEI, el botón "Confirmar pedido" de abajo es el que paga
+                      por transferencia y este sobraría. */}
+                  {paymentMethod === "card" && selectedAddressId !== null && isAddressValid && (
                     <button
-                      onClick={handleExpressCheckout}
+                      onClick={() => void handlePlaceOrder("spei")}
                       disabled={isProcessing}
-                      className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-[#242529] text-white font-bold rounded-xl hover:bg-black disabled:opacity-70 transition-colors"
+                      className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-[#5B21B6] text-white font-bold rounded-xl hover:bg-[#4C1D95] disabled:opacity-70 transition-colors"
                     >
                       {isProcessing ? (
                         <>
@@ -717,10 +712,7 @@ export function CheckoutDrawer() {
                       ) : (
                         <>
                           <Zap className="w-5 h-5 text-yellow-400" />
-                          Pagar al instante
-                          {savedCard.last4
-                            ? ` ··· ${savedCard.last4}${savedCard.brand ? ` (${savedCard.brand})` : ""}`
-                            : ""}
+                          Obtén Envío Prioritario
                         </>
                       )}
                     </button>

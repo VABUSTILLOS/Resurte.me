@@ -198,9 +198,17 @@
     en el repo a propósito**: sin ellos el checkout decía "todavía no publicamos
     una CLABE" y nadie podía transferir (de 24 pedidos, cero SPEI).
   - El mismo componente `SpeiIncentive` lo montan las **dos** superficies
-    (página completa y drawer) para que el mensaje no pueda divergir. El drawer
-    ganó un selector Tarjeta / SPEI en su paso de pago: la tarjeta sigue siendo
-    el default (es el camino corto del drawer) y el express 1-click no cambia.
+    (página completa y drawer) para que el mensaje no pueda divergir.
+  - **En el drawer, el atajo instantáneo es la transferencia**: el CTA que antes
+    era "Pedir al instante ··· 1234" (cobro 1-click con la tarjeta guardada) es
+    ahora **"Obtén Envío Prioritario"** y crea el pedido por SPEI en un clic con
+    la dirección preseleccionada (`handlePlaceOrder("spei")`, sin Stripe). En el
+    paso de pago se ofrece como alternativa cuando el método elegido es tarjeta.
+    Consecuencias deliberadas: **el drawer ya no cobra con tarjeta en 1 clic**
+    (el cobro con tarjeta sigue existiendo vía "Confirmar pedido") y el CTA **no
+    exige tarjeta guardada** — exigirla era justo lo contrario del objetivo. El
+    express con tarjeta (`handleExpressCheckout`) sobrevive en la **página
+    completa**, cuyo paso de pago conserva su selector de métodos.
   - **El monto exacto y la referencia se muestran DESPUÉS de crear el pedido**
     (`PaymentInstructions`): si el cliente transfiere antes de que exista el
     pedido, el dinero llega sin referencia que reconciliar. El incentivo muestra
