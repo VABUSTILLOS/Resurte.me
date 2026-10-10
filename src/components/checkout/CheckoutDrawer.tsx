@@ -579,6 +579,7 @@ export function CheckoutDrawer() {
                       <>
                         <Zap className="w-4 h-4 text-yellow-400" />
                         Obtén Envío Prioritario
+                        <ArrowRight className="w-4 h-4" />
                       </>
                     )}
                   </span>
