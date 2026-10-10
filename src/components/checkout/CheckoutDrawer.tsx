@@ -207,7 +207,29 @@ export function CheckoutDrawer() {
     // last_order (merge), limpia carrito, cierra, refresca direcciones,
     // dispara ORDER_PAID_EVENT (UpsellModal) y navega si nadie lo reclamó.
     onPaid: (info: CheckoutPaidInfo) => {
-      saveLastOrder(info.orderId ?? undefined, info.cashback?.credits, info.cashback?.tier, info.repurchaseCoupon, info.trackingToken)
+      saveLastOrder({
+        orderId: info.orderId ?? undefined,
+        cashbackCredits: info.cashback?.credits,
+        cashbackTier: info.cashback?.tier,
+        repurchaseCoupon: info.repurchaseCoupon,
+        trackingToken: info.trackingToken,
+        paymentMethod: info.paymentMethod,
+        total,
+        items: [
+          ...cart.items.map((i) => ({
+            id: String(i.product_id),
+            name: i.name,
+            quantity: i.quantity,
+            price: i.sale_price ?? i.price,
+          })),
+          ...selectedBumps.map((b) => ({
+            id: String(b.productId),
+            name: b.name ?? `Artículo especial #${b.productId}`,
+            quantity: b.quantity,
+            price: b.unitPrice,
+          })),
+        ],
+      })
       clearCart()
       setIsOpen(false)
 
@@ -218,20 +240,29 @@ export function CheckoutDrawer() {
       void refreshSavedAddresses()
 
       // El UpsellModal escucha este evento para interceptar la navegación y
-      // ofrecer el 1-click upsell. `dispatchEvent` retorna false si un
-      // listener llamó a preventDefault() (el modal reclamó el evento). Por
-      // lo tanto: navegamos a la confirmación SOLO si nadie lo reclamó.
-      const claimed = window.dispatchEvent(
-        new CustomEvent(ORDER_PAID_EVENT, {
-          detail: {
-            orderId: info.orderId,
-            paymentIntentId: info.paymentIntentId,
-            total,
-          },
-          cancelable: true,
-        })
-      )
-      if (claimed) {
+      // ofrecer el 1-click upsell. `dispatchEvent` retorna false si un listener
+      // llamó a preventDefault() (el modal reclamó el evento), así que
+      // navegamos SOLO si nadie lo reclamó.
+      //
+      // El evento se dispara únicamente cuando hubo cobro con tarjeta: el upsell
+      // post-compra cobra off-session con esa tarjeta, así que en un pago manual
+      // (SPEI) no hay nada que cobrar y el modal se quedaba en "Preparando tu
+      // oferta…" hasta rendirse, mostrando el encabezado "¡Un último paso para
+      // completar tu pedido!" sin nada detrás. Además, en SPEI el upsell ya se
+      // ofreció ANTES de transferir: repetirlo aquí sobra.
+      const nobodyClaimed = info.paymentMethod === "card"
+        ? window.dispatchEvent(
+            new CustomEvent(ORDER_PAID_EVENT, {
+              detail: {
+                orderId: info.orderId,
+                paymentIntentId: info.paymentIntentId,
+                total,
+              },
+              cancelable: true,
+            })
+          )
+        : true
+      if (nobodyClaimed) {
         // Nunca bloquear tras un pago exitoso: city siempre está disponible
         // (CityProvider auto-sanea slugs inválidos); por seguridad se usa el
         // slug por defecto si no lo hubiera.
@@ -244,12 +275,17 @@ export function CheckoutDrawer() {
   // ── Pago prioritario por transferencia (SPEI) ──
   // El pedido se crea al pulsar el CTA, pero el drawer NO se cierra: primero se
   // muestran los datos de transferencia (monto exacto y número de pedido como
-  // concepto) y solo al pulsar "Listo" corre el post-pago. El carrito se vacía
-  // en cuanto la orden existe para que un cierre accidental no deje la puerta
-  // abierta a crear un pedido duplicado.
+  // concepto) y solo al pulsar "Listo" corre el post-pago.
   //
-  // El total se guarda junto a la orden a propósito: vaciar el carrito pone el
-  // total en vivo en 0, y leerlo al pintar mostraría "transfiere $0.00".
+  // El carrito NO se vacía aquí: el post-pago guarda el resumen del pedido en
+  // `last_order` (método, total e items) leyéndolo del carrito vivo, y vaciarlo
+  // antes dejaría esa foto en ceros. Lo que evita el pedido duplicado es la
+  // guarda de abajo: si ya hay una transferencia pendiente, el CTA vuelve a ella
+  // en vez de crear otra orden.
+  //
+  // El total se guarda junto a la orden a propósito: al vaciar el carrito (en el
+  // post-pago) el total en vivo queda en 0, y leerlo al pintar mostraría
+  // "transfiere $0.00".
   const [transferOrder, setTransferOrder] = useState<{
     created: CreatedOrder
     total: number
@@ -261,6 +297,13 @@ export function CheckoutDrawer() {
   // Sin `useCallback`: el React Compiler memoiza solo, y envolverlo a mano hacía
   // que el compilador se rindiera (el `total` capturado "puede cambiar después").
   const handlePriorityCheckout = async () => {
+    // Ya hay una transferencia pendiente: se vuelve a ella en lugar de crear
+    // otra orden (el carrito sigue intacto, así que sin esta guarda el CTA
+    // generaría un pedido duplicado).
+    if (transferOrder) {
+      setStep("transfer")
+      return
+    }
     setIsProcessing(true)
     setCheckoutError(null)
     try {
@@ -270,7 +313,6 @@ export function CheckoutDrawer() {
         return
       }
       setTransferOrder({ created, total })
-      clearCart()
       setIsProcessing(false)
       setStep("transfer")
     } catch (err) {
@@ -1006,7 +1048,7 @@ export function CheckoutDrawer() {
               />
 
               <button
-                onClick={() => completeOrder(transferOrder.created)}
+                onClick={() => completeOrder(transferOrder.created, "spei")}
                 className="w-full px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] transition-colors"
               >
                 Listo, ver mi pedido
@@ -1036,7 +1078,16 @@ export function CheckoutDrawer() {
  * confirmación pueda disparar el evento `purchase` y mostrar el cashback.
  * Mismo contrato que el checkout page (last_order).
  */
-function saveLastOrder(orderId?: number, cashbackCredits?: number, cashbackTier?: string | null, repurchaseCoupon?: RepurchaseCouponInfo | null, trackingToken?: string | null) {
+function saveLastOrder(entry: {
+  orderId?: number
+  cashbackCredits?: number
+  cashbackTier?: string | null
+  repurchaseCoupon?: RepurchaseCouponInfo | null
+  trackingToken?: string | null
+  paymentMethod?: string | null
+  total?: number
+  items?: { id: string; name: string; quantity: number; price: number }[]
+}) {
   if (typeof window === "undefined") return
   const raw = window.sessionStorage.getItem("last_order")
   const previous = raw ? JSON.parse(raw) : {}
@@ -1044,11 +1095,19 @@ function saveLastOrder(orderId?: number, cashbackCredits?: number, cashbackTier?
     "last_order",
     JSON.stringify({
       ...previous,
-      orderId: orderId ?? null,
-      cashbackCredits: cashbackCredits ?? 0,
-      cashbackTier: cashbackTier ?? null,
-      repurchaseCoupon: repurchaseCoupon ?? null,
-      trackingToken: trackingToken ?? null,
+      orderId: entry.orderId ?? null,
+      cashbackCredits: entry.cashbackCredits ?? 0,
+      cashbackTier: entry.cashbackTier ?? null,
+      repurchaseCoupon: entry.repurchaseCoupon ?? null,
+      trackingToken: entry.trackingToken ?? null,
+      // Los tres que lee la confirmación: `paymentMethod` decide si muestra los
+      // datos de transferencia y `total`/`items` alimentan el evento `purchase`
+      // (y el total consolidado del upsell, que los suma sobre estos). El drawer
+      // no los guardaba —era card-only— así que un pago por SPEI aterrizaba en
+      // una confirmación sin CLABE.
+      paymentMethod: entry.paymentMethod ?? previous.paymentMethod ?? null,
+      total: entry.total ?? previous.total ?? null,
+      items: entry.items ?? previous.items ?? null,
     })
   )
 }

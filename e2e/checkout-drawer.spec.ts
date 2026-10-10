@@ -990,6 +990,15 @@ test.describe("envío prioritario (Obtén Envío Prioritario)", { tag: "@ci" }, 
     })
 
     seedCart(page, [aguacate])
+    // Cuenta los avisos de pago: en un pago manual no debe dispararse ninguno
+    // (el upsell post-compra necesita una tarjeta que cobrar).
+    await page.addInitScript(() => {
+      const w = window as unknown as { __orderPaidEvents?: number }
+      w.__orderPaidEvents = 0
+      window.addEventListener("resurte:order-paid", () => {
+        w.__orderPaidEvents = (w.__orderPaidEvents ?? 0) + 1
+      })
+    })
     await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await openCheckoutDrawer(page)
 
@@ -1014,6 +1023,22 @@ test.describe("envío prioritario (Obtén Envío Prioritario)", { tag: "@ci" }, 
     // Monto exacto de la compra sembrada ($850, con envío gratis).
     await expect(drawer.getByText("$850.00 MXN")).toBeVisible()
     await expect(drawer.getByRole("button", { name: /Listo, ver mi pedido/ })).toBeVisible()
+
+    // Cierra el pedido SIN pasar por el upsell post-compra: en un pago manual no
+    // hay tarjeta que cobrar, y el upsell ya se ofreció antes de transferir.
+    await drawer.getByRole("button", { name: /Listo, ver mi pedido/ }).click()
+    await expect(page).toHaveURL(/pedido-confirmado/, { timeout: 15_000 })
+    const paidEvents = await page.evaluate(
+      () => (window as unknown as { __orderPaidEvents?: number }).__orderPaidEvents ?? 0
+    )
+    expect(paidEvents).toBe(0)
+    await expect(page.getByText("¡Un último paso para completar tu pedido!")).toHaveCount(0)
+
+    // Y la confirmación SÍ muestra los datos de transferencia: el drawer ahora
+    // persiste `paymentMethod`/`total` en `last_order` (antes no lo hacía y un
+    // pago SPEI aterrizaba en una página sin CLABE).
+    await expect(page.getByText("0141 5060 6044 4770 78")).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText("$850.00 MXN")).toBeVisible()
   })
 
   test("la oferta previa sube el monto a transferir y entra al pedido", async ({ page }) => {

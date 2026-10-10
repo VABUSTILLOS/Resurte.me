@@ -64,6 +64,13 @@ export type CheckoutPaidInfo = {
   orderId: number | null
   cashback: { credits: number; tier: string | null } | null
   paymentIntentId: string
+  /**
+   * Método con el que se cerró el pedido. El post-pago lo necesita: solo un
+   * cobro con tarjeta (con PaymentIntent) puede llevar el upsell post-compra
+   * —cobra off-session— y la página de confirmación decide con él si muestra
+   * los datos de transferencia.
+   */
+  paymentMethod: PaymentMethod
   /** Cupón de recompra emitido con esta orden (solo usuarios logueados). */
   repurchaseCoupon?: RepurchaseCouponInfo | null
   /** Token de seguimiento público del pedido (restore_token de la orden). */
@@ -624,6 +631,8 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
         orderId: finalOrderId,
         cashback: finalCashback,
         paymentIntentId,
+        // `handleStripeSuccess` solo lo llama el flujo con tarjeta (Stripe).
+        paymentMethod: "card",
         repurchaseCoupon,
         trackingToken: orderTrackingToken,
       })
@@ -644,11 +653,12 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
   // exactamente lo que hace `onPaid`. Se expone aparte porque el drawer necesita
   // MOSTRAR los datos de transferencia antes de cerrar: crea la orden, enseña la
   // CLABE y solo al pulsar "Listo" el cliente llama aquí.
-  const completeOrder = useCallback((created: CreatedOrder) => {
+  const completeOrder = useCallback((created: CreatedOrder, method: PaymentMethod) => {
     onPaidRef.current({
       orderId: created.orderId,
       cashback: created.cashback,
       paymentIntentId: "",
+      paymentMethod: method,
       repurchaseCoupon: created.repurchaseCoupon ?? null,
       trackingToken: created.trackingToken ?? null,
     })
@@ -676,7 +686,7 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
           return
         }
         // Métodos no-tarjeta: el flujo navega a la confirmación directo.
-        completeOrder(created)
+        completeOrder(created, method)
       } catch (err) {
         setCheckoutError(
           err instanceof Error ? err.message : "Error de conexión. Intenta de nuevo."

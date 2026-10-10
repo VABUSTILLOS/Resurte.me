@@ -215,10 +215,13 @@
     la cuenta pero pide confirmar primero. Por eso el drawer tiene un **paso
     `transfer`**: al pulsar el CTA morado se crea la orden y el drawer **no se
     cierra** — enseña la CLABE, el monto exacto y el número de pedido como
-    concepto, y solo al pulsar "Listo" corre el post-pago (`completeOrder`). El
-    carrito se vacía en cuanto la orden existe, para que un cierre accidental no
-    permita crear un pedido duplicado. "Confirmar pedido" con SPEI elegido pasa
-    por el mismo paso.
+    concepto, y solo al pulsar "Listo" corre el post-pago (`completeOrder`).
+    El carrito se vacía **en el post-pago**, no al crear la orden: el post-pago
+    arma `last_order` (método, total, items) leyendo el carrito vivo, y vaciarlo
+    antes dejaba esa foto en ceros. El pedido duplicado lo evita una **guarda**:
+    si ya hay una transferencia pendiente (`transferOrder`), el CTA vuelve al
+    paso `transfer` en lugar de crear otra orden. "Confirmar pedido" con SPEI
+    elegido pasa por el mismo paso.
   - **Antes de ese paso se ofrece un producto más** (`step === "offer"`): el
     cliente puede agregarlo y el **monto a transferir sube con él**. Se resuelve
     con el motor de bumps (`POST /api/cart/bumps`), no con el modal post-compra:
@@ -232,6 +235,22 @@
   - **El cuadro del incentivo muestra el monto a transferir** (`SpeiIncentive`
     acepta `amount`): es el dato con el que el cliente no se equivoca de
     cantidad, y cambia si acepta la oferta.
+  - **El upsell post-compra (`UpsellModal`) es solo para tarjeta.** Cobra
+    off-session con la tarjeta guardada, así que en un pago manual no hay nada
+    que cobrar: el modal se quedaba en "Preparando tu oferta…" mostrando el
+    encabezado "¡Un último paso para completar tu pedido!" sin nada detrás. Por
+    eso el drawer **solo dispara `ORDER_PAID_EVENT` cuando el método es tarjeta**
+    (`info.paymentMethod === "card"`) y en SPEI el upsell se ofreció antes de
+    transferir. Consecuencia: en un pedido por transferencia el drawer cierra el
+    flujo solo (`router.push` a la confirmación).
+  - **`last_order` (sessionStorage) es el contrato entre el checkout y la
+    confirmación** y debe llevar `paymentMethod`, `total` e `items`, además de
+    `orderId`/`trackingToken`/cashback/`repurchaseCoupon`. La página
+    `/[slug]/pedido-confirmado` decide con `paymentMethod === "spei"` si muestra
+    los datos de transferencia y el badge "Envío prioritario desbloqueado"; sin
+    el campo, un pago por SPEI aterrizaba en una confirmación **sin CLABE**. El
+    drawer no lo guardaba (era card-only) y por eso `saveLastOrder` recibe un
+    objeto: son 8 campos y la firma posicional ya se había desincronizado.
   - `priority` se lee como columna **opcional** del panel
     (`ADMIN_ORDER_OPTIONAL_COLUMNS`, migración `00220`): el esquema puede ir por
     detrás del código sin tumbar el checkout ni el ticket.

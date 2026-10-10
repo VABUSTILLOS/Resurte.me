@@ -359,6 +359,7 @@ describe("useCheckoutOrder · flujo onPaid", () => {
       orderId: 101,
       cashback: { credits: 20, tier: "Verde" },
       paymentIntentId: "pi_123",
+      paymentMethod: "card",
       repurchaseCoupon: REPURCHASE,
       trackingToken: "tok-9",
     })
@@ -375,6 +376,9 @@ describe("useCheckoutOrder · flujo onPaid", () => {
       orderId: 101,
       cashback: { credits: 20, tier: "Verde" },
       paymentIntentId: "",
+      // El post-pago necesita el método: con él decide si dispara el upsell
+      // (solo tarjeta) y la confirmación si muestra los datos de transferencia.
+      paymentMethod: "spei",
       repurchaseCoupon: REPURCHASE,
       trackingToken: "tok-9",
     })
@@ -394,7 +398,11 @@ describe("useCheckoutOrder · flujo onPaid", () => {
     expect(calls.filter((c) => c === "/api/orders")).toHaveLength(1)
     expect(calls).not.toContain("/api/payments/stripe/create-intent")
     expect(opts.onPaid).toHaveBeenCalledWith(
-      expect.objectContaining({ orderId: 101, paymentIntentId: "" })
+      expect.objectContaining({
+        orderId: 101,
+        paymentIntentId: "",
+        paymentMethod: "cash_on_delivery",
+      })
     )
   })
 
