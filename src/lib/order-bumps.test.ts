@@ -1118,6 +1118,32 @@ describe("resolveBumps", () => {
       })
     })
 
+    it("el checkout apunta al doble de la ventana para encadenar sin vaciarse", async () => {
+      // El checkout no manda `limit`: quiere el pool completo. Con cinco reglas
+      // curadas disponibles sirve las cinco, así elegir una oferta no deja la
+      // sección vacía en la tercera.
+      const supabase = makeSupabase({
+        categories: [{ id: 20, slug: "limpieza-cocina" }],
+        rules: [
+          rule("perishables", { id: 1, product_id: 100, display_order: 1 }),
+          rule("snacks_drinks", { id: 2, product_id: 200, display_order: 2 }),
+          rule("subtotal_threshold", { id: 3, product_id: 300, display_order: 3 }),
+          rule("meat_bbq", { id: 4, product_id: 400, display_order: 4 }),
+          rule("drinks_sides", { id: 5, product_id: 500, display_order: 5 }),
+        ],
+        bumpProducts: {
+          100: product({ id: 100, price: 120 }),
+          200: product({ id: 200, price: 110 }),
+          300: product({ id: 300, price: 100 }),
+          400: product({ id: 400, price: 90 }),
+          500: product({ id: 500, price: 60 }),
+        },
+      })
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+      const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+      expect(bumps.map((b) => b.ruleId)).toEqual([1, 2, 3, 4, 5])
+    })
+
     it("no rellena por encima del tope que pide la superficie de carrito", async () => {
       const supabase = makeSupabase({
         categories: [{ id: 20, slug: "limpieza-cocina" }],

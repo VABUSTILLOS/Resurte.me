@@ -1062,6 +1062,15 @@ export async function resolveBumps(
       diagnostics,
     })
 
+  /**
+   * Cuántas ofertas se intentan servir. El checkout pide el pool completo
+   * (`maxBumps` = el tope de petición) para encadenar ofertas al elegir: ahí se
+   * apunta al **doble** de la ventana visible, para que elegir una oferta no
+   * vacíe la sección a la tercera. Las superficies de carrito piden su ventana
+   * (`MAX_BUMPS`) y no se rellenan más allá.
+   */
+  const offerTarget = Math.min(maxBumps, MAX_BUMPS * 2)
+
   if (
     matchedTriggers.length === 0 &&
     collectionSlugsInCart.size === 0 &&
@@ -1070,7 +1079,7 @@ export async function resolveBumps(
     // Nada del carrito dispara una regla. Antes esto devolvía `[]` y el carrito
     // se quedaba sin ninguna oferta —y sin el paso de oferta del pago por
     // transferencia—; ahora es justo el caso que cubre el relleno.
-    const filler = await runFill(new Set(), new Set(), Math.min(maxBumps, MAX_BUMPS))
+    const filler = await runFill(new Set(), new Set(), offerTarget)
     return filler.slice(0, maxBumps)
   }
 
@@ -1196,8 +1205,8 @@ export async function resolveBumps(
   // Ver `fillWithCuratedOffers`: sin esto, un carrito al que solo le aplica una
   // regla se queda sin ofertas y el paso de oferta del pago por transferencia
   // (que necesita una oferta NUEVA) se salta.
-  if (bumps.length < Math.min(maxBumps, MAX_BUMPS)) {
-    const filler = await runFill(seen, evaluatedRuleIds, Math.min(maxBumps, MAX_BUMPS) - bumps.length)
+  if (bumps.length < offerTarget) {
+    const filler = await runFill(seen, evaluatedRuleIds, offerTarget - bumps.length)
     for (const offer of filler) {
       if (bumps.length >= maxBumps) break
       bumps.push(offer)
