@@ -1009,6 +1009,8 @@ test.describe("envío prioritario (Obtén Envío Prioritario)", { tag: "@ci" }, 
       drawer.getByRole("heading", { name: /Pedido #999999 registrado/ })
     ).toBeVisible()
     await expect(drawer.getByText("0141 5060 6044 4770 78")).toBeVisible()
+    await expect(drawer.getByText("Santander")).toBeVisible()
+    await expect(drawer.getByText("Victor Bustillos")).toBeVisible()
     // Monto exacto de la compra sembrada ($850, con envío gratis).
     await expect(drawer.getByText("$850.00 MXN")).toBeVisible()
     await expect(drawer.getByRole("button", { name: /Listo, ver mi pedido/ })).toBeVisible()

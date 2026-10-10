@@ -26,8 +26,8 @@ export interface SpeiAccount {
 
 const DEFAULT_SPEI_ACCOUNT: SpeiAccount = {
   clabe: "014150606044477078",
-  banco: "SANTANDER SUPERCUENTA CHEQUES",
-  beneficiario: "Victor Alberto Bustillos Tena",
+  banco: "Santander",
+  beneficiario: "Victor Bustillos",
   cuenta: "60-60444770-7",
 }
 

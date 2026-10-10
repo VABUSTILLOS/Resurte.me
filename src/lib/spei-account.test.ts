@@ -11,8 +11,8 @@ describe("getSpeiAccount", () => {
     // cobrar por transferencia (era el estado anterior: cero pedidos SPEI).
     const account = getSpeiAccount()
     expect(account.clabe).toBe("014150606044477078")
-    expect(account.banco).toBe("SANTANDER SUPERCUENTA CHEQUES")
-    expect(account.beneficiario).toBe("Victor Alberto Bustillos Tena")
+    expect(account.banco).toBe("Santander")
+    expect(account.beneficiario).toBe("Victor Bustillos")
     expect(account.cuenta).toBe("60-60444770-7")
   })
 
