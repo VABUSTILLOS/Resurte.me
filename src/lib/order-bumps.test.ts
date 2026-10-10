@@ -235,6 +235,8 @@ describe("resolveBumps", () => {
     affinityRules?: BumpRuleRow[]
     /** Candidatos que devuelve la búsqueda de sustituto (mismo pasillo). */
     substitutes?: BumpProduct[]
+    /** Sustitutos por pasillo (`category_id`), para el respaldo del carrito. */
+    substitutesByCategory?: Record<number, BumpProduct[]>
     /** Fuerza el fallo del re-apunte de la regla (UPDATE con error). */
     updateFails?: boolean
   }) {
@@ -250,6 +252,7 @@ describe("resolveBumps", () => {
       affinityPairs = [],
       affinityRules = [],
       substitutes = [],
+      substitutesByCategory,
       updateFails = false,
     } = opts
 
@@ -360,9 +363,14 @@ describe("resolveBumps", () => {
                       neq: vi.fn().mockReturnValue({
                         gte: vi.fn().mockImplementation((gteCol: string, gteValue: number) => {
                           substituteFilters.push({ col: gteCol, value: gteValue })
+                          // `substitutesByCategory` permite distinguir pasillos:
+                          // el re-apunte prueba primero el del producto roto y
+                          // luego el del carrito.
+                          const data =
+                            substitutesByCategory?.[value as number] ?? substitutes
                           return {
                             order: vi.fn().mockReturnValue({
-                              limit: vi.fn().mockResolvedValue({ data: substitutes, error: null }),
+                              limit: vi.fn().mockResolvedValue({ data, error: null }),
                             }),
                           }
                         }),
@@ -660,13 +668,20 @@ describe("resolveBumps", () => {
     expect(diagnostics.state?.healedRules).toEqual([])
   })
 
-  it("sin reglas que apliquen devuelve []", async () => {
+  it("sin reglas que apliquen sirve el relleno de complementos (nunca 0 ofertas)", async () => {
     const supabase = makeSupabase({
       categories: [{ id: 20, slug: "limpieza-cocina" }],
       rules: [perishableRule],
     })
     vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
-    expect(await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })).toEqual([])
+    const diagnostics: BumpDiagnostics = {}
+    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] }, diagnostics)
+    // El carrito no dispara ninguna regla, pero el carrito no puede quedarse sin
+    // ofertas: el paso de oferta del pago por transferencia necesita una.
+    expect(bumps).toHaveLength(1)
+    expect(bumps[0]?.ruleId).toBe(1)
+    expect(diagnostics.state?.fillerRules).toEqual(["1:perishables"])
+    expect(diagnostics.state?.matchedTriggers).toEqual([])
   })
 
   // ── Cross-sell por receta/colección (motor de recomendación) ──
@@ -1031,6 +1046,91 @@ describe("resolveBumps", () => {
 
       expect(bumps).toHaveLength(1)
       expect(bumps[0]?.trigger_type).toBe("perishables")
+    })
+  })
+
+  describe("relleno de complementos (la ventana visible siempre llena)", () => {
+    /** Tres reglas curadas, ninguna con trigger que dispare este carrito. */
+    function curatedRules(): BumpRuleRow[] {
+      return [
+        rule("perishables", { id: 1, product_id: 100, display_order: 1 }),
+        rule("meat_bbq", { id: 4, product_id: 400, display_order: 4 }),
+        rule("drinks_sides", { id: 5, product_id: 500, display_order: 5 }),
+      ]
+    }
+
+    it("completa hasta la ventana visible con las reglas curadas", async () => {
+      const supabase = makeSupabase({
+        categories: [{ id: 20, slug: "limpieza-cocina" }],
+        rules: curatedRules(),
+        bumpProducts: {
+          100: product({ id: 100, name: "Empaque térmico", price: 120 }),
+          400: product({ id: 400, name: "Sazonador", price: 90 }),
+          500: product({ id: 500, name: "Botana", price: 60 }),
+        },
+      })
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+      const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+      expect(bumps.map((b) => b.ruleId)).toEqual([1, 4, 5])
+    })
+
+    it("no repite una regla que ya disparó ni la reintenta", async () => {
+      const supabase = makeSupabase({
+        rules: curatedRules(),
+        bumpProducts: {
+          100: product({ id: 100, price: 120 }),
+          400: product({ id: 400, name: "Sazonador", price: 90 }),
+          500: product({ id: 500, name: "Botana", price: 60 }),
+        },
+      })
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+      const diagnostics: BumpDiagnostics = {}
+      const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] }, diagnostics)
+      // El carrito (frutas-verduras) dispara `perishables`; el relleno aporta las
+      // otras dos y no vuelve a servir la primera.
+      expect(bumps.map((b) => b.ruleId)).toEqual([1, 4, 5])
+      expect(diagnostics.state?.matchedTriggers).toEqual(["perishables"])
+      expect(diagnostics.state?.fillerRules).toEqual(["4:meat_bbq", "5:drinks_sides"])
+      expect(diagnostics.state?.droppedRules).toEqual([])
+    })
+
+    it("re-apunta una regla rota con el pasillo del CARRITO cuando el suyo no tiene nada", async () => {
+      // La regla apunta a un producto oculto de un pasillo muerto (el caso real
+      // de `bebidas`/`botanas-dulces`, sin un solo producto visible) y el
+      // carrito trae frutas-verduras: el sustituto sale del pasillo del carrito.
+      const supabase = makeSupabase({
+        rules: [rule("snacks_drinks", { id: 1, product_id: 100, display_order: 1 })],
+        categories: [{ id: 20, slug: "frutas-verduras" }],
+        cartProducts: [product({ id: 700, name: "Acelga", category_id: 20 })],
+        bumpProducts: { 100: product({ id: 100, is_visible: false, category_id: 10 }) },
+        substitutesByCategory: {
+          10: [],
+          20: [product({ id: 555, name: "Aguacate Hass", price: 90, category_id: 20 })],
+        },
+      })
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+      const bumps = await resolveBumps({ items: [{ product_id: 700, quantity: 1 }] })
+      expect(bumps.map((b) => b.product.id)).toEqual([555])
+      expect(supabase.__updateBumpRules).toHaveBeenCalledWith({
+        product_id: 555,
+        title: "Aguacate Hass",
+        description: "Fuerte",
+      })
+    })
+
+    it("no rellena por encima del tope que pide la superficie de carrito", async () => {
+      const supabase = makeSupabase({
+        categories: [{ id: 20, slug: "limpieza-cocina" }],
+        rules: curatedRules(),
+        bumpProducts: {
+          100: product({ id: 100, price: 120 }),
+          400: product({ id: 400, price: 90 }),
+          500: product({ id: 500, price: 60 }),
+        },
+      })
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+      const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] }, undefined, 2)
+      expect(bumps).toHaveLength(2)
     })
   })
 

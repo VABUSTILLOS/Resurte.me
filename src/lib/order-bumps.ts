@@ -165,6 +165,12 @@ export interface BumpDiagnostics {
     droppedRules: string[]
     /** Reglas re-apuntadas a un sustituto usable en esta misma respuesta. */
     healedRules: string[]
+    /**
+     * Reglas curadas que se sirvieron SOLO para completar la ventana visible
+     * (no disparó su trigger). Si esto crece, la configuración de reglas se está
+     * quedando sin ofertas propias del carrito.
+     */
+    fillerRules: string[]
   }
 }
 
@@ -555,23 +561,15 @@ function unusableReason(product: BumpProduct | null | undefined): string {
 const SUBSTITUTE_SCAN_LIMIT = 20
 
 /**
- * Sustituto usable para una regla cuyo producto dejó de ser ofrecible: el más
- * barato de la MISMA categoría (un bump es compra de impulso, así que lo barato
- * es lo correcto **dentro del piso**), visible, con existencia y con precio
- * (`>= BUMP_MIN_PRICE_MXN`).
- *
- * La categoría es la del producto roto a propósito: es el pasillo que el admin
- * eligió como complemento. Si el catálogo de ese pasillo está entero oculto
- * (caso real: `bebidas` y `botanas-dulces` sin un solo producto visible) o no
- * queda nada por encima del piso, no hay sustituto posible y la regla se queda
- * muda — pero queda registrado.
+ * Busca en UN pasillo el producto usable más barato que pasa el piso.
+ * `excluded` son los productos que no pueden salir (ya en el carrito o ya
+ * ofrecidos en esta respuesta).
  */
-async function findSubstituteProduct(
+async function findAisleProduct(
   supabase: Awaited<ReturnType<typeof createServiceClient>>,
-  categoryId: number | null | undefined,
+  categoryId: number,
   excluded: Set<number>
 ): Promise<BumpProduct | null> {
-  if (typeof categoryId !== "number") return null
   const { data, error } = await supabase
     .from("products")
     .select(BUMP_PRODUCT_COLUMNS)
@@ -594,6 +592,35 @@ async function findSubstituteProduct(
     if (excluded.has(row.id)) continue
     if (!isOfferableBumpProduct(row)) continue
     return row
+  }
+  return null
+}
+
+/**
+ * Sustituto usable para una regla cuyo producto dejó de ser ofrecible: el más
+ * barato de la MISMA categoría (un bump es compra de impulso, así que lo barato
+ * es lo correcto **dentro del piso**), visible, con existencia y con precio
+ * (`>= BUMP_MIN_PRICE_MXN`).
+ *
+ * La categoría es la del producto roto a propósito: es el pasillo que el admin
+ * eligió como complemento. Si ese pasillo no tiene nada usable —caso real:
+ * `bebidas` y `botanas-dulces` sin un solo producto visible, así que las reglas
+ * `snacks_drinks` y `drinks_sides` se quedaban mudas para siempre— se prueban
+ * los `fallbackCategoryIds` (los pasillos del propio carrito): lo que el cliente
+ * ya está comprando es el contexto más fiable que tenemos.
+ */
+async function findSubstituteProduct(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  categoryId: number | null | undefined,
+  excluded: Set<number>,
+  fallbackCategoryIds: readonly number[] = []
+): Promise<BumpProduct | null> {
+  const aisles = [categoryId, ...fallbackCategoryIds].filter(
+    (id, index, all): id is number => typeof id === "number" && all.indexOf(id) === index
+  )
+  for (const aisle of aisles) {
+    const candidate = await findAisleProduct(supabase, aisle, excluded)
+    if (candidate) return candidate
   }
   return null
 }
@@ -627,12 +654,14 @@ async function healCategoryRule(
   rule: BumpRuleRow,
   broken: BumpProduct | null | undefined,
   excluded: Set<number>,
-  diagnostics?: BumpDiagnostics
+  diagnostics?: BumpDiagnostics,
+  fallbackCategoryIds: readonly number[] = []
 ): Promise<OrderBump | null> {
   const substitute = await findSubstituteProduct(
     supabase,
     broken?.category_id ?? null,
-    excluded
+    excluded,
+    fallbackCategoryIds
   )
   if (!substitute) return null
 
@@ -1019,14 +1048,30 @@ export async function resolveBumps(
       affinityCandidates: affinity.candidateCount,
       droppedRules: [],
       healedRules: [],
+      fillerRules: [],
     }
   }
+  /** Rellena con las reglas curadas que no dispararon (ver `fillWithCuratedOffers`). */
+  const runFill = (used: Set<number>, skip: Set<number>, limit: number) =>
+    fillWithCuratedOffers(supabase, rules, {
+      cartProductIds,
+      usedProductIds: used,
+      skipRuleIds: skip,
+      cartCategoryIds: Array.from(categoryIds),
+      limit,
+      diagnostics,
+    })
+
   if (
     matchedTriggers.length === 0 &&
     collectionSlugsInCart.size === 0 &&
     affinity.bumps.length === 0
   ) {
-    return []
+    // Nada del carrito dispara una regla. Antes esto devolvía `[]` y el carrito
+    // se quedaba sin ninguna oferta —y sin el paso de oferta del pago por
+    // transferencia—; ahora es justo el caso que cubre el relleno.
+    const filler = await runFill(new Set(), new Set(), Math.min(maxBumps, MAX_BUMPS))
+    return filler.slice(0, maxBumps)
   }
 
   // ── 1) Candidatos de receta/colección (mayor relevancia) ──
@@ -1095,9 +1140,15 @@ export async function resolveBumps(
     categoryTriggerRules.map((rule) => rule.product_id)
   )
 
+  // Reglas que ya se evaluaron (hayan servido o no): el relleno de complementos
+  // no las reintenta (el re-apunte fallido daría el mismo resultado) ni duplica
+  // su motivo en `droppedRules`.
+  const evaluatedRuleIds = new Set<number>()
+
   for (const rule of categoryTriggerRules) {
     if (categoryCandidates.length >= maxBumps) break
     if (usedProductIds.has(rule.product_id)) continue
+    evaluatedRuleIds.add(rule.id)
     const product = categoryProductMap.get(rule.product_id)
     // Un bump de $0 o por debajo del piso no es una oferta: se trata como
     // producto inservible y la regla se re-apunta.
@@ -1109,11 +1160,19 @@ export async function resolveBumps(
     // La regla disparó pero su producto dejó de ser ofrecible (oculto, agotado,
     // sin precio, barato o inexistente). Antes se descartaba en silencio —el
     // carrito se quedaba sin ofertas y no había rastro ni en logs ni en el
-    // panel—; ahora se re-apunta a un sustituto usable del mismo pasillo.
+    // panel—; ahora se re-apunta a un sustituto usable del mismo pasillo y, si
+    // ese pasillo no tiene nada usable, al del propio carrito.
     // El sustituto NO puede ser un producto que ya está en el carrito (el
     // cliente lo agregaría dos veces) ni uno ya ofrecido en esta respuesta.
     const healExcluded = new Set<number>([...cartProductIds, ...usedProductIds])
-    const healed = await healCategoryRule(supabase, rule, product, healExcluded, diagnostics)
+    const healed = await healCategoryRule(
+      supabase,
+      rule,
+      product,
+      healExcluded,
+      diagnostics,
+      Array.from(categoryIds)
+    )
     if (healed) {
       usedProductIds.add(healed.product.id)
       categoryCandidates.push(healed)
@@ -1132,7 +1191,93 @@ export async function resolveBumps(
     bumps.push(bump)
     if (bumps.length >= maxBumps) break
   }
+
+  // ── 4) Relleno de complementos: la ventana visible siempre llena ──
+  // Ver `fillWithCuratedOffers`: sin esto, un carrito al que solo le aplica una
+  // regla se queda sin ofertas y el paso de oferta del pago por transferencia
+  // (que necesita una oferta NUEVA) se salta.
+  if (bumps.length < Math.min(maxBumps, MAX_BUMPS)) {
+    const filler = await runFill(seen, evaluatedRuleIds, Math.min(maxBumps, MAX_BUMPS) - bumps.length)
+    for (const offer of filler) {
+      if (bumps.length >= maxBumps) break
+      bumps.push(offer)
+    }
+  }
+
   return bumps
+}
+
+/**
+ * Completa la respuesta con las reglas **curadas** (categoría/umbral) que no
+ * dispararon, para que el carrito nunca se quede sin ofertas.
+ *
+ * Por qué existe: el pool lo determinan las reglas, y para muchos carritos solo
+ * dispara una —o ninguna—. El 2026-10-03 se ocultaron los productos de las
+ * reglas de categoría/umbral y hay pasillos enteros sin un solo producto visible
+ * (`bebidas`, `botanas-dulces`), así que `snacks_drinks` y `drinks_sides` están
+ * mudas por diseño del catálogo. Un carrito sin ofertas no solo pierde el
+ * cross-sell: el paso de oferta del pago por transferencia **se salta** cuando no
+ * hay nada nuevo que ofrecer, así que quien pulsa "Obtén Envío Prioritario" nunca
+ * ve la oferta.
+ *
+ * Nunca inventa reglas: sirve el producto de una regla existente (re-apuntándola
+ * si hace falta, con el pasillo del carrito como respaldo), así que
+ * `POST /api/orders` valida el artículo especial como cualquier otro bump. Las
+ * reglas dinámicas (receta/afinidad) quedan fuera a propósito: existen por su
+ * contexto y servir una fuera de él mentiría en la tarjeta.
+ */
+async function fillWithCuratedOffers(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  rules: BumpRuleRow[],
+  opts: {
+    cartProductIds: Set<number>
+    /** Productos ya ofrecidos en esta respuesta (se muta al agregar). */
+    usedProductIds: Set<number>
+    /** Reglas que ya se evaluaron (dispararon): no se reintentan ni se repiten. */
+    skipRuleIds: Set<number>
+    cartCategoryIds: readonly number[]
+    /** Cuántas ofertas puede agregar este pase. */
+    limit: number
+    diagnostics?: BumpDiagnostics
+  }
+): Promise<OrderBump[]> {
+  if (opts.limit <= 0) return []
+  const candidates = rules.filter(
+    (r) =>
+      r.trigger_type !== "recipe_collection" &&
+      r.trigger_type !== "ingredient_affinity" &&
+      !opts.skipRuleIds.has(r.id) &&
+      !opts.cartProductIds.has(r.product_id) &&
+      !opts.usedProductIds.has(r.product_id)
+  )
+  if (candidates.length === 0) return []
+
+  const productMap = await loadBumpProducts(
+    supabase,
+    candidates.map((r) => r.product_id)
+  )
+
+  const offers: OrderBump[] = []
+  for (const rule of candidates) {
+    if (offers.length >= opts.limit) break
+    const product = productMap.get(rule.product_id)
+    const excluded = new Set<number>([...opts.cartProductIds, ...opts.usedProductIds])
+    const offer = isOfferableBumpProduct(product)
+      ? buildBump(rule, product)
+      : await healCategoryRule(
+          supabase,
+          rule,
+          product,
+          excluded,
+          opts.diagnostics,
+          opts.cartCategoryIds
+        )
+    if (!offer) continue
+    opts.usedProductIds.add(offer.product.id)
+    opts.diagnostics?.state?.fillerRules.push(`${rule.id}:${rule.trigger_type}`)
+    offers.push(offer)
+  }
+  return offers
 }
 
 /**

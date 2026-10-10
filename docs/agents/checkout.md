@@ -96,6 +96,31 @@
   `.neq("trigger_type", "ingredient_affinity")` — esas reglas existen para el
   carrito, no para upsells 1-click. `POST /api/orders` valida bumps por
   `product_id` + `is_active`, así que las reglas de afinidad pasan sin cambios.
+- **La ventana de ofertas nunca se queda vacía: relleno de complementos.** El
+  pool lo determinan las reglas y para muchos carritos solo dispara una —o
+  ninguna—: el 2026-10-03 se ocultaron los productos de las reglas de
+  categoría/umbral y hay pasillos enteros sin un solo producto visible
+  (`bebidas`, `botanas-dulces`), así que `snacks_drinks` y `drinks_sides` están
+  mudas por diseño del catálogo. Un carrito sin ofertas no solo pierde el
+  cross-sell: el **paso de oferta del pago por transferencia se salta** cuando no
+  hay nada nuevo que ofrecer (`startPriorityCheckout` en `CheckoutDrawer`), así
+  que quien pulsa "Obtén Envío Prioritario" nunca veía la oferta. Por eso, si el
+  carrito produce menos ofertas que la ventana visible (`MAX_BUMPS`), el motor
+  completa con las reglas **curadas** (categoría/umbral) que no dispararon, en
+  `display_order`, sirviendo su producto o re-apuntándolo si está roto
+  (`fillWithCuratedOffers`). Nunca inventa reglas —sirve el `product_id` de una
+  regla existente, así que `POST /api/orders` valida el artículo especial como
+  cualquier otro— y deja fuera las dinámicas (receta/afinidad), que existen por su
+  contexto y servirían una tarjeta mentirosa fuera de él. El pase se registra en
+  `diagnostics.state.fillerRules` (`"4:meat_bbq"`): si crece, la configuración de
+  reglas se está quedando sin ofertas propias del carrito y toca re-curarla.
+- **El re-apunte de una regla rota prueba también el pasillo del carrito.** Si el
+  pasillo del producto roto no tiene nada usable —el caso de las reglas de
+  `bebidas`/`botanas-dulces`, que no tienen un solo producto visible— el sustituto
+  se busca en las categorías del **propio carrito** (`findSubstituteProduct` con
+  `fallbackCategoryIds`): lo que el cliente ya está comprando es el contexto más
+  fiable que tenemos, y sin este respaldo esas reglas se quedaban mudas para
+  siempre.
 - **Un artículo especial por debajo del piso de precio no se ofrece.**
   `BUMP_MIN_PRICE_MXN` (`src/lib/checkout-config.ts`, hoy **$50**) es el mínimo
   MXN del bump y lo aplica **el mismo predicado en todos los tiers**
