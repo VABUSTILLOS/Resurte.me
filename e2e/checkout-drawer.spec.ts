@@ -53,10 +53,10 @@ async function openCheckoutDrawer(page: Page) {
   // si el evento llegó antes de registrarse el listener, es un no-op y el
   // siguiente intento (ya con el listener activo) lo abre.
   //
-  // Señal de drawer abierto: el botón "Continuar al envío" es exclusivo del
+  // Señal de drawer abierto: el botón "Envío Normal" es exclusivo del
   // paso "review" del drawer (la página pública también tiene una sección
   // "Tu pedido" en el footer, por eso no usamos el heading como señal).
-  const continueBtn = page.getByRole("button", { name: "Continuar al envío" })
+  const continueBtn = page.getByRole("button", { name: "Envío Normal" })
   for (let i = 0; i < 6; i++) {
     await page.evaluate((evt) => window.dispatchEvent(new Event(evt)), CHECKOUT_DRAWER_EVENT)
     try {
@@ -90,7 +90,7 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await openCheckoutDrawer(page)
 
     // Drawer visible con el paso de revisión (botón exclusivo del drawer)
-    await expect(page.getByRole("button", { name: "Continuar al envío" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Envío Normal" })).toBeVisible()
     await expect(page.getByText("1× Aguacate Hass (caja 10 kg)")).toBeVisible()
 
     // Barra de envío gratis: subtotal $850 ≥ $500 → envío gratis.
@@ -110,7 +110,7 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
 
     await openCheckoutDrawer(page)
 
-    await expect(page.getByRole("button", { name: "Continuar al envío" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Envío Normal" })).toBeVisible()
     // $250 → faltan $250 para envío gratis
     const drawer = page.getByLabel("Checkout", { exact: true })
     await expect(drawer.getByText("Agrega $250.00 más para envío gratis").filter({ visible: true })).toBeVisible()
@@ -123,7 +123,7 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
 
     await openCheckoutDrawer(page)
 
-    await expect(page.getByRole("button", { name: "Continuar al envío" })).toBeDisabled()
+    await expect(page.getByRole("button", { name: "Envío Normal" })).toBeDisabled()
   })
 
   test("recorre los pasos hasta pago mostrando el paso de bumps", async ({ page }) => {
@@ -131,10 +131,10 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
 
     await openCheckoutDrawer(page)
-    await expect(page.getByRole("button", { name: "Continuar al envío" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Envío Normal" })).toBeVisible()
 
     // Review → Address
-    await page.getByRole("button", { name: "Continuar al envío" }).click()
+    await page.getByRole("button", { name: "Envío Normal" }).click()
     await expect(page.getByRole("heading", { name: "Dirección de entrega" })).toBeVisible()
 
     // Llena la dirección para habilitar continuar
@@ -270,7 +270,7 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     // "Ir a Checkout" transfiere los bumps vía detail.bumps al CheckoutDrawer.
     await page.getByRole("button", { name: /Ir a Checkout/ }).click()
 
-    await expect(page.getByRole("button", { name: "Continuar al envío" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Envío Normal" })).toBeVisible()
     // El review del checkout incluye el bump: subtotal $850 + bump $31.50.
     // exact: true — "Artículos especiales" como subcadena también coincide con
     // "Hasta 3 artículos especiales por pedido." del cart drawer (strict mode).
@@ -507,7 +507,7 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await expect(drawer.getByText("Tu pedido (0)")).toBeVisible()
     await expect(drawer.getByText("$0.00").first()).toBeVisible()
     // Con el pedido en 0 no se avanza al envío.
-    await expect(drawer.getByRole("button", { name: "Continuar al envío" })).toBeDisabled()
+    await expect(drawer.getByRole("button", { name: "Envío Normal" })).toBeDisabled()
 
     // El "−" en 0 ya no reduce: pide confirmar la eliminación.
     await expect(removeBtn).toBeEnabled()
@@ -887,7 +887,7 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await openCheckoutDrawer(page)
 
-    await page.getByRole("button", { name: "Continuar al envío" }).click()
+    await page.getByRole("button", { name: "Envío Normal" }).click()
     await expect(page.getByRole("heading", { name: "Dirección de entrega" })).toBeVisible()
 
     const group = page.getByRole("radiogroup", { name: "Direcciones guardadas" })

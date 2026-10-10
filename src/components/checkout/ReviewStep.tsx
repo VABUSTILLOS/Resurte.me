@@ -206,7 +206,7 @@ export function ReviewStep({
       </div>
 
       {/* Con todo el pedido en 0 no hay nada que pagar: se bloquea el avance
-          (mismo criterio que el "Continuar al envío" del CheckoutDrawer). */}
+          (mismo criterio que el "Envío Normal" del CheckoutDrawer). */}
       {itemCount === 0 && (
         <p className="mb-3 text-sm text-gray-500">
           Tu pedido está en 0 artículos. Sube la cantidad de un artículo o

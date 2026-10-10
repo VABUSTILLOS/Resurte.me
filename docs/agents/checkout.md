@@ -306,6 +306,11 @@
     ahora **"Obtén Envío Prioritario"** y crea el pedido por SPEI en un clic con
     la dirección preseleccionada (`handlePlaceOrder("spei")`, sin Stripe). En el
     paso de pago se ofrece como alternativa cuando el método elegido es tarjeta.
+    El par de decisión del paso de revisión se lee por **subtítulo**, no por
+    logística: **"Obtén Envío Prioritario" → "Pagando con transferencia"** contra
+    **"Envío Normal" → "Pagando con tarjeta"** (el segundo avanza al paso de
+    dirección/horario). La dirección guardada **no** se repite en el subtítulo:
+    vive en el paso de dirección, y duplicarla ahí era ruido.
     Consecuencias deliberadas: **el drawer ya no cobra con tarjeta en 1 clic**
     (el cobro con tarjeta sigue existiendo vía "Confirmar pedido") y el CTA **no
     exige tarjeta guardada** — exigirla era justo lo contrario del objetivo. El

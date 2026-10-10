@@ -584,7 +584,7 @@ export function CheckoutDrawer() {
                   </span>
                   {!isProcessing && (
                     <span className="text-[11px] font-normal text-white/80 truncate max-w-full">
-                      Paga por transferencia · {address.street} {address.number}
+                      Pagando con transferencia
                     </span>
                   )}
                 </button>
@@ -610,10 +610,15 @@ export function CheckoutDrawer() {
                   }
                 }}
                 disabled={itemCount === 0}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full flex flex-col items-center gap-0.5 px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Continuar al envío
-                <ArrowRight className="w-4 h-4" />
+                <span className="flex items-center gap-2">
+                  Envío Normal
+                  <ArrowRight className="w-4 h-4" />
+                </span>
+                <span className="text-[11px] font-normal text-white/80 truncate max-w-full">
+                  Pagando con tarjeta
+                </span>
               </button>
               <p className="text-center text-xs text-gray-400">
                 Pago seguro con Stripe · Envío gratis desde {formatMxn(FREE_SHIPPING_THRESHOLD)}
