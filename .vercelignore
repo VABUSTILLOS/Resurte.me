@@ -1,0 +1,26 @@
+# Archivos que NO se suben a Vercel.
+#
+# El CLI sube el árbol de trabajo y hasta ahora aplicaba el `.gitignore` de git,
+# que ignora `.next*`… pero **no** los distDir que crea Playwright
+# (`NEXT_DIST_DIR` en `next.config.ts`): `.next-e2e-build` y `.next-e2e` son
+# ~3.4 GB y miles de archivos, y el deploy por CLI fallaba con
+# "`files` should NOT have more than 15000 items" (10-oct-2026). Aquí se excluyen
+# junto con el resto de artefactos locales, que son regenerables y no forman
+# parte del build remoto.
+.next
+.next-e2e
+.next-e2e-build
+out
+build
+test-results
+playwright-report
+blob-report
+playwright/.cache
+coverage
+verifier
+node_modules
+.vercel
+.env*
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
