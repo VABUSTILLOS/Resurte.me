@@ -1269,6 +1269,12 @@ async function fillWithCuratedOffers(
   const offers: OrderBump[] = []
   for (const rule of candidates) {
     if (offers.length >= opts.limit) break
+    // El filtro de arriba se evaluó ANTES del bucle: dos reglas curadas pueden
+    // apuntar al mismo producto (el re-apunte elige el más barato del pasillo, así
+    // que dos reglas del mismo pasillo convergen), y servirlo dos veces mostraría
+    // la misma tarjeta repetida.
+    if (opts.usedProductIds.has(rule.product_id)) continue
+    if (opts.cartProductIds.has(rule.product_id)) continue
     const product = productMap.get(rule.product_id)
     const excluded = new Set<number>([...opts.cartProductIds, ...opts.usedProductIds])
     const offer = isOfferableBumpProduct(product)

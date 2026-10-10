@@ -1144,6 +1144,24 @@ describe("resolveBumps", () => {
       expect(bumps.map((b) => b.ruleId)).toEqual([1, 2, 3, 4, 5])
     })
 
+    it("no sirve dos veces el mismo producto (dos reglas del mismo pasillo)", async () => {
+      // El re-apunte elige el más barato del pasillo, así que dos reglas rotas
+      // del mismo pasillo convergen en el mismo producto: la tarjeta no puede
+      // salir dos veces.
+      const supabase = makeSupabase({
+        categories: [{ id: 20, slug: "limpieza-cocina" }],
+        rules: [
+          rule("perishables", { id: 1, product_id: 100, display_order: 1 }),
+          rule("meat_bbq", { id: 4, product_id: 100, display_order: 4 }),
+        ],
+        bumpProducts: { 100: product({ id: 100, name: "Comino Molido", price: 63 }) },
+      })
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+      const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+      expect(bumps).toHaveLength(1)
+      expect(bumps[0]?.product.id).toBe(100)
+    })
+
     it("no rellena por encima del tope que pide la superficie de carrito", async () => {
       const supabase = makeSupabase({
         categories: [{ id: 20, slug: "limpieza-cocina" }],
