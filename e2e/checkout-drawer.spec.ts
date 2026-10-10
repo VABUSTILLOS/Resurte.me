@@ -1013,4 +1013,85 @@ test.describe("envío prioritario (Obtén Envío Prioritario)", { tag: "@ci" }, 
     await expect(drawer.getByText("$850.00 MXN")).toBeVisible()
     await expect(drawer.getByRole("button", { name: /Listo, ver mi pedido/ })).toBeVisible()
   })
+
+  test("la oferta previa sube el monto a transferir y entra al pedido", async ({ page }) => {
+    const orderBodies: Record<string, unknown>[] = []
+    await page.route("**/api/orders", async (route) => {
+      orderBodies.push(JSON.parse(route.request().postData() ?? "{}"))
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          orderId: 999999,
+          cashbackCredits: 0,
+          cashbackTier: null,
+          trackingToken: "e2e-prioritario",
+        }),
+      })
+    })
+    await page.route("**/api/leads", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" })
+    )
+    await page.route("**/api/addresses/guest*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ addresses: [GUEST_ADDRESS] }),
+      })
+    )
+    // Una sola oferta, a precio de catálogo (los bumps ya no llevan descuento).
+    await page.route("**/api/cart/bumps", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          bumps: [
+            {
+              ruleId: 77,
+              trigger_type: "perishables",
+              title: "Limón para tus mariscos",
+              description: "Refresca tu pedido",
+              product: {
+                id: 900,
+                name: "Limón",
+                slug: "limon",
+                description: "",
+                image_url: "",
+                price: 30,
+                sale_price: null,
+                stock_status: "in_stock",
+                category_id: 1,
+              },
+              price: 30,
+            },
+          ],
+        }),
+      })
+    )
+
+    seedCart(page, [aguacate])
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
+    await openCheckoutDrawer(page)
+
+    await page.getByRole("button", { name: /Obtén Envío Prioritario/ }).click()
+
+    const drawer = page.getByLabel("Checkout", { exact: true })
+    await expect(drawer.getByText("Limón", { exact: true })).toBeVisible()
+
+    // Aceptar la oferta actualiza el total a transferir (850 + 30).
+    await drawer.getByRole("button", { name: /Sí, agregar/ }).click()
+    await expect(drawer.getByText("$880.00")).toBeVisible()
+
+    await drawer.getByRole("button", { name: /Continuar con la transferencia/ }).click()
+
+    await expect.poll(() => orderBodies.length).toBeGreaterThan(0)
+    const body = orderBodies[0] as { payment_method?: string; items?: unknown[] }
+    expect(body.payment_method).toBe("spei")
+    // El producto aceptado viaja como artículo especial del pedido.
+    expect(body.items).toContainEqual(
+      expect.objectContaining({ product_id: 900, item_type: "bump", quantity: 1, unit_price: 30 })
+    )
+    // Y el monto que se le pide transferir es el total actualizado.
+    await expect(drawer.getByText("$880.00 MXN")).toBeVisible()
+  })
 })

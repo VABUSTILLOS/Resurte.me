@@ -24,7 +24,7 @@ import { formatClabe, getSpeiAccount } from "@/lib/spei-account"
  * Lo montan las DOS superficies de checkout (página completa y drawer) para que
  * el mensaje no pueda divergir entre ellas.
  */
-export function SpeiIncentive() {
+export function SpeiIncentive({ amount }: { amount?: number | null }) {
   const account = getSpeiAccount()
 
   return (
@@ -41,6 +41,17 @@ export function SpeiIncentive() {
           </p>
         </div>
       </div>
+
+      {/* El monto a transferir, arriba de la cuenta: es el dato que el cliente
+          necesita para no equivocarse de cantidad. */}
+      {amount != null && (
+        <div className="mb-2 flex items-center justify-between gap-3 rounded-lg border border-violet-200 bg-white px-3 py-2">
+          <span className="text-[10px] uppercase tracking-wide text-violet-600">
+            Total a transferir
+          </span>
+          <span className="text-sm font-bold text-[#242529]">${amount.toFixed(2)} MXN</span>
+        </div>
+      )}
 
       <div className="space-y-2">
         <CopyRow label="CLABE" value={formatClabe(account.clabe)} copyValue={account.clabe} />

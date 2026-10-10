@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
@@ -27,6 +28,7 @@ import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
 import { CouponInput } from "@/components/cart/coupon-input"
 import { BumpCards } from "@/components/checkout/BumpCards"
+import type { OrderBump } from "@/lib/order-bumps"
 import { OrderItemsList } from "@/components/checkout/OrderItemsList"
 import { RemoveLineDialog } from "@/components/checkout/RemoveLineDialog"
 import { useOrderLines } from "@/components/checkout/use-order-lines"
@@ -50,7 +52,7 @@ export const CHECKOUT_DRAWER_EVENT = "resurte:toggle-checkout-drawer"
 // lo maneja, el drawer navega a la confirmación.
 export const ORDER_PAID_EVENT = "resurte:order-paid"
 
-type DrawerStep = "review" | "address" | "schedule" | "bumps" | "payment" | "transfer"
+type DrawerStep = "review" | "address" | "schedule" | "bumps" | "payment" | "offer" | "transfer"
 
 /**
  * Checkout completo dentro del drawer (mecánica SamCart/ThriveCart).
@@ -252,6 +254,9 @@ export function CheckoutDrawer() {
     created: CreatedOrder
     total: number
   } | null>(null)
+  // Oferta previa a la transferencia y si el cliente ya la agregó.
+  const [priorityOffer, setPriorityOffer] = useState<OrderBump | null>(null)
+  const [offerAdded, setOfferAdded] = useState(false)
 
   // Sin `useCallback`: el React Compiler memoiza solo, y envolverlo a mano hacía
   // que el compilador se rindiera (el `total` capturado "puede cambiar después").
@@ -274,6 +279,63 @@ export function CheckoutDrawer() {
       )
       setIsProcessing(false)
     }
+  }
+
+  // ── Oferta previa a la transferencia ──
+  // Antes de mandar al cliente a transferir se le ofrece un producto más: si lo
+  // acepta, entra al pedido y el monto a transferir sube con él. Se resuelve con
+  // el mismo motor de ofertas del checkout (`POST /api/cart/bumps`) porque el
+  // modal post-compra no sirve aquí: cobra off-session con una tarjeta y un pago
+  // por SPEI no tiene ninguna.
+  //
+  // El orden importa: la oferta se acepta en un render y la orden se crea en el
+  // SIGUIENTE ("Continuar"), porque `createOrder` arma el payload con los bumps
+  // del render en curso — aceptar y crear en el mismo clic dejaría fuera el
+  // producto aceptado y el monto no cuadraría con el pedido.
+  const startPriorityCheckout = async () => {
+    setIsProcessing(true)
+    setCheckoutError(null)
+    try {
+      const res = await fetch("/api/cart/bumps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: cart.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+        }),
+      })
+      const data = (await res.json()) as { bumps?: OrderBump[] }
+      const chosen = new Set(selectedBumps.map((b) => b.productId))
+      const offer = (data.bumps ?? []).find(
+        (b) => !chosen.has(b.product.id) && !cart.items.some((i) => i.product_id === b.product.id)
+      )
+      setIsProcessing(false)
+      if (offer) {
+        setPriorityOffer(offer)
+        setOfferAdded(false)
+        setStep("offer")
+        return
+      }
+    } catch {
+      // Fail-open: sin oferta (o si la API falla) se va directo a transferir.
+    }
+    setIsProcessing(false)
+    void handlePriorityCheckout()
+  }
+
+  const acceptPriorityOffer = () => {
+    if (!priorityOffer) return
+    setSelectedBumps((prev) => [
+      ...prev,
+      {
+        ruleId: priorityOffer.ruleId,
+        productId: priorityOffer.product.id,
+        quantity: 1,
+        unitPrice: priorityOffer.price,
+        name: priorityOffer.product.name,
+        imageUrl: priorityOffer.product.image_url,
+      },
+    ])
+    setOfferAdded(true)
   }
 
   // ── Apertura / cierre del drawer ──
@@ -358,7 +420,7 @@ export function CheckoutDrawer() {
         </div>
 
         {/* Step indicator */}
-        {step !== "review" && step !== "transfer" && (
+        {step !== "review" && step !== "transfer" && step !== "offer" && (
           <div className="px-5 py-3 border-b border-[#E8E9EB] flex items-center gap-1.5">
             {(["address", "schedule", "bumps", "payment"] as DrawerStep[]).map((s, i) => {
               const currentIdx = ["address", "schedule", "bumps", "payment"].indexOf(step)
@@ -455,7 +517,7 @@ export function CheckoutDrawer() {
                   guardada — justo lo contrario. */}
               {selectedAddressId !== null && isAddressValid && (
                 <button
-                  onClick={() => void handlePriorityCheckout()}
+                  onClick={() => void startPriorityCheckout()}
                   disabled={isProcessing || itemCount === 0}
                   className="w-full flex flex-col items-center gap-0.5 px-6 py-3 mb-3 bg-[#5B21B6] text-white font-bold rounded-xl hover:bg-[#4C1D95] disabled:opacity-70 transition-colors"
                 >
@@ -732,7 +794,7 @@ export function CheckoutDrawer() {
                     ))}
                   </div>
 
-                  {paymentMethod === "spei" && <SpeiIncentive />}
+                  {paymentMethod === "spei" && <SpeiIncentive amount={total} />}
 
                   {/* Alternativa prioritaria: si eligió tarjeta, este botón le
                       ofrece la transferencia en un clic (fondos el mismo día,
@@ -741,7 +803,7 @@ export function CheckoutDrawer() {
                       por transferencia y este sobraría. */}
                   {paymentMethod === "card" && selectedAddressId !== null && isAddressValid && (
                     <button
-                      onClick={() => void handlePriorityCheckout()}
+                      onClick={() => void startPriorityCheckout()}
                       disabled={isProcessing}
                       className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-[#5B21B6] text-white font-bold rounded-xl hover:bg-[#4C1D95] disabled:opacity-70 transition-colors"
                     >
@@ -809,7 +871,7 @@ export function CheckoutDrawer() {
                         // cliente ve la CLABE antes de que el drawer se cierre.
                         // El resto de métodos cierran directo.
                         if (paymentMethod === "spei") {
-                          void handlePriorityCheckout()
+                          void startPriorityCheckout()
                           return
                         }
                         void handlePlaceOrder(paymentMethod)
@@ -835,6 +897,82 @@ export function CheckoutDrawer() {
                   <p className="text-center text-xs text-gray-400">
                     Al confirmar aceptas nuestros Términos y Política de Privacidad.
                   </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Oferta antes de transferir: si la acepta, el producto entra al
+              pedido y el monto a transferir sube con él. Una sola oferta: es un
+              paso de decisión, no un catálogo. */}
+          {step === "offer" && priorityOffer && (
+            <div className="space-y-4">
+              <div className="text-center">
+                <h2 className="text-lg font-bold text-[#242529]">
+                  {offerAdded ? "¡Listo, va en tu pedido!" : "¿Le agregas algo a tu pedido?"}
+                </h2>
+                <p className="text-sm text-[#6b6b6b] mt-1">
+                  {offerAdded
+                    ? "Se suma al total que vas a transferir."
+                    : "Aprovecha antes de transferir: llega en la misma entrega."}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-[#E8E9EB] bg-white p-4 flex items-start gap-3">
+                <div className="w-16 h-16 rounded-lg bg-[#F7F5F0] overflow-hidden shrink-0">
+                  {priorityOffer.product.image_url ? (
+                    <Image
+                      src={priorityOffer.product.image_url}
+                      alt={priorityOffer.product.name}
+                      width={64}
+                      height={64}
+                      className="w-full h-full object-contain p-1"
+                    />
+                  ) : null}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#242529]">
+                    {priorityOffer.product.name}
+                  </p>
+                  <p className="text-xs text-[#6b6b6b] line-clamp-2 mt-0.5">
+                    {priorityOffer.description}
+                  </p>
+                  <p className="text-sm font-bold text-[#0E7A0E] mt-1">
+                    ${priorityOffer.price.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              {offerAdded && (
+                <div className="rounded-xl bg-[#F6FDF6] border border-brand-100 p-4 text-sm flex justify-between">
+                  <span className="text-[#6b6b6b]">Total a transferir</span>
+                  <span className="font-bold text-[#242529]">${total.toFixed(2)}</span>
+                </div>
+              )}
+
+              {offerAdded ? (
+                <button
+                  onClick={() => void handlePriorityCheckout()}
+                  disabled={isProcessing}
+                  className="w-full px-6 py-3 bg-[#5B21B6] text-white font-bold rounded-xl hover:bg-[#4C1D95] disabled:opacity-70 transition-colors"
+                >
+                  {isProcessing ? "Procesando..." : "Continuar con la transferencia"}
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    onClick={acceptPriorityOffer}
+                    className="w-full px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] transition-colors"
+                  >
+                    Sí, agregar — ${priorityOffer.price.toFixed(2)}
+                  </button>
+                  <button
+                    onClick={() => void handlePriorityCheckout()}
+                    disabled={isProcessing}
+                    className="w-full px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 disabled:opacity-70 transition-colors"
+                  >
+                    {isProcessing ? "Procesando..." : "No, gracias"}
+                  </button>
                 </div>
               )}
             </div>

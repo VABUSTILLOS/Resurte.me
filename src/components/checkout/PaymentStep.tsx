@@ -200,7 +200,7 @@ export function PaymentStep({
               La promesa se respalda con `orders.priority` (migración 00220). */}
           {paymentMethod === "spei" && (
             <div className="mb-6">
-              <SpeiIncentive />
+              <SpeiIncentive amount={total} />
             </div>
           )}
 

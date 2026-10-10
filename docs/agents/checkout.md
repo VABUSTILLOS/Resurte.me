@@ -219,6 +219,19 @@
     carrito se vacía en cuanto la orden existe, para que un cierre accidental no
     permita crear un pedido duplicado. "Confirmar pedido" con SPEI elegido pasa
     por el mismo paso.
+  - **Antes de ese paso se ofrece un producto más** (`step === "offer"`): el
+    cliente puede agregarlo y el **monto a transferir sube con él**. Se resuelve
+    con el motor de bumps (`POST /api/cart/bumps`), no con el modal post-compra:
+    ese modal cobra off-session con una tarjeta y un pago por SPEI no tiene
+    ninguna, así que ahí nunca habría aparecido (era el síntoma "el upsell ya no
+    aparece"). La oferta se acepta en un render y la orden se crea en el
+    SIGUIENTE ("Continuar"), porque `createOrder` arma el payload con los bumps
+    del render en curso: aceptar y crear en el mismo clic dejaría fuera el
+    producto y el monto no cuadraría con el pedido. Si no hay ofertas (o la API
+    falla) el paso se salta y se va directo a transferir.
+  - **El cuadro del incentivo muestra el monto a transferir** (`SpeiIncentive`
+    acepta `amount`): es el dato con el que el cliente no se equivoca de
+    cantidad, y cambia si acepta la oferta.
   - `priority` se lee como columna **opcional** del panel
     (`ADMIN_ORDER_OPTIONAL_COLUMNS`, migración `00220`): el esquema puede ir por
     detrás del código sin tumbar el checkout ni el ticket.
