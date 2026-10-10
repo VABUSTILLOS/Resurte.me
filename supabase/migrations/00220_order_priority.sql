@@ -1,0 +1,27 @@
+-- ============================================================================
+-- 00220 — Pedido prioritario (pago por transferencia)
+--
+-- QUÉ AÑADE
+--   Una marca en el pedido para que el almacén despache primero los pedidos que
+--   se pagaron por transferencia SPEI. Es el respaldo real del incentivo del
+--   checkout ("Desbloquea envío prioritario al pagar con transferencia"): sin
+--   una marca que el operador vea, la promesa es solo copy.
+--
+-- QUIÉN LA ESCRIBE
+--   El servidor, en POST /api/orders, derivada del método de pago
+--   (`payment_method = 'spei'`). Nunca llega en el body del cliente: si fuera un
+--   campo del cliente, cualquiera podría marcarse prioritario sin transferir.
+--
+-- POR QUÉ ES ADITIVA Y CON DEFAULT
+--   `NOT NULL DEFAULT false` deja a los pedidos existentes en "normal" y permite
+--   que el código viejo siga insertando sin la columna. El endpoint tolera que
+--   la migración aún no esté aplicada (reintento por 42703), así que desplegar
+--   código antes que esquema no rompe el checkout.
+--
+-- LO QUE NO HACE
+--   No cambia el orden de la lista del panel ni añade índices: con el volumen
+--   actual (decenas de pedidos) el badge es suficiente y un índice sería coste
+--   sin consulta que lo justifique.
+-- ============================================================================
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS priority BOOLEAN NOT NULL DEFAULT false;

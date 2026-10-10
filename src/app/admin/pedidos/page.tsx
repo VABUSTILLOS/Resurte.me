@@ -923,7 +923,17 @@ function AdminOrdersContent() {
                       className="w-4 h-4 align-middle accent-brand-600 cursor-pointer"
                     />
                   </td>
-                  <td className="px-5 py-3 font-mono text-xs font-semibold text-gray-500">#{order.id}</td>
+                  <td className="px-5 py-3 font-mono text-xs font-semibold text-gray-500">
+                    #{order.id}
+                    {order.priority && (
+                      <span
+                        className="ml-2 inline-flex items-center gap-0.5 rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-700 align-middle"
+                        title="Pagó por transferencia: despachar primero"
+                      >
+                        ⚡ Prioritario
+                      </span>
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-xs text-gray-500">
                     {orderCustomerLabel(order)}
                   </td>
@@ -1144,6 +1154,14 @@ function AdminOrdersContent() {
                 <span className="px-2 py-1 rounded-lg bg-gray-50 text-gray-500 font-medium">
                   {PAYMENT_STATUS_LABEL[selectedOrder.payment_status]}
                 </span>
+                {selectedOrder.priority && (
+                  <span
+                    className="px-2 py-1 rounded-lg bg-violet-50 text-violet-700 font-bold border border-violet-200"
+                    title="Pagó por transferencia: despachar primero"
+                  >
+                    ⚡ Prioritario
+                  </span>
+                )}
               </div>
 
               {/* Repartidor asignado (migración 00076) */}

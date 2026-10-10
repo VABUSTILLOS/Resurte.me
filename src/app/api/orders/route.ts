@@ -642,6 +642,12 @@ export async function POST(request: NextRequest) {
       total: realTotal,
       payment_method,
       payment_status: "pending",
+      // Incentivo del checkout: pagar por transferencia (SPEI) desbloquea el
+      // envío prioritario. La marca la deriva el SERVIDOR del método de pago:
+      // nunca llega en el body, o cualquiera se marcaría prioritario sin
+      // transferir. Si la columna no existe (migración 00220 sin aplicar), el
+      // reintento por 42703 de abajo inserta el pedido sin ella.
+      priority: payment_method === "spei",
       scheduled_for: scheduledFor.toISOString(),
       source: "web",
       // Teléfono de contacto: habilita la confirmación por WhatsApp (workflows.ts)

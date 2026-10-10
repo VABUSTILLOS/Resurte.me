@@ -6,6 +6,7 @@ import { PAYMENT_METHODS, type PaymentMethod } from "@/types"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
 import { PAYMENT_ICONS } from "./checkout-shared"
+import { SpeiIncentive } from "./spei-incentive"
 import { SocialProofBadge } from "./social-proof"
 import { AnalyticsEvents } from "@/lib/analytics"
 
@@ -111,7 +112,16 @@ export function PaymentStep({
                   {PAYMENT_ICONS[method.value]}
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-gray-900 text-sm">{method.label}</p>
+                  <p className="font-semibold text-gray-900 text-sm">
+                    {method.label}
+                    {/* El incentivo se ve ANTES de elegir: si solo apareciera al
+                        seleccionar SPEI, solo lo leería quien ya lo eligió. */}
+                    {method.value === "spei" && (
+                      <span className="ml-2 inline-flex items-center gap-0.5 rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 align-middle text-[10px] font-bold text-violet-700">
+                        ⚡ Envío prioritario
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-gray-500">{method.description}</p>
                 </div>
                 <div
@@ -186,14 +196,11 @@ export function PaymentStep({
               </button>
             )}
 
-          {/* Payment method instructions */}
+          {/* Incentivo de transferencia: datos bancarios + envío prioritario.
+              La promesa se respalda con `orders.priority` (migración 00220). */}
           {paymentMethod === "spei" && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm">
-              <p className="text-blue-800 font-semibold mb-1">Pago vía SPEI</p>
-              <p className="text-blue-600 text-xs">
-                Te damos los datos de transferencia al confirmar tu pedido. Tu
-                pedido se surte cuando confirmamos el pago.
-              </p>
+            <div className="mb-6">
+              <SpeiIncentive />
             </div>
           )}
 

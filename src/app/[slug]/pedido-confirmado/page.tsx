@@ -126,7 +126,24 @@ export default function OrderConfirmedPage() {
 
       {/* Instrucciones de pago para métodos manuales (SPEI / OXXO) */}
       {(lastOrder.paymentMethod === "spei" || lastOrder.paymentMethod === "oxxo") && (
-        <div className="mb-8">
+        <div className="mb-8 space-y-3">
+          {/* La promesa del incentivo, cumplida del lado del cliente. Se deriva
+              del método de pago igual que `orders.priority` en el servidor. */}
+          {lastOrder.paymentMethod === "spei" && (
+            <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 flex items-start gap-2">
+              <span className="text-lg leading-none" aria-hidden>
+                ⚡
+              </span>
+              <div>
+                <p className="text-sm font-bold text-violet-900">
+                  Envío prioritario desbloqueado
+                </p>
+                <p className="text-xs text-violet-700 mt-0.5">
+                  Tu pedido está marcado para salir en la ruta prioritaria del día.
+                </p>
+              </div>
+            </div>
+          )}
           <PaymentInstructions
             method={lastOrder.paymentMethod}
             amount={lastOrder.total}

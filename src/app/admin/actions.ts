@@ -179,6 +179,12 @@ export interface AdminOrder {
    * con `"refunded"` el reembolso cubrió el total.
    */
   refunded_amount_cents?: number | null
+  /**
+   * Envío prioritario (00220): el pedido se pagó por transferencia SPEI, que es
+   * lo que el checkout incentiva. `null` = el esquema desplegado aún no tiene la
+   * columna. El almacén debe despachar estos pedidos primero.
+   */
+  priority?: boolean | null
   address: {
     street: string
     number: string
@@ -308,6 +314,7 @@ export async function getAdminOrders(
       driver: !dropped.has("driver_id"),
       proof: !dropped.has("delivery_proof_path"),
       refunded: !dropped.has("refunded_amount_cents"),
+      priority: !dropped.has("priority"),
     })
 
   // El SELECT se arma en runtime (columnas opcionales), así que supabase-js no
@@ -395,6 +402,9 @@ export async function getAdminOrders(
         driver_id: o.driver_id ?? null,
         delivery_proof_path: o.delivery_proof_path ?? null,
         refunded_amount_cents: o.refunded_amount_cents ?? null,
+        // Envío prioritario (pagó por transferencia). `null` cuando la columna
+        // aún no existe en el esquema desplegado (migración 00220).
+        priority: o.priority ?? null,
         address: addr
           ? {
               street: addr.street,

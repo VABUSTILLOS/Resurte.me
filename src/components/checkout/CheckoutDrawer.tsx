@@ -35,6 +35,8 @@ import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
 import { useCheckoutOrder, type CheckoutPaidInfo } from "@/components/checkout/use-checkout-order"
+import { SpeiIncentive } from "@/components/checkout/spei-incentive"
+import { PAYMENT_METHODS, type PaymentMethod } from "@/types"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { RepurchaseCouponInfo } from "@/types"
 
@@ -80,6 +82,11 @@ export function CheckoutDrawer() {
   const { selectedBumps, setSelectedBumps } = useSelectedBumps()
   // Consentimiento de guardado de tarjeta (Stripe setup_future_usage → upsells)
   const [saveCardConsent, setSaveCardConsent] = useState(false)
+  // Método de pago del drawer. La tarjeta es el default: el drawer existe para
+  // cobrar rápido y SPEI exige salir a transferir. Ofrecer SPEI aquí es lo que
+  // permite incentivar la transferencia (fondos inmediatos, sin comisión), pero
+  // el camino corto no se toca.
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
   // Guardar la dirección como predeterminada (checkbox en AddressStep, logged-in)
   const [saveAsDefault, setSaveAsDefault] = useState(false)
 
@@ -650,8 +657,53 @@ export function CheckoutDrawer() {
                     </p>
                   </div>
 
+                  {/* Método de pago. La tarjeta va primero (es el camino corto
+                      del drawer); SPEI desbloquea el envío prioritario, que el
+                      servidor marca en el pedido (orders.priority, 00220). */}
+                  <div className="space-y-2">
+                    {PAYMENT_METHODS.filter(
+                      (m) => m.value === "card" || m.value === "spei"
+                    ).map((m) => (
+                      <button
+                        key={m.value}
+                        type="button"
+                        onClick={() => setPaymentMethod(m.value)}
+                        aria-pressed={paymentMethod === m.value}
+                        className={`w-full flex items-center gap-3 rounded-xl border-2 p-3 text-left transition-colors ${
+                          paymentMethod === m.value
+                            ? "border-[#0E7A0E] bg-[#F6FDF6]"
+                            : "border-[#E8E9EB] bg-white hover:border-[#C7C8CD]"
+                        }`}
+                      >
+                        <span className="text-lg" aria-hidden>
+                          {m.icon}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-semibold text-[#242529]">
+                            {m.label}
+                            {m.value === "spei" && (
+                              <span className="ml-2 inline-flex items-center gap-0.5 rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 align-middle text-[10px] font-bold text-violet-700">
+                                ⚡ Envío prioritario
+                              </span>
+                            )}
+                          </span>
+                          <span className="block text-xs text-[#6b6b6b]">{m.description}</span>
+                        </span>
+                        <span
+                          className={`w-4 h-4 rounded-full border-2 shrink-0 ${
+                            paymentMethod === m.value
+                              ? "border-[#0E7A0E] bg-[#0E7A0E]"
+                              : "border-[#C7C8CD]"
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+
+                  {paymentMethod === "spei" && <SpeiIncentive />}
+
                   {/* Express Checkout: tarjeta guardada (solo sesión iniciada) */}
-                  {isLoggedIn === true && savedCard?.hasSavedCard && (
+                  {paymentMethod === "card" && isLoggedIn === true && savedCard?.hasSavedCard && (
                     <button
                       onClick={handleExpressCheckout}
                       disabled={isProcessing}
@@ -688,6 +740,7 @@ export function CheckoutDrawer() {
                   </div>
 
                   {/* Guardado de tarjeta (condiciona setup_future_usage → upsells 1-click) */}
+                  {paymentMethod === "card" && (
                   <label className="flex items-start gap-3 bg-white rounded-xl border border-gray-200 p-4 cursor-pointer hover:border-brand-300 transition-colors">
                     <input
                       type="checkbox"
@@ -707,6 +760,7 @@ export function CheckoutDrawer() {
                       </span>
                     </span>
                   </label>
+                  )}
 
                   <div className="flex gap-3">
                     <button
@@ -717,7 +771,7 @@ export function CheckoutDrawer() {
                       Atrás
                     </button>
                     <button
-                      onClick={() => handlePlaceOrder()}
+                      onClick={() => handlePlaceOrder(paymentMethod)}
                       disabled={isProcessing}
                       className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] disabled:opacity-70 transition-colors"
                     >
@@ -729,7 +783,9 @@ export function CheckoutDrawer() {
                       ) : (
                         <>
                           <CheckCircle2 className="w-5 h-5" />
-                          Confirmar pedido — ${total.toFixed(2)}
+                          {paymentMethod === "spei"
+                            ? `Confirmar y ver la CLABE — $${total.toFixed(2)}`
+                            : `Confirmar pedido — $${total.toFixed(2)}`}
                         </>
                       )}
                     </button>

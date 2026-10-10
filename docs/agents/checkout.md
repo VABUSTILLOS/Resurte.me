@@ -182,6 +182,35 @@
   checkout; todas las listas filtran `deleted_at IS NULL`.
 - Stripe: el `clientSecret` se obtiene de `/api/payments/stripe/create-intent`;
   `/api/orders` solo registra. Webhooks verifican firma.
+- **Transferencia (SPEI) = envío prioritario**: el checkout incentiva pagar por
+  transferencia porque Stripe liquida las tarjetas en ~5 días hábiles y el
+  negocio necesita el dinero a diario (además de la comisión). El incentivo es
+  **real, no copy**: `POST /api/orders` marca `orders.priority = (payment_method
+  === "spei")` y el almacén lo ve como badge en `/admin/pedidos`, en el detalle
+  y en el **ticket** (`/admin/pedidos/[id]/print`), que es lo que lee quien
+  despacha. Invariantes:
+  - **La marca la deriva el servidor del método de pago; nunca llega en el body.**
+    Si fuera un campo del cliente, cualquiera se marcaría prioritario sin
+    transferir. Si algún día se quita la marca, hay que quitar también el copy del
+    incentivo (`spei-incentive.tsx`): sería una promesa vacía.
+  - Los datos de la cuenta viven en `src/lib/spei-account.ts` (CLABE, banco,
+    beneficiario, cuenta) con override por `NEXT_PUBLIC_SPEI_*`. **Tienen default
+    en el repo a propósito**: sin ellos el checkout decía "todavía no publicamos
+    una CLABE" y nadie podía transferir (de 24 pedidos, cero SPEI).
+  - El mismo componente `SpeiIncentive` lo montan las **dos** superficies
+    (página completa y drawer) para que el mensaje no pueda divergir. El drawer
+    ganó un selector Tarjeta / SPEI en su paso de pago: la tarjeta sigue siendo
+    el default (es el camino corto del drawer) y el express 1-click no cambia.
+  - **El monto exacto y la referencia se muestran DESPUÉS de crear el pedido**
+    (`PaymentInstructions`): si el cliente transfiere antes de que exista el
+    pedido, el dinero llega sin referencia que reconciliar. El incentivo muestra
+    la cuenta pero pide confirmar primero.
+  - `priority` se lee como columna **opcional** del panel
+    (`ADMIN_ORDER_OPTIONAL_COLUMNS`, migración `00220`): el esquema puede ir por
+    detrás del código sin tumbar el checkout ni el ticket.
+  - SPEI **sigue siendo confirmación manual**: el pedido queda `pending` hasta
+    que alguien pulse "Confirmar pago" en `/admin/pedidos`. Se gana liquidez
+    inmediata, se paga con trabajo de conciliación.
 - **La fecha de entrega sale del día local, no de UTC**: las 7 opciones del
   selector y la fecha por defecto vienen de `getNextDays()`
   (`src/lib/delivery-days.ts`, reexportado por `checkout-shared.tsx`), que ancla

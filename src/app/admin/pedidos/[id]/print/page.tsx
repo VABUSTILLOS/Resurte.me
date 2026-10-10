@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin-auth"
 import { logger } from "@/lib/logger"
 import {
   buildAdminOrderPrintSelect,
+  ADMIN_ORDER_OPTIONAL_COLUMNS,
   missingOptionalOrderColumn,
   type AdminOrderPrintRow,
   type OrderQueryResult,
@@ -43,14 +44,23 @@ export default async function PrintOrderPage({
       .eq("id", orderId)
       .maybeSingle()) as unknown as OrderQueryResult<AdminOrderPrintRow>
 
-  let { data: order, error: orderError } = await fetchOrder(buildAdminOrderPrintSelect())
-
-  // 42703 = orders.coupon_code aún no existe (migración 00114 sin aplicar):
-  // se imprime el ticket sin la línea del cupón en lugar de devolver 404.
-  if (missingOptionalOrderColumn(orderError) === "coupon_code") {
-    logger.warn("[ADMIN-ORDER-PRINT] orders.coupon_code no existe; imprimiendo sin cupón")
+  // 42703 = una columna opcional aún no existe en el esquema desplegado
+  // (coupon_code → 00114, priority → 00220): se imprime el ticket sin esa línea
+  // en lugar de devolver 404. Un intento por columna, como en el panel.
+  const dropped = new Set<string>()
+  let { data: order, error: orderError } = await fetchOrder(
+    buildAdminOrderPrintSelect()
+  )
+  for (let attempt = 0; attempt < ADMIN_ORDER_OPTIONAL_COLUMNS.length; attempt++) {
+    const column = missingOptionalOrderColumn(orderError)
+    if (!column || dropped.has(column)) break
+    logger.warn(`[ADMIN-ORDER-PRINT] orders.${column} no existe; imprimiendo sin ella`)
+    dropped.add(column)
     ;({ data: order, error: orderError } = await fetchOrder(
-      buildAdminOrderPrintSelect({ coupon: false })
+      buildAdminOrderPrintSelect({
+        coupon: !dropped.has("coupon_code"),
+        priority: !dropped.has("priority"),
+      })
     ))
   }
 
@@ -145,6 +155,12 @@ export default async function PrintOrderPage({
             {PAYMENT_METHOD_LABEL[order.payment_method ?? "cash_on_delivery"]} ·{" "}
             {PAYMENT_STATUS_LABEL[order.payment_status as keyof typeof PAYMENT_STATUS_LABEL]}
           </p>
+          {/* El ticket es lo que ve el almacén: la marca va en caja, no en gris. */}
+          {order.priority && (
+            <p className="mt-2 border-2 border-black rounded px-2 py-1 text-center text-[11px] font-bold uppercase tracking-wide">
+              ⚡ Envío prioritario — despachar primero
+            </p>
+          )}
         </div>
 
         <p className="text-center text-[10px] text-gray-600 mt-6">

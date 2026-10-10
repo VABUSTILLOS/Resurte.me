@@ -22,13 +22,14 @@
  *
  * ## Columnas opcionales
  *
- * `coupon_code`, `driver_id`, `delivery_proof_path` y
- * `refunded_amount_cents` se leen como best-effort:
+ * `coupon_code`, `driver_id`, `delivery_proof_path`, `refunded_amount_cents` y
+ * `priority` se leen como best-effort:
  * si el esquema desplegado aún no las tiene, PostgREST responde `42703` y el
  * consumidor reintenta sin ellas en lugar de romper la superficie (ver
  * `missingOptionalOrderColumn`). El esquema de referencia las define en
  * `supabase/migrations/` (driver_id en 00076, coupon_code en 00114,
- * delivery_proof_path en 00154, refunded_amount_cents en 00187).
+ * delivery_proof_path en 00154, refunded_amount_cents en 00187, priority en
+ * 00220).
  */
 
 /** FK que desambigua el embed `orders → profiles` (cliente, no vendedor). */
@@ -49,6 +50,7 @@ export const ADMIN_ORDER_OPTIONAL_COLUMNS = [
   "driver_id",
   "delivery_proof_path",
   "refunded_amount_cents",
+  "priority",
 ] as const
 
 export type AdminOrderOptionalColumn = (typeof ADMIN_ORDER_OPTIONAL_COLUMNS)[number]
@@ -68,6 +70,8 @@ export type AdminOrdersSelectOptions = {
   proof?: boolean
   /** Incluir `refunded_amount_cents` (omitir cuando la columna no existe). */
   refunded?: boolean
+  /** Incluir `priority` (omitir cuando la columna no existe en el esquema). */
+  priority?: boolean
 }
 
 /**
@@ -84,6 +88,7 @@ export function buildAdminOrdersSelect({
   driver = true,
   proof = true,
   refunded = true,
+  priority = true,
 }: AdminOrdersSelectOptions = {}): string {
   return [
     "id",
@@ -98,6 +103,7 @@ export function buildAdminOrdersSelect({
     "payment_status",
     "source",
     "created_at",
+    ...(priority ? ["priority"] : []),
     `profiles!${ORDERS_PROFILE_FK}(full_name)`,
     `addresses(${ORDERS_ADDRESS_COLUMNS})`,
     ...(driver ? ["driver_id"] : []),
@@ -113,6 +119,7 @@ export function buildAdminOrdersSelect({
  */
 export function buildAdminOrderPrintSelect({
   coupon = true,
+  priority = true,
 }: AdminOrdersSelectOptions = {}): string {
   return [
     "id",
@@ -124,6 +131,7 @@ export function buildAdminOrderPrintSelect({
     "total",
     "payment_method",
     "payment_status",
+    ...(priority ? ["priority"] : []),
     "created_at",
     "scheduled_for",
     "customer_phone",
@@ -198,6 +206,8 @@ export interface AdminOrderRow {
   delivery_proof_path?: string | null
   /** Ausente cuando la columna no existe en el esquema desplegado (00187). */
   refunded_amount_cents?: number | null
+  /** Envío prioritario (pagó por transferencia). Ausente sin la migración 00220. */
+  priority?: boolean | null
   profiles: { full_name: string | null } | { full_name: string | null }[] | null
   addresses: AdminOrderAddressRow | AdminOrderAddressRow[] | null
 }
@@ -216,6 +226,8 @@ export interface AdminOrderPrintRow {
   created_at: string
   scheduled_for: string | null
   customer_phone: string | null
+  /** Envío prioritario (pagó por transferencia). Ausente sin la migración 00220. */
+  priority?: boolean | null
   profiles: { full_name: string | null } | { full_name: string | null }[] | null
   addresses: AdminOrderAddressRow | AdminOrderAddressRow[] | null
   delivery_drivers: { name: string } | { name: string }[] | null

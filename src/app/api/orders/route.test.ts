@@ -408,6 +408,69 @@ describe("/api/orders POST sesión, cupón y fallbacks", () => {
   })
 })
 
+describe("/api/orders prioridad por transferencia (migración 00220)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("marca prioritario el pedido pagado por SPEI", async () => {
+    // La marca la deriva el SERVIDOR del método de pago: es el respaldo real
+    // del incentivo "desbloquea envío prioritario al pagar con transferencia".
+    const orders = tableBuilder({
+      data: { id: 7, cashback_credits: 0, cashback_tier: null, total: 100, restore_token: "tok" },
+      error: null,
+    })
+    mockFlow({ orders })
+
+    const res = await POST(orderReq({ ...validBody, payment_method: "spei" }))
+
+    expect(res.status).toBe(200)
+    expect(orders.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_method: "spei", priority: true })
+    )
+  })
+
+  it("no marca prioritario un pedido con tarjeta", async () => {
+    const orders = tableBuilder({
+      data: { id: 7, cashback_credits: 0, cashback_tier: null, total: 100, restore_token: "tok" },
+      error: null,
+    })
+    mockFlow({ orders })
+
+    const res = await POST(orderReq({ ...validBody, payment_method: "card" }))
+
+    expect(res.status).toBe(200)
+    expect(orders.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_method: "card", priority: false })
+    )
+  })
+
+  it("42703: crea el pedido sin la marca si la columna aún no existe", async () => {
+    // Desplegar código antes que esquema no puede tumbar el checkout.
+    const orders = tableBuilder()
+    orders.single
+      .mockResolvedValueOnce({
+        data: null,
+        error: { message: "column orders.priority does not exist", code: "42703" },
+      })
+      .mockResolvedValueOnce({
+        data: { id: 7, cashback_credits: 0, cashback_tier: null, total: 100, restore_token: "tok" },
+        error: null,
+      })
+    mockFlow({ orders })
+
+    const res = await POST(orderReq({ ...validBody, payment_method: "spei" }))
+
+    expect(res.status).toBe(200)
+    expect(orders.insert).toHaveBeenCalledTimes(2)
+    expect(orders.insert.mock.calls[0]![0]).toHaveProperty("priority", true)
+    expect(orders.insert.mock.calls[1]![0]).not.toHaveProperty("priority")
+    expect(logger.warn).toHaveBeenCalledWith(
+      "orders.priority no existe; insertando el pedido sin esa columna"
+    )
+  })
+})
+
 describe("/api/orders inventario (migración 00143)", () => {
   beforeEach(() => {
     vi.clearAllMocks()

@@ -55,6 +55,7 @@ describe("buildAdminOrdersSelect", () => {
       "created_at",
       "driver_id",
       "delivery_proof_path",
+      "priority",
     ]) {
       expect(select).toContain(column)
     }
@@ -81,6 +82,13 @@ describe("buildAdminOrdersSelect", () => {
     expect(select).not.toContain("delivery_proof_path")
     expect(select).toContain("driver_id")
     expect(select).toContain("coupon_code")
+  })
+
+  it("omite priority cuando el esquema no lo tiene (reintento por 42703)", () => {
+    const select = buildAdminOrdersSelect({ priority: false })
+    expect(select).not.toContain("priority")
+    expect(select).toContain("coupon_code")
+    expect(select).toContain("driver_id")
   })
 
   it("solo pide la ruta del comprobante, no su fecha ni su nota", () => {
@@ -115,6 +123,16 @@ describe("buildAdminOrderPrintSelect", () => {
     expect(select).not.toContain("coupon_code")
     expect(select).toContain("order_items(")
     expect(select).toContain("delivery_drivers(name)")
+  })
+
+  it("trae la marca de prioritario y puede omitirla por 42703", () => {
+    // El ticket es lo que ve el almacén: sin la marca, la promesa del checkout
+    // no llega a quien despacha.
+    expect(buildAdminOrderPrintSelect()).toContain("priority")
+    const withoutPriority = buildAdminOrderPrintSelect({ priority: false })
+    expect(withoutPriority).not.toContain("priority")
+    expect(withoutPriority).toContain("coupon_code")
+    expect(withoutPriority).toContain("order_items(")
   })
 })
 

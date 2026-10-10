@@ -3,6 +3,7 @@
 import { Building2, Store, Copy, Check, MessageCircle } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/components/toast"
+import { formatClabe, getSpeiAccount } from "@/lib/spei-account"
 
 /**
  * Instrucciones de pago para métodos manuales (SPEI / OXXO) — R6.4 / A1 parcial.
@@ -12,9 +13,9 @@ import { useToast } from "@/components/toast"
  * manualmente (flujo existente que abona el cashback). Aquí se le muestran la
  * CLABE / referencia para completar el pago.
  *
- * Los datos bancarios/referencia se configuran por env (no hay credenciales de
- * cobro, solo la información para que el cliente transfiera):
- *   NEXT_PUBLIC_SPEI_CLABE, NEXT_PUBLIC_SPEI_BENEFICIARIO, NEXT_PUBLIC_OXXO_REFERENCIA
+ * Los datos bancarios salen de `src/lib/spei-account.ts` (con override por env,
+ * ver `NEXT_PUBLIC_SPEI_*`). Tienen default en el repo a propósito: sin ellos el
+ * cliente no puede transferir y el checkout pierde el pago.
  *
  * Si un dato no está configurado NO se promete que llegará después (no hay
  * canal de envío automático: ni correo ni WhatsApp Business están configurados).
@@ -49,12 +50,14 @@ function WhatsAppHelpLink({ message, label }: { message: string; label: string }
   )
 }
 
-function CopyRow({ label, value }: { label: string; value: string }) {
+export function CopyRow({ label, value, copyValue }: { label: string; value: string; copyValue?: string }) {
   const { toast } = useToast()
   const [copied, setCopied] = useState(false)
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(value)
+      // `copyValue` permite mostrar un valor formateado (CLABE en grupos de 4)
+      // y copiar el crudo, que es lo que la banca acepta sin rechistar.
+      await navigator.clipboard.writeText(copyValue ?? value)
       setCopied(true)
       toast(`${label} copiada`)
       setTimeout(() => setCopied(false), 2000)
@@ -81,8 +84,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
 }
 
 export function PaymentInstructions({ method, amount, orderRef }: PaymentInstructionsProps) {
-  const clabe = process.env.NEXT_PUBLIC_SPEI_CLABE ?? ""
-  const beneficiario = process.env.NEXT_PUBLIC_SPEI_BENEFICIARIO ?? "Resurte.me"
+  const account = getSpeiAccount()
   const oxxoRef = process.env.NEXT_PUBLIC_OXXO_REFERENCIA ?? ""
 
   const isSpei = method === "spei"
@@ -103,21 +105,13 @@ export function PaymentInstructions({ method, amount, orderRef }: PaymentInstruc
         )}
         {isSpei ? (
           <>
-            {clabe ? (
-              <CopyRow label="CLABE" value={clabe} />
-            ) : (
-              <div className="rounded-lg bg-white border border-amber-200 px-3 py-2">
-                <p className="text-xs text-amber-700">
-                  Todavía no publicamos una CLABE fija. Pídenos los datos de
-                  transferencia y te los compartimos al momento.
-                </p>
-                <WhatsAppHelpLink
-                  message={`Hola, necesito la CLABE para transferir el pago${orderConcept}.`}
-                  label="Pedir la CLABE por WhatsApp"
-                />
-              </div>
-            )}
-            <CopyRow label="Beneficiario" value={beneficiario} />
+            <CopyRow
+              label="CLABE"
+              value={formatClabe(account.clabe)}
+              copyValue={account.clabe}
+            />
+            <CopyRow label="Banco" value={account.banco} />
+            <CopyRow label="Beneficiario" value={account.beneficiario} />
             {orderRef && <CopyRow label="Concepto / referencia" value={orderRef} />}
           </>
         ) : oxxoRef ? (
@@ -139,9 +133,7 @@ export function PaymentInstructions({ method, amount, orderRef }: PaymentInstruc
 
       <p className="text-[11px] text-amber-700 mt-3">
         {isSpei
-          ? clabe
-            ? "Tu pedido se confirma y se surte en cuanto recibimos tu transferencia. Envíanos el comprobante por WhatsApp para agilizar."
-            : "En cuanto nos confirmes la transferencia, tu pedido se surte."
+          ? "Tu pedido se confirma y se surte en cuanto recibimos tu transferencia — y entra a la ruta prioritaria. Envíanos el comprobante por WhatsApp para agilizar."
           : oxxoRef
             ? "Presenta la referencia en cualquier OXXO y paga en caja. Tu pedido se surte al confirmar el pago."
             : "Tu pedido queda registrado. Te contactamos para acordar cómo completar el pago."}
