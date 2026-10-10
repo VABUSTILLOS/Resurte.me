@@ -202,10 +202,11 @@ export function CheckoutDrawer() {
     setAddress,
     setPhone,
     setEmail,
-    // El drawer no necesita limpiar bumps tras crear la orden (los mantiene
-    // seleccionados por si el usuario vuelve atrás). Post-pago: persiste
-    // last_order (merge), limpia carrito, cierra, refresca direcciones,
-    // dispara ORDER_PAID_EVENT (UpsellModal) y navega si nadie lo reclamó.
+    // Mientras la orden no esté pagada el drawer **no** limpia los bumps: los
+    // mantiene seleccionados por si el usuario vuelve atrás dentro del flujo.
+    // Post-pago: persiste last_order (merge), limpia carrito **y bumps**, cierra,
+    // refresca direcciones, dispara ORDER_PAID_EVENT (UpsellModal) y navega si
+    // nadie lo reclamó.
     onPaid: (info: CheckoutPaidInfo) => {
       saveLastOrder({
         orderId: info.orderId ?? undefined,
@@ -231,6 +232,11 @@ export function CheckoutDrawer() {
         ],
       })
       clearCart()
+      // Los bumps ya viajaron dentro de esta orden: dejarlos seleccionados hacía
+      // que el siguiente pedido naciera con los artículos especiales del anterior
+      // ya marcados (y contados en el badge del carrito). El "volver atrás" que
+      // justificaba conservarlos es intra-flujo y aquí el pago ya se cobró.
+      setSelectedBumps([])
       setIsOpen(false)
 
       // Refresca "Mis direcciones" sin recargar: la dirección que se guardó

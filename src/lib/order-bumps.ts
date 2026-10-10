@@ -52,6 +52,7 @@
 
 import { createServiceClient } from "@/lib/supabase/service"
 import { round2 } from "@/lib/money"
+import { isOfferableProduct } from "@/lib/published-product"
 import { MAX_BUMPS, MAX_BUMPS_REQUEST_LIMIT } from "@/lib/checkout-config"
 import { logger } from "@/lib/logger"
 import { getAllRecipes } from "@/lib/recipes"
@@ -156,6 +157,14 @@ export interface BumpDiagnostics {
     affinityPairs: number
     /** Candidatos de afinidad antes de filtrar por stock/visibilidad. */
     affinityCandidates: number
+    /**
+     * Reglas que dispararon pero NO produjeron oferta, con el motivo
+     * (`"2:product_not_visible"`). Sin esto, un producto oculto dejaba la regla
+     * muda: el carrito se quedaba sin bumps y el log solo decía `bumpCount: 0`.
+     */
+    droppedRules: string[]
+    /** Reglas re-apuntadas a un sustituto usable en esta misma respuesta. */
+    healedRules: string[]
   }
 }
 
@@ -385,12 +394,29 @@ async function loadAffinityPairs(
  * Carga el catálogo mínimo (id, name, slug) para resolver los ingredientes del
  * recetario contra productos reales. Es la única query "ancha" del motor; se
  * pide una sola vez y solo con las columnas que necesita el índice de nombres.
+ *
+ * **Solo productos publicados en tienda** (`is_visible = true`). Antes traía el
+ * catálogo completo (646 filas, 378 ocultas) y como `buildProductIndex` es un
+ * `Map` first-match-wins, un producto oculto **tapaba a su gemelo publicado** con
+ * el mismo nombre: el candidato salía con el id oculto y luego
+ * `isUsableBumpProduct` lo descartaba, así que la oferta se perdía aunque el
+ * producto publicado existiera.
+ *
+ * Los productos del CARRITO entran al índice aunque ya no estén publicados, y
+ * **después** de los publicados: el recetario se detecta por lo que el cliente ya
+ * lleva (eso no es una oferta) y así un oculto del carrito tampoco puede tapar a
+ * su gemelo publicado. Un oculto nunca llega a ofrecerse: el filtro de servicio
+ * (`isUsableBumpProduct`) y el `cartById` de `computeAffinity` lo impiden.
  */
 async function loadCatalogIndex(
   supabase: Awaited<ReturnType<typeof createServiceClient>>,
-  diagnostics?: BumpDiagnostics
+  diagnostics?: BumpDiagnostics,
+  cartProducts: AffinityProduct[] = []
 ): Promise<AffinityProduct[]> {
-  const { data, error } = await supabase.from("products").select("id, name, slug")
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name, slug")
+    .eq("is_visible", true)
   if (error) {
     logger.warn("[BUMPS] catalog fetch error, afinidad por receta omitida", {
       error: error.message,
@@ -398,7 +424,13 @@ async function loadCatalogIndex(
     if (diagnostics) diagnostics.reason = "catalog_fetch_error"
     return []
   }
-  return (data ?? []) as AffinityProduct[]
+  const published = (data ?? []) as AffinityProduct[]
+  if (cartProducts.length === 0) return published
+  const seen = new Set(published.map((p) => p.id))
+  const cartOnly = cartProducts
+    .filter((p) => !seen.has(p.id))
+    .map((p) => ({ id: p.id, name: p.name, slug: p.slug }))
+  return [...published, ...cartOnly]
 }
 
 /** Payload de la fila `bump_rules` de un bump de afinidad. */
@@ -486,14 +518,141 @@ async function registerAffinityRule(
   return existing as BumpRuleRow
 }
 
-/** Producto usable: existe, visible y con stock (no out_of_stock). */
+/**
+ * Producto usable como oferta: existe, **publicado en tienda** (`is_visible`) y
+ * con existencia. La definición del predicado vive en `published-product.ts`.
+ */
 function isUsableBumpProduct(product: BumpProduct | null | undefined): product is BumpProduct {
-  return (
-    product !== null &&
-    product !== undefined &&
-    product.is_visible !== false &&
-    product.stock_status !== "out_of_stock"
+  return product !== null && product !== undefined && isOfferableProduct(product)
+}
+
+/** Motivo por el que una regla que disparó no pudo ofrecer su producto. */
+function unusableReason(product: BumpProduct | null | undefined): string {
+  if (!product) return "product_not_found"
+  if (product.is_visible === false) return "product_not_visible"
+  if (product.stock_status === "out_of_stock") return "product_out_of_stock"
+  if (effectivePrice(product) <= 0) return "product_sin_precio"
+  return "unusable"
+}
+
+/**
+ * Cuántos candidatos se miran al buscar sustituto para una regla rota. Acota la
+ * query: basta con los más baratos de la categoría para encontrar uno servible.
+ */
+const SUBSTITUTE_SCAN_LIMIT = 20
+
+/**
+ * Sustituto usable para una regla cuyo producto dejó de ser ofrecible: el más
+ * barato de la MISMA categoría (un bump es compra de impulso, así que lo barato
+ * es lo correcto), visible, con existencia y con precio.
+ *
+ * La categoría es la del producto roto a propósito: es el pasillo que el admin
+ * eligió como complemento. Si el catálogo de ese pasillo está entero oculto
+ * (caso real: `bebidas` y `botanas-dulces` sin un solo producto visible) no hay
+ * sustituto posible y la regla se queda muda — pero ahora queda registrado.
+ */
+async function findSubstituteProduct(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  categoryId: number | null | undefined,
+  excluded: Set<number>
+): Promise<BumpProduct | null> {
+  if (typeof categoryId !== "number") return null
+  const { data, error } = await supabase
+    .from("products")
+    .select(BUMP_PRODUCT_COLUMNS)
+    .eq("category_id", categoryId)
+    .eq("is_visible", true)
+    .neq("stock_status", "out_of_stock")
+    .order("price", { ascending: true })
+    .limit(SUBSTITUTE_SCAN_LIMIT)
+  if (error) {
+    logger.warn("[BUMPS] búsqueda de sustituto error, fail-open", {
+      error: error.message,
+      categoryId,
+    })
+    return null
+  }
+  for (const row of (data ?? []) as BumpProduct[]) {
+    if (excluded.has(row.id)) continue
+    if (!isUsableBumpProduct(row)) continue
+    if (effectivePrice(row) <= 0) continue
+    return row
+  }
+  return null
+}
+
+/**
+ * Copy de la regla cuando el motor la re-apunta: el nombre y la descripción del
+ * producto nuevo. La descripción del catálogo puede venir vacía o nula (la
+ * columna es nullable aunque el tipo diga `string`), así que hay respaldo.
+ */
+function bumpCopyFromProduct(product: BumpProduct): string {
+  const description = (product.description ?? "").trim()
+  return description || "Agrégalo a este envío."
+}
+
+/**
+ * Re-apunta una regla de categoría/umbral cuyo producto dejó de ser ofrecible a
+ * un sustituto usable de su misma categoría, y devuelve el bump listo para
+ * servir. Devuelve null si no hay sustituto.
+ *
+ * El re-apunte se PERSISTE en `bump_rules` y no es un adorno: `POST /api/orders`
+ * valida cada artículo especial contra los `product_id` de las reglas activas,
+ * así que servir un producto que la regla no apunta haría fallar el pedido en el
+ * último paso. Mismo patrón que `buildDynamicRecipeBump` y `registerAffinityRule`.
+ *
+ * El `UPDATE` exige que la regla siga apuntando al producto roto
+ * (`.eq("product_id", rule.product_id)`): si otro request la curó antes, esta
+ * corrida no pisa la decisión y simplemente no sirve el bump.
+ */
+async function healCategoryRule(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  rule: BumpRuleRow,
+  broken: BumpProduct | null | undefined,
+  excluded: Set<number>,
+  diagnostics?: BumpDiagnostics
+): Promise<OrderBump | null> {
+  const substitute = await findSubstituteProduct(
+    supabase,
+    broken?.category_id ?? null,
+    excluded
   )
+  if (!substitute) return null
+
+  // El copy de la regla viaja con el producto: las tarjetas encabezan con
+  // `product.name` y subtitulan con `rule.description`, así que dejar la copy
+  // vieja ("Sazonador umami…" sobre una hoja de laurel) mentiría.
+  const patch = {
+    product_id: substitute.id,
+    title: substitute.name,
+    description: bumpCopyFromProduct(substitute),
+  }
+
+  const { data, error } = await supabase
+    .from("bump_rules")
+    .update(patch)
+    .eq("id", rule.id)
+    .eq("product_id", rule.product_id)
+    .select("id")
+  if (error || !data || data.length === 0) {
+    logger.warn("[BUMPS] no se pudo re-apuntar la regla, fail-open", {
+      ruleId: rule.id,
+      from: rule.product_id,
+      to: substitute.id,
+      error: error?.message ?? "sin filas actualizadas",
+    })
+    return null
+  }
+
+  logger.warn("[BUMPS] regla re-apuntada a un producto usable", {
+    ruleId: rule.id,
+    trigger_type: rule.trigger_type,
+    from: rule.product_id,
+    to: substitute.id,
+    reason: unusableReason(broken),
+  })
+  diagnostics?.state?.healedRules.push(`${rule.id}:${rule.product_id}→${substitute.id}`)
+  return buildBump({ ...rule, ...patch }, substitute)
 }
 
 function buildBump(rule: BumpRuleRow, product: BumpProduct): OrderBump {
@@ -643,7 +802,7 @@ async function resolveAffinityBumps(
   }
 
   const [catalog, pairs] = await Promise.all([
-    loadCatalogIndex(supabase, diagnostics),
+    loadCatalogIndex(supabase, diagnostics, cartProducts),
     loadAffinityPairs(supabase, Array.from(cartProductIds), diagnostics),
   ])
   if (catalog.length === 0) {
@@ -838,6 +997,8 @@ export async function resolveBumps(
       matchedTriggers: Array.from(matchedTriggers),
       affinityPairs: affinity.pairsLoaded,
       affinityCandidates: affinity.candidateCount,
+      droppedRules: [],
+      healedRules: [],
     }
   }
   if (
@@ -912,9 +1073,26 @@ export async function resolveBumps(
     if (categoryCandidates.length >= maxBumps) break
     if (usedProductIds.has(rule.product_id)) continue
     const product = categoryProductMap.get(rule.product_id)
-    if (!isUsableBumpProduct(product)) continue
-    usedProductIds.add(rule.product_id)
-    categoryCandidates.push(buildBump(rule, product))
+    // Un bump de $0 no es una oferta: se trata como producto inservible.
+    if (isUsableBumpProduct(product) && effectivePrice(product) > 0) {
+      usedProductIds.add(rule.product_id)
+      categoryCandidates.push(buildBump(rule, product))
+      continue
+    }
+    // La regla disparó pero su producto dejó de ser ofrecible (oculto, agotado,
+    // sin precio o inexistente). Antes se descartaba en silencio —el carrito se
+    // quedaba sin ofertas y no había rastro ni en logs ni en el panel—; ahora se
+    // re-apunta a un sustituto usable del mismo pasillo.
+    // El sustituto NO puede ser un producto que ya está en el carrito (el
+    // cliente lo agregaría dos veces) ni uno ya ofrecido en esta respuesta.
+    const healExcluded = new Set<number>([...cartProductIds, ...usedProductIds])
+    const healed = await healCategoryRule(supabase, rule, product, healExcluded, diagnostics)
+    if (healed) {
+      usedProductIds.add(healed.product.id)
+      categoryCandidates.push(healed)
+      continue
+    }
+    diagnostics?.state?.droppedRules.push(`${rule.id}:${unusableReason(product)}`)
   }
 
   // ── Ranking final: afinidad por ingrediente → recetas/colecciones →
@@ -997,6 +1175,9 @@ async function buildDynamicRecipeBump(
     sale_price: resolveSalePrice(saleWindow),
     stock_status: (candidate.stock_status as BumpProduct["stock_status"]) ?? "in_stock",
     category_id: typeof candidate.category_id === "number" ? candidate.category_id : 0,
+    // La RPC ya filtra `WHERE p.is_visible = true`: se declara explícito para que
+    // el producto pase el predicado de "publicado en tienda" sin ambigüedad.
+    is_visible: true,
     sale_starts_at: saleWindow.sale_starts_at,
     sale_ends_at: saleWindow.sale_ends_at,
   }

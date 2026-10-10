@@ -25,19 +25,27 @@ interface CartState {
   cart: Cart
   coupon: AppliedCoupon | null
   isLoaded: boolean
+  /**
+   * epoch ms del último vaciado **deliberado** en este dispositivo (el usuario
+   * quitó el último artículo, pulsó "vaciar" o el post-pago limpió la compra), o
+   * `null` si no lo hubo. Vive en el reducer —y no en un `ref`— porque decide el
+   * merge con el servidor y una carrera de efectos lo dejaría mintiendo. No es
+   * parte de la API pública del contexto.
+   */
+  clearedAt: number | null
 }
 
 type CartAction =
-  | { type: "ADD_ITEM"; payload: CartItem }
-  | { type: "ADD_ITEMS"; payload: CartItem[] }
-  | { type: "REMOVE_ITEM"; payload: { product_id: number } }
-  | { type: "UPDATE_QUANTITY"; payload: { product_id: number; quantity: number } }
-  | { type: "CLEAR_CART" }
+  | { type: "ADD_ITEM"; payload: CartItem; at: number }
+  | { type: "ADD_ITEMS"; payload: CartItem[]; at: number }
+  | { type: "REMOVE_ITEM"; payload: { product_id: number }; at: number }
+  | { type: "UPDATE_QUANTITY"; payload: { product_id: number; quantity: number }; at: number }
+  | { type: "CLEAR_CART"; at: number }
   | { type: "APPLY_COUPON"; payload: AppliedCoupon }
   | { type: "REMOVE_COUPON" }
   | { type: "LOAD_CART"; payload: CartState }
 
-interface CartContextValue extends CartState {
+interface CartContextValue extends Omit<CartState, "clearedAt"> {
   addItem: (item: CartItem) => void
   addOrderItems: (items: CartItem[]) => void
   removeItem: (productId: number) => void
@@ -79,6 +87,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       return {
         ...state,
         cart: { items },
+        clearedAt: null,
       }
     }
 
@@ -101,6 +110,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       return {
         ...state,
         cart: { items },
+        clearedAt: null,
       }
     }
 
@@ -110,9 +120,15 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       )
       // If no items left, reset store info
       if (items.length === 0) {
-        return { ...state, cart: { ...EMPTY_CART } }
+        return {
+          ...state,
+          cart: { ...EMPTY_CART },
+          // Solo es un vaciado deliberado si había algo que quitar: marcar un
+          // carrito ya vacío dejaría que este dispositivo pisara al servidor.
+          clearedAt: state.cart.items.length > 0 ? action.at : state.clearedAt,
+        }
       }
-      return { ...state, cart: { ...state.cart, items } }
+      return { ...state, cart: { ...state.cart, items }, clearedAt: null }
     }
 
     case "UPDATE_QUANTITY": {
@@ -120,9 +136,13 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       if (quantity <= 0) {
         const items = state.cart.items.filter((i) => i.product_id !== product_id)
         if (items.length === 0) {
-          return { ...state, cart: { ...EMPTY_CART } }
+          return {
+            ...state,
+            cart: { ...EMPTY_CART },
+            clearedAt: state.cart.items.length > 0 ? action.at : state.clearedAt,
+          }
         }
-        return { ...state, cart: { ...state.cart, items } }
+        return { ...state, cart: { ...state.cart, items }, clearedAt: null }
       }
 
       return {
@@ -133,11 +153,17 @@ function cartReducer(state: CartState, action: CartAction): CartState {
             i.product_id === product_id ? { ...i, quantity } : i
           ),
         },
+        clearedAt: null,
       }
     }
 
     case "CLEAR_CART":
-      return { ...state, cart: { ...EMPTY_CART }, coupon: null }
+      return {
+        ...state,
+        cart: { ...EMPTY_CART },
+        coupon: null,
+        clearedAt: action.at,
+      }
 
     case "APPLY_COUPON":
       return { ...state, coupon: action.payload }
@@ -163,7 +189,13 @@ const CART_STORAGE_KEY = "resurte_cart"
 
 function loadFromStorage(): CartState & { updatedAt: number | null } {
   if (typeof window === "undefined") {
-    return { cart: { ...EMPTY_CART }, coupon: null, isLoaded: false, updatedAt: null }
+    return {
+      cart: { ...EMPTY_CART },
+      coupon: null,
+      isLoaded: false,
+      clearedAt: null,
+      updatedAt: null,
+    }
   }
 
   try {
@@ -174,6 +206,7 @@ function loadFromStorage(): CartState & { updatedAt: number | null } {
         cart: parsed.cart ?? { ...EMPTY_CART },
         coupon: parsed.coupon ?? null,
         isLoaded: false,
+        clearedAt: typeof parsed.clearedAt === "number" ? parsed.clearedAt : null,
         updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : null,
       }
     }
@@ -181,15 +214,21 @@ function loadFromStorage(): CartState & { updatedAt: number | null } {
     // corrupted data, reset
   }
 
-  return { cart: { ...EMPTY_CART }, coupon: null, isLoaded: false, updatedAt: null }
+  return {
+    cart: { ...EMPTY_CART },
+    coupon: null,
+    isLoaded: false,
+    clearedAt: null,
+    updatedAt: null,
+  }
 }
 
-function saveToStorage(cart: Cart, coupon: AppliedCoupon | null) {
+function saveToStorage(cart: Cart, coupon: AppliedCoupon | null, clearedAt: number | null) {
   if (typeof window === "undefined") return
   try {
     localStorage.setItem(
       CART_STORAGE_KEY,
-      JSON.stringify({ cart, coupon, updatedAt: Date.now() })
+      JSON.stringify({ cart, coupon, clearedAt, updatedAt: Date.now() })
     )
   } catch {
     // storage full or unavailable
@@ -257,7 +296,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(
     cartReducer,
     undefined,
-    (): CartState => ({ cart: { ...EMPTY_CART }, coupon: null, isLoaded: false })
+    (): CartState => ({
+      cart: { ...EMPTY_CART },
+      coupon: null,
+      isLoaded: false,
+      clearedAt: null,
+    })
   )
 
   // Load the persisted cart on the client after hydration
@@ -268,9 +312,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Persist to localStorage on changes
   useEffect(() => {
     if (state.isLoaded) {
-      saveToStorage(state.cart, state.coupon)
+      saveToStorage(state.cart, state.coupon, state.clearedAt)
     }
-  }, [state.cart, state.coupon, state.isLoaded])
+  }, [state.cart, state.coupon, state.clearedAt, state.isLoaded])
 
   // ── Sync con el carrito del servidor (usuarios con sesión) ──
   // El carrito local sigue funcionando offline y para invitados; al iniciar
@@ -314,14 +358,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (cancelled) return
         const local = loadFromStorage()
         const decision = mergeCarts(
-          { cart: local.cart, coupon: local.coupon, updatedAt: local.updatedAt },
+          {
+            cart: local.cart,
+            coupon: local.coupon,
+            updatedAt: local.updatedAt,
+            clearedAt: local.clearedAt,
+          },
           server
         )
         if (decision.action === "use-server") {
           lastPushedRef.current = serializeCart(decision.cart.items, decision.coupon)
           dispatch({
             type: "LOAD_CART",
-            payload: { cart: decision.cart, coupon: decision.coupon, isLoaded: true },
+            // El carrito adoptado es el del servidor: no queda ningún vaciado
+            // local pendiente de reconciliar.
+            payload: {
+              cart: decision.cart,
+              coupon: decision.coupon,
+              isLoaded: true,
+              clearedAt: null,
+            },
           })
         } else if (decision.action === "upload-local") {
           lastPushedRef.current = serializeCart(local.cart.items, local.coupon)
@@ -383,23 +439,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addItem = useCallback((item: CartItem) => {
-    dispatch({ type: "ADD_ITEM", payload: item })
+    dispatch({ type: "ADD_ITEM", payload: item, at: Date.now() })
   }, [])
 
   const addOrderItems = useCallback((items: CartItem[]) => {
-    dispatch({ type: "ADD_ITEMS", payload: items })
+    dispatch({ type: "ADD_ITEMS", payload: items, at: Date.now() })
   }, [])
 
   const removeItem = useCallback((productId: number) => {
-    dispatch({ type: "REMOVE_ITEM", payload: { product_id: productId } })
+    dispatch({ type: "REMOVE_ITEM", payload: { product_id: productId }, at: Date.now() })
   }, [])
 
   const updateQuantity = useCallback((productId: number, quantity: number) => {
-    dispatch({ type: "UPDATE_QUANTITY", payload: { product_id: productId, quantity } })
+    dispatch({
+      type: "UPDATE_QUANTITY",
+      payload: { product_id: productId, quantity },
+      at: Date.now(),
+    })
   }, [])
 
   const clearCart = useCallback(() => {
-    dispatch({ type: "CLEAR_CART" })
+    dispatch({ type: "CLEAR_CART", at: Date.now() })
   }, [])
 
   const applyCoupon = useCallback((coupon: AppliedCoupon) => {

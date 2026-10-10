@@ -12,6 +12,7 @@ import {
   resolveBumpPricing,
   sanitizeBumpLimit,
   detectCollectionsInCart,
+  type BumpDiagnostics,
   type BumpProduct,
   type BumpRuleRow,
   type BumpTriggerType,
@@ -232,6 +233,10 @@ describe("resolveBumps", () => {
     catalog?: AffinityProduct[]
     affinityPairs?: AffinityPairRow[]
     affinityRules?: BumpRuleRow[]
+    /** Candidatos que devuelve la búsqueda de sustituto (mismo pasillo). */
+    substitutes?: BumpProduct[]
+    /** Fuerza el fallo del re-apunte de la regla (UPDATE con error). */
+    updateFails?: boolean
   }) {
     const {
       rules = [perishableRule],
@@ -244,6 +249,8 @@ describe("resolveBumps", () => {
       catalog = [],
       affinityPairs = [],
       affinityRules = [],
+      substitutes = [],
+      updateFails = false,
     } = opts
 
     // Espía accesible para verificar que el fallback dinámico registró la regla.
@@ -251,6 +258,9 @@ describe("resolveBumps", () => {
     // (`insert(array).select()` esperado directo). El lote devuelve las filas
     // del payload con ids sintéticos, como haría Postgres.
     let nextRuleId = 9000
+    // Filtros aplicados a la query del índice de afinidad (regresión: debe pedir
+    // solo productos publicados en tienda).
+    const catalogFilters: { col: string; value: unknown }[] = []
     const insertBumpRules = vi.fn().mockImplementation((payload: unknown) => ({
       select: vi.fn().mockImplementation(() => {
         const rows = (Array.isArray(payload) ? payload : [payload]).filter(
@@ -265,8 +275,24 @@ describe("resolveBumps", () => {
       }),
     }))
 
+    // Re-apunte de una regla rota: update({product_id}).eq(id).eq(product_id)    // .select("id"). El segundo `eq` es la guarda de carrera: exige que la regla
+    // siga apuntando al producto roto.
+    const updateBumpRules = vi.fn().mockImplementation(() => ({
+      eq: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          select: vi.fn().mockResolvedValue(
+            updateFails
+              ? { data: null, error: { message: "update boom" } }
+              : { data: [{ id: 1 }], error: null }
+          ),
+        }),
+      }),
+    }))
+
     const supabase = {
       __insertBumpRules: insertBumpRules,
+      __updateBumpRules: updateBumpRules,
+      __catalogFilters: catalogFilters,
       from: vi.fn().mockImplementation((table: string) => {
         if (table === "bump_rules") {
           const selectStar = vi.fn().mockReturnValue({
@@ -293,6 +319,7 @@ describe("resolveBumps", () => {
           return {
             select: selectStar,
             insert: insertBumpRules,
+            update: updateBumpRules,
           }
         }
         if (table === "products") {
@@ -306,17 +333,41 @@ describe("resolveBumps", () => {
                   }),
                 }
               }
-              // Catálogo mínimo para el índice de afinidad por ingrediente.
+              // Catálogo mínimo para el índice de afinidad por ingrediente. El
+              // motor lo pide filtrado por publicación (`is_visible = true`):
+              // un producto oculto no puede tapar a su gemelo publicado.
               if (cols === "id, name, slug") {
-                return Promise.resolve({ data: catalog, error: null })
+                return {
+                  eq: vi.fn().mockImplementation((col: string, value: unknown) => {
+                    catalogFilters.push({ col, value })
+                    return Promise.resolve({ data: catalog, error: null })
+                  }),
+                }
               }
-              const eq = vi.fn().mockImplementation((_col: string, value?: number) => ({
-                maybeSingle: vi.fn().mockResolvedValue({
-                  data:
-                    value !== undefined ? (bumpProducts[value] ?? null) : (bumpProducts[100] ?? null),
-                  error: null,
-                }),
-              }))
+              const eq = vi.fn().mockImplementation((col: string, value?: number) => {
+                // Búsqueda de sustituto de una regla rota:
+                // eq(category_id) → eq(is_visible) → neq(stock) → order → limit.
+                if (col === "category_id") {
+                  return {
+                    eq: vi.fn().mockReturnValue({
+                      neq: vi.fn().mockReturnValue({
+                        order: vi.fn().mockReturnValue({
+                          limit: vi.fn().mockResolvedValue({ data: substitutes, error: null }),
+                        }),
+                      }),
+                    }),
+                  }
+                }
+                return {
+                  maybeSingle: vi.fn().mockResolvedValue({
+                    data:
+                      value !== undefined
+                        ? (bumpProducts[value] ?? null)
+                        : (bumpProducts[100] ?? null),
+                    error: null,
+                  }),
+                }
+              })
               // Query del carrito (incluye "tags"): devuelve los productos del
               // carrito. Consultas batched de bumps (sin tags): resuelve por id.
               if (cols.includes("tags")) {
@@ -464,7 +515,7 @@ describe("resolveBumps", () => {
     expect(bumps[0]?.price).toBeCloseTo(20, 2)
   })
 
-  it("omite bumps cuyo producto está agotado", async () => {
+  it("sin sustituto usable omite el bump cuyo producto está agotado", async () => {
     const supabase = makeSupabase({
       bumpProducts: { 100: product({ id: 100, stock_status: "out_of_stock" }) },
     })
@@ -472,12 +523,129 @@ describe("resolveBumps", () => {
     expect(await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })).toEqual([])
   })
 
-  it("omite bumps cuyo producto no es visible (is_visible = false)", async () => {
+  it("sin sustituto usable omite el bump cuyo producto no es visible", async () => {
     const supabase = makeSupabase({
       bumpProducts: { 100: product({ id: 100, is_visible: false }) },
     })
     vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
     expect(await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })).toEqual([])
+  })
+
+  it("omite el bump si el llamador no trajo is_visible (fail-closed)", async () => {
+    // El predicado de "publicado en tienda" es estricto (`is_visible === true`):
+    // si una ruta olvida pedir la columna, el producto se descarta en vez de
+    // colarse. Es la causa de raíz del bug de la oferta post-compra.
+    const supabase = makeSupabase({
+      bumpProducts: { 100: product({ id: 100, is_visible: undefined }) },
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    expect(await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })).toEqual([])
+  })
+
+  it("pide el índice de afinidad solo con productos publicados en tienda", async () => {
+    // Antes traía el catálogo completo (378 de 646 filas ocultas) y un oculto
+    // podía tapar a su gemelo publicado por nombre (Map first-match-wins).
+    const supabase = makeSupabase({
+      catalog: [{ id: 5, name: "Cebolla", slug: "cebolla" }],
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+    expect(supabase.__catalogFilters).toEqual([{ col: "is_visible", value: true }])
+  })
+
+  it("re-apunta la regla a un sustituto del mismo pasillo si su producto está oculto", async () => {
+    const supabase = makeSupabase({
+      bumpProducts: { 100: product({ id: 100, is_visible: false, category_id: 10 }) },
+      substitutes: [
+        product({
+          id: 555,
+          name: "Orégano Molido 100g",
+          description: "Orégano mexicano molido.",
+          price: 11,
+          category_id: 10,
+        }),
+      ],
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+    expect(bumps).toHaveLength(1)
+    expect(bumps[0]?.product.id).toBe(555)
+    expect(bumps[0]?.ruleId).toBe(1)
+    // La tarjeta subtitula con `rule.description`: si viaja la copy vieja, el
+    // cliente lee una mentira ("Sazonador umami" sobre orégano).
+    expect(bumps[0]?.description).toBe("Orégano mexicano molido.")
+    // El re-apunte se PERSISTE: `POST /api/orders` valida el artículo especial
+    // contra los `product_id` de las reglas activas, así que servir un producto
+    // que la regla no apunta haría fallar el pedido en el último paso.
+    expect(supabase.__updateBumpRules).toHaveBeenCalledWith({
+      product_id: 555,
+      title: "Orégano Molido 100g",
+      description: "Orégano mexicano molido.",
+    })
+  })
+
+  it("nunca sustituye con un producto que ya está en el carrito", async () => {
+    // El más barato del pasillo ES el que el cliente ya lleva: si el motor lo
+    // ofreciera como bump, el pedido cobraría dos veces el mismo artículo.
+    const supabase = makeSupabase({
+      cartProducts: [product({ id: 700, name: "Acelga", category_id: 20 })],
+      bumpProducts: { 100: product({ id: 100, is_visible: false, category_id: 10 }) },
+      substitutes: [
+        product({ id: 700, name: "Acelga", price: 10, category_id: 10 }),
+        product({ id: 555, name: "Sal de Mar", price: 14, category_id: 10 }),
+      ],
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    const bumps = await resolveBumps({ items: [{ product_id: 700, quantity: 1 }] })
+    expect(bumps.map((b) => b.product.id)).toEqual([555])
+  })
+
+  it("usa copy de respaldo si el producto sustituto no trae descripción", async () => {
+    const supabase = makeSupabase({
+      bumpProducts: { 100: product({ id: 100, is_visible: false, category_id: 10 }) },
+      substitutes: [
+        product({ id: 555, name: "Sal de Mar", description: "   ", category_id: 10 }),
+      ],
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+    expect(bumps[0]?.description).toBe("Agrégalo a este envío.")
+  })
+
+  it("re-apunta la regla si su producto quedó sin precio ($0 no es oferta)", async () => {
+    const supabase = makeSupabase({
+      bumpProducts: { 100: product({ id: 100, price: 0, category_id: 10 }) },
+      substitutes: [product({ id: 556, price: 12, category_id: 10 })],
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+    expect(bumps[0]?.product.id).toBe(556)
+  })
+
+  it("no sirve el sustituto si el re-apunte falla (el pedido lo rechazaría)", async () => {
+    const supabase = makeSupabase({
+      bumpProducts: { 100: product({ id: 100, is_visible: false, category_id: 10 }) },
+      substitutes: [product({ id: 555, category_id: 10 })],
+      updateFails: true,
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    const diagnostics: BumpDiagnostics = {}
+    expect(
+      await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] }, diagnostics)
+    ).toEqual([])
+    expect(diagnostics.state?.droppedRules).toEqual(["1:product_not_visible"])
+  })
+
+  it("registra el motivo de la regla descartada para cazar '0 bumps' en prod", async () => {
+    const supabase = makeSupabase({
+      bumpProducts: { 100: product({ id: 100, stock_status: "out_of_stock" }) },
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    const diagnostics: BumpDiagnostics = {}
+    await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] }, diagnostics)
+    expect(diagnostics.state?.matchedTriggers).toContain("perishables")
+    expect(diagnostics.state?.droppedRules).toEqual(["1:product_out_of_stock"])
+    expect(diagnostics.state?.healedRules).toEqual([])
   })
 
   it("sin reglas que apliquen devuelve []", async () => {

@@ -21,6 +21,11 @@ import {
 } from "@/lib/address-book"
 import { getStoredUtm } from "@/lib/utm"
 import {
+  clearPendingCardPayment,
+  paymentIntentIdFromClientSecret,
+  savePendingCardPayment,
+} from "@/lib/payment-return"
+import {
   DEFAULT_ADDRESS_FORM,
   type AddressForm,
   type ScheduleForm,
@@ -604,6 +609,14 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
         setStripeClientSecret(intentData.clientSecret)
         setShowStripeForm(true)
         setIsProcessing(false)
+        // Marca de "esta pestaña dejó un cobro en curso". Si el banco se lleva al
+        // cliente (CoDi, 3DS no inline), al volver la página se recarga, este
+        // estado muere y `onPaid` nunca corre: `StripeReturnHandler` reclama esa
+        // vuelta con esta marca y cierra el post-pago (carrito incluido).
+        savePendingCardPayment({
+          orderId,
+          paymentIntentId: paymentIntentIdFromClientSecret(intentData.clientSecret as string),
+        })
       } catch (intentErr) {
         setCheckoutError(
           intentErr instanceof Error
@@ -627,6 +640,8 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
     ) => {
       const finalOrderId = opts?.orderId ?? createdOrderId
       const finalCashback = opts?.cashback ?? earnedCashback
+      // El cobro ya cerró en esta página: la vuelta de un redirect ya no aplica.
+      clearPendingCardPayment()
       onPaidRef.current({
         orderId: finalOrderId,
         cashback: finalCashback,
@@ -643,6 +658,8 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
   const handleStripeBack = useCallback(() => {
     setShowStripeForm(false)
     setStripeClientSecret(null)
+    // El cobro se abandonó: la marca de vuelta ya no tiene a qué referirse.
+    clearPendingCardPayment()
   }, [])
 
   // ── Cierra un pedido de método manual (SPEI / OXXO / contra entrega) ──
@@ -753,11 +770,19 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
           await initializeCardPayment(orderId, cashback)
           return "fallback"
         }
+        // El 3DS puede salir del navegador (`if_required` solo evita el redirect
+        // cuando el banco lo resuelve inline): misma marca que el flujo normal
+        // para que la vuelta cierre el post-pago en vez de dejar el carrito vivo.
+        savePendingCardPayment({
+          orderId,
+          paymentIntentId: paymentIntentIdFromClientSecret(data.clientSecret as string),
+        })
         const { error } = await stripe.confirmPayment({
           clientSecret: data.clientSecret,
           redirect: "if_required",
         })
         if (error) {
+          clearPendingCardPayment()
           setCheckoutError(
             error.message || "Tu banco no confirmó el pago. Intenta de nuevo."
           )

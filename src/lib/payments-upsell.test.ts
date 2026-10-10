@@ -26,6 +26,7 @@ const PRODUCT = {
   price: 120,
   sale_price: null,
   stock_status: "in_stock",
+  is_visible: true,
 }
 
 function makeSupabase(opts: {
@@ -325,9 +326,46 @@ describe("processUpsellForOrder — 1-click upsells off-session", () => {
     ).rejects.toThrow("no está confirmado")
   })
 
-  it("rechaza pedidos sin método de pago guardado (wallet/Link)", async () => {
+  it("rechaza un producto NO publicado en tienda y no intenta cobrar", async () => {
+    // Última barrera antes de mover dinero: el modal ya no lo ofrece, pero un
+    // product_id puede llegar por otra vía (o despublicarse entre la oferta y el
+    // cobro). Sin esto se cobraba un producto que el cliente no puede ver.
     vi.mocked(createServiceClient).mockResolvedValue(
-      makeSupabase({
+      makeSupabase({ product: { ...PRODUCT, is_visible: false } }) as never
+    )
+
+    await expect(
+      processUpsellForOrder({
+        orderId: 42,
+        productId: 77,
+        quantity: 1,
+        idempotencyKey: "key-hidden",
+        userId: "u1",
+      })
+    ).rejects.toMatchObject({ message: "Producto no disponible", code: "not_published" })
+
+    expect(stripe.paymentIntents.create).not.toHaveBeenCalled()
+  })
+
+  it("rechaza un producto sin la columna is_visible (fail-closed)", async () => {
+    vi.mocked(createServiceClient).mockResolvedValue(
+      makeSupabase({ product: { ...PRODUCT, is_visible: undefined } }) as never
+    )
+
+    await expect(
+      processUpsellForOrder({
+        orderId: 42,
+        productId: 77,
+        quantity: 1,
+        idempotencyKey: "key-no-col",
+        userId: "u1",
+      })
+    ).rejects.toMatchObject({ code: "not_published" })
+
+    expect(stripe.paymentIntents.create).not.toHaveBeenCalled()
+  })
+
+  it("rechaza pedidos sin método de pago guardado (wallet/Link)", async () => {    vi.mocked(createServiceClient).mockResolvedValue(      makeSupabase({
         order: { ...PAID_ORDER, stripe_payment_method_id: null },
       }) as never
     )

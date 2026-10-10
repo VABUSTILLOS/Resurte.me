@@ -12,6 +12,8 @@ import {
 } from "lucide-react"
 import { formatMoney, modifiersSummary } from "@/lib/foodos"
 import { detectStorefrontLang } from "@/lib/foodos-i18n"
+import { cartStorageKey } from "@/hooks/use-foodos-cart"
+import { withoutQueryParams } from "@/lib/url-params"
 import {
   FOODOS_CANCEL_REFUSAL_MESSAGE,
   foodosCustomerCancelRefusal,
@@ -73,6 +75,32 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
   const [confirmingCancel, setConfirmingCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
+
+  // El cobro con tarjeta puede salir del navegador (CoDi, y el 3DS que el banco
+  // no resuelve inline): Stripe devuelve al comensal **aquí**, no al micrositio,
+  // así que el `onSuccess` del overlay —donde vive la limpieza del carrito—
+  // nunca corre y el carrito se quedaba con los artículos del pedido ya pagado.
+  // Stripe añade `redirect_status` a la `return_url`; los parámetros son de un
+  // solo uso y se consumen en la misma pasada para que un reload no los repita.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("redirect_status") !== "succeeded") {
+      return
+    }
+    try {
+      localStorage.removeItem(cartStorageKey(slug))
+    } catch {
+      // Modo privado o cuota llena: el carrito no se pudo persistir, nada que limpiar.
+    }
+    window.history.replaceState(
+      null,
+      "",
+      withoutQueryParams(window.location.href, [
+        "redirect_status",
+        "payment_intent",
+        "payment_intent_client_secret",
+      ])
+    )
+  }, [slug])
 
   useEffect(() => {
     let cancelled = false

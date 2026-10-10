@@ -8,6 +8,7 @@ import {
   type PaymentNextAction,
 } from "@/lib/payment-next-action"
 import { logger } from "@/lib/logger"
+import { isPublishedInStore } from "@/lib/published-product"
 import { isMissingColumnError, resolveEffectivePrice } from "@/lib/sale-window"
 import {
   buildDestinationChargeParams,
@@ -225,7 +226,7 @@ export async function processUpsellForOrder(
 
   // Producto + descuento del upsell (derivados del server, nunca del cliente).
   const UPSELL_PRODUCT_COLS =
-    "id, name, price, sale_price, stock_status, sale_starts_at, sale_ends_at"
+    "id, name, price, sale_price, stock_status, is_visible, sale_starts_at, sale_ends_at"
   let { data: product, error: productError } = await supabase
     .from("products")
     .select(UPSELL_PRODUCT_COLS)
@@ -236,13 +237,20 @@ export async function processUpsellForOrder(
     // Migración 00107 pendiente: sin ventana de oferta, la oferta siempre aplica.
     ;({ data: product, error: productError } = await supabase
       .from("products")
-      .select("id, name, price, sale_price, stock_status")
+      .select("id, name, price, sale_price, stock_status, is_visible")
       .eq("id", params.productId)
       .maybeSingle())
   }
 
   if (productError || !product) {
     throw new PaymentIntentError("Producto de upsell no encontrado", 404)
+  }
+  // Solo se cobra lo publicado en la tienda. Es la última barrera antes de mover
+  // dinero: `resolveUpsellOffers` ya lo filtra para no mostrarlo, pero un
+  // `product_id` puede llegar por otra vía (o el producto despublicarse entre la
+  // oferta y el cobro) y aquí no se puede confiar en el cliente.
+  if (!isPublishedInStore(product)) {
+    throw new PaymentIntentError("Producto no disponible", 409, "not_published")
   }
   if (product.stock_status === "out_of_stock") {
     throw new PaymentIntentError("Producto agotado", 409, "out_of_stock")

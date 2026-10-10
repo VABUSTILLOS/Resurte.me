@@ -1,6 +1,8 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { applyDiscount, round2 } from "@/lib/money"
+import { logger } from "@/lib/logger"
 import { type BumpRuleRow, type BumpProduct } from "@/lib/order-bumps"
+import { isPublishedInStore } from "@/lib/published-product"
 import { resolveEffectivePrice } from "@/lib/sale-window"
 
 /**
@@ -158,6 +160,19 @@ export async function resolveUpsellOffers(
     if (!product) continue
     if (existingIds.has(product.id)) continue
     if (product.stock_status === "out_of_stock") continue
+    // Solo se oferta lo publicado en la tienda (`is_visible`). Sin esto, el modal
+    // post-compra ofrecía productos ocultos del catálogo (las 5 reglas de
+    // categoría apuntan desde el 2026-10-03 a productos despublicados) que el
+    // cliente no puede ver ni comprar. El cargo vuelve a validarlo en
+    // `payments.ts`: aquí se evita hasta mostrarlo.
+    if (!isPublishedInStore(product)) {
+      logger.warn("[UPSELL] regla con producto no publicado, omitida", {
+        ruleId: row.id,
+        productId: product.id,
+        trigger_type: row.trigger_type,
+      })
+      continue
+    }
     candidates.push(
       toOffer(
         {

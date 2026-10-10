@@ -6,7 +6,7 @@ vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn() }))
 vi.mock("@/lib/audit-log", () => ({ logAdminAction: vi.fn() }))
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
 
-import { POST } from "./route"
+import { POST, GET } from "./route"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { logAdminAction } from "@/lib/audit-log"
@@ -82,5 +82,72 @@ describe("POST /api/admin/bump-rules", () => {
     const res = await POST(req(VALID))
     expect(res.status).toBe(500)
     expect(logAdminAction).not.toHaveBeenCalled()
+  })
+})
+
+describe("GET /api/admin/bump-rules", () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  function setupList(opts: {
+    rules?: Record<string, unknown>[]
+    products?: Record<string, unknown>[]
+    listError?: unknown
+  }) {
+    const ruleRows = opts.rules ?? [
+      {
+        id: 2,
+        trigger_type: "perishables",
+        product_id: 77,
+        title: "Salsa",
+        is_active: true,
+        display_order: 1,
+      },
+    ]
+    const from = vi.fn((table: string) => {
+      if (table === "bump_rules") {
+        return {
+          select: vi.fn(() => ({
+            order: vi.fn().mockResolvedValue({
+              data: opts.listError ? null : ruleRows,
+              error: opts.listError ?? null,
+            }),
+          })),
+        }
+      }
+      return {
+        select: vi.fn(() => ({
+          in: vi.fn().mockResolvedValue({ data: opts.products ?? [], error: null }),
+        })),
+      }
+    })
+    vi.mocked(requireAdmin).mockResolvedValue({ user: ADMIN, response: null } as never)
+    vi.mocked(createServiceClient).mockResolvedValue({ from } as never)
+    return { from }
+  }
+
+  it("adjunta el estado del producto para que el panel avise de reglas mudas", async () => {
+    setupList({
+      products: [{ id: 77, name: "Salsa Maggi 200ml", is_visible: false, stock_status: "in_stock" }],
+    })
+    const res = await GET()
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { rules: Record<string, unknown>[] }
+    expect(body.rules[0]).toMatchObject({
+      product_id: 77,
+      product_name: "Salsa Maggi 200ml",
+      product_is_visible: false,
+      product_stock_status: "in_stock",
+    })
+  })
+
+  it("producto ausente del catálogo: nombre null sin tumbar la lista", async () => {
+    setupList({ products: [] })
+    const body = (await (await GET()).json()) as { rules: Record<string, unknown>[] }
+    expect(body.rules[0]).toMatchObject({ product_name: null, product_is_visible: null })
+  })
+
+  it("500 si la lista falla", async () => {
+    setupList({ listError: { message: "boom" } })
+    expect((await GET()).status).toBe(500)
   })
 })

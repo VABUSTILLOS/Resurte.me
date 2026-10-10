@@ -55,6 +55,15 @@
   separado de `updated_at`, para que el merge last-write-wins de los bumps no pise
   un cambio de carrito local (ni al revés). El merge (`mergeBumps`, puro y probado
   en `bumps-sync.ts`) lo usan cliente y servidor para no divergir.
+  **La selección se limpia cuando el pedido se cierra** (post-pago): el
+  `CheckoutDrawer` hace `setSelectedBumps([])` junto a `clearCart()` —después de
+  armar `last_order`, que sí los necesita— y el checkout full-page ya los limpiaba
+  en `onAfterOrderCreated`. Conservarlos era el defecto reportado como "se quedan
+  grabados los artículos del pedido anterior en el carrito": los bumps ya viajaron
+  **dentro** de esa orden, así que el pedido siguiente nacía con ellos marcados,
+  con su cantidad, sumados al badge y al total (el badge cuenta catálogo + bumps
+  vía `countOrderUnits`). Lo que sobrevive salir del checkout es la selección
+  **en curso**, no la de una orden ya cobrada.
 - **Qué se poda de una selección persistida**: `BumpCards` descarta los bumps cuyo
   **producto ya es una línea del carrito** (se cobraría doble) y, solo cuando la
   petición del pool fue completa (`revealNext && limit === undefined`), los que ya
@@ -87,6 +96,56 @@
   `.neq("trigger_type", "ingredient_affinity")` — esas reglas existen para el
   carrito, no para upsells 1-click. `POST /api/orders` valida bumps por
   `product_id` + `is_active`, así que las reglas de afinidad pasan sin cambios.
+- **Una regla cuyo producto deja de ser ofrecible se re-apunta sola** (no se
+  descarta en silencio). Si el `product_id` de una regla de categoría/umbral
+  queda **oculto, agotado, sin precio o inexistente**, el motor ya no la salta
+  muda: busca el producto usable **más barato de su misma categoría** (un bump es
+  compra de impulso, así que lo barato es lo correcto; nunca uno que ya esté en el
+  carrito) y **persiste el re-apunte** en `bump_rules` junto con el copy
+  (`title` = nombre del producto, `description` = su descripción, con respaldo si
+  viene vacía). Persistir no es un adorno: `POST /api/orders` valida el artículo
+  especial contra los `product_id` de las reglas activas, así que servir un
+  producto que la regla no apunta haría **fallar el pedido en el último paso**. El
+  `UPDATE` exige que la regla siga apuntando al producto roto (guarda de carrera)
+  y, si falla, el bump **no** se sirve. Por qué existe: el 2026-10-03 se ocultaron
+  los 5 productos de las reglas de categoría y **todo ese tier quedó mudo durante
+  una semana** — el log solo decía `bumpCount: 0` con
+  `matchedTriggers: ["perishables"]`. Si la categoría entera está oculta (caso
+  real: `bebidas` y `botanas-dulces` sin un solo producto visible) no hay
+  sustituto posible y la regla queda muda, pero **queda registrada**:
+  `diagnostics.state.droppedRules` (`"2:product_not_visible"`) viaja en el log
+  `[BUMPS] served` y en `?debug=1`, y `/admin/marketing` avisa en la regla con el
+  nombre del producto y un "⚠ Producto oculto/agotado". No metas productos
+  ocultos en el pool de ofertas para "arreglarlo": el cliente no podría comprarlos.
+- **Solo se oferta lo publicado en la tienda.** El predicado único vive en
+  `src/lib/published-product.ts` (`isPublishedInStore` = `is_visible === true` **estricto**,
+  `isOfferableProduct` = publicado + con existencia) porque tres rutas construyen ofertas
+  desde `bump_rules` y cada una lo había recordado por su cuenta: el motor del carrito, la
+  resolución del upsell post-compra (`upsell-offers.ts`) y el **cargo** de ese upsell
+  (`payments.ts`). La tercera se lo saltó: ofrecía —y cobraba— productos ocultos del
+  catálogo (las 5 reglas de categoría apuntan desde el 2026-10-03 a productos
+  despublicados, y su pasillo está entero oculto). `is_visible = true` **es** "publicado en
+  tienda" (es el predicado de `src/lib/data.ts`): la papelera despublica (55 productos en
+  papelera, ninguno visible) y la programación editorial está sin usar. Es estricto a
+  propósito: si un llamador olvida pedir la columna, el producto se **descarta** en vez de
+  colarse. Invariantes:
+  - El **índice de afinidad** (`loadCatalogIndex`) también se filtra por publicación: antes
+    traía el catálogo completo (646 filas, 378 ocultas) y, como `buildProductIndex` es un
+    `Map` first-match-wins, un oculto **tapaba a su gemelo publicado** con el mismo nombre
+    (el candidato salía con el id oculto, `isUsableBumpProduct` lo descartaba y la oferta se
+    perdía aunque el publicado existiera). Los productos del **carrito** entran al índice
+    aunque ya no estén publicados y **después** de los publicados: el recetario se detecta
+    por lo que el cliente ya lleva (eso no es una oferta) y así un oculto del carrito
+    tampoco tapa a su gemelo.
+  - El **cargo** del upsell valida publicación antes de crear el `PaymentIntent` y lanza
+    `409 not_published`. Es la última barrera antes de mover dinero: el modal ya no lo
+    ofrece, pero un `product_id` puede llegar por otra vía o el producto puede
+    despublicarse entre la oferta y el cobro.
+  - El upsell **no re-apunta** la regla a otro producto (a diferencia del tier de categoría
+    del carrito): un modal post-compra no reescribe merchandising; solo omite la regla y lo
+    registra en `logger.warn`.
+  - No "arregles" un pasillo vacío metiendo productos ocultos en el pool: el cliente no
+    podría verlos ni comprarlos. La salida es republicar un producto o despublicar la regla.
 - **Los order bumps no llevan descuento propio**: un artículo especial se cobra
   al precio de catálogo (`sale_price ?? price`), exactamente lo que costaría
   comprarlo suelto. `bumpUnitPrice(basePrice)` ya no recibe un porcentaje y
@@ -257,6 +316,63 @@
   - SPEI **sigue siendo confirmación manual**: el pedido queda `pending` hasta
     que alguien pulse "Confirmar pago" en `/admin/pedidos`. Se gana liquidez
     inmediata, se paga con trabajo de conciliación.
+- **Un carrito vaciado a propósito no pierde contra la copia vieja del servidor**:
+  `mergeCarts` (`src/lib/cart-sync.ts`) resolvía `localCount === 0` → `use-server`
+  **sin mirar timestamps**, así que el carrito vacío local (el pedido recién
+  cerrado, o el usuario que quitó el último artículo) perdía contra la fila de
+  `user_carts` y **los artículos del pedido anterior volvían en la siguiente
+  visita**. Ahora el vacío local solo gana si el dispositivo registró un vaciado
+  deliberado (`clearedAt`) que no es anterior a `updated_at` del servidor
+  (`isDeliberateClear`). La marca vive en el reducer de `cart-context` y no en un
+  `ref`, porque decide un merge y una carrera de efectos la dejaría mintiendo:
+  `CLEAR_CART`, `REMOVE_ITEM` y `UPDATE_QUANTITY` a 0 la escriben con el `at` de
+  la acción (el reducer sigue puro), y `ADD_ITEM`/`ADD_ITEMS` la limpian. Un
+  carrito vacío **sin** marca es un dispositivo sin datos —entrar desde un
+  navegador nuevo no puede borrar el carrito de la cuenta— y ahí el servidor
+  sigue mandando. La marca se persiste junto al carrito (`resurte_cart`) y se
+  relee en el arranque, así que sobrevive a cerrar la pestaña antes del push.
+- **El cobro con tarjeta puede salir del navegador, y al volver hay que cerrar el
+  post-pago.** `StripePaymentForm` confirma con `redirect: "if_required"`, así que
+  CoDi y el 3DS que el banco no resuelve inline se llevan al cliente y lo
+  devuelven a la `return_url` (que el checkout no fija: es la página donde estaba)
+  con `redirect_status=succeeded` y el `payment_intent`. Al volver la página se
+  recarga, el estado del checkout muere y `onPaid` **nunca corre**: el carrito se
+  quedaba con los artículos del pedido ya pagado y el cliente aterrizaba en el
+  paso de pago. `src/lib/payment-return.ts` guarda en `sessionStorage`
+  (`resurte:pending-card-payment`) el intent que dejó **esta** pestaña —lo escribe
+  `initializeCardPayment` y el 3DS del express, y lo limpia `handleStripeSuccess`
+  y `handleStripeBack`—, y `StripeReturnHandler` (montado en `CheckoutOverlays`,
+  porque la vuelta cae en cualquier ruta) reclama esa vuelta **solo si el
+  `payment_intent` coincide**: así completar el pago de un pedido viejo desde
+  `/mis-pedidos` no vacía un carrito ajeno. Al reclamarla consume marca y
+  parámetros antes de tocar nada, deja `last_order` (orderId + método + total por
+  `calcCheckoutTotals` + ítems) para que la confirmación no sea genérica, limpia
+  carrito y bumps, olvida el paso del checkout y navega a `/pedido-confirmado`.
+  Límite honesto: sin el `trackingToken` (viaja en la respuesta de `createOrder`,
+  que muere con la recarga) la confirmación no ofrece el enlace de seguimiento.
+- **El carrito del comensal (micrositio FoodOS) no puede revivir el pedido que
+  acaba de cerrar.** `useFoodosCart` (`src/hooks/use-foodos-cart.ts`) persiste en
+  `localStorage` por restaurante (`foodos-cart-<slug>`), así que **todo camino que
+  rellene el carrito desde un pedido tiene que consumirse una sola vez**:
+  - El reorden (`/r/[slug]?reorden=<id>`, el enlace "🔁 Volver a pedir" del
+    tracking) **quita el parámetro de la URL** en cuanto el pedido entra al
+    carrito. Sin eso, cada `reload` de esa misma ruta volvía a llenar el carrito
+    con el pedido anterior —incluido uno **recién pagado**, porque el botón
+    "Volver al menú" de `SuccessScreen` es un `location.reload()`— y el comensal
+    tenía que vaciarlo a mano. El carrito ya quedó persistido, así que el reload
+    lo restaura sin el parámetro.
+  - El cobro con tarjeta **puede salir del navegador** (CoDi y el 3DS que el banco
+    no resuelve inline, porque `StripePaymentForm` usa `redirect: "if_required"`).
+    Stripe devuelve al comensal a la `return_url` —el micrositio la fija en
+    `/r/[slug]/pedido/<id>`, no en el carrito— con `redirect_status=succeeded`, y
+    el `onSuccess` del overlay **nunca corre**: la limpieza que vivía solo ahí
+    dejaba el carrito con los artículos del pedido ya pagado. Por eso
+    `order-tracking.tsx` borra `foodos-cart-<slug>` al detectar ese
+    `redirect_status` y consume los parámetros de Stripe en la misma pasada
+    (`withoutQueryParams`, `src/lib/url-params.ts`).
+  - El parámetro se quita con **manipulación de texto**, no con
+    `URLSearchParams.toString()`: el `toString()` re-codifica y reordena el resto
+    de la query (los espacios pasan a `+`).
 - **La fecha de entrega sale del día local, no de UTC**: las 7 opciones del
   selector y la fecha por defecto vienen de `getNextDays()`
   (`src/lib/delivery-days.ts`, reexportado por `checkout-shared.tsx`), que ancla

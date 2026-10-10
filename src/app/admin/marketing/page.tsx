@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Copy, Megaphone, Pencil, Percent, Plus, Power, TicketPercent, Trash2, X } from "lucide-react"
 import { suggestDuplicateCode } from "@/lib/admin-marketing-validation"
@@ -17,6 +18,10 @@ interface BumpRule {
   discount_pct: number
   is_active: boolean
   display_order: number
+  /** Estado del producto de la regla (lo añade GET /api/admin/bump-rules). */
+  product_name: string | null
+  product_is_visible: boolean | null
+  product_stock_status: string | null
 }
 
 interface Coupon {
@@ -382,8 +387,38 @@ function MarketingContent() {
                 </p>
                 <p className="text-xs text-gray-500 truncate">{rule.description}</p>
                 <p className="text-xs text-gray-600">
-                  Producto #{rule.product_id} · orden {rule.display_order}
+                  {rule.product_name ?? `Producto #${rule.product_id}`} · orden {rule.display_order}
                 </p>
+                {rule.is_active && rule.product_is_visible === false && (
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    ⚠ Producto oculto del catálogo: la oferta no se puede mostrar. El motor
+                    re-apunta la regla al más barato de su categoría; si esa categoría no tiene
+                    productos visibles, la regla queda muda.{" "}
+                    {rule.product_name && (
+                      <Link
+                        href={`/admin/productos?q=${encodeURIComponent(rule.product_name)}`}
+                        className="underline"
+                      >
+                        Ver en el catálogo
+                      </Link>
+                    )}
+                  </p>
+                )}
+                {rule.is_active && rule.product_stock_status === "out_of_stock" && (
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    ⚠ Producto agotado: la oferta no se puede mostrar. El motor re-apunta la regla
+                    al más barato de su categoría; si esa categoría no tiene productos visibles, la
+                    regla queda muda.{" "}
+                    {rule.product_name && (
+                      <Link
+                        href={`/admin/productos?q=${encodeURIComponent(rule.product_name)}`}
+                        className="underline"
+                      >
+                        Ver en el catálogo
+                      </Link>
+                    )}
+                  </p>
+                )}
               </div>
               <button
                 type="button"

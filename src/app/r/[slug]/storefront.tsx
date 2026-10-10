@@ -18,6 +18,7 @@ import {
   type OpenStatus,
 } from "@/lib/foodos"
 import { mapLinesToMenu, useFoodosCart } from "@/hooks/use-foodos-cart"
+import { withoutQueryParams } from "@/lib/url-params"
 import type {
   FoodosRestaurant,
   FoodosBranch,
@@ -235,6 +236,13 @@ export function FoodosStorefront({
 
   // Carga diferida del reorden: trae el pedido y mapea sus líneas al menú
   // actual (precios vigentes; se omiten ítems que ya no existen).
+  //
+  // El parámetro se **consume**: se quita de la URL en cuanto el pedido entra al
+  // carrito. Si sobreviviera, cada `reload` de esta misma ruta volvería a llenar
+  // el carrito con el pedido anterior —incluido uno recién pagado, porque el
+  // botón "Volver al menú" de la pantalla de éxito es un `location.reload()`—.
+  // El carrito ya quedó persistido en localStorage, así que el reload lo
+  // restaura sin ayuda del parámetro.
   useEffect(() => {
     if (!reorderId || reorderLoaded) return
     let cancelled = false
@@ -249,6 +257,11 @@ export function FoodosStorefront({
         )
         if (lines.length) replaceLines(lines)
         setReorderLoaded(true)
+        window.history.replaceState(
+          null,
+          "",
+          withoutQueryParams(window.location.href, ["reorden"])
+        )
       })
       .catch(() => {})
     return () => {
