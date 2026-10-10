@@ -1,5 +1,4 @@
 import { test, expect, type Page } from "@playwright/test"
-import { hasAdminCredentials, signInAsAdmin } from "./support/session"
 
 /**
  * E2E del checkout drawer de alta conversión (mecánica SamCart/ThriveCart).
@@ -933,16 +932,26 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
  * del drawer crea el pedido **por transferencia SPEI**, que es lo que el negocio
  * necesita (fondos el mismo día, sin comisión de Stripe).
  *
- * El botón solo aparece con una dirección en el libro —es lo que permite pagar
- * "en un clic"—, así que el bloque se salta sin credenciales reales (mismo
- * criterio que e2e/support/session.ts: mejor saltado y visible que fingiendo
- * verificar) y también si la cuenta no tiene direcciones guardadas.
+ * El botón aparece con una dirección en el libro, así que se mockea el libro
+ * anónimo (`/api/addresses/guest`): el bloque corre sin sesión y sin depender de
+ * datos reales de nadie.
  */
 test.describe("envío prioritario (Obtén Envío Prioritario)", { tag: "@ci" }, () => {
-  test("el atajo instantáneo crea el pedido por SPEI y no toca Stripe", async ({ page }) => {
-    test.skip(!hasAdminCredentials(), "sin E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD")
-    test.skip(!(await signInAsAdmin(page)), "no se pudo iniciar sesión")
+  const GUEST_ADDRESS = {
+    id: 4242,
+    label: "Casa",
+    street: "Av. Juárez",
+    number: "123",
+    interior: "",
+    neighborhood: "Centro",
+    zip_code: "31000",
+    references: "",
+    is_default: true,
+    last_used_at: null,
+    created_at: "2026-01-01T00:00:00.000Z",
+  }
 
+  test("muestra los datos de transferencia antes de cerrar el pedido", async ({ page }) => {
     // Nada de esto debe tocar la BD ni Stripe: el pedido es de mentira.
     const orderBodies: Record<string, unknown>[] = []
     await page.route("**/api/orders", async (route) => {
@@ -961,6 +970,14 @@ test.describe("envío prioritario (Obtén Envío Prioritario)", { tag: "@ci" }, 
     await page.route("**/api/leads", (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: "{}" })
     )
+    // Libro de direcciones anónimo: es lo que hace aparecer el CTA.
+    await page.route("**/api/addresses/guest*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ addresses: [GUEST_ADDRESS] }),
+      })
+    )
     // Sonda: si el camino prioritario tocara Stripe, el test lo caza.
     let stripeCalled = false
     await page.route("**/api/payments/stripe/**", (route) => {
@@ -977,12 +994,23 @@ test.describe("envío prioritario (Obtén Envío Prioritario)", { tag: "@ci" }, 
     await openCheckoutDrawer(page)
 
     const cta = page.getByRole("button", { name: /Obtén Envío Prioritario/ })
-    test.skip((await cta.count()) === 0, "la cuenta no tiene direcciones guardadas")
-
+    await expect(cta).toBeVisible()
     await cta.click()
 
     await expect.poll(() => orderBodies.length).toBeGreaterThan(0)
     expect(orderBodies[0]).toMatchObject({ payment_method: "spei" })
     expect(stripeCalled).toBe(false)
+
+    // El drawer NO se cierra de golpe: primero muestra los datos de
+    // transferencia (con el número de pedido como concepto) y el cliente decide
+    // cuándo salir.
+    const drawer = page.getByLabel("Checkout", { exact: true })
+    await expect(
+      drawer.getByRole("heading", { name: /Pedido #999999 registrado/ })
+    ).toBeVisible()
+    await expect(drawer.getByText("0141 5060 6044 4770 78")).toBeVisible()
+    // Monto exacto de la compra sembrada ($850, con envío gratis).
+    await expect(drawer.getByText("$850.00 MXN")).toBeVisible()
+    await expect(drawer.getByRole("button", { name: /Listo, ver mi pedido/ })).toBeVisible()
   })
 })

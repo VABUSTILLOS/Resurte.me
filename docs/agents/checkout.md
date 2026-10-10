@@ -212,7 +212,13 @@
   - **El monto exacto y la referencia se muestran DESPUÉS de crear el pedido**
     (`PaymentInstructions`): si el cliente transfiere antes de que exista el
     pedido, el dinero llega sin referencia que reconciliar. El incentivo muestra
-    la cuenta pero pide confirmar primero.
+    la cuenta pero pide confirmar primero. Por eso el drawer tiene un **paso
+    `transfer`**: al pulsar el CTA morado se crea la orden y el drawer **no se
+    cierra** — enseña la CLABE, el monto exacto y el número de pedido como
+    concepto, y solo al pulsar "Listo" corre el post-pago (`completeOrder`). El
+    carrito se vacía en cuanto la orden existe, para que un cierre accidental no
+    permita crear un pedido duplicado. "Confirmar pedido" con SPEI elegido pasa
+    por el mismo paso.
   - `priority` se lee como columna **opcional** del panel
     (`ADMIN_ORDER_OPTIONAL_COLUMNS`, migración `00220`): el esquema puede ir por
     detrás del código sin tumbar el checkout ni el ticket.

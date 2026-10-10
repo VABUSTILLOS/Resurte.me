@@ -34,8 +34,9 @@ import { SocialProofBadge } from "@/components/checkout/social-proof"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
-import { useCheckoutOrder, type CheckoutPaidInfo } from "@/components/checkout/use-checkout-order"
+import { useCheckoutOrder, type CheckoutPaidInfo, type CreatedOrder } from "@/components/checkout/use-checkout-order"
 import { SpeiIncentive } from "@/components/checkout/spei-incentive"
+import { PaymentInstructions } from "@/components/checkout/payment-instructions"
 import { PAYMENT_METHODS, type PaymentMethod } from "@/types"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { RepurchaseCouponInfo } from "@/types"
@@ -49,7 +50,7 @@ export const CHECKOUT_DRAWER_EVENT = "resurte:toggle-checkout-drawer"
 // lo maneja, el drawer navega a la confirmación.
 export const ORDER_PAID_EVENT = "resurte:order-paid"
 
-type DrawerStep = "review" | "address" | "schedule" | "bumps" | "payment"
+type DrawerStep = "review" | "address" | "schedule" | "bumps" | "payment" | "transfer"
 
 /**
  * Checkout completo dentro del drawer (mecánica SamCart/ThriveCart).
@@ -177,6 +178,9 @@ export function CheckoutDrawer() {
     checkoutError,
     setCheckoutError,
     isProcessing,
+    createOrder,
+    completeOrder,
+    setIsProcessing,
   } = useCheckoutOrder({
     city,
     address,
@@ -235,6 +239,43 @@ export function CheckoutDrawer() {
     },
   })
 
+  // ── Pago prioritario por transferencia (SPEI) ──
+  // El pedido se crea al pulsar el CTA, pero el drawer NO se cierra: primero se
+  // muestran los datos de transferencia (monto exacto y número de pedido como
+  // concepto) y solo al pulsar "Listo" corre el post-pago. El carrito se vacía
+  // en cuanto la orden existe para que un cierre accidental no deje la puerta
+  // abierta a crear un pedido duplicado.
+  //
+  // El total se guarda junto a la orden a propósito: vaciar el carrito pone el
+  // total en vivo en 0, y leerlo al pintar mostraría "transfiere $0.00".
+  const [transferOrder, setTransferOrder] = useState<{
+    created: CreatedOrder
+    total: number
+  } | null>(null)
+
+  // Sin `useCallback`: el React Compiler memoiza solo, y envolverlo a mano hacía
+  // que el compilador se rindiera (el `total` capturado "puede cambiar después").
+  const handlePriorityCheckout = async () => {
+    setIsProcessing(true)
+    setCheckoutError(null)
+    try {
+      const created = await createOrder("spei")
+      if (!created) {
+        setIsProcessing(false)
+        return
+      }
+      setTransferOrder({ created, total })
+      clearCart()
+      setIsProcessing(false)
+      setStep("transfer")
+    } catch (err) {
+      setCheckoutError(
+        err instanceof Error ? err.message : "Error de conexión. Intenta de nuevo."
+      )
+      setIsProcessing(false)
+    }
+  }
+
   // ── Apertura / cierre del drawer ──
   useEffect(() => {
     const handler = () => {
@@ -286,7 +327,7 @@ export function CheckoutDrawer() {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E9EB]">
           <div className="flex items-center gap-2">
-            {step !== "review" && (
+            {step !== "review" && step !== "transfer" && (
               <button
                 onClick={() =>
                   setStep(
@@ -317,7 +358,7 @@ export function CheckoutDrawer() {
         </div>
 
         {/* Step indicator */}
-        {step !== "review" && (
+        {step !== "review" && step !== "transfer" && (
           <div className="px-5 py-3 border-b border-[#E8E9EB] flex items-center gap-1.5">
             {(["address", "schedule", "bumps", "payment"] as DrawerStep[]).map((s, i) => {
               const currentIdx = ["address", "schedule", "bumps", "payment"].indexOf(step)
@@ -414,7 +455,7 @@ export function CheckoutDrawer() {
                   guardada — justo lo contrario. */}
               {selectedAddressId !== null && isAddressValid && (
                 <button
-                  onClick={() => void handlePlaceOrder("spei")}
+                  onClick={() => void handlePriorityCheckout()}
                   disabled={isProcessing || itemCount === 0}
                   className="w-full flex flex-col items-center gap-0.5 px-6 py-3 mb-3 bg-[#5B21B6] text-white font-bold rounded-xl hover:bg-[#4C1D95] disabled:opacity-70 transition-colors"
                 >
@@ -700,7 +741,7 @@ export function CheckoutDrawer() {
                       por transferencia y este sobraría. */}
                   {paymentMethod === "card" && selectedAddressId !== null && isAddressValid && (
                     <button
-                      onClick={() => void handlePlaceOrder("spei")}
+                      onClick={() => void handlePriorityCheckout()}
                       disabled={isProcessing}
                       className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-[#5B21B6] text-white font-bold rounded-xl hover:bg-[#4C1D95] disabled:opacity-70 transition-colors"
                     >
@@ -763,7 +804,16 @@ export function CheckoutDrawer() {
                       Atrás
                     </button>
                     <button
-                      onClick={() => handlePlaceOrder(paymentMethod)}
+                      onClick={() => {
+                        // SPEI comparte el paso de datos de transferencia: el
+                        // cliente ve la CLABE antes de que el drawer se cierre.
+                        // El resto de métodos cierran directo.
+                        if (paymentMethod === "spei") {
+                          void handlePriorityCheckout()
+                          return
+                        }
+                        void handlePlaceOrder(paymentMethod)
+                      }}
                       disabled={isProcessing}
                       className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] disabled:opacity-70 transition-colors"
                     >
@@ -787,6 +837,46 @@ export function CheckoutDrawer() {
                   </p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Paso final del pago por transferencia: el pedido YA existe (de ahí
+              sale el número que va como concepto) pero el drawer no se cierra
+              hasta que el cliente ve los datos. Antes se cerraba de golpe y los
+              datos quedaban solo en la página de confirmación. */}
+          {step === "transfer" && transferOrder && (
+            <div className="space-y-5">
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-violet-100 mb-3">
+                  <span className="text-2xl" aria-hidden>
+                    ⚡
+                  </span>
+                </div>
+                <h2 className="text-lg font-bold text-[#242529]">
+                  ¡Pedido #{transferOrder.created.orderId} registrado!
+                </h2>
+                <p className="text-sm text-[#6b6b6b] mt-1">
+                  Envío prioritario desbloqueado. Solo falta tu transferencia para
+                  que lo surtamos.
+                </p>
+              </div>
+
+              <PaymentInstructions
+                method="spei"
+                amount={transferOrder.total}
+                orderRef={String(transferOrder.created.orderId)}
+              />
+
+              <button
+                onClick={() => completeOrder(transferOrder.created)}
+                className="w-full px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] transition-colors"
+              >
+                Listo, ver mi pedido
+              </button>
+              <p className="text-center text-[11px] text-gray-400">
+                Puedes cerrar esta ventana: tu pedido queda registrado y lo
+                surtimos al confirmar tu pago.
+              </p>
             </div>
           )}
         </div>

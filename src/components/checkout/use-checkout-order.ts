@@ -636,6 +636,24 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
     setStripeClientSecret(null)
   }, [])
 
+  // ── Cierra un pedido de método manual (SPEI / OXXO / contra entrega) ──
+  //
+  // Esos métodos no tienen PaymentIntent: el "pago" llega después y lo confirma
+  // el admin. Lo único que falta al crear la orden es el post-pago de cada
+  // superficie (limpiar carrito, navegar, disparar el upsell), y eso es
+  // exactamente lo que hace `onPaid`. Se expone aparte porque el drawer necesita
+  // MOSTRAR los datos de transferencia antes de cerrar: crea la orden, enseña la
+  // CLABE y solo al pulsar "Listo" el cliente llama aquí.
+  const completeOrder = useCallback((created: CreatedOrder) => {
+    onPaidRef.current({
+      orderId: created.orderId,
+      cashback: created.cashback,
+      paymentIntentId: "",
+      repurchaseCoupon: created.repurchaseCoupon ?? null,
+      trackingToken: created.trackingToken ?? null,
+    })
+  }, [])
+
   // ── Place order: reintento del intent, o crea la orden y paga ──
   const handlePlaceOrder = useCallback(
     async (method: PaymentMethod = "card") => {
@@ -658,13 +676,7 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
           return
         }
         // Métodos no-tarjeta: el flujo navega a la confirmación directo.
-        onPaidRef.current({
-          orderId: created.orderId,
-          cashback: created.cashback,
-          paymentIntentId: "",
-          repurchaseCoupon: created.repurchaseCoupon ?? null,
-          trackingToken: created.trackingToken ?? null,
-        })
+        completeOrder(created)
       } catch (err) {
         setCheckoutError(
           err instanceof Error ? err.message : "Error de conexión. Intenta de nuevo."
@@ -672,7 +684,7 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
         setIsProcessing(false)
       }
     },
-    [city, createdOrderId, earnedCashback, initializeCardPayment, createOrder]
+    [city, createdOrderId, earnedCashback, initializeCardPayment, createOrder, completeOrder]
   )
 
   // ── Express Checkout: cobra con la tarjeta guardada (off-session) ──
@@ -789,6 +801,7 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
     captureLead,
     createOrder,
     initializeCardPayment,
+    completeOrder,
     handlePlaceOrder,
     handleExpressCheckout,
     handleStripeSuccess,
