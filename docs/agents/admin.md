@@ -622,6 +622,19 @@
   reordena. Los productos **sin categoría van al final** (única excepción
   declarada). Es idempotente, y la escritura se delega en `reorderWaCatalog`,
   que sigue siendo el único escritor de `position`.
+- **Un alta sin confirmación visible crea duplicados (WH8)**: el alta de
+  categoría **sí guardaba** (el log da `201` y la fila está en la base), pero
+  desde la tarjeta "Catálogo de …" no producía **ningún cambio a la vista** —
+  los chips de categoría viven en la tarjeta de al lado—, así que el usuario lo
+  reintentó y quedaron **tres "Frutas y Verduras"** con slugs distintos. Dos
+  lecciones que no hay que volver a aprender: (1) una acción que no cambia nada
+  visible se percibe como fallo, y el reintento es la respuesta natural, así que
+  **toda acción de escritura necesita confirmación donde se hizo**; (2) el slug
+  único **no** es una validación de negocio: deduplicar la URL deja pasar dos
+  nombres idénticos en pantalla, así que el endpoint rechaza el nombre repetido
+  con **409** (`src/lib/category-name.ts`, normalizando mayúsculas, acentos y
+  espacios) y el cliente, ante el 409, **selecciona la que ya existe** y lo dice
+  en vez de dejar al usuario reintentando.
 - **"Seleccionar todos" en la curaduría (WH7)**: la tarjeta "Catálogo de …"
   tenía modo selección pero sólo llegaba a marcar producto por producto, así que
   no había forma de tomar el catálogo entero. Ahora trae "Seleccionar todos (N)"
