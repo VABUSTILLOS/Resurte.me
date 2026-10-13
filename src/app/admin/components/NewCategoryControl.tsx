@@ -25,8 +25,12 @@ import type { AdminWhatsappCategory } from "@/app/admin/actions"
  * el motivo tiene que estar pegado al campo que lo causó.
  */
 export interface NewCategoryControlProps {
-  /** Categoría recién creada: el panel la añade a su lista y la preselecciona. */
-  onCreated: (category: AdminWhatsappCategory) => void
+  /**
+   * Categoría resultante: la recién creada, o la que ya existía cuando el
+   * nombre estaba repetido. El segundo argumento lo distingue, porque el
+   * mensaje al usuario no es el mismo.
+   */
+  onCreated: (category: AdminWhatsappCategory, existed: boolean) => void
   /** Hay una acción en curso en el panel: se deshabilita para no pisarla. */
   busy?: boolean
 }
@@ -56,8 +60,18 @@ export function NewCategoryControl({ onCreated, busy }: NewCategoryControlProps)
         body: JSON.stringify({ name: value }),
       })
       const data = await res.json().catch(() => ({}))
+
+      // Nombre repetido (409): no es un callejón sin salida. Se selecciona la
+      // que ya existe — que es lo que el usuario quería — en vez de dejarlo
+      // reintentando y creando duplicados.
+      if (res.status === 409 && data.category) {
+        onCreated(data.category as AdminWhatsappCategory, true)
+        close()
+        return
+      }
+
       if (!res.ok) throw new Error(data.error ?? "Error al crear la categoría")
-      onCreated(data.category as AdminWhatsappCategory)
+      onCreated(data.category as AdminWhatsappCategory, false)
       close()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear la categoría")

@@ -25,6 +25,30 @@ export async function POST(request: Request) {
 
     const supabase = await createServiceClient()
 
+    // Nombre repetido: 409 en vez de crear `nombre-2`.
+    //
+    // Antes sólo se deduplicaba el SLUG, así que reintentar el alta producía
+    // otra categoría con el MISMO nombre visible (`frutas-y-verduras-2`). Eso
+    // convirtió un reintento del usuario —el alta no daba confirmación— en tres
+    // categorías idénticas. El slug único no es una validación de negocio.
+    const { findCategoryByName } = await import("@/lib/category-name")
+    const { data: existing, error: readError } = await supabase
+      .from("categories")
+      .select("id, name")
+    if (readError) {
+      return NextResponse.json({ error: readError.message }, { status: 500 })
+    }
+    const duplicate = findCategoryByName(existing ?? [], name)
+    if (duplicate) {
+      return NextResponse.json(
+        {
+          error: `Ya existe una categoría llamada “${duplicate.name}”.`,
+          category: duplicate,
+        },
+        { status: 409 }
+      )
+    }
+
     const root = slugify(name) || "categoria"
     const { data: slugRows } = await supabase
       .from("categories")

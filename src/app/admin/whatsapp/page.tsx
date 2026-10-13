@@ -166,6 +166,8 @@ export default function AdminWhatsAppPage() {
   // Crear categoría desde este panel: el control vive en
   // `components/NewCategoryControl.tsx` y se pinta en las DOS tarjetas.
   const [assignCategoryId, setAssignCategoryId] = useState("")
+  // Da confirmación visible en la tarjeta del catálogo (ver handleCategoryCreated).
+  const [lastCreatedCategoryId, setLastCreatedCategoryId] = useState<number | null>(null)
 
   // Agregar TODO un proveedor de un clic (sin pasar por el modo selección).
   const [armSupplierAdd, setArmSupplierAdd] = useState(false)
@@ -381,6 +383,27 @@ export default function AdminWhatsAppPage() {
   )
 
   const supplierUnsyncableCount = supplierAddable.length - supplierAddableSyncable.length
+
+  /**
+   * Cómo está repartido el catálogo por categoría, para la tarjeta del catálogo.
+   *
+   * Se calcula con lo que YA está cargado (`curated` + `productById`), sin
+   * consulta nueva. Dos usos: da **confirmación visible** al crear una categoría
+   * desde esa tarjeta (aparece aunque esté en 0) y muestra sobre qué actúa
+   * "Ordenar por categoría", que es la acción de al lado.
+   */
+  const curatedCategoryTally = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const item of curated) {
+      const categoryId = productById.get(item.product_id)?.category_id
+      if (categoryId == null) continue
+      counts.set(categoryId, (counts.get(categoryId) ?? 0) + 1)
+    }
+    return categories
+      .filter((c) => counts.has(c.id) || c.id === lastCreatedCategoryId)
+      .map((c) => ({ id: c.id, name: c.name, count: counts.get(c.id) ?? 0 }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  }, [curated, productById, categories, lastCreatedCategoryId])
 
   async function run<T>(fn: () => Promise<T>, okText?: (r: T) => string) {
     setBusy(true)
@@ -990,16 +1013,22 @@ export default function AdminWhatsAppPage() {
 
   /**
    * Alta de categoría desde este panel: el control (`NewCategoryControl`) hace
-   * el fetch y aquí sólo se guarda el resultado. Se preselecciona en el
-   * selector de "mover a categoría" porque es el paso siguiente natural — una
-   * categoría recién creada está vacía y no filtra nada útil todavía.
+   * el fetch y aquí sólo se guarda el resultado.
+   *
+   * `lastCreatedCategoryId` es lo que da **confirmación visible en la tarjeta
+   * del catálogo**: sin él, crear desde ahí no cambiaba nada a la vista (los
+   * chips de categoría viven en la tarjeta de al lado) y el usuario reintentó
+   * tres veces, dejando tres "Frutas y Verduras" en la base.
    */
-  const handleCategoryCreated = (created: AdminWhatsappCategory) => {
+  const handleCategoryCreated = (created: AdminWhatsappCategory, existed: boolean) => {
     setCategories((prev) => (prev.some((c) => c.id === created.id) ? prev : [...prev, created]))
     setAssignCategoryId(String(created.id))
+    setLastCreatedCategoryId(created.id)
     setMessage({
       ok: true,
-      text: `Categoría “${created.name}” creada. Selecciona productos y usa “Mover a la categoría” para llenarla.`,
+      text: existed
+        ? `“${created.name}” ya existía: seleccionada. No se creó un duplicado.`
+        : `Categoría “${created.name}” creada. Selecciona productos y usa “Mover a la categoría” para llenarla.`,
     })
   }
 
@@ -1860,6 +1889,41 @@ export default function AdminWhatsAppPage() {
             <div className="mb-4">
               <NewCategoryControl onCreated={handleCategoryCreated} busy={busy} />
             </div>
+
+            {/*
+              Confirmación visible + sobre qué actúa "Ordenar por categoría".
+              Sin esto, crear desde aquí no cambiaba NADA a la vista y el usuario
+              reintentó tres veces (tres "Frutas y Verduras" en la base).
+            */}
+            {curatedCategoryTally.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-1.5">
+                  Categorías en este catálogo
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {curatedCategoryTally.map((c) => (
+                    <span
+                      key={c.id}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs ${
+                        c.id === lastCreatedCategoryId
+                          ? "bg-[#E7F8EE] text-[#0E7A0E] font-bold ring-1 ring-[#0E7A0E]/30"
+                          : "bg-[#F5F3F0] text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      {c.name}
+                      <span className="text-[10px] font-bold opacity-70">{c.count}</span>
+                    </span>
+                  ))}
+                </div>
+                {lastCreatedCategoryId !== null &&
+                  curatedCategoryTally.some((c) => c.id === lastCreatedCategoryId && c.count === 0) && (
+                    <p className="text-[11px] text-[#0F7A3D] mt-1.5">
+                      La categoría nueva ya está guardada. Asígnale productos con “Mover a la
+                      categoría” en la tarjeta de al lado.
+                    </p>
+                  )}
+              </div>
+            )}
 
             {curated.length === 0 ? (
               <p className="text-sm text-[#B0B3B8] py-8 text-center">
