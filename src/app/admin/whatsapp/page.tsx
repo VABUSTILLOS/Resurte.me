@@ -2195,7 +2195,7 @@ export default function AdminWhatsAppPage() {
               </p>
             )}
 
-            <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
+            <div className="flex gap-2 overflow-x-auto pb-2">
               <button
                 onClick={() => setSelectedCategory(null)}
                 className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium ${selectedCategory === null ? "bg-[#0E7A0E] text-white" : "bg-[#F5F3F0] text-[var(--text-secondary)]"}`}
@@ -2211,42 +2211,53 @@ export default function AdminWhatsAppPage() {
                   {getCategoryIcon(cat.icon ?? "", cat.slug)} {cat.name}
                 </button>
               ))}
-              <button
-                onClick={() => {
-                  setNewCatOpen((v) => !v)
-                  setNewCatName("")
-                }}
-                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-dashed ${
-                  newCatOpen
-                    ? "border-[#0E7A0E] text-[#0E7A0E] bg-[#E7F8EE]"
-                    : "border-[#0E7A0E]/40 text-[#0E7A0E] hover:bg-[#E7F8EE]"
-                }`}
-                aria-expanded={newCatOpen}
-              >
-                {newCatOpen ? "Cancelar" : "+ Nueva categoría"}
-              </button>
             </div>
 
-            {/* Crear categoría sin salir de la curación */}
-            {newCatOpen && (
-              <form onSubmit={handleCreateCategory} className="mb-3 flex gap-2">
-                <input
-                  value={newCatName}
-                  onChange={(e) => setNewCatName(e.target.value)}
-                  placeholder="Nombre de la categoría…"
-                  aria-label="Nombre de la nueva categoría"
-                  autoFocus
-                  className="flex-1 min-w-0 px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
-                />
+            {/*
+              Crear categoría: FUERA de la fila con scroll horizontal.
+              Dentro quedaba al final y con varias categorías se salía de la
+              pantalla a la derecha — invisible sin desplazar, que es lo mismo
+              que no existir.
+            */}
+            <div className="mb-3">
+              {newCatOpen ? (
+                <form onSubmit={handleCreateCategory} className="flex flex-wrap gap-2">
+                  <input
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    placeholder="Nombre de la nueva categoría…"
+                    aria-label="Nombre de la nueva categoría"
+                    autoFocus
+                    className="flex-1 min-w-[12rem] px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={creatingCat || !newCatName.trim()}
+                    className="px-4 py-2 rounded-xl bg-[#0E7A0E] text-white text-xs font-bold hover:bg-[#0D720D] disabled:opacity-50"
+                  >
+                    {creatingCat ? "Creando…" : "Crear categoría"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewCatOpen(false)
+                      setNewCatName("")
+                    }}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[#EDEAE4]"
+                  >
+                    Cancelar
+                  </button>
+                </form>
+              ) : (
                 <button
-                  type="submit"
-                  disabled={creatingCat || !newCatName.trim()}
-                  className="px-4 py-2 rounded-xl bg-[#0E7A0E] text-white text-xs font-bold hover:bg-[#0D720D] disabled:opacity-50"
+                  onClick={() => setNewCatOpen(true)}
+                  aria-expanded={false}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-dashed border-[#0E7A0E]/40 text-[#0E7A0E] hover:bg-[#E7F8EE]"
                 >
-                  {creatingCat ? "Creando…" : "Crear"}
+                  + Nueva categoría
                 </button>
-              </form>
-            )}
+              )}
+            </div>
 
             {/* Selección explícita: todos los filtrados o sólo algunos */}
             {pickMode && (
