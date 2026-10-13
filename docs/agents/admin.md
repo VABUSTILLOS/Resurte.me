@@ -622,6 +622,22 @@
   reordena. Los productos **sin categoría van al final** (única excepción
   declarada). Es idempotente, y la escritura se delega en `reorderWaCatalog`,
   que sigue siendo el único escritor de `position`.
+- **Borrar categoría: la consecuencia va ANTES del clic (WH9)**: cada fila de
+  "Categorías en este catálogo" tiene un ✕ que borra la categoría
+  (`DELETE /api/admin/categories/delete`, con body JSON como el de productos).
+  Lo que no se ve en el nombre: `products.category_id` es **`ON DELETE SET NULL`**
+  (00001), así que borrar una categoría **deja sus productos sin categoría** —
+  no se pierden ni se despublican, pero salen del agrupamiento y de las secciones
+  del mensaje de WhatsApp. Por eso el borrado es de **doble confirmación** y la
+  primera pulsación muestra el **número exacto** de productos que quedarán
+  huérfanos (contado sobre la lista de productos ya cargada: sin consulta nueva),
+  y con 0 lo dice también, para que borrar una categoría vacía no dé miedo. **No
+  se bloquea** cuando tiene productos —a diferencia de borrar un producto con
+  pedidos—: reasignar es recuperable y lo único realmente peligroso es el borrado
+  silencioso. El conteo queda en la respuesta, en el toast y en la bitácora
+  (`category_delete`). Ojo: `admin_audit_log.action` es `TEXT NOT NULL` **sin
+  CHECK**, así que una acción nueva se inserta sin migración; lo que sí hay que
+  ampliar es la unión de `src/lib/audit-log.ts` o no compila.
 - **Un alta sin confirmación visible crea duplicados (WH8)**: el alta de
   categoría **sí guardaba** (el log da `201` y la fila está en la base), pero
   desde la tarjeta "Catálogo de …" no producía **ningún cambio a la vista** —
