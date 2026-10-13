@@ -1825,12 +1825,31 @@ export default function AdminWhatsAppPage() {
               <div className="flex items-center gap-2">
                 <span className="text-xs text-[#B0B3B8]">{curated.length} productos</span>
                 {curated.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setSelectionMode((v) => !v)
-                      setSelectedIds(new Set())
-                    }}
-                    className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
+                  <>
+                    {/*
+                      "Seleccionar todos" SIEMPRE visible en la cabecera, no
+                      dentro de la barra de selección: escondido tras pulsar
+                      "Seleccionar" no se encuentra, y ese fue el reporte real
+                      ("no puedo seleccionar todos"). Un clic entra en modo
+                      selección con todo marcado.
+                    */}
+                    <button
+                      onClick={() => {
+                        setSelectionMode(true)
+                        selectAllCurated()
+                      }}
+                      disabled={busy}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#E7F8EE] text-[#0E7A0E] hover:bg-[#D5F1E0] disabled:opacity-50"
+                    >
+                      Seleccionar todos ({curated.length})
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectionMode((v) => !v)
+                        setSelectedIds(new Set())
+                        setArmBulkRemove(false)
+                      }}
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
                       selectionMode
                         ? "bg-[#0E7A0E] text-white"
                         : "bg-[#F5F3F0] text-[var(--text-secondary)] hover:bg-[#EDEAE4]"
@@ -1838,6 +1857,7 @@ export default function AdminWhatsAppPage() {
                   >
                     {selectionMode ? "Listo" : "Seleccionar"}
                   </button>
+                  </>
                 )}
               </div>
             </div>
