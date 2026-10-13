@@ -635,7 +635,12 @@
   de ids.
 - **Crear categoría desde el catálogo de WhatsApp (WH6)**: el botón "Ordenar
   por categoría" agrupa por categoría, así que poder crear una **ahí mismo**
-  evita salir a `/admin/productos` a media curación. Reusa
+  evita salir a `/admin/productos` a media curación. El alta se pide desde
+  **las dos tarjetas** del panel ("Catálogo de …" y "Agregar productos"),
+  porque cada una es el sitio natural según lo que se esté haciendo: revisar el
+  orden del catálogo o curar productos. Vive en un solo componente
+  (`src/app/admin/components/NewCategoryControl.tsx`) — duplicarlo sería
+  duplicar su validación, su estado de error y el endpoint. Reusa
   `POST /api/admin/categories/create` (slug único, invalidación de caché y
   auditoría ya resueltos), no añade endpoint. **Dos decisiones que importan**:
   (1) la categoría nueva **no** queda como filtro activo —una categoría recién
