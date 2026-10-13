@@ -622,6 +622,21 @@
   reordena. Los productos **sin categoría van al final** (única excepción
   declarada). Es idempotente, y la escritura se delega en `reorderWaCatalog`,
   que sigue siendo el único escritor de `position`.
+- **Crear categoría desde el catálogo de WhatsApp (WH6)**: el botón "Ordenar
+  por categoría" agrupa por categoría, así que poder crear una **ahí mismo**
+  evita salir a `/admin/productos` a media curación. Reusa
+  `POST /api/admin/categories/create` (slug único, invalidación de caché y
+  auditoría ya resueltos), no añade endpoint. **Dos decisiones que importan**:
+  (1) la categoría nueva **no** queda como filtro activo —una categoría recién
+  creada no tiene productos, y filtrar por ella vaciaría la lista justo cuando
+  el usuario necesita ver productos para moverlos dentro—; en su lugar queda
+  preseleccionada en el selector de "Mover a la categoría". (2) El movimiento
+  en lote usa `bulkPatch(ids, { category_id })`
+  (`src/lib/admin-product-bulk-run.ts`), el **único** camino de escritura masiva
+  del panel, así que hereda troceado, fallos por id y el encolado de sync. Y
+  `category_id` es del **producto**, no del catálogo de WhatsApp: cambia la
+  categoría en toda la tienda (listados, ficha y las secciones del mensaje), por
+  eso el control lo dice en vez de parecer una etiqueta de este panel.
 - **La papelera no se ofrece al catálogo público (WH2)**:
   `getAdminWhatsappCatalog` no filtraba `deleted_at`, así que un producto
   borrado aparecía en "Agregar productos" y se podía mandar a Meta. Ahora

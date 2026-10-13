@@ -22,6 +22,7 @@ import {
   splitSyncable,
 } from "@/lib/whatsapp-catalog-shared"
 import { parseSupplierOverview, type SupplierOverview } from "@/lib/admin-supplier-panel"
+import { bulkPatch } from "@/lib/admin-product-bulk-run"
 import {
   buildCatalogChatLink,
   buildCatalogShareText,
@@ -156,6 +157,14 @@ export default function AdminWhatsAppPage() {
 
   // Ordenar la curaduría por categoría.
   const [armOrder, setArmOrder] = useState(false)
+
+  // Crear categoría desde este panel (00221/WH6): el botón "Ordenar por
+  // categoría" agrupa por categoría, así que poder crear una aquí —y llenarla—
+  // evita salir a /admin/productos a media curación.
+  const [newCatOpen, setNewCatOpen] = useState(false)
+  const [newCatName, setNewCatName] = useState("")
+  const [creatingCat, setCreatingCat] = useState(false)
+  const [assignCategoryId, setAssignCategoryId] = useState("")
 
   // Agregar TODO un proveedor de un clic (sin pasar por el modo selección).
   const [armSupplierAdd, setArmSupplierAdd] = useState(false)
@@ -956,6 +965,72 @@ export default function AdminWhatsAppPage() {
         return result
       },
       (r) => `Reconciliado: ${r.added} agregados y ${r.removed} quitados del catálogo.`
+    )
+
+  /**
+   * Crea una categoría desde este panel, reusando el endpoint del modal de
+   * producto (slug único, invalidación de caché y auditoría ya resueltos).
+   *
+   * **No la deja como filtro activo a propósito**: una categoría recién creada
+   * no tiene productos, así que filtrar por ella vaciaría la lista justo cuando
+   * el usuario necesita ver productos para moverlos dentro. En su lugar queda
+   * preseleccionada en el selector de "mover a categoría", que es el paso
+   * siguiente natural.
+   */
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const name = newCatName.trim()
+    if (!name || creatingCat) return
+    setCreatingCat(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/categories/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al crear la categoría")
+      const created = data.category as AdminWhatsappCategory
+      setCategories((prev) =>
+        prev.some((c) => c.id === created.id) ? prev : [...prev, created]
+      )
+      setAssignCategoryId(String(created.id))
+      setNewCatName("")
+      setNewCatOpen(false)
+      setMessage({
+        ok: true,
+        text: `Categoría “${created.name}” creada. Selecciona productos y usa “Mover a la categoría” para llenarla.`,
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al crear la categoría")
+    } finally {
+      setCreatingCat(false)
+    }
+  }
+
+  /**
+   * Asigna los productos seleccionados a una categoría, en lote.
+   *
+   * OJO: `category_id` es del producto, no del catálogo de WhatsApp — cambia la
+   * categoría en toda la tienda (listados, ficha y las secciones del mensaje).
+   * Por eso el control lo dice, en vez de parecer una etiqueta de este panel.
+   */
+  const handleAssignCategory = () =>
+    run(
+      async () => {
+        const categoryId = Number(assignCategoryId)
+        if (!Number.isInteger(categoryId) || categoryId <= 0) {
+          throw new Error("Elige una categoría")
+        }
+        if (pickedIds.size === 0) return { updated: 0, failed: 0 }
+        const result = await bulkPatch([...pickedIds], { category_id: categoryId })
+        return { updated: result.updated.length, failed: result.failed.length }
+      },
+      (r) =>
+        r.failed > 0
+          ? `${r.updated} producto(s) movidos a la categoría; ${r.failed} no se pudieron.`
+          : `${r.updated} producto(s) movidos a la categoría.`
     )
 
   if (loading) {
@@ -2136,7 +2211,42 @@ export default function AdminWhatsAppPage() {
                   {getCategoryIcon(cat.icon ?? "", cat.slug)} {cat.name}
                 </button>
               ))}
+              <button
+                onClick={() => {
+                  setNewCatOpen((v) => !v)
+                  setNewCatName("")
+                }}
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-dashed ${
+                  newCatOpen
+                    ? "border-[#0E7A0E] text-[#0E7A0E] bg-[#E7F8EE]"
+                    : "border-[#0E7A0E]/40 text-[#0E7A0E] hover:bg-[#E7F8EE]"
+                }`}
+                aria-expanded={newCatOpen}
+              >
+                {newCatOpen ? "Cancelar" : "+ Nueva categoría"}
+              </button>
             </div>
+
+            {/* Crear categoría sin salir de la curación */}
+            {newCatOpen && (
+              <form onSubmit={handleCreateCategory} className="mb-3 flex gap-2">
+                <input
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="Nombre de la categoría…"
+                  aria-label="Nombre de la nueva categoría"
+                  autoFocus
+                  className="flex-1 min-w-0 px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+                />
+                <button
+                  type="submit"
+                  disabled={creatingCat || !newCatName.trim()}
+                  className="px-4 py-2 rounded-xl bg-[#0E7A0E] text-white text-xs font-bold hover:bg-[#0D720D] disabled:opacity-50"
+                >
+                  {creatingCat ? "Creando…" : "Crear"}
+                </button>
+              </form>
+            )}
 
             {/* Selección explícita: todos los filtrados o sólo algunos */}
             {pickMode && (
@@ -2169,6 +2279,40 @@ export default function AdminWhatsAppPage() {
                     acepta, así que no se pueden vender. Puedes marcarlos a mano si quieres.
                   </p>
                 )}
+
+                {/* Mover los seleccionados a una categoría (cambia el producto en
+                    toda la tienda, no sólo aquí: por eso se dice). */}
+                <div className="rounded-lg border border-[#E8E9EB] bg-white p-2 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label htmlFor="wa-assign-category" className="text-[11px] font-semibold text-[#242529]">
+                      Categoría
+                    </label>
+                    <select
+                      id="wa-assign-category"
+                      value={assignCategoryId}
+                      onChange={(e) => setAssignCategoryId(e.target.value)}
+                      className="flex-1 min-w-0 px-2 py-1.5 bg-white border border-[#E8E9EB] rounded-lg text-xs focus:outline-none focus:border-[#0E7A0E]"
+                    >
+                      <option value="">Elige una categoría…</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleAssignCategory}
+                      disabled={busy || pickedIds.size === 0 || !assignCategoryId}
+                      className="px-3 py-1.5 rounded-lg bg-[#E7F8EE] text-[#0E7A0E] text-xs font-bold hover:bg-[#D5F1E0] disabled:opacity-40"
+                    >
+                      Mover {pickedIds.size} a la categoría
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[#B0B3B8]">
+                    Cambia la categoría del producto en toda la tienda, no sólo en este catálogo.
+                  </p>
+                </div>
+
                 <button
                   onClick={handleAddPicked}
                   disabled={busy || pickedIds.size === 0}
