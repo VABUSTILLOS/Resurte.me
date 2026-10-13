@@ -21,7 +21,7 @@ import {
   broadcastWhatsAppSegment,
 } from "../actions"
 import { formatMoney } from "@/lib/foodos"
-import { orderedWhatsAppItems } from "@/lib/foodos-whatsapp"
+import { orderedWhatsAppItems } from "@/lib/foodos-whatsapp-shared"
 import type {
   FoodosCustomerSegment,
   FoodosMenuItem,

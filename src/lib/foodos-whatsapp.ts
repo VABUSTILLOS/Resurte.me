@@ -9,6 +9,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypt
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { WhatsAppConfig, WhatsAppProduct } from "@/lib/whatsapp"
 import type { FoodosMenuCategory, FoodosMenuItem } from "@/types/foodos"
+import { orderedWhatsAppItems } from "@/lib/foodos-whatsapp-shared"
 
 const GRAPH_BASE = "https://graph.facebook.com/v21.0"
 
@@ -81,20 +82,10 @@ export async function verifyWhatsAppConnection(
 
 // --- Builders de catálogo (selección + orden del restaurante) ---
 
-/**
- * Platillos visibles en WhatsApp, en el orden exacto de la curaduría
- * (whatsapp_position; los sin posición van al final por sort_order).
- */
-export function orderedWhatsAppItems(items: FoodosMenuItem[]): FoodosMenuItem[] {
-  return items
-    .filter((i) => i.whatsapp_visible && i.is_available)
-    .sort((a, b) => {
-      const pa = a.whatsapp_position ?? Number.MAX_SAFE_INTEGER
-      const pb = b.whatsapp_position ?? Number.MAX_SAFE_INTEGER
-      if (pa !== pb) return pa - pb
-      return a.sort_order - b.sort_order
-    })
-}
+// `orderedWhatsAppItems` vive en `foodos-whatsapp-shared` (puro): lo usa un
+// componente cliente y este módulo importa `node:crypto`. Se importa para uso
+// interno y se re-exporta para no romper a quien ya lo traía de aquí.
+export { orderedWhatsAppItems }
 
 /** Mapea la curaduría a productos de WhatsApp Commerce. */
 export function buildCatalogProducts(items: FoodosMenuItem[]): WhatsAppProduct[] {

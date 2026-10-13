@@ -20,7 +20,7 @@ import {
   countAddableSupplierProducts,
   isCatalogSyncable,
   splitSyncable,
-} from "@/lib/whatsapp-catalogs"
+} from "@/lib/whatsapp-catalog-shared"
 import { parseSupplierOverview, type SupplierOverview } from "@/lib/admin-supplier-panel"
 import {
   buildCatalogChatLink,

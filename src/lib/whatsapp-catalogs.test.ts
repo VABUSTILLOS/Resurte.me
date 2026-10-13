@@ -1,21 +1,23 @@
 import { describe, expect, it } from "vitest"
 import {
-  addableSupplierProductIds,
   buildAdminCatalogProducts,
   buildAdminProductListSections,
   buildCatalogSyncDiff,
   compareMetaVsStore,
   computeCatalogHealth,
-  countAddableSupplierProducts,
   groupCuratedByCategory,
-  isCatalogSyncable,
   orderCatalogItems,
-  splitSyncable,
   toWhatsAppProduct,
   validateCatalogProducts,
   type AdminProduct,
   type WaCatalogItemRow,
 } from "./whatsapp-catalogs"
+import {
+  addableSupplierProductIds,
+  countAddableSupplierProducts,
+  isCatalogSyncable,
+  splitSyncable,
+} from "./whatsapp-catalog-shared"
 
 const product = (partial: Partial<AdminProduct> = {}): AdminProduct => ({
   id: 1,

@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { CatalogProductInfo, WhatsAppConfig, WhatsAppProduct } from "@/lib/whatsapp"
 import { parseMetaPriceToMajor } from "@/lib/whatsapp"
 import { decryptToken } from "@/lib/foodos-whatsapp"
+import { isCatalogSyncable } from "@/lib/whatsapp-catalog-shared"
 
 export interface WaCatalog {
   id: string
@@ -46,20 +47,9 @@ export function orderCatalogItems<T extends { position: number }>(items: T[]): T
 }
 
 /**
- * ¿Se puede sincronizar a Meta? Misma regla que `toWhatsAppProduct`: un
- * producto sin precio (o en 0) no se puede publicar en el catálogo, así que
- * tampoco se puede vender.
- *
- * Vive aparte para que la UI pueda marcar los que no van a sincronizar con la
- * MISMA condición que los excluye del payload. Dos copias de `precio > 0` es
- * como se llega a ofrecer un producto que después desaparece en silencio.
+ * ¿Se puede sincronizar a Meta? La definición ÚNICA vive en
+ * `whatsapp-catalog-shared` (módulo puro, apto para el cliente).
  */
-export function isCatalogSyncable(p: {
-  price: number | null
-  sale_price: number | null
-}): boolean {
-  return (p.sale_price ?? p.price ?? 0) > 0
-}
 
 /** Mapea un producto admin a producto WhatsApp (null si precio inválido). */
 export function toWhatsAppProduct(
@@ -200,63 +190,6 @@ export function buildAdminProductListSections(
     title: title.slice(0, 24),
     product_items,
   }))
-}
-
-/**
- * Separa una lista de productos en los que se pueden publicar y los que no.
- *
- * La UI declara el recorte con este número ("N sin precio quedan fuera") y el
- * sync excluye con la MISMA regla, así que el conteo que ve el admin no puede
- * discrepar de lo que de verdad se va a subir a Meta.
- */
-export function splitSyncable<T extends { price: number | null; sale_price: number | null }>(
-  products: T[]
-): { syncable: T[]; unsyncable: T[] } {
-  const syncable: T[] = []
-  const unsyncable: T[] = []
-  for (const p of products) {
-    if (isCatalogSyncable(p)) syncable.push(p)
-    else unsyncable.push(p)
-  }
-  return { syncable, unsyncable }
-}
-
-/**
- * Ids de un proveedor que se pueden agregar todavía a la curaduría.
- *
- * Es la definición ÚNICA de "agregable": `countAddableSupplierProducts` cuenta
- * sobre este mismo resultado, para que el número del chip y lo que de verdad se
- * agrega no puedan divergir.
- *
- * `knownIds` son los productos que la lista de "Agregar" puede ofrecer: incluir
- * uno que no está ahí sería prometer un producto que el botón no va a agregar.
- * Los ids repetidos cuentan una sola vez — `product_suppliers` admite varias
- * filas del mismo producto (distinto SKU) y el conteo no debe inflarse.
- */
-export function addableSupplierProductIds(
-  productIds: readonly number[],
-  curatedIds: ReadonlySet<number>,
-  knownIds: ReadonlySet<number>
-): number[] {
-  const seen = new Set<number>()
-  const out: number[] = []
-  for (const id of productIds) {
-    if (seen.has(id)) continue
-    seen.add(id)
-    if (curatedIds.has(id)) continue
-    if (!knownIds.has(id)) continue
-    out.push(id)
-  }
-  return out
-}
-
-/** Cuántos productos de un proveedor se pueden agregar todavía (ver arriba). */
-export function countAddableSupplierProducts(
-  productIds: readonly number[],
-  curatedIds: ReadonlySet<number>,
-  knownIds: ReadonlySet<number>
-): number {
-  return addableSupplierProductIds(productIds, curatedIds, knownIds).length
 }
 
 /**
