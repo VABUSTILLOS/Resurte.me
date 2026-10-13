@@ -15,7 +15,12 @@ import {
 } from "lucide-react"
 import { getCategoryIcon } from "@/lib/utils"
 import { resolveDefaultCatalog } from "@/lib/whatsapp-default-catalog"
-import { isCatalogSyncable, splitSyncable, countAddableSupplierProducts } from "@/lib/whatsapp-catalogs"
+import {
+  addableSupplierProductIds,
+  countAddableSupplierProducts,
+  isCatalogSyncable,
+  splitSyncable,
+} from "@/lib/whatsapp-catalogs"
 import { parseSupplierOverview, type SupplierOverview } from "@/lib/admin-supplier-panel"
 import {
   buildCatalogChatLink,
@@ -152,6 +157,12 @@ export default function AdminWhatsAppPage() {
   // Ordenar la curaduría por categoría.
   const [armOrder, setArmOrder] = useState(false)
 
+  // Agregar TODO un proveedor de un clic (sin pasar por el modo selección).
+  const [armSupplierAdd, setArmSupplierAdd] = useState(false)
+  // Si el resumen de proveedores no llega, se dice: un control que desaparece
+  // en silencio parece una función que no existe.
+  const [suppliersError, setSuppliersError] = useState(false)
+
   // WC8/WC9 — credenciales del catálogo y prueba de conexión.
   const [showCreds, setShowCreds] = useState(false)
   const [credsPhoneId, setCredsPhoneId] = useState("")
@@ -247,10 +258,17 @@ export default function AdminWhatsAppPage() {
     ;(async () => {
       try {
         const res = await fetch("/api/admin/suppliers/overview")
-        const data = res.ok ? await res.json().catch(() => null) : null
-        if (!cancelled) setSuppliers(parseSupplierOverview(data))
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json().catch(() => null)
+        if (!cancelled) {
+          setSuppliers(parseSupplierOverview(data))
+          setSuppliersError(false)
+        }
       } catch {
-        if (!cancelled) setSuppliers([])
+        if (!cancelled) {
+          setSuppliers([])
+          setSuppliersError(true)
+        }
       }
     })()
     return () => {
@@ -330,6 +348,30 @@ export default function AdminWhatsAppPage() {
     [suppliers, curatedIds, productById, supplierFilter]
   )
 
+  /**
+   * Todo lo que falta por agregar del proveedor elegido, sin importar los
+   * filtros de categoría ni de búsqueda: el botón dice "todo el proveedor" y
+   * eso es lo que hace. El número del botón lo declara.
+   */
+  const supplierAddable = useMemo(() => {
+    if (supplierFilter === null) return []
+    const supplier = suppliers.find((s) => s.id === supplierFilter)
+    if (!supplier) return []
+    return addableSupplierProductIds(supplier.productIds, curatedIds, new Set(productById.keys()))
+  }, [supplierFilter, suppliers, curatedIds, productById])
+
+  /** De esos, los que Meta aceptaría. Los sin precio se declaran aparte. */
+  const supplierAddableSyncable = useMemo(
+    () =>
+      supplierAddable.filter((id) => {
+        const p = productById.get(id)
+        return p ? isCatalogSyncable(p) : false
+      }),
+    [supplierAddable, productById]
+  )
+
+  const supplierUnsyncableCount = supplierAddable.length - supplierAddableSyncable.length
+
   async function run<T>(fn: () => Promise<T>, okText?: (r: T) => string) {
     setBusy(true)
     setMessage(null)
@@ -394,6 +436,32 @@ export default function AdminWhatsAppPage() {
     setSupplierFilter(supplierId)
     setPickedIds(new Set())
     setArmPickAdd(false)
+    setArmSupplierAdd(false)
+  }
+
+  /**
+   * Agrega TODO el proveedor elegido de un clic, sin pasar por el modo
+   * selección. Ignora los filtros de categoría y búsqueda a propósito: el botón
+   * promete "todo el proveedor" y el número que muestra es el de esa promesa.
+   */
+  const handleAddWholeSupplier = () => {
+    if (supplierAddableSyncable.length === 0) return
+    if (supplierAddableSyncable.length >= PICK_CONFIRM_FROM && !armSupplierAdd) {
+      setArmSupplierAdd(true)
+      return
+    }
+    setArmSupplierAdd(false)
+    run(
+      async () => {
+        if (!selectedCatalog) return 0
+        return bulkAddWaCatalogProducts(selectedCatalog.id, supplierAddableSyncable)
+      },
+      (n) =>
+        `${n} productos del proveedor agregados a la curaduría de ${selectedCatalog?.name}.` +
+        (supplierUnsyncableCount > 0
+          ? ` ${supplierUnsyncableCount} quedaron fuera por no tener precio.`
+          : "")
+    )
   }
 
   // Ordena la curaduría agrupándola por categoría (doble confirmación: reescribe
@@ -2012,11 +2080,44 @@ export default function AdminWhatsAppPage() {
                   ))}
                 </div>
                 {supplierFilter !== null && (
-                  <p className="text-[11px] text-[#B0B3B8] mt-1.5">
-                    Es una acción de una sola vez: un producto nuevo del proveedor no entra solo.
-                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    <button
+                      onClick={handleAddWholeSupplier}
+                      disabled={busy || supplierAddableSyncable.length === 0}
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-60 ${
+                        armSupplierAdd
+                          ? "bg-[#0E7A0E] text-white hover:bg-[#0D720D]"
+                          : "bg-[#E7F8EE] text-[#0E7A0E] hover:bg-[#D5F1E0]"
+                      }`}
+                    >
+                      {supplierAddableSyncable.length === 0
+                        ? "Nada que agregar de este proveedor"
+                        : armSupplierAdd
+                          ? `¿Confirmar? Agregar ${supplierAddableSyncable.length} productos del proveedor`
+                          : `Agregar todo el proveedor (${supplierAddableSyncable.length})`}
+                    </button>
+                    {supplierUnsyncableCount > 0 && (
+                      <p className="text-[11px] text-[var(--text-secondary)]">
+                        {supplierUnsyncableCount} sin precio quedan fuera: Meta no los acepta. Agrégalos
+                        a mano desde la lista si quieres.
+                      </p>
+                    )}
+                    <p className="text-[11px] text-[#B0B3B8]">
+                      Es una acción de una sola vez: un producto nuevo del proveedor no entra solo.
+                      Para elegir sólo algunos, usa “Seleccionar”.
+                    </p>
+                  </div>
                 )}
               </div>
+            )}
+
+            {suppliersError && (
+              <p className="flex items-start gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5 mb-3">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                No se pudieron cargar los proveedores. Puede faltar el permiso de Catálogo
+                (“Productos, categorías, precios, imágenes y proveedores”). Puedes seguir agregando
+                producto por producto.
+              </p>
             )}
 
             <div className="flex gap-2 overflow-x-auto pb-2 mb-3">

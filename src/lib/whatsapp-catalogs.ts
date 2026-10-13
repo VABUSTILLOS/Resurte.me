@@ -222,28 +222,41 @@ export function splitSyncable<T extends { price: number | null; sale_price: numb
 }
 
 /**
- * Cuántos productos de un proveedor se pueden agregar todavía a la curaduría.
+ * Ids de un proveedor que se pueden agregar todavía a la curaduría.
  *
- * `knownIds` son los productos que la lista de "Agregar" puede ofrecer: contar
+ * Es la definición ÚNICA de "agregable": `countAddableSupplierProducts` cuenta
+ * sobre este mismo resultado, para que el número del chip y lo que de verdad se
+ * agrega no puedan divergir.
+ *
+ * `knownIds` son los productos que la lista de "Agregar" puede ofrecer: incluir
  * uno que no está ahí sería prometer un producto que el botón no va a agregar.
  * Los ids repetidos cuentan una sola vez — `product_suppliers` admite varias
  * filas del mismo producto (distinto SKU) y el conteo no debe inflarse.
  */
-export function countAddableSupplierProducts(
+export function addableSupplierProductIds(
   productIds: readonly number[],
   curatedIds: ReadonlySet<number>,
   knownIds: ReadonlySet<number>
-): number {
+): number[] {
   const seen = new Set<number>()
-  let count = 0
+  const out: number[] = []
   for (const id of productIds) {
     if (seen.has(id)) continue
     seen.add(id)
     if (curatedIds.has(id)) continue
     if (!knownIds.has(id)) continue
-    count++
+    out.push(id)
   }
-  return count
+  return out
+}
+
+/** Cuántos productos de un proveedor se pueden agregar todavía (ver arriba). */
+export function countAddableSupplierProducts(
+  productIds: readonly number[],
+  curatedIds: ReadonlySet<number>,
+  knownIds: ReadonlySet<number>
+): number {
+  return addableSupplierProductIds(productIds, curatedIds, knownIds).length
 }
 
 /**

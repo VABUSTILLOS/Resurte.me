@@ -4560,11 +4560,16 @@ async function setWaProductFlags(
   value: boolean
 ): Promise<void> {
   if (productIds.length === 0) return
-  const { error } = await supabase
-    .from("products")
-    .update({ show_in_whatsapp: value })
-    .in("id", productIds)
-  if (error) throw new Error(error.message)
+  // Troceado: `.in()` viaja en la URL del request y un proveedor puede traer
+  // cientos de productos ("agregar todo el proveedor" es justo el caso).
+  const { chunkIds } = await import("@/lib/admin-product-list")
+  for (const part of chunkIds(productIds)) {
+    const { error } = await supabase
+      .from("products")
+      .update({ show_in_whatsapp: value })
+      .in("id", part)
+    if (error) throw new Error(error.message)
+  }
 }
 
 /**

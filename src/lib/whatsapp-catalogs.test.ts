@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  addableSupplierProductIds,
   buildAdminCatalogProducts,
   buildAdminProductListSections,
   buildCatalogSyncDiff,
@@ -94,6 +95,36 @@ describe("splitSyncable", () => {
 
   it("una lista vacía devuelve los dos grupos vacíos", () => {
     expect(splitSyncable([])).toEqual({ syncable: [], unsyncable: [] })
+  })
+})
+
+describe("addableSupplierProductIds", () => {
+  it("devuelve los ids que faltan por curar, en orden", () => {
+    expect(addableSupplierProductIds([1, 2, 3], new Set([3]), new Set([1, 2, 3]))).toEqual([1, 2])
+  })
+
+  it("omite los que la lista no puede ofrecer", () => {
+    expect(addableSupplierProductIds([1, 9], new Set(), new Set([1]))).toEqual([1])
+  })
+
+  it("deduplica: varias filas del mismo producto (distinto SKU) cuentan una vez", () => {
+    expect(addableSupplierProductIds([1, 1, 2], new Set(), new Set([1, 2]))).toEqual([1, 2])
+  })
+
+  it("sin nada pendiente devuelve vacío", () => {
+    expect(addableSupplierProductIds([1, 2], new Set([1, 2]), new Set([1, 2]))).toEqual([])
+  })
+
+  it("el conteo es exactamente la longitud de esta lista", () => {
+    // El número del chip y el del botón "Agregar todo el proveedor" tienen que
+    // salir de la misma definición, o el botón promete algo distinto de lo que
+    // el chip anuncia.
+    const productIds = [5, 3, 5, 8, 99]
+    const curated = new Set([3])
+    const known = new Set([5, 3, 8])
+    expect(countAddableSupplierProducts(productIds, curated, known)).toBe(
+      addableSupplierProductIds(productIds, curated, known).length
+    )
   })
 })
 

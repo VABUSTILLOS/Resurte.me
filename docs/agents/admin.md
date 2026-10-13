@@ -591,8 +591,19 @@
   `/admin/productos`, que existe justo para **no** mandar
   `product_suppliers.cost`—, así que **no hay permiso nuevo y no se amplía
   superficie**: la ruta ya exige `productos`, y un admin sin él recibe 403,
-  `parseSupplierOverview(null)` ⇒ `[]` y el control no se pinta. La escritura
-  sigue siendo `bulkAddWaCatalogProducts` (curaduría + marca + cola). La
+  `parseSupplierOverview(null)` ⇒ `[]`. **Ese silencio era el defecto**: un
+  apartado que desaparece parece una función que no existe, así que el fallo
+  ahora se **declara** con un aviso ámbar ("puede faltar el permiso de
+  Catálogo"). Al elegir un proveedor hay **dos caminos**, y el orden importa:
+  **"Agregar todo el proveedor (N)" de un clic** —ignora los filtros de
+  categoría y búsqueda a propósito, porque promete el proveedor entero y el
+  número lo declara— y el modo selección para *sólo algunos*. Los dos comparten
+  `addableSupplierProductIds`, la definición ÚNICA de "agregable"
+  (`countAddableSupplierProducts` es sólo su `.length`), para que el número del
+  chip y lo que de verdad se agrega no puedan divergir. La escritura de la marca
+  va troceada con `chunkIds` porque `.in()` viaja en la URL y un proveedor puede
+  traer cientos. La escritura sigue siendo `bulkAddWaCatalogProducts` (curaduría
+  + marca + cola). La
   selección es **explícita**: casillas por fila + "Seleccionar todos los
   filtrados (N)" + "Agregar N", con el número exacto en el botón y doble
   confirmación a partir de 50. Se retiró el "Agregar toda la vista" con tope de
