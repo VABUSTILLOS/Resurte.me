@@ -622,6 +622,17 @@
   reordena. Los productos **sin categoría van al final** (única excepción
   declarada). Es idempotente, y la escritura se delega en `reorderWaCatalog`,
   que sigue siendo el único escritor de `position`.
+- **"Seleccionar todos" en la curaduría (WH7)**: la tarjeta "Catálogo de …"
+  tenía modo selección pero sólo llegaba a marcar producto por producto, así que
+  no había forma de tomar el catálogo entero. Ahora trae "Seleccionar todos (N)"
+  y "Limpiar", igual que la tarjeta de "Agregar productos". **Dos consecuencias
+  que hay que respetar**: (1) con un clic se llega al catálogo entero, así que
+  un lote de **50+ pide confirmación** antes de quitar (antes, alcanzar ese
+  tamaño a mano era tedioso y no hacía falta) y el aviso dice que salen del
+  catálogo y quedan **fuera de stock en Meta — reversible** al volver a
+  agregarlos; (2) `removeFromWaCuration` trocea el `DELETE` con `chunkIds`,
+  porque el filtro `product_id=in.(...)` viaja en la URL y "todos" son cientos
+  de ids.
 - **Crear categoría desde el catálogo de WhatsApp (WH6)**: el botón "Ordenar
   por categoría" agrupa por categoría, así que poder crear una **ahí mismo**
   evita salir a `/admin/productos` a media curación. Reusa
