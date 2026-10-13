@@ -158,6 +158,10 @@ export default function AdminWhatsAppPage() {
   // Ordenar la curaduría por categoría.
   const [armOrder, setArmOrder] = useState(false)
 
+  // Quitar en lote desde la curaduría: con "Seleccionar todos" se puede llegar
+  // al catálogo entero de un clic, así que un lote grande pide confirmación.
+  const [armBulkRemove, setArmBulkRemove] = useState(false)
+
   // Crear categoría desde este panel (00221/WH6): el botón "Ordenar por
   // categoría" agrupa por categoría, así que poder crear una aquí —y llenarla—
   // evita salir a /admin/productos a media curación.
@@ -491,7 +495,15 @@ export default function AdminWhatsAppPage() {
   }
 
   // WC7 — quitar los seleccionados de la curaduría.
-  const handleBulkRemove = () =>
+  const handleBulkRemove = () => {
+    if (selectedIds.size === 0) return
+    // Un lote grande (el catálogo entero, con "Seleccionar todos") confirma
+    // antes: sale del catálogo que ve el cliente.
+    if (selectedIds.size >= PICK_CONFIRM_FROM && !armBulkRemove) {
+      setArmBulkRemove(true)
+      return
+    }
+    setArmBulkRemove(false)
     run(
       async () => {
         if (!selectedCatalog) return 0
@@ -503,6 +515,18 @@ export default function AdminWhatsAppPage() {
       },
       (n) => `${n} productos quitados de la curaduría.`
     )
+  }
+
+  /** Marca toda la curaduría: el atajo para vaciar o revisar el catálogo entero. */
+  const selectAllCurated = () => {
+    setArmBulkRemove(false)
+    setSelectedIds(new Set(curated.map((i) => i.product_id)))
+  }
+
+  const clearCuratedSelection = () => {
+    setArmBulkRemove(false)
+    setSelectedIds(new Set())
+  }
 
   const toggleSelected = (productId: number) =>
     setSelectedIds((prev) => {
@@ -1923,23 +1947,55 @@ export default function AdminWhatsAppPage() {
 
             {/* Barra de acciones de selección múltiple (WC7) */}
             {selectionMode && (
-              <div className="mt-3 flex items-center gap-2">
-                <button
-                  onClick={handleBulkRemove}
-                  disabled={busy || selectedIds.size === 0}
-                  className="px-4 py-2 rounded-full bg-red-600 text-white text-xs font-bold hover:bg-red-700 disabled:opacity-40"
-                >
-                  Quitar {selectedIds.size} seleccionado(s)
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectionMode(false)
-                    setSelectedIds(new Set())
-                  }}
-                  className="px-4 py-2 rounded-full text-xs font-semibold text-[var(--text-secondary)] hover:bg-[#F7F5F0]"
-                >
-                  Cancelar
-                </button>
+              <div className="mt-3 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={selectAllCurated}
+                    disabled={busy || curated.length === 0}
+                    className="px-3 py-1.5 rounded-lg bg-[#E7F8EE] text-[#0E7A0E] text-xs font-bold hover:bg-[#D5F1E0] disabled:opacity-40"
+                  >
+                    Seleccionar todos ({curated.length})
+                  </button>
+                  <button
+                    onClick={clearCuratedSelection}
+                    disabled={busy || selectedIds.size === 0}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-secondary)] hover:bg-[#EDEAE4] disabled:opacity-40"
+                  >
+                    Limpiar
+                  </button>
+                  <span className="text-xs font-semibold text-[#242529]">
+                    {selectedIds.size} seleccionado(s)
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleBulkRemove}
+                    disabled={busy || selectedIds.size === 0}
+                    className={`px-4 py-2 rounded-full text-white text-xs font-bold disabled:opacity-40 ${
+                      armBulkRemove ? "bg-red-700 hover:bg-red-800" : "bg-red-600 hover:bg-red-700"
+                    }`}
+                  >
+                    {armBulkRemove
+                      ? `¿Confirmar? Quitar ${selectedIds.size} del catálogo`
+                      : `Quitar ${selectedIds.size} seleccionado(s)`}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectionMode(false)
+                      setSelectedIds(new Set())
+                      setArmBulkRemove(false)
+                    }}
+                    className="px-4 py-2 rounded-full text-xs font-semibold text-[var(--text-secondary)] hover:bg-[#F7F5F0]"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+                {armBulkRemove && (
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    Salen de la curaduría y quedan fuera de stock en Meta (reversible: volver a
+                    agregarlos los reactiva).
+                  </p>
+                )}
               </div>
             )}
 

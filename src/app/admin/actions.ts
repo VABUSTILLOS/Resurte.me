@@ -4542,12 +4542,17 @@ async function removeFromWaCuration(
 ): Promise<void> {
   if (productIds.length === 0) return
 
-  const { error } = await supabase
-    .from("whatsapp_catalog_items")
-    .delete()
-    .eq("catalog_id", catalogId)
-    .in("product_id", productIds)
-  if (error) throw new Error(error.message)
+  // Troceado: con "Seleccionar todos" esto recibe el catálogo entero, y el
+  // filtro `product_id=in.(...)` viaja en la URL del request.
+  const { chunkIds } = await import("@/lib/admin-product-list")
+  for (const part of chunkIds(productIds)) {
+    const { error } = await supabase
+      .from("whatsapp_catalog_items")
+      .delete()
+      .eq("catalog_id", catalogId)
+      .in("product_id", part)
+    if (error) throw new Error(error.message)
+  }
 
   const { enqueueWaSyncForCatalog } = await import("@/lib/whatsapp-sync-queue")
   await enqueueWaSyncForCatalog(supabase, catalogId, productIds, "hide", reason)
