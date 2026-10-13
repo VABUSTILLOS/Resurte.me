@@ -169,6 +169,11 @@ export default function AdminWhatsAppPage() {
   // Da confirmación visible en la tarjeta del catálogo (ver handleCategoryCreated).
   const [lastCreatedCategoryId, setLastCreatedCategoryId] = useState<number | null>(null)
 
+  // Borrado de categoría: doble confirmación, y la primera pulsación muestra la
+  // consecuencia exacta (cuántos productos quedan sin categoría).
+  const [armDeleteCategoryId, setArmDeleteCategoryId] = useState<number | null>(null)
+  const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(null)
+
   // Agregar TODO un proveedor de un clic (sin pasar por el modo selección).
   const [armSupplierAdd, setArmSupplierAdd] = useState(false)
   // Si el resumen de proveedores no llega, se dice: un control que desaparece
@@ -383,6 +388,57 @@ export default function AdminWhatsAppPage() {
   )
 
   const supplierUnsyncableCount = supplierAddable.length - supplierAddableSyncable.length
+
+  /**
+   * Cuántos productos tiene cada categoría **en toda la tienda**.
+   *
+   * Es el número que importa al borrar: `products.category_id` es
+   * `ON DELETE SET NULL`, así que se van sin categoría TODOS los productos de
+   * la categoría, no sólo los que están en este catálogo. Se cuenta con la
+   * lista de productos que ya está cargada — sin consulta nueva.
+   */
+  const totalProductsByCategory = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const p of products) {
+      if (p.category_id == null) continue
+      counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1)
+    }
+    return counts
+  }, [products])
+
+  /**
+   * Borra una categoría. Doble confirmación: la primera pulsación sólo arma y
+   * muestra cuántos productos quedarían sin categoría; la segunda borra.
+   */
+  const handleDeleteCategory = (categoryId: number) => {
+    if (armDeleteCategoryId !== categoryId) {
+      setArmDeleteCategoryId(categoryId)
+      return
+    }
+    setArmDeleteCategoryId(null)
+    setDeletingCategoryId(categoryId)
+    run(
+      async () => {
+        const res = await fetch("/api/admin/categories/delete", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ categoryId }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error ?? "Error al borrar la categoría")
+        // `run` recarga el listado, pero se limpia el estado local para que el
+        // filtro y la marca de "recién creada" no apunten a algo que ya no existe.
+        setCategories((prev) => prev.filter((c) => c.id !== categoryId))
+        if (selectedCategory === categoryId) setSelectedCategory(null)
+        if (lastCreatedCategoryId === categoryId) setLastCreatedCategoryId(null)
+        return data as { name: string; orphaned: number }
+      },
+      (r) =>
+        r.orphaned > 0
+          ? `Categoría “${r.name}” borrada. ${r.orphaned} producto(s) quedaron sin categoría.`
+          : `Categoría “${r.name}” borrada.`
+    ).finally(() => setDeletingCategoryId(null))
+  }
 
   /**
    * Cómo está repartido el catálogo por categoría, para la tarjeta del catálogo.
@@ -1900,20 +1956,77 @@ export default function AdminWhatsAppPage() {
                 <p className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-1.5">
                   Categorías en este catálogo
                 </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {curatedCategoryTally.map((c) => (
-                    <span
-                      key={c.id}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs ${
-                        c.id === lastCreatedCategoryId
-                          ? "bg-[#E7F8EE] text-[#0E7A0E] font-bold ring-1 ring-[#0E7A0E]/30"
-                          : "bg-[#F5F3F0] text-[var(--text-secondary)]"
-                      }`}
-                    >
-                      {c.name}
-                      <span className="text-[10px] font-bold opacity-70">{c.count}</span>
-                    </span>
-                  ))}
+                <div className="space-y-1">
+                  {curatedCategoryTally.map((c) => {
+                    const total = totalProductsByCategory.get(c.id) ?? 0
+                    const armed = armDeleteCategoryId === c.id
+                    return (
+                      <div
+                        key={c.id}
+                        className={`rounded-lg border px-2.5 py-1.5 ${
+                          c.id === lastCreatedCategoryId
+                            ? "border-[#0E7A0E]/30 bg-[#E7F8EE]"
+                            : "border-[#F0F1F2] bg-[#FAFAF9]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="flex-1 min-w-0 text-xs text-[#242529] truncate">
+                            {c.name}
+                          </span>
+                          <span
+                            className="text-[10px] font-bold text-[var(--text-secondary)]"
+                            title={`${c.count} en este catálogo · ${total} en total`}
+                          >
+                            {c.count}
+                          </span>
+                          {armed ? (
+                            <button
+                              onClick={() => setArmDeleteCategoryId(null)}
+                              className="px-2 py-0.5 rounded text-[11px] font-semibold text-[var(--text-secondary)] hover:bg-[#EDEAE4]"
+                            >
+                              No
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setArmDeleteCategoryId(c.id)}
+                              disabled={busy || deletingCategoryId === c.id}
+                              aria-label={`Borrar la categoría ${c.name}`}
+                              title={`Borrar “${c.name}”`}
+                              className="p-1 text-[#B0B3B8] hover:text-red-700 disabled:opacity-40"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+
+                        {/*
+                          La consecuencia va ANTES de borrar, con el número
+                          exacto: `products.category_id` es ON DELETE SET NULL,
+                          así que los productos no se pierden pero quedan SIN
+                          categoría. Ocultarlo convertiría un borrado de 200
+                          productos en una sorpresa.
+                        */}
+                        {armed && (
+                          <div className="mt-1.5 space-y-1.5">
+                            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                              {total > 0
+                                ? `${total} producto(s) quedarán sin categoría (no se borran ni se despublican).`
+                                : "No tiene productos: se puede borrar sin consecuencias."}
+                            </p>
+                            <button
+                              onClick={() => handleDeleteCategory(c.id)}
+                              disabled={busy || deletingCategoryId === c.id}
+                              className="w-full px-3 py-1.5 rounded-lg bg-red-600 text-white text-[11px] font-bold hover:bg-red-700 disabled:opacity-50"
+                            >
+                              {deletingCategoryId === c.id
+                                ? "Borrando…"
+                                : `¿Confirmar? Borrar “${c.name}”`}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
                 {lastCreatedCategoryId !== null &&
                   curatedCategoryTally.some((c) => c.id === lastCreatedCategoryId && c.count === 0) && (
