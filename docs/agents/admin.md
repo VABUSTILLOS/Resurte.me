@@ -560,6 +560,61 @@
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
   sync registra un run en `whatsapp_sync_runs`. Los productos de Meta viven
   bajo el `catalog_id` (`items_batch`), no bajo la WABA.
+- **Catálogo principal (WG1-WG5, `00221`)**: `products.show_in_whatsapp` ⇔ el
+  producto es visible en el catálogo marcado con `whatsapp_catalogs.is_default`
+  (uno solo, garantizado por índice único parcial). El puente es un trigger
+  (`trg_products_wa_default_membership`) y es **asimétrico a propósito**: cubre
+  las ~7 rutas de escritura de productos (update, bulk, create, duplicate,
+  merge, delete, city-availability) y las altas por SQL, mientras que las 3
+  acciones de curaduría escriben la marca desde TypeScript. Un puente
+  bidireccional sería un trigger recursivo. Sin catálogo principal el trigger
+  es **no-op**: una escritura de producto nunca falla por esto. La
+  reconciliación es **explícita** (botón "Reconciliar marcas" con
+  previsualización): la migración no reescribe la marca de ningún producto.
+  Dos direcciones distintas, y no son intercambiables: "Reconciliar marcas"
+  manda la TIENDA (lo marcado entra a la curaduría, lo no marcado sale) y
+  "Marcar como principal" manda la CURADURÍA (las marcas se re-derivan de la
+  curaduría del nuevo principal) — al revés se perdería el orden elegido.
+  **Cuál escribe qué no es un detalle**: el trigger sólo reacciona a CAMBIOS de
+  la marca, así que "Reconciliar marcas" escribe la CURADURÍA directo (en un
+  diff las marcas ya tienen el valor correcto en los dos lados, y confiar en el
+  trigger dejaría el catálogo igual) mientras "Marcar como principal" escribe
+  las MARCAS (ahí sí cambian de valor). Lo mismo vale para quitar de la
+  curaduría: el `hide` se encola **siempre**, no cuando el trigger lo haría,
+  porque al quitar la fila la marca ya vale `false` y no hay cambio que lo
+  dispare. `whatsapp_sync_queue.kind` distingue `upsert` (payload completo) de
+  `hide` (`out of stock` en Meta, **reversible**: desmarcar nunca borra, y el
+  borrado sigue siendo una confirmación explícita del sync).
+- **Curaduría por proveedor y orden por categoría (WH1-WH5)**: los chips de
+  proveedor de la tarjeta "Agregar productos" los alimenta
+  `GET /api/admin/suppliers/overview` —la misma ruta del panel de Proveedores de
+  `/admin/productos`, que existe justo para **no** mandar
+  `product_suppliers.cost`—, así que **no hay permiso nuevo y no se amplía
+  superficie**: la ruta ya exige `productos`, y un admin sin él recibe 403,
+  `parseSupplierOverview(null)` ⇒ `[]` y el control no se pinta. La escritura
+  sigue siendo `bulkAddWaCatalogProducts` (curaduría + marca + cola). La
+  selección es **explícita**: casillas por fila + "Seleccionar todos los
+  filtrados (N)" + "Agregar N", con el número exacto en el botón y doble
+  confirmación a partir de 50. Se retiró el "Agregar toda la vista" con tope de
+  50: un recorte que no se declara es exactamente lo que el repo evita. Los
+  productos sin precio (`isCatalogSyncable`, la **misma** regla que usa
+  `toWhatsAppProduct`, para no ofrecer uno que después desaparece en silencio) se
+  marcan, quedan fuera de "seleccionar todos" y se declaran en la confirmación
+  (`splitSyncable` hace el reparto y `countAddableSupplierProducts` cuenta lo
+  agregable del chip —sin inflarse con los ids repetidos que admite
+  `product_suppliers`—). Es una acción de **una sola vez**, como el panel de
+  Proveedores: un producto nuevo del proveedor no entra solo.
+- **`groupCuratedByCategory` (WH3)**: el botón "Ordenar por categoría" agrupa la
+  curaduría **en el orden de primera aparición de cada categoría** —la tabla
+  `categories` no tiene columna de orden (00001), así que cualquier otro orden
+  sería inventado— y **conserva el orden interno de cada grupo**: junta, no
+  reordena. Los productos **sin categoría van al final** (única excepción
+  declarada). Es idempotente, y la escritura se delega en `reorderWaCatalog`,
+  que sigue siendo el único escritor de `position`.
+- **La papelera no se ofrece al catálogo público (WH2)**:
+  `getAdminWhatsappCatalog` no filtraba `deleted_at`, así que un producto
+  borrado aparecía en "Agregar productos" y se podía mandar a Meta. Ahora
+  filtra, con degradación si `00099` no está aplicada.
 - Observabilidad del sync (WB1-WB5): los batches asíncronos de Meta se
   resuelven vía handles → `whatsapp_sync_items` (ok/error por producto); los
   errores se reintentan individualmente desde el historial; runs `running`

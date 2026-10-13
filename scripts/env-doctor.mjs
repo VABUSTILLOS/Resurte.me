@@ -186,6 +186,32 @@ if (valueOf("FOODOS_WA_ENCRYPTION_KEY") === "" && valueOf("SUPABASE_SERVICE_ROLE
   )
 }
 
+// --- WhatsApp Cloud API (catálogo de la plataforma) --------------------------
+// Las cinco van juntas: con tres, /admin/whatsapp deja de sincronizar con un
+// error de Meta ("token inválido") que no dice cuál falta.
+const WA_CLOUD = [
+  "WHATSAPP_ACCESS_TOKEN",
+  "WHATSAPP_PHONE_NUMBER_ID",
+  "WHATSAPP_WABA_ID",
+  "WHATSAPP_WEBHOOK_VERIFY_TOKEN",
+  "WHATSAPP_APP_SECRET",
+]
+const waPresent = WA_CLOUD.filter((name) => states.get(name) === "ok")
+if (waPresent.length > 0 && waPresent.length < WA_CLOUD.length) {
+  const waMissing = WA_CLOUD.filter((name) => states.get(name) !== "ok")
+  warnings.push(
+    `WhatsApp Cloud API a medias: faltan ${waMissing.join(", ")}. Sin token no hay ` +
+      `sync de catálogo, sin APP_SECRET el webhook responde 503 y sin verify token ` +
+      `Meta no deja configurarlo.`
+  )
+}
+if (valueOf("WHATSAPP_CATALOG_ID") === "" && waPresent.length === WA_CLOUD.length) {
+  notes.push(
+    "WHATSAPP_CATALOG_ID vacía: el sync usa el Catalog ID guardado por catálogo en " +
+      "/admin/whatsapp (y de ahí cae al waba_id). Es el fallback de plataforma, no un requisito."
+  )
+}
+
 for (const [name, note] of Object.entries(NOT_RECOVERABLE)) {
   if (states.get(name) === "vacía") notes.push(`${name}: ${note}`)
 }

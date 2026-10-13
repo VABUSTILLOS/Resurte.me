@@ -2215,6 +2215,85 @@ Y una cuarta, de método: **validar una llave antes de pegarla** con
 
 ---
 
+## 16. Catálogo de WhatsApp de la plataforma: conectar Meta y retirar take.app
+
+El motor de sync vive en `/admin/whatsapp` (fases WA–WF de `docs/PLAN-MEJORAS.md`)
+y la marca de `/admin/productos` se une a él en la fase WG (`00221`). Este
+runbook es el camino operativo para pasar de "el catálogo lo alimenta take.app"
+a "lo alimenta Resurte.me".
+
+### 16.1 Antes de tocar código: decidir el catálogo
+
+Hay dos caminos y **no son intercambiables**:
+
+| Camino | Cuándo | Qué implica |
+|---|---|---|
+| Reusar el catálogo de Meta de take.app | Ya tienes el catálogo a mano y quieres conservar los `retailer_id` | Hay que purgar lo que subió take.app (queda como `only_meta` en el Explorador y se borra con confirmación explícita) |
+| Crear un catálogo NUEVO en Meta | Prefieres partir limpio | La primera corrida sólo crea; no hay nada que purgar. **Es el camino recomendado** |
+
+### 16.2 En Meta (una sola vez)
+
+1. **Commerce Manager** → crear el catálogo (si se eligió el camino nuevo).
+2. **Conectar** ese catálogo a la WABA / número de WhatsApp. Meta admite **un
+   catálogo conectado por WABA**: si el de take.app sigue conectado, el número
+   seguirá mostrando ese.
+3. **Token permanente de System User** con `catalog_management` +
+   `whatsapp_business_management` (+ `business_management`). Un token de usuario
+   caduca en horas y el sync falla con "token inválido" sin decir por qué.
+4. **Retirar el acceso de take.app**: Business Settings → Usuarios / Socios /
+   Apps. Sin esto, take.app puede seguir reescribiendo el catálogo o reasignarlo,
+   aunque el sync de Resurte.me ya funcione.
+
+### 16.3 En Resurte.me
+
+5. `/admin/whatsapp` → **Credenciales**: pegar Phone Number ID, WABA ID,
+   **Catalog ID de Meta**, número público (para `wa.me` y QR) y el token →
+   **"Probar conexión"**. Debe reportar el nombre del catálogo y la latencia.
+6. Marcar el catálogo como **principal** ("Marcar como principal") y como
+   **activo** (participa en los syncs automáticos).
+7. Curar la selección y el orden → **"Sincronizar"**: previsualizar el diff y
+   confirmar. Si venías del camino nuevo, todo es `toCreate`.
+8. Verificar en el **Explorador Meta**: 0 `only_meta`, 0 diferencias, salud 100.
+   Abrir el catálogo real en WhatsApp (`wa.me/c/<número>`).
+9. **Vercel**: `WHATSAPP_CATALOG_ID` (fallback de plataforma) y
+   `FOODOS_WA_ENCRYPTION_KEY` — sin ella el `access_token_enc` guardado por
+   catálogo no descifra (§3, aviso de re-cifrado).
+10. **Cron**: `/api/cron/daily` (12:00 UTC, `vercel.json`) ya ejecuta
+    `whatsapp-sync-queue`, `whatsapp-batch-status` y `scheduled-publishing`.
+    Confirmar `CRON_SECRET` (§1).
+
+### 16.4 Precedencia del Catalog ID
+
+El sync resuelve el catálogo en este orden (`src/lib/whatsapp.ts:187`):
+
+1. `whatsapp_catalogs.catalog_id` — lo que se pega en `/admin/whatsapp` → Credenciales.
+2. `WHATSAPP_CATALOG_ID` — el fallback de plataforma (env).
+3. `whatsapp_catalogs.waba_id` — último recurso.
+
+Con varios catálogos, cada uno puede apuntar a su propio `catalog_id`. Si uno
+queda en `NULL`, cae al de plataforma: eso es lo que hace que un catálogo
+"recién creado" empiece a escribir en el catálogo equivocado.
+
+### 16.5 La marca de `/admin/productos` y la curaduría
+
+`products.show_in_whatsapp` ⇔ visible en el **catálogo principal**. El trigger de
+`00221` mantiene la curaduría y encola el sync; sin catálogo principal es no-op
+y la marca queda inerte (como antes de la fase WG).
+
+Si las dos verdades se separaron (por ejemplo antes de aplicar `00221`), hay
+**dos** botones y manda uno distinto en cada caso:
+
+| Botón | Manda | Qué escribe | Para qué |
+|---|---|---|---|
+| **Reconciliar marcas** | La tienda | La **curaduría** (el trigger no serviría: en un diff las marcas ya tienen el valor correcto) | "Marqué productos en `/admin/productos`; que el catálogo coincida" |
+| **Marcar como principal** | La curaduría | Las **marcas** (ahí sí cambian de valor y el trigger hace el resto) | "Este catálogo es el que manda; re-deriva las marcas de su selección" |
+
+Ninguno de los dos borra en Meta: lo que sale de la selección queda `out of
+stock` (`kind = 'hide'`, reversible). El borrado real sigue siendo la
+confirmación explícita del sync.
+
+---
+
 ## Referencias
 - `vercel.json` (crons + headers de seguridad), `src/app/api/cron/*`, `src/app/api/workflows/*`, `src/app/api/foodos/campaigns/run`.
 - Migraciones: `supabase/migrations/00039_rate_limits.sql`, `00042_cleanup_guest_addresses.sql`, `00043_pg_cron_cleanup_guest_addresses.sql`, `00044_pg_cron_purge_rate_limits.sql`, `00055_panel_entries.sql`, `00056_panel_entries_realtime.sql`, `00057_panel_rows.sql`, `00058_panel_members.sql`, `00082_foodos_payment_proofs.sql`, `00083_foodos_order_notifications.sql`, `00084_foodos_orders_updated_at.sql`, `00085_stripe_connect.sql`.

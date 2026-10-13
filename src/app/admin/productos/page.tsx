@@ -4048,7 +4048,7 @@ function AdminProductsContent() {
                 ? "bg-red-600 text-white"
                 : "bg-white border border-red-200 text-red-700 hover:bg-red-50"
             }`}
-            title="Activos en el catálogo de WhatsApp pero despublicados en tienda"
+            title="En el catálogo principal de WhatsApp pero despublicados en tienda"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
             WA sin publicar
@@ -4637,7 +4637,7 @@ function AdminProductsContent() {
               onClick={() => bulkSetWhatsApp(true)}
               disabled={bulkSaving}
               className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
-              title="Mostrar la selección en el catálogo de WhatsApp"
+              title="Mostrar la selección en el catálogo principal de WhatsApp (se elige en WhatsApp → Catálogos)"
             >
               <Eye className="w-3.5 h-3.5" />
               WA sí
@@ -4646,7 +4646,7 @@ function AdminProductsContent() {
               onClick={() => bulkSetWhatsApp(false)}
               disabled={bulkSaving}
               className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
-              title="Ocultar la selección del catálogo de WhatsApp"
+              title="Ocultar la selección del catálogo principal de WhatsApp (sale de la curaduría; en Meta queda fuera de stock)"
             >
               <EyeOff className="w-3.5 h-3.5" />
               WA no
@@ -4778,7 +4778,12 @@ function AdminProductsContent() {
                   </button>
                 </th>
                 <th className="px-5 py-3 hidden md:table-cell">Estado</th>
-                <th className="px-5 py-3 hidden md:table-cell">WhatsApp</th>
+                <th
+                  className="px-5 py-3 hidden md:table-cell"
+                  title="Visible en el catálogo principal de WhatsApp (se elige en WhatsApp → Catálogos)"
+                >
+                  WhatsApp
+                </th>
                 <th className="px-5 py-3 hidden md:table-cell">Ciudades</th>
                 <th className="px-5 py-3 hidden md:table-cell" aria-sort={ariaSortFor("sales", sort)}>
                   <button
@@ -5152,7 +5157,13 @@ function AdminProductsContent() {
                     </td>
                     <td className="px-5 py-3 hidden md:table-cell">
                       <div className="flex items-center gap-1.5">
-                        <button aria-label="Mostrar en WhatsApp"
+                        <button
+                          aria-label={
+                            product.show_in_whatsapp
+                              ? `Quitar ${product.name} del catálogo principal de WhatsApp`
+                              : `Mostrar ${product.name} en el catálogo principal de WhatsApp`
+                          }
+                          aria-pressed={product.show_in_whatsapp === true}
                           onClick={() => toggleWhatsApp(product)}
                           disabled={saving.has(product.id)}
                           className={`relative w-9 h-5 rounded-full transition-colors ${

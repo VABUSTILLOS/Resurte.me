@@ -11,9 +11,12 @@ import {
   Search, RefreshCw, ArrowUp, ArrowDown, Plus, Send,
   Loader2, MapPin, Globe, History, ListChecks, AlertTriangle, X,
   ChevronDown, ChevronRight, RotateCcw, GripVertical, Eye, KeyRound, Radar,
-  Pause, Play, Trash2, Share2, Copy, Check, FileText,
+  Pause, Play, Trash2, Share2, Copy, Check, FileText, Star, Truck, ListOrdered,
 } from "lucide-react"
 import { getCategoryIcon } from "@/lib/utils"
+import { resolveDefaultCatalog } from "@/lib/whatsapp-default-catalog"
+import { isCatalogSyncable, splitSyncable, countAddableSupplierProducts } from "@/lib/whatsapp-catalogs"
+import { parseSupplierOverview, type SupplierOverview } from "@/lib/admin-supplier-panel"
 import {
   buildCatalogChatLink,
   buildCatalogShareText,
@@ -23,6 +26,10 @@ import {
   getAdminWhatsappCatalog,
   listWaCatalogs,
   createWaCatalog,
+  setDefaultWaCatalog,
+  getWaMembershipReconcile,
+  applyWaMembershipReconcile,
+  reorderWaCatalogByCategory,
   getWaCatalogItems,
   setWaCatalogProduct,
   reorderWaCatalog,
@@ -63,6 +70,7 @@ import {
   type WaQueueItem,
   type WaMetaCatalogRow,
   type WaTemplateRow,
+  type WaMembershipPreview,
 } from "@/app/admin/actions"
 
 // Antigüedad legible para la cola y el historial.
@@ -79,6 +87,9 @@ const QUEUE_REASON_LABELS: Record<string, string> = {
   visibility: "visibilidad",
   city_availability: "disponibilidad por ciudad",
   catalog_curation_add: "alta en curaduría",
+  catalog_curation_remove: "baja de curaduría",
+  catalog_default_switch: "cambio de catálogo principal",
+  show_in_whatsapp: "marca de WhatsApp",
 }
 
 export default function AdminWhatsAppPage() {
@@ -107,6 +118,9 @@ export default function AdminWhatsAppPage() {
   const [history, setHistory] = useState<WaSyncRunSummary[]>([])
   const [queueCount, setQueueCount] = useState(0)
 
+  // 00221 — reconciliación entre la marca de la tienda y la curaduría.
+  const [reconcile, setReconcile] = useState<WaMembershipPreview | null>(null)
+
   // WB4 — detalle de corridas y vista de cola.
   const [queueItems, setQueueItems] = useState<WaQueueItem[]>([])
   const [showQueue, setShowQueue] = useState(false)
@@ -122,9 +136,21 @@ export default function AdminWhatsAppPage() {
   const [showPreview, setShowPreview] = useState(false)
 
   // WC7 — curaduría masiva.
-  const [armBulkAdd, setArmBulkAdd] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+
+  // Agregar por proveedor: el resumen viene de la ruta que ya usa
+  // /admin/productos (conteos e ids, SIN costos) y ya excluye la papelera.
+  const [suppliers, setSuppliers] = useState<SupplierOverview[]>([])
+  const [supplierFilter, setSupplierFilter] = useState<number | null>(null)
+
+  // Modo selección de la lista de disponibles (todos o algunos).
+  const [pickMode, setPickMode] = useState(false)
+  const [pickedIds, setPickedIds] = useState<Set<number>>(new Set())
+  const [armPickAdd, setArmPickAdd] = useState(false)
+
+  // Ordenar la curaduría por categoría.
+  const [armOrder, setArmOrder] = useState(false)
 
   // WC8/WC9 — credenciales del catálogo y prueba de conexión.
   const [showCreds, setShowCreds] = useState(false)
@@ -176,7 +202,10 @@ export default function AdminWhatsAppPage() {
       setCategories(data.categories)
       setCatalogs(cats)
       if (cats.length > 0) {
-        const first = cats.find((c) => c.slug === "chihuahua") ?? cats[0] ?? null
+        // Se abre en el principal: es el que gobierna la marca de
+        // /admin/productos y el que el admin tiene que ver primero.
+        const first =
+          resolveDefaultCatalog(cats) ?? cats.find((c) => c.slug === "chihuahua") ?? cats[0] ?? null
         setSelectedCatalog((prev) => prev ?? first)
       }
     } catch (err) {
@@ -210,6 +239,25 @@ export default function AdminWhatsAppPage() {
     run().catch(() => {})
   }, [loadItems])
 
+  // Proveedores para "agregar por proveedor". La ruta ya exige el permiso
+  // `productos` (y devuelve conteos e ids, nunca costos): si el admin no lo
+  // tiene, responde 403, el parser devuelve `[]` y el control no se pinta.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/admin/suppliers/overview")
+        const data = res.ok ? await res.json().catch(() => null) : null
+        if (!cancelled) setSuppliers(parseSupplierOverview(data))
+      } catch {
+        if (!cancelled) setSuppliers([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const curatedIds = useMemo(() => new Set(catalogItems.map((i) => i.product_id)), [catalogItems])
   const curated = useMemo(
     () => catalogItems.filter((i) => i.is_visible).sort((a, b) => a.position - b.position),
@@ -237,15 +285,49 @@ export default function AdminWhatsAppPage() {
     return [...byCat.entries()].map(([title, prods]) => ({ title: title.slice(0, 24), products: prods }))
   }, [curated, productById, categories])
 
+  /**
+   * Ids de producto del proveedor elegido (`null` = sin filtro de proveedor).
+   * Vienen del resumen del servidor, que ya excluye la papelera.
+   */
+  const supplierProductIds = useMemo(() => {
+    if (supplierFilter === null) return null
+    const supplier = suppliers.find((s) => s.id === supplierFilter)
+    return new Set(supplier?.productIds ?? [])
+  }, [supplierFilter, suppliers])
+
   const available = useMemo(
     () =>
       products.filter((p) => {
         if (curatedIds.has(p.id)) return false
+        if (supplierProductIds && !supplierProductIds.has(p.id)) return false
         if (selectedCategory && p.category_id !== selectedCategory) return false
         if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
         return true
       }),
-    [products, curatedIds, selectedCategory, search]
+    [products, curatedIds, supplierProductIds, selectedCategory, search]
+  )
+
+  /** De los visibles, los que de verdad se pueden publicar (precio > 0). */
+  const { syncable: selectable, unsyncable } = useMemo(() => splitSyncable(available), [available])
+
+  /** Los que no se pueden sincronizar: se declaran, no se esconden. */
+  const unsyncableCount = unsyncable.length
+
+  /**
+   * Chips de proveedor con cuántos de sus productos se pueden agregar de verdad
+   * (los que no están ya en la curaduría). Un proveedor sin nada pendiente no
+   * se ofrece —salvo el elegido, que hay que poder deseleccionar.
+   */
+  const supplierChips = useMemo(
+    () =>
+      suppliers
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          addable: countAddableSupplierProducts(s.productIds, curatedIds, new Set(productById.keys())),
+        }))
+        .filter((s) => s.addable > 0 || supplierFilter === s.id),
+    [suppliers, curatedIds, productById, supplierFilter]
   )
 
   async function run<T>(fn: () => Promise<T>, okText?: (r: T) => string) {
@@ -270,21 +352,64 @@ export default function AdminWhatsAppPage() {
       await setWaCatalogProduct(selectedCatalog.id, productId, true)
     })
 
-  // WC7 — agregar toda la vista filtrada (tope 50, doble clic de confirmación).
-  const BULK_ADD_CAP = 50
-  const handleBulkAdd = () => {
-    if (!armBulkAdd) {
-      setArmBulkAdd(true)
+  // Agregar por proveedor: selección explícita (todos o algunos), sin tope
+  // silencioso. El número exacto va en el botón y, a partir de 50, se pide
+  // doble confirmación (mismo patrón `arm` que el resto del panel).
+  const PICK_CONFIRM_FROM = 50
+  const handleAddPicked = () => {
+    if (pickedIds.size === 0) return
+    if (pickedIds.size >= PICK_CONFIRM_FROM && !armPickAdd) {
+      setArmPickAdd(true)
       return
     }
-    setArmBulkAdd(false)
+    setArmPickAdd(false)
     run(
       async () => {
         if (!selectedCatalog) return 0
-        const ids = available.slice(0, BULK_ADD_CAP).map((p) => p.id)
-        return bulkAddWaCatalogProducts(selectedCatalog.id, ids)
+        const ids = [...pickedIds]
+        const n = await bulkAddWaCatalogProducts(selectedCatalog.id, ids)
+        setPickedIds(new Set())
+        return n
       },
       (n) => `${n} productos agregados a la curaduría de ${selectedCatalog?.name}.`
+    )
+  }
+
+  const togglePicked = (productId: number) =>
+    setPickedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(productId)) next.delete(productId)
+      else next.add(productId)
+      return next
+    })
+
+  /** Marca de golpe lo visible y publicable (los sin precio no se pueden vender). */
+  const selectAllAvailable = () => {
+    setArmPickAdd(false)
+    setPickedIds(new Set(selectable.map((p) => p.id)))
+  }
+
+  /** Cambiar de proveedor cambia la intención completa: se limpia la selección. */
+  const chooseSupplier = (supplierId: number | null) => {
+    setSupplierFilter(supplierId)
+    setPickedIds(new Set())
+    setArmPickAdd(false)
+  }
+
+  // Ordena la curaduría agrupándola por categoría (doble confirmación: reescribe
+  // todas las posiciones).
+  const handleOrderByCategory = () => {
+    if (!armOrder) {
+      setArmOrder(true)
+      return
+    }
+    setArmOrder(false)
+    run(
+      async () => {
+        if (!selectedCatalog) return { moved: 0 }
+        return reorderWaCatalogByCategory(selectedCatalog.id)
+      },
+      (r) => `${r.moved} productos agrupados por categoría.`
     )
   }
 
@@ -733,6 +858,37 @@ export default function AdminWhatsAppPage() {
       () => "Catálogo creado."
     )
   }
+
+  // 00221 — catálogo principal y reconciliación de marcas.
+  const handleSetDefault = () =>
+    run(
+      async () => {
+        if (!selectedCatalog) throw new Error("Selecciona un catálogo")
+        return setDefaultWaCatalog(selectedCatalog.id)
+      },
+      (r) =>
+        `“${selectedCatalog?.name}” es el catálogo principal. ` +
+        (r.marked || r.hidden
+          ? `${r.marked} producto(s) marcados y ${r.hidden} desmarcados para que coincidan con su curaduría.`
+          : "Las marcas de la tienda ya coincidían con su curaduría.")
+    )
+
+  const handleOpenReconcile = () =>
+    run(async () => {
+      if (!selectedCatalog) throw new Error("Selecciona un catálogo")
+      setReconcile(await getWaMembershipReconcile(selectedCatalog.id))
+    })
+
+  const handleApplyReconcile = () =>
+    run(
+      async () => {
+        if (!selectedCatalog) throw new Error("Selecciona un catálogo")
+        const result = await applyWaMembershipReconcile(selectedCatalog.id)
+        setReconcile(null)
+        return result
+      },
+      (r) => `Reconciliado: ${r.added} agregados y ${r.removed} quitados del catálogo.`
+    )
 
   if (loading) {
     return (
@@ -1459,6 +1615,38 @@ export default function AdminWhatsAppPage() {
         </form>
       </div>
 
+      {/* Catálogo principal (00221): el que gobierna la marca de /admin/productos */}
+      {selectedCatalog && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-6 text-xs">
+          {selectedCatalog.is_default ? (
+            <span className="inline-flex flex-wrap items-center gap-1.5 font-semibold text-[#0F7A3D]">
+              <Star className="w-3.5 h-3.5" aria-hidden="true" />
+              Catálogo principal
+              <span className="font-normal text-[var(--text-secondary)]">
+                — el switch “Mostrar en WhatsApp” de /admin/productos alimenta este catálogo
+              </span>
+            </span>
+          ) : (
+            <button
+              onClick={handleSetDefault}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 font-semibold px-3 py-1.5 rounded-full bg-[#F5F3F0] text-[#242529] hover:bg-[#EDEAE4] disabled:opacity-50"
+            >
+              <Star className="w-3.5 h-3.5" aria-hidden="true" />
+              Marcar “{selectedCatalog.name}” como principal
+            </button>
+          )}
+          <button
+            onClick={handleOpenReconcile}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 font-semibold px-3 py-1.5 rounded-full border border-[#E8E9EB] bg-white text-[var(--text-secondary)] hover:bg-[#F7F5F0] disabled:opacity-50"
+          >
+            <ListChecks className="w-3.5 h-3.5" aria-hidden="true" />
+            Reconciliar marcas
+          </button>
+        </div>
+      )}
+
       {selectedCatalog && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Curaduría ordenada */}
@@ -1488,6 +1676,22 @@ export default function AdminWhatsAppPage() {
             </div>
             <p className="text-xs text-[var(--text-secondary)] mb-4">
               Este es el orden EXACTO que verá el cliente.
+              {curated.length > 1 && !selectionMode && (
+                <>
+                  {" "}
+                  <button
+                    onClick={handleOrderByCategory}
+                    disabled={busy}
+                    title="Agrupa los productos por categoría, en el orden en que las categorías ya aparecen. Los que no tienen categoría van al final."
+                    className={`inline-flex items-center gap-1 font-semibold disabled:opacity-50 ${
+                      armOrder ? "text-[#0E7A0E]" : "text-[#0F7A3D] hover:underline"
+                    }`}
+                  >
+                    <ListOrdered className="w-3.5 h-3.5" aria-hidden="true" />
+                    {armOrder ? "¿Confirmar? Se reordena todo" : "Ordenar por categoría"}
+                  </button>
+                </>
+              )}
             </p>
 
             {curated.length === 0 ? (
@@ -1738,7 +1942,25 @@ export default function AdminWhatsAppPage() {
 
           {/* Productos disponibles */}
           <div className="bg-white rounded-2xl border border-[#E8E9EB] p-5">
-            <h2 className="font-bold text-[#242529] mb-3">Agregar productos</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-[#242529]">Agregar productos</h2>
+              {available.length > 0 && (
+                <button
+                  onClick={() => {
+                    setPickMode((v) => !v)
+                    setPickedIds(new Set())
+                    setArmPickAdd(false)
+                  }}
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
+                    pickMode
+                      ? "bg-[#0E7A0E] text-white"
+                      : "bg-[#F5F3F0] text-[var(--text-secondary)] hover:bg-[#EDEAE4]"
+                  }`}
+                >
+                  {pickMode ? "Listo" : "Seleccionar"}
+                </button>
+              )}
+            </div>
             <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B0B3B8]" />
               <input
@@ -1749,6 +1971,54 @@ export default function AdminWhatsAppPage() {
                 className="w-full pl-9 pr-4 py-2.5 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
               />
             </div>
+
+            {/* Proveedor: agregar todo lo de un proveedor, o sólo algunos */}
+            {supplierChips.length > 0 && (
+              <div className="mb-3">
+                <p className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-1.5">
+                  <Truck className="w-3.5 h-3.5" aria-hidden="true" />
+                  Proveedor
+                </p>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  <button
+                    onClick={() => chooseSupplier(null)}
+                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                      supplierFilter === null
+                        ? "bg-[#0F7A3D] text-white"
+                        : "bg-[#F5F3F0] text-[var(--text-secondary)]"
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  {supplierChips.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => chooseSupplier(s.id)}
+                      className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                        supplierFilter === s.id
+                          ? "bg-[#0F7A3D] text-white"
+                          : "bg-[#F5F3F0] text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      {s.name}
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                          supplierFilter === s.id ? "bg-white text-[#0F7A3D]" : "bg-[#E8E9EB]"
+                        }`}
+                      >
+                        {s.addable}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {supplierFilter !== null && (
+                  <p className="text-[11px] text-[#B0B3B8] mt-1.5">
+                    Es una acción de una sola vez: un producto nuevo del proveedor no entra solo.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
               <button
                 onClick={() => setSelectedCategory(null)}
@@ -1767,43 +2037,103 @@ export default function AdminWhatsAppPage() {
               ))}
             </div>
 
-            {/* Agregado masivo de la vista filtrada (WC7) */}
-            {available.length > 0 && (
-              <button
-                onClick={handleBulkAdd}
-                disabled={busy}
-                className={`w-full mb-3 px-3 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-60 ${
-                  armBulkAdd
-                    ? "bg-[#0E7A0E] text-white hover:bg-[#0D720D]"
-                    : "bg-[#E7F8EE] text-[#0E7A0E] hover:bg-[#D5F1E0]"
-                }`}
-              >
-                {armBulkAdd
-                  ? `¿Confirmar? Agregar ${Math.min(available.length, BULK_ADD_CAP)} productos a la curaduría`
-                  : `Agregar toda la vista (${Math.min(available.length, BULK_ADD_CAP)}${available.length > BULK_ADD_CAP ? ` de ${available.length}` : ""})`}
-              </button>
+            {/* Selección explícita: todos los filtrados o sólo algunos */}
+            {pickMode && (
+              <div className="mb-3 rounded-xl border border-[#E8E9EB] bg-[#F7F5F0] p-3 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={selectAllAvailable}
+                    disabled={busy || selectable.length === 0}
+                    className="px-3 py-1.5 rounded-lg bg-[#E7F8EE] text-[#0E7A0E] text-xs font-bold hover:bg-[#D5F1E0] disabled:opacity-40"
+                  >
+                    Seleccionar todos los filtrados ({selectable.length})
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPickedIds(new Set())
+                      setArmPickAdd(false)
+                    }}
+                    disabled={busy || pickedIds.size === 0}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-secondary)] hover:bg-[#EDEAE4] disabled:opacity-40"
+                  >
+                    Limpiar
+                  </button>
+                  <span className="text-xs font-semibold text-[#242529]">
+                    {pickedIds.size} seleccionado(s)
+                  </span>
+                </div>
+                {unsyncableCount > 0 && (
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    {unsyncableCount} sin precio quedan fuera de “seleccionar todos”: Meta no los
+                    acepta, así que no se pueden vender. Puedes marcarlos a mano si quieres.
+                  </p>
+                )}
+                <button
+                  onClick={handleAddPicked}
+                  disabled={busy || pickedIds.size === 0}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-60 ${
+                    armPickAdd
+                      ? "bg-[#0E7A0E] text-white hover:bg-[#0D720D]"
+                      : "bg-[#E7F8EE] text-[#0E7A0E] hover:bg-[#D5F1E0]"
+                  }`}
+                >
+                  {armPickAdd
+                    ? `¿Confirmar? Agregar ${pickedIds.size} producto(s) a la curaduría`
+                    : `Agregar ${pickedIds.size} producto(s)`}
+                </button>
+              </div>
             )}
 
             <div className="space-y-1.5 max-h-[55vh] overflow-y-auto">
               {available.length === 0 ? (
                 <p className="text-sm text-[#B0B3B8] py-8 text-center">Sin productos por agregar.</p>
               ) : (
-                available.map((p) => (
-                  <div key={p.id} className="flex items-center gap-3 rounded-xl border border-[#F0F1F2] px-3 py-2 hover:border-[#25D366]/40 transition-colors">
-                    {p.image_url ? (
-                      <Image src={p.image_url} alt={p.name} width={36} height={36} className="w-9 h-9 rounded-lg object-cover shrink-0" />
-                    ) : (
-                      <div className="w-9 h-9 rounded-lg bg-[#F5F3F0] shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-[#242529] truncate">{p.name}</p>
-                      <p className="text-xs text-[#B0B3B8]">${(p.sale_price ?? p.price ?? 0).toFixed(2)}{p.unit ? ` · ${p.unit}` : ""}</p>
+                available.map((p) => {
+                  const syncable = isCatalogSyncable(p)
+                  if (pickMode) {
+                    const checked = pickedIds.has(p.id)
+                    return (
+                      <label
+                        key={p.id}
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 cursor-pointer transition-colors ${
+                          checked ? "border-[#0E7A0E] bg-[#E7F8EE]" : "border-[#F0F1F2]"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => togglePicked(p.id)}
+                          className="accent-[#0E7A0E]"
+                          aria-label={`Seleccionar ${p.name}`}
+                        />
+                        <span className="flex-1 min-w-0 text-sm text-[#242529] truncate">
+                          {p.name}
+                          {!syncable && (
+                            <span className="ml-1.5 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                              sin precio
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    )
+                  }
+                  return (
+                    <div key={p.id} className="flex items-center gap-3 rounded-xl border border-[#F0F1F2] px-3 py-2 hover:border-[#25D366]/40 transition-colors">
+                      {p.image_url ? (
+                        <Image src={p.image_url} alt={p.name} width={36} height={36} className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-lg bg-[#F5F3F0] shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-[#242529] truncate">{p.name}</p>
+                        <p className="text-xs text-[#B0B3B8]">${(p.sale_price ?? p.price ?? 0).toFixed(2)}{p.unit ? ` · ${p.unit}` : ""}</p>
+                      </div>
+                      <button onClick={() => handleAdd(p.id)} disabled={busy} className="p-1.5 text-[#0E7A0E] hover:bg-[#E7F8EE] rounded-lg" aria-label={`Agregar ${p.name}`}>
+                        <Plus className="w-4 h-4" />
+                      </button>
                     </div>
-                    <button onClick={() => handleAdd(p.id)} disabled={busy} className="p-1.5 text-[#0E7A0E] hover:bg-[#E7F8EE] rounded-lg" aria-label={`Agregar ${p.name}`}>
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>
@@ -1869,6 +2199,105 @@ export default function AdminWhatsAppPage() {
               <p className="text-[11px] text-center text-[#8696A0] mt-3">
                 Máximo 30 productos por mensaje, en tu orden exacto.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: reconciliación de marcas (00221) */}
+      {reconcile && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Reconciliar marcas de WhatsApp"
+        >
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+            <div className="flex items-start justify-between mb-1">
+              <h3 className="font-bold text-[#242529]">
+                Reconciliar “{reconcile.catalog_name}”
+              </h3>
+              <button
+                onClick={() => setReconcile(null)}
+                className="p-1 text-[#B0B3B8] hover:text-[#242529]"
+                aria-label="Cerrar reconciliación"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)] mb-4">
+              Compara el switch “Mostrar en WhatsApp” de /admin/productos con la curaduría de este
+              catálogo. Al aplicar manda la tienda: lo marcado entra y lo no marcado sale.
+            </p>
+
+            {!reconcile.is_default && (
+              <p className="flex items-start gap-2 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                Este catálogo no es el principal. Marca “{reconcile.catalog_name}” como principal
+                antes de reconciliar.
+              </p>
+            )}
+
+            <ul className="space-y-2 text-sm text-[var(--text-secondary)] mb-4">
+              <li className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-700" aria-hidden="true" />
+                <span>
+                  <strong className="text-[#242529]">{reconcile.toAdd.length}</strong> marcados que
+                  entrarán al catálogo
+                </span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-700" aria-hidden="true" />
+                <span>
+                  <strong className="text-[#242529]">{reconcile.toRemove.length}</strong> curados que
+                  saldrán del catálogo
+                </span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#B0B3B8]" aria-hidden="true" />
+                <span>
+                  <strong className="text-[#242529]">{reconcile.unchanged_count}</strong> ya coinciden
+                </span>
+              </li>
+            </ul>
+
+            {(reconcile.toAdd.length > 0 || reconcile.toRemove.length > 0) && (
+              <div className="max-h-40 overflow-y-auto rounded-xl border border-[#E8E9EB] divide-y divide-[#F0F1F2] mb-4">
+                {reconcile.toAdd.map((p) => (
+                  <p key={`add-${p.id}`} className="px-3 py-1.5 text-xs text-[#242529] truncate">
+                    <span className="font-bold text-[#0F7A3D]" aria-hidden="true">+ </span>
+                    {p.name}
+                  </p>
+                ))}
+                {reconcile.toRemove.map((p) => (
+                  <p key={`rm-${p.id}`} className="px-3 py-1.5 text-xs text-[#242529] truncate">
+                    <span className="font-bold text-amber-800" aria-hidden="true">− </span>
+                    {p.name}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                onClick={() => setReconcile(null)}
+                className="px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] rounded-full hover:bg-[#F5F3F0]"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleApplyReconcile}
+                disabled={
+                  busy ||
+                  !reconcile.is_default ||
+                  (reconcile.toAdd.length === 0 && reconcile.toRemove.length === 0)
+                }
+                className="px-5 py-2 bg-[#0F7A3D] text-white text-sm font-bold rounded-full hover:bg-[#0F6B3A] disabled:opacity-60"
+              >
+                {reconcile.toAdd.length + reconcile.toRemove.length > 0
+                  ? `Aplicar a ${reconcile.toAdd.length + reconcile.toRemove.length} producto(s)`
+                  : "Nada que reconciliar"}
+              </button>
             </div>
           </div>
         </div>

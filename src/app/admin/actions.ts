@@ -10,6 +10,11 @@ import { paginaCapada, type PaginaCapada } from "@/lib/bitacora"
 import { isMissingColumnError, isMissingRelationError } from "@/lib/sale-window"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import {
+  buildWaMembershipReconcile,
+  positionAfter,
+  summarizeReconcile,
+} from "@/lib/whatsapp-default-catalog"
+import {
   ADMIN_ORDER_OPTIONAL_COLUMNS,
   buildAdminOrdersSelect,
   missingOptionalOrderColumn,
@@ -610,15 +615,29 @@ export async function getAdminWhatsappCatalog(): Promise<{
 
   const supabase = await createServiceClient()
 
-  const [productsRes, categoriesRes] = await Promise.all([
-    supabase
+  const loadProducts = (withoutTrash: boolean) => {
+    const query = supabase
       .from("products")
       .select(
         "id, name, brand, category_id, image_url, price, sale_price, unit, show_in_whatsapp, whatsapp_product_id"
       )
-      .order("name"),
+      .order("name")
+    // La papelera (00099) no puede ofrecerse para el catálogo público: un
+    // producto borrado no se puede vender, y sin este filtro se podía mandar a
+    // Meta desde "Agregar productos".
+    return withoutTrash ? query.is("deleted_at", null) : query
+  }
+
+  const [withTrashFilter, categoriesRes] = await Promise.all([
+    loadProducts(true),
     supabase.from("categories").select("id, name, icon, slug").order("id"),
   ])
+  let productsRes = withTrashFilter
+
+  if (productsRes.error && isMissingColumnError(productsRes.error)) {
+    // 00099 (papelera) sin aplicar: se sigue sin el filtro.
+    productsRes = await loadProducts(false)
+  }
 
   if (productsRes.error) {
     logger.error("[ADMIN-WHATSAPP] Error fetching products:", productsRes.error)
@@ -4306,6 +4325,8 @@ export interface WaCatalogSummary {
   city_id: number | null
   city_name: string | null
   is_active: boolean
+  /** Catálogo principal: gobierna `products.show_in_whatsapp` (00221). */
+  is_default: boolean
   items_count: number
 }
 
@@ -4316,17 +4337,65 @@ export interface WaCatalogDetailItem {
   available_in_city: boolean | null // null = catálogo global
 }
 
+interface WaCatalogRow {
+  id: string
+  slug: string
+  name: string
+  city_id: number | null
+  is_active: boolean
+  is_default: boolean
+}
+
+/**
+ * Catálogos con `is_default`, degradando a `false` si la migración `00221`
+ * todavía no corrió. Desplegar código antes que esquema no puede tumbar el
+ * panel: sin la columna, el comportamiento es exactamente el de antes.
+ */
+async function fetchWaCatalogs(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>
+): Promise<WaCatalogRow[]> {
+  const { data, error } = await supabase
+    .from("whatsapp_catalogs")
+    .select("id, slug, name, city_id, is_active, is_default")
+    .order("created_at")
+  if (!error) return (data ?? []) as WaCatalogRow[]
+
+  const legacy = await supabase
+    .from("whatsapp_catalogs")
+    .select("id, slug, name, city_id, is_active")
+    .order("created_at")
+  if (legacy.error) throw new Error(legacy.error.message)
+  return ((legacy.data ?? []) as Omit<WaCatalogRow, "is_default">[]).map((c) => ({
+    ...c,
+    is_default: false,
+  }))
+}
+
+/**
+ * ¿Este catálogo es el principal (el que gobierna `show_in_whatsapp`)?
+ * Degrada a `false` sin la migración `00221`: la curaduría sigue funcionando
+ * como antes y nadie escribe una marca que no se puede leer.
+ */
+async function isDefaultWaCatalog(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  catalogId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("whatsapp_catalogs")
+    .select("is_default")
+    .eq("id", catalogId)
+    .maybeSingle()
+  if (error) return false
+  return Boolean(data?.is_default)
+}
+
 export async function listWaCatalogs(): Promise<WaCatalogSummary[]> {
   const { response: adminDenied } = await requireAdmin()
   if (adminDenied) throw new Error("Acceso restringido a administradores")
   const supabase = await createServiceClient()
 
-  const { data: catalogs, error } = await supabase
-    .from("whatsapp_catalogs")
-    .select("id, slug, name, city_id, is_active")
-    .order("created_at")
-  if (error) throw new Error(error.message)
-  if (!catalogs?.length) return []
+  const catalogs = await fetchWaCatalogs(supabase)
+  if (!catalogs.length) return []
 
   const cityIds = [...new Set(catalogs.map((c) => c.city_id).filter(Boolean))] as number[]
   const { data: cities } = cityIds.length
@@ -4344,13 +4413,14 @@ export async function listWaCatalogs(): Promise<WaCatalogSummary[]> {
   }
 
   return catalogs.map((c) => ({
-    id: c.id as string,
-    slug: c.slug as string,
-    name: c.name as string,
-    city_id: c.city_id as number | null,
-    city_name: c.city_id ? cityName.get(c.city_id as number) ?? null : null,
-    is_active: c.is_active as boolean,
-    items_count: countByCatalog.get(c.id as string) ?? 0,
+    id: c.id,
+    slug: c.slug,
+    name: c.name,
+    city_id: c.city_id,
+    city_name: c.city_id ? cityName.get(c.city_id) ?? null : null,
+    is_active: c.is_active,
+    is_default: c.is_default,
+    items_count: countByCatalog.get(c.id) ?? 0,
   }))
 }
 
@@ -4414,7 +4484,96 @@ export async function getWaCatalogItems(catalogId: string): Promise<WaCatalogDet
   }))
 }
 
-/** Agrega/quita un producto de la curaduría (visible). */
+// ------------------------------------------------------------
+// Curaduría: las dos operaciones primitivas
+//
+// Escriben la CURADURÍA y encolan el sync ellas mismas. No dependen del
+// trigger de `00221`, que sólo reacciona a CAMBIOS de `show_in_whatsapp`: la
+// reconciliación arregla deriva donde la marca ya tiene el valor correcto, así
+// que ahí el trigger no se dispara y el trabajo tiene que hacerlo esto.
+// ------------------------------------------------------------
+
+/** Inserta productos al final de la curaduría y los encola para subir a Meta. */
+async function addToWaCuration(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  catalogId: string,
+  productIds: number[],
+  reason: string
+): Promise<void> {
+  if (productIds.length === 0) return
+
+  const { data: maxRow } = await supabase
+    .from("whatsapp_catalog_items")
+    .select("position")
+    .eq("catalog_id", catalogId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const base = positionAfter(maxRow?.position as number | undefined)
+
+  const rows = productIds.map((product_id, i) => ({
+    catalog_id: catalogId,
+    product_id,
+    position: base + i,
+    is_visible: true,
+  }))
+  const { error } = await supabase
+    .from("whatsapp_catalog_items")
+    .upsert(rows, { onConflict: "catalog_id,product_id" })
+  if (error) throw new Error(error.message)
+
+  // WA5 — alta en curaduría: encolar para que el sync incremental lo suba.
+  const { enqueueProductsForWaSync } = await import("@/lib/whatsapp-sync-queue")
+  await enqueueProductsForWaSync(supabase, productIds, reason)
+}
+
+/**
+ * Saca productos de la curaduría y pide su `hide` en Meta.
+ *
+ * El `hide` se encola SIEMPRE, no sólo cuando el trigger lo haría: al quitar la
+ * curaduría la marca ya suele valer `false`, así que el trigger no vería ningún
+ * cambio y el producto seguiría disponible en Meta.
+ */
+async function removeFromWaCuration(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  catalogId: string,
+  productIds: number[],
+  reason: string
+): Promise<void> {
+  if (productIds.length === 0) return
+
+  const { error } = await supabase
+    .from("whatsapp_catalog_items")
+    .delete()
+    .eq("catalog_id", catalogId)
+    .in("product_id", productIds)
+  if (error) throw new Error(error.message)
+
+  const { enqueueWaSyncForCatalog } = await import("@/lib/whatsapp-sync-queue")
+  await enqueueWaSyncForCatalog(supabase, catalogId, productIds, "hide", reason)
+}
+
+/** Escribe la marca de la tienda. El trigger del principal hace el resto. */
+async function setWaProductFlags(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  productIds: number[],
+  value: boolean
+): Promise<void> {
+  if (productIds.length === 0) return
+  const { error } = await supabase
+    .from("products")
+    .update({ show_in_whatsapp: value })
+    .in("id", productIds)
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Agrega/quita un producto de la curaduría.
+ *
+ * Puente curaduría → marca: si el catálogo es el PRINCIPAL, además escribe
+ * `products.show_in_whatsapp`. Es la dirección segura: la curaduría ya tiene el
+ * orden que el admin eligió, así que reflejarla en la marca no reordena nada.
+ */
 export async function setWaCatalogProduct(
   catalogId: string,
   productId: number,
@@ -4424,33 +4583,17 @@ export async function setWaCatalogProduct(
   if (adminDenied) throw new Error("Acceso restringido a administradores")
   const supabase = await createServiceClient()
 
+  const isDefault = await isDefaultWaCatalog(supabase, catalogId)
+
   if (visible) {
-    const { data: maxRow } = await supabase
-      .from("whatsapp_catalog_items")
-      .select("position")
-      .eq("catalog_id", catalogId)
-      .order("position", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    const { error } = await supabase
-      .from("whatsapp_catalog_items")
-      .upsert(
-        { catalog_id: catalogId, product_id: productId, position: (maxRow?.position ?? 0) + 1, is_visible: true },
-        { onConflict: "catalog_id,product_id" }
-      )
-    if (error) throw new Error(error.message)
-    // WA5 — alta en curaduría: encolar para que el sync incremental lo suba.
-    const { enqueueProductsForWaSync } = await import("@/lib/whatsapp-sync-queue")
-    await enqueueProductsForWaSync(supabase, [productId], "catalog_curation_add")
+    await addToWaCuration(supabase, catalogId, [productId], "catalog_curation_add")
+    if (isDefault) await setWaProductFlags(supabase, [productId], true)
   } else {
-    const { error } = await supabase
-      .from("whatsapp_catalog_items")
-      .delete()
-      .eq("catalog_id", catalogId)
-      .eq("product_id", productId)
-    if (error) throw new Error(error.message)
+    await removeFromWaCuration(supabase, catalogId, [productId], "catalog_curation_remove")
+    if (isDefault) await setWaProductFlags(supabase, [productId], false)
   }
   revalidatePath("/admin/whatsapp")
+  revalidatePath("/admin/productos")
 }
 
 export interface WaMetaCatalogRow {
@@ -5007,32 +5150,16 @@ export async function bulkAddWaCatalogProducts(
   if (productIds.length === 0) return 0
   const supabase = await createServiceClient()
 
-  const { data: maxRow } = await supabase
-    .from("whatsapp_catalog_items")
-    .select("position")
-    .eq("catalog_id", catalogId)
-    .order("position", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  let next = (maxRow?.position as number | undefined) ?? 0
+  await addToWaCuration(supabase, catalogId, productIds, "catalog_curation_add")
 
-  const rows = productIds.map((product_id) => ({
-    catalog_id: catalogId,
-    product_id,
-    position: ++next,
-    is_visible: true,
-  }))
-  const { error } = await supabase
-    .from("whatsapp_catalog_items")
-    .upsert(rows, { onConflict: "catalog_id,product_id" })
-  if (error) throw new Error(error.message)
-
-  // WA5 — encolar para sync incremental.
-  const { enqueueProductsForWaSync } = await import("@/lib/whatsapp-sync-queue")
-  await enqueueProductsForWaSync(supabase, productIds, "catalog_curation_add")
+  // Puente curaduría → marca cuando el catálogo es el principal.
+  if (await isDefaultWaCatalog(supabase, catalogId)) {
+    await setWaProductFlags(supabase, productIds, true)
+  }
 
   revalidatePath("/admin/whatsapp")
-  return rows.length
+  revalidatePath("/admin/productos")
+  return productIds.length
 }
 
 /** Quita varios productos de la curaduría de una vez (WC7). */
@@ -5045,14 +5172,238 @@ export async function bulkRemoveWaCatalogProducts(
   if (productIds.length === 0) return 0
   const supabase = await createServiceClient()
 
-  const { error } = await supabase
-    .from("whatsapp_catalog_items")
-    .delete()
-    .eq("catalog_id", catalogId)
-    .in("product_id", productIds)
-  if (error) throw new Error(error.message)
+  await removeFromWaCuration(supabase, catalogId, productIds, "catalog_curation_remove")
+
+  if (await isDefaultWaCatalog(supabase, catalogId)) {
+    await setWaProductFlags(supabase, productIds, false)
+  }
+
   revalidatePath("/admin/whatsapp")
+  revalidatePath("/admin/productos")
   return productIds.length
+}
+
+// ------------------------------------------------------------
+// Catálogo principal: marca ⇔ curaduría (00221)
+// ------------------------------------------------------------
+
+/** PostgREST corta en 1000 filas: leer por páginas, no confiar en el default. */
+const WA_SCAN_PAGE_SIZE = 1000
+const WA_SCAN_MAX_ROWS = 20000
+
+/** Marcas de la tienda, paginadas. */
+async function readWaProductFlags(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>
+): Promise<{ id: number; show_in_whatsapp: boolean }[]> {
+  const rows: { id: number; show_in_whatsapp: boolean }[] = []
+  for (let from = 0; from < WA_SCAN_MAX_ROWS; from += WA_SCAN_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("products")
+      .select("id, show_in_whatsapp")
+      .order("id", { ascending: true })
+      .range(from, from + WA_SCAN_PAGE_SIZE - 1)
+    if (error) throw new Error(error.message)
+    const batch = (data ?? []) as { id: number; show_in_whatsapp: boolean }[]
+    rows.push(...batch)
+    if (batch.length < WA_SCAN_PAGE_SIZE) break
+  }
+  return rows
+}
+
+/** Curaduría de un catálogo, paginada. */
+async function readWaCuratedRows(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  catalogId: string
+): Promise<{ product_id: number; position: number; is_visible: boolean }[]> {
+  const rows: { product_id: number; position: number; is_visible: boolean }[] = []
+  for (let from = 0; from < WA_SCAN_MAX_ROWS; from += WA_SCAN_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("whatsapp_catalog_items")
+      .select("product_id, position, is_visible")
+      .eq("catalog_id", catalogId)
+      .order("position", { ascending: true })
+      .range(from, from + WA_SCAN_PAGE_SIZE - 1)
+    if (error) throw new Error(error.message)
+    const batch = (data ?? []) as { product_id: number; position: number; is_visible: boolean }[]
+    rows.push(...batch)
+    if (batch.length < WA_SCAN_PAGE_SIZE) break
+  }
+  return rows
+}
+
+export interface WaMembershipPreview {
+  catalog_id: string
+  catalog_name: string
+  is_default: boolean
+  /** Marcados en la tienda y ausentes de la curaduría. */
+  toAdd: { id: number; name: string }[]
+  /** Curados en el catálogo y sin la marca en la tienda. */
+  toRemove: { id: number; name: string }[]
+  unchanged_count: number
+  summary: string
+}
+
+/**
+ * Previsualiza la reconciliación entre las marcas de la tienda y la curaduría
+ * del catálogo principal. Sólo lee: aplicar es un botón aparte.
+ */
+export async function getWaMembershipReconcile(catalogId: string): Promise<WaMembershipPreview> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const { data: catalog } = await supabase
+    .from("whatsapp_catalogs")
+    .select("id, name, is_default")
+    .eq("id", catalogId)
+    .maybeSingle()
+  if (!catalog) throw new Error("Catálogo no encontrado")
+
+  const [flags, curated] = await Promise.all([
+    readWaProductFlags(supabase),
+    readWaCuratedRows(supabase, catalogId),
+  ])
+  const diff = buildWaMembershipReconcile(flags, curated)
+
+  const ids = [...diff.toAdd, ...diff.toRemove]
+  const { data: products } = ids.length
+    ? await supabase.from("products").select("id, name").in("id", ids)
+    : { data: [] as { id: number; name: string }[] }
+  const nameById = new Map((products ?? []).map((p) => [p.id as number, p.name as string]))
+  const label = (id: number) => nameById.get(id) ?? `#${id}`
+
+  return {
+    catalog_id: catalog.id as string,
+    catalog_name: catalog.name as string,
+    is_default: Boolean(catalog.is_default),
+    toAdd: diff.toAdd.map((id) => ({ id, name: label(id) })),
+    toRemove: diff.toRemove.map((id) => ({ id, name: label(id) })),
+    unchanged_count: diff.unchanged.length,
+    summary: summarizeReconcile(diff),
+  }
+}
+
+/**
+ * Aplica la reconciliación: manda la TIENDA.
+ *
+ * Los productos marcados entran a la curaduría del principal y los no marcados
+ * salen. Se escribe la CURADURÍA directamente y **no** la marca: en un diff las
+ * marcas ya tienen el valor correcto en los dos lados (ese es justo el sentido
+ * del diff), así que el trigger de `00221` no vería ningún cambio. Las
+ * posiciones de lo que ya estaba curado no se tocan.
+ */
+export async function applyWaMembershipReconcile(catalogId: string): Promise<{
+  added: number
+  removed: number
+}> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const { data: catalog } = await supabase
+    .from("whatsapp_catalogs")
+    .select("id, is_default")
+    .eq("id", catalogId)
+    .maybeSingle()
+  if (!catalog) throw new Error("Catálogo no encontrado")
+  if (!catalog.is_default) {
+    throw new Error(
+      "Marca este catálogo como principal antes de reconciliar: la marca de los productos apunta al principal."
+    )
+  }
+
+  // El diff se recalcula en el servidor: el cliente nunca decide qué se toca.
+  const [flags, curated] = await Promise.all([
+    readWaProductFlags(supabase),
+    readWaCuratedRows(supabase, catalogId),
+  ])
+  const diff = buildWaMembershipReconcile(flags, curated)
+
+  await addToWaCuration(supabase, catalogId, diff.toAdd, "wa_reconcile_add")
+  await removeFromWaCuration(supabase, catalogId, diff.toRemove, "wa_reconcile_remove")
+
+  revalidatePath("/admin/whatsapp")
+  revalidatePath("/admin/productos")
+  return { added: diff.toAdd.length, removed: diff.toRemove.length }
+}
+
+/**
+ * Cambia el catálogo principal y re-deriva las marcas DESDE su curaduría.
+ *
+ * Aquí manda la CURADURÍA, al revés que en `applyWaMembershipReconcile`: la
+ * curaduría guarda el orden que el admin ya eligió y es justo lo que se está
+ * promoviendo. Dejar que las marcas ganaran reordenaría el catálogo entero
+ * (las altas por marca van al final).
+ *
+ * Los que salen de la selección no se borran en Meta: se piden como `hide`
+ * (fuera de stock), reversible, y el borrado sigue siendo una confirmación
+ * explícita del sync (invariante WA2).
+ */
+export async function setDefaultWaCatalog(catalogId: string): Promise<{
+  marked: number
+  hidden: number
+}> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const { data: catalog } = await supabase
+    .from("whatsapp_catalogs")
+    .select("id, name")
+    .eq("id", catalogId)
+    .maybeSingle()
+  if (!catalog) throw new Error("Catálogo no encontrado")
+
+  // Un solo principal: apagar el anterior ANTES de encender el nuevo, porque
+  // el índice único parcial no admite dos a la vez.
+  const { error: offError } = await supabase
+    .from("whatsapp_catalogs")
+    .update({ is_default: false })
+    .eq("is_default", true)
+    .neq("id", catalogId)
+  if (offError) throw new Error(offError.message)
+
+  const { error: onError } = await supabase
+    .from("whatsapp_catalogs")
+    .update({ is_default: true })
+    .eq("id", catalogId)
+  if (onError) throw new Error(onError.message)
+
+  const [flags, curated] = await Promise.all([
+    readWaProductFlags(supabase),
+    readWaCuratedRows(supabase, catalogId),
+  ])
+
+  const curatedIds = curated.filter((c) => c.is_visible).map((c) => c.product_id)
+  const curatedSet = new Set(curatedIds)
+  const markedSet = new Set(flags.filter((f) => f.show_in_whatsapp).map((f) => f.id))
+
+  // Curados y sin marca: ganan la marca (el trigger encola su upsert).
+  const toMark = curatedIds.filter((id) => !markedSet.has(id))
+  // Marcados y no curados: pierden la marca (el trigger limpia la curaduría).
+  const toUnmark = flags
+    .filter((f) => f.show_in_whatsapp && !curatedSet.has(f.id))
+    .map((f) => f.id)
+
+  if (toMark.length > 0) {
+    // La marca cambia de valor ⇒ el trigger del principal las mete a la
+    // curaduría (al final) y encola su upsert.
+    await setWaProductFlags(supabase, toMark, true)
+  }
+
+  if (toUnmark.length > 0) {
+    await setWaProductFlags(supabase, toUnmark, false)
+
+    // Salieron de la selección pero siguen en Meta: se ocultan, no se borran.
+    // El trigger no los encola (no había curaduría que borrar en el nuevo
+    // principal), así que el `hide` se pide aquí.
+    const { enqueueWaSyncForCatalog } = await import("@/lib/whatsapp-sync-queue")
+    await enqueueWaSyncForCatalog(supabase, catalogId, toUnmark, "hide", "catalog_default_switch")
+  }
+
+  revalidatePath("/admin/whatsapp")
+  revalidatePath("/admin/productos")
+  return { marked: toMark.length, hidden: toUnmark.length }
 }
 
 /** Reordena la curaduría: array ordenado de product_ids (posiciones 1..N). */
@@ -5073,6 +5424,44 @@ export async function reorderWaCatalog(
     if (error) throw new Error(error.message)
   }
   revalidatePath("/admin/whatsapp")
+}
+
+/**
+ * Reordena la curaduría agrupándola por categoría (para que el catálogo que ve
+ * el cliente quede agrupado, igual que las secciones del mensaje `product_list`).
+ *
+ * Calcula el orden con `groupCuratedByCategory` (puro y probado) y **delega la
+ * escritura en `reorderWaCatalog`**: sigue habiendo un solo escritor de
+ * `position`, así que no hay dos formas de reordenar que puedan divergir.
+ */
+export async function reorderWaCatalogByCategory(catalogId: string): Promise<{
+  moved: number
+}> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const { data: items, error } = await supabase
+    .from("whatsapp_catalog_items")
+    .select("product_id, position, is_visible")
+    .eq("catalog_id", catalogId)
+    .order("position")
+  if (error) throw new Error(error.message)
+
+  const productIds = (items ?? []).map((i) => i.product_id as number)
+  const { data: products } = productIds.length
+    ? await supabase.from("products").select("id, category_id").in("id", productIds)
+    : { data: [] as { id: number; category_id: number | null }[] }
+
+  const wa = await import("@/lib/whatsapp-catalogs")
+  const ordered = wa.groupCuratedByCategory(
+    (items ?? []) as WaCatalogs.WaCatalogItemRow[],
+    (products ?? []) as { id: number; category_id: number | null }[]
+  )
+  if (ordered.length === 0) return { moved: 0 }
+
+  await reorderWaCatalog(catalogId, ordered)
+  return { moved: ordered.length }
 }
 
 export interface WaSyncRunSummary {

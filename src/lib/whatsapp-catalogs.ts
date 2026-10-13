@@ -45,12 +45,28 @@ export function orderCatalogItems<T extends { position: number }>(items: T[]): T
   return [...items].sort((a, b) => a.position - b.position)
 }
 
+/**
+ * ¿Se puede sincronizar a Meta? Misma regla que `toWhatsAppProduct`: un
+ * producto sin precio (o en 0) no se puede publicar en el catálogo, así que
+ * tampoco se puede vender.
+ *
+ * Vive aparte para que la UI pueda marcar los que no van a sincronizar con la
+ * MISMA condición que los excluye del payload. Dos copias de `precio > 0` es
+ * como se llega a ofrecer un producto que después desaparece en silencio.
+ */
+export function isCatalogSyncable(p: {
+  price: number | null
+  sale_price: number | null
+}): boolean {
+  return (p.sale_price ?? p.price ?? 0) > 0
+}
+
 /** Mapea un producto admin a producto WhatsApp (null si precio inválido). */
 export function toWhatsAppProduct(
   p: AdminProduct & { stock_status?: string | null }
 ): WhatsAppProduct | null {
+  if (!isCatalogSyncable(p)) return null
   const price = p.sale_price ?? p.price ?? 0
-  if (price <= 0) return null
   return {
     id: String(p.id),
     name: p.name,
@@ -184,6 +200,109 @@ export function buildAdminProductListSections(
     title: title.slice(0, 24),
     product_items,
   }))
+}
+
+/**
+ * Separa una lista de productos en los que se pueden publicar y los que no.
+ *
+ * La UI declara el recorte con este número ("N sin precio quedan fuera") y el
+ * sync excluye con la MISMA regla, así que el conteo que ve el admin no puede
+ * discrepar de lo que de verdad se va a subir a Meta.
+ */
+export function splitSyncable<T extends { price: number | null; sale_price: number | null }>(
+  products: T[]
+): { syncable: T[]; unsyncable: T[] } {
+  const syncable: T[] = []
+  const unsyncable: T[] = []
+  for (const p of products) {
+    if (isCatalogSyncable(p)) syncable.push(p)
+    else unsyncable.push(p)
+  }
+  return { syncable, unsyncable }
+}
+
+/**
+ * Cuántos productos de un proveedor se pueden agregar todavía a la curaduría.
+ *
+ * `knownIds` son los productos que la lista de "Agregar" puede ofrecer: contar
+ * uno que no está ahí sería prometer un producto que el botón no va a agregar.
+ * Los ids repetidos cuentan una sola vez — `product_suppliers` admite varias
+ * filas del mismo producto (distinto SKU) y el conteo no debe inflarse.
+ */
+export function countAddableSupplierProducts(
+  productIds: readonly number[],
+  curatedIds: ReadonlySet<number>,
+  knownIds: ReadonlySet<number>
+): number {
+  const seen = new Set<number>()
+  let count = 0
+  for (const id of productIds) {
+    if (seen.has(id)) continue
+    seen.add(id)
+    if (curatedIds.has(id)) continue
+    if (!knownIds.has(id)) continue
+    count++
+  }
+  return count
+}
+
+/**
+ * Producto mínimo que necesita el agrupador: sólo su categoría.
+ *
+ * Es un tipo aparte de `AdminProduct` a propósito: agrupar no necesita precio
+ * ni imagen, y pedir el objeto entero obligaría a traer columnas que no se usan.
+ */
+export interface CategorizedProductRef {
+  id: number
+  category_id: number | null
+}
+
+/**
+ * Reordena la curaduría agrupándola por categoría. Devuelve los `product_id`
+ * en el orden nuevo, listo para `reorderWaCatalog`.
+ *
+ * DOS REGLAS, y ninguna es arbitraria:
+ *
+ * 1. **El orden de las categorías es el de su primera aparición** en la
+ *    curaduría actual. `categories` no tiene columna de orden (00001: sólo id,
+ *    name, slug, icon), así que cualquier orden sería inventado; agrupar sin
+ *    reordenar los grupos respeta el criterio que el admin ya venía aplicando.
+ * 2. **Dentro de cada grupo se conserva el orden actual.** La función junta, no
+ *    reordena: si alguien dejó los lácteos en un orden deliberado, sigue igual.
+ *
+ * La única excepción declarada: los productos **sin categoría van al final**.
+ * Un producto suelto no debería encabezar el catálogo que ve el cliente, y
+ * "sin categoría" no es una categoría que alguien eligió poner primero.
+ *
+ * Es idempotente: aplicarla sobre su propio resultado devuelve lo mismo (el
+ * orden de primera aparición ya es el orden de los grupos).
+ */
+export function groupCuratedByCategory(
+  curated: WaCatalogItemRow[],
+  products: CategorizedProductRef[]
+): number[] {
+  const categoryOf = new Map(products.map((p) => [p.id, p.category_id ?? null]))
+
+  const groups = new Map<number, number[]>()
+  const groupOrder: number[] = []
+  const uncategorized: number[] = []
+
+  for (const item of orderCatalogItems(curated.filter((i) => i.is_visible))) {
+    const categoryId = categoryOf.get(item.product_id) ?? null
+    if (categoryId === null) {
+      uncategorized.push(item.product_id)
+      continue
+    }
+    let group = groups.get(categoryId)
+    if (!group) {
+      group = []
+      groups.set(categoryId, group)
+      groupOrder.push(categoryId)
+    }
+    group.push(item.product_id)
+  }
+
+  return [...groupOrder.flatMap((categoryId) => groups.get(categoryId) ?? []), ...uncategorized]
 }
 
 /**

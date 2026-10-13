@@ -5,7 +5,12 @@ import {
   buildCatalogSyncDiff,
   compareMetaVsStore,
   computeCatalogHealth,
+  countAddableSupplierProducts,
+  groupCuratedByCategory,
+  isCatalogSyncable,
   orderCatalogItems,
+  splitSyncable,
+  toWhatsAppProduct,
   validateCatalogProducts,
   type AdminProduct,
   type WaCatalogItemRow,
@@ -35,6 +40,163 @@ describe("orderCatalogItems", () => {
   it("ordena por posición de la curaduría", () => {
     const ordered = orderCatalogItems([item(1, 3), item(2, 1), item(3, 2)])
     expect(ordered.map((i) => i.product_id)).toEqual([2, 3, 1])
+  })
+})
+
+describe("isCatalogSyncable", () => {
+  it("exige precio mayor a 0", () => {
+    expect(isCatalogSyncable({ price: 50, sale_price: null })).toBe(true)
+    expect(isCatalogSyncable({ price: 0, sale_price: null })).toBe(false)
+    expect(isCatalogSyncable({ price: null, sale_price: null })).toBe(false)
+  })
+
+  it("el precio de oferta manda sobre el de lista, incluso en 0", () => {
+    // Un producto con lista 0 y oferta 30 sí se puede vender.
+    expect(isCatalogSyncable({ price: 0, sale_price: 30 })).toBe(true)
+    // `sale_price = 0` GANA (?? no cae con 0), así que el producto queda sin
+    // precio. Es la semántica que ya tenía toWhatsAppProduct y la misma que
+    // pinta el panel (`$0.00`), así que se conserva tal cual: cambiarla
+    // alteraría lo que se empuja a Meta.
+    expect(isCatalogSyncable({ price: 30, sale_price: 0 })).toBe(false)
+  })
+
+  it("coincide con lo que toWhatsAppProduct descarta", () => {
+    // La UI marca "sin precio" con esta función y el sync excluye con
+    // toWhatsAppProduct: si divergieran, se ofrecería un producto que después
+    // desaparece en silencio.
+    for (const price of [0, null, 25]) {
+      const p = product({ price, sale_price: null })
+      expect(isCatalogSyncable(p)).toBe(toWhatsAppProduct(p) !== null)
+    }
+  })
+})
+
+describe("splitSyncable", () => {
+  it("separa los publicables de los que no tienen precio", () => {
+    const { syncable, unsyncable } = splitSyncable([
+      { id: 1, price: 50, sale_price: null },
+      { id: 2, price: 0, sale_price: null },
+      { id: 3, price: null, sale_price: null },
+      { id: 4, price: 80, sale_price: 60 },
+    ])
+    expect(syncable.map((p) => p.id)).toEqual([1, 4])
+    expect(unsyncable.map((p) => p.id)).toEqual([2, 3])
+  })
+
+  it("no pierde ni duplica: los dos grupos suman la entrada", () => {
+    const input = [
+      { id: 1, price: 10, sale_price: null },
+      { id: 2, price: 0, sale_price: null },
+    ]
+    const { syncable, unsyncable } = splitSyncable(input)
+    expect(syncable.length + unsyncable.length).toBe(input.length)
+  })
+
+  it("una lista vacía devuelve los dos grupos vacíos", () => {
+    expect(splitSyncable([])).toEqual({ syncable: [], unsyncable: [] })
+  })
+})
+
+describe("countAddableSupplierProducts", () => {
+  it("cuenta sólo los que no están ya en la curaduría", () => {
+    // 3 ya está curado ⇒ no se cuenta.
+    expect(countAddableSupplierProducts([1, 2, 3], new Set([3]), new Set([1, 2, 3]))).toBe(2)
+  })
+
+  it("no cuenta un producto que la lista no puede ofrecer", () => {
+    // 9 no está entre los conocidos: contarlo prometería algo que el botón no
+    // va a agregar.
+    expect(countAddableSupplierProducts([1, 9], new Set(), new Set([1]))).toBe(1)
+  })
+
+  it("un proveedor sin productos da 0", () => {
+    expect(countAddableSupplierProducts([], new Set([1]), new Set([1]))).toBe(0)
+  })
+
+  it("un proveedor con todo ya curado da 0", () => {
+    expect(countAddableSupplierProducts([1, 2], new Set([1, 2]), new Set([1, 2]))).toBe(0)
+  })
+
+  it("no cuenta ids repetidos dos veces", () => {
+    // `product_suppliers` puede tener varias filas del mismo producto (distinto
+    // SKU); el resumen ya deduplica, y el conteo tampoco debe inflarse.
+    expect(countAddableSupplierProducts([1, 1], new Set(), new Set([1]))).toBe(1)
+  })
+})
+
+describe("groupCuratedByCategory", () => {
+  const ref = (id: number, category_id: number | null) => ({ id, category_id })
+
+  it("junta los productos de cada categoría", () => {
+    // 1 y 3 son de la categoría 10; 2 y 4 de la 20.
+    const ordered = groupCuratedByCategory(
+      [item(1, 1), item(2, 2), item(3, 3), item(4, 4)],
+      [ref(1, 10), ref(2, 20), ref(3, 10), ref(4, 20)]
+    )
+    expect(ordered).toEqual([1, 3, 2, 4])
+  })
+
+  it("el orden de las categorías es el de su primera aparición", () => {
+    // La categoría 20 aparece primero (posición 1) ⇒ va antes, aunque su id sea
+    // mayor. No se inventa un orden: se respeta el que ya tenía la curaduría.
+    const ordered = groupCuratedByCategory(
+      [item(1, 1), item(2, 2), item(3, 3)],
+      [ref(1, 20), ref(2, 10), ref(3, 10)]
+    )
+    expect(ordered).toEqual([1, 2, 3])
+  })
+
+  it("conserva el orden interno de cada grupo", () => {
+    // 9 va antes que 5 dentro de la categoría 10: junta, no reordena.
+    const ordered = groupCuratedByCategory(
+      [item(9, 1), item(5, 2), item(7, 3)],
+      [ref(9, 10), ref(5, 10), ref(7, 20)]
+    )
+    expect(ordered).toEqual([9, 5, 7])
+  })
+
+  it("manda los productos sin categoría al final", () => {
+    // Aunque el sin categoría esté en la posición 1.
+    const ordered = groupCuratedByCategory(
+      [item(1, 1), item(2, 2), item(3, 3)],
+      [ref(1, null), ref(2, 10), ref(3, 20)]
+    )
+    expect(ordered).toEqual([2, 3, 1])
+  })
+
+  it("un producto ausente del catálogo cuenta como sin categoría", () => {
+    // No se puede saber su categoría: al final, no en medio de un grupo.
+    const ordered = groupCuratedByCategory([item(1, 1), item(2, 2)], [ref(1, 10)])
+    expect(ordered).toEqual([1, 2])
+  })
+
+  it("ignora las filas ocultas", () => {
+    const ordered = groupCuratedByCategory(
+      [item(1, 1), item(2, 2, false), item(3, 3)],
+      [ref(1, 10), ref(2, 10), ref(3, 10)]
+    )
+    expect(ordered).toEqual([1, 3])
+  })
+
+  it("no pierde ni duplica ids", () => {
+    const rows = [item(1, 1), item(2, 2), item(3, 3), item(4, 4), item(5, 5)]
+    const refs = [ref(1, 10), ref(2, 20), ref(3, 10), ref(4, null), ref(5, 20)]
+    const ordered = groupCuratedByCategory(rows, refs)
+    expect(ordered).toHaveLength(5)
+    expect(new Set(ordered).size).toBe(5)
+    expect([...ordered].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  it("es idempotente: aplicarla sobre su resultado no cambia nada", () => {
+    const rows = [item(1, 1), item(2, 2), item(3, 3), item(4, 4), item(5, 5)]
+    const refs = [ref(1, 10), ref(2, 20), ref(3, 10), ref(4, null), ref(5, 20)]
+    const once = groupCuratedByCategory(rows, refs)
+    const reordered = once.map((id, idx) => item(id, idx + 1))
+    expect(groupCuratedByCategory(reordered, refs)).toEqual(once)
+  })
+
+  it("una curaduría vacía devuelve vacío", () => {
+    expect(groupCuratedByCategory([], [])).toEqual([])
   })
 })
 
