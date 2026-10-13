@@ -23,6 +23,7 @@ import {
 } from "@/lib/whatsapp-catalog-shared"
 import { parseSupplierOverview, type SupplierOverview } from "@/lib/admin-supplier-panel"
 import { bulkPatch } from "@/lib/admin-product-bulk-run"
+import { NewCategoryControl } from "@/app/admin/components/NewCategoryControl"
 import {
   buildCatalogChatLink,
   buildCatalogShareText,
@@ -162,12 +163,8 @@ export default function AdminWhatsAppPage() {
   // al catálogo entero de un clic, así que un lote grande pide confirmación.
   const [armBulkRemove, setArmBulkRemove] = useState(false)
 
-  // Crear categoría desde este panel (00221/WH6): el botón "Ordenar por
-  // categoría" agrupa por categoría, así que poder crear una aquí —y llenarla—
-  // evita salir a /admin/productos a media curación.
-  const [newCatOpen, setNewCatOpen] = useState(false)
-  const [newCatName, setNewCatName] = useState("")
-  const [creatingCat, setCreatingCat] = useState(false)
+  // Crear categoría desde este panel: el control vive en
+  // `components/NewCategoryControl.tsx` y se pinta en las DOS tarjetas.
   const [assignCategoryId, setAssignCategoryId] = useState("")
 
   // Agregar TODO un proveedor de un clic (sin pasar por el modo selección).
@@ -992,45 +989,18 @@ export default function AdminWhatsAppPage() {
     )
 
   /**
-   * Crea una categoría desde este panel, reusando el endpoint del modal de
-   * producto (slug único, invalidación de caché y auditoría ya resueltos).
-   *
-   * **No la deja como filtro activo a propósito**: una categoría recién creada
-   * no tiene productos, así que filtrar por ella vaciaría la lista justo cuando
-   * el usuario necesita ver productos para moverlos dentro. En su lugar queda
-   * preseleccionada en el selector de "mover a categoría", que es el paso
-   * siguiente natural.
+   * Alta de categoría desde este panel: el control (`NewCategoryControl`) hace
+   * el fetch y aquí sólo se guarda el resultado. Se preselecciona en el
+   * selector de "mover a categoría" porque es el paso siguiente natural — una
+   * categoría recién creada está vacía y no filtra nada útil todavía.
    */
-  const handleCreateCategory = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const name = newCatName.trim()
-    if (!name || creatingCat) return
-    setCreatingCat(true)
-    setError(null)
-    try {
-      const res = await fetch("/api/admin/categories/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error ?? "Error al crear la categoría")
-      const created = data.category as AdminWhatsappCategory
-      setCategories((prev) =>
-        prev.some((c) => c.id === created.id) ? prev : [...prev, created]
-      )
-      setAssignCategoryId(String(created.id))
-      setNewCatName("")
-      setNewCatOpen(false)
-      setMessage({
-        ok: true,
-        text: `Categoría “${created.name}” creada. Selecciona productos y usa “Mover a la categoría” para llenarla.`,
-      })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al crear la categoría")
-    } finally {
-      setCreatingCat(false)
-    }
+  const handleCategoryCreated = (created: AdminWhatsappCategory) => {
+    setCategories((prev) => (prev.some((c) => c.id === created.id) ? prev : [...prev, created]))
+    setAssignCategoryId(String(created.id))
+    setMessage({
+      ok: true,
+      text: `Categoría “${created.name}” creada. Selecciona productos y usa “Mover a la categoría” para llenarla.`,
+    })
   }
 
   /**
@@ -1881,6 +1851,16 @@ export default function AdminWhatsAppPage() {
               )}
             </p>
 
+            {/*
+              Alta de categoría TAMBIÉN desde aquí: "Ordenar por categoría"
+              agrupa por categoría, así que crear una es parte del mismo
+              trabajo. El control es el mismo componente que el de la tarjeta
+              de al lado — una sola implementación del alta.
+            */}
+            <div className="mb-4">
+              <NewCategoryControl onCreated={handleCategoryCreated} busy={busy} />
+            </div>
+
             {curated.length === 0 ? (
               <p className="text-sm text-[#B0B3B8] py-8 text-center">
                 Catálogo vacío. Agrega productos de la lista de la derecha.
@@ -2296,43 +2276,7 @@ export default function AdminWhatsAppPage() {
               que no existir.
             */}
             <div className="mb-3">
-              {newCatOpen ? (
-                <form onSubmit={handleCreateCategory} className="flex flex-wrap gap-2">
-                  <input
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
-                    placeholder="Nombre de la nueva categoría…"
-                    aria-label="Nombre de la nueva categoría"
-                    autoFocus
-                    className="flex-1 min-w-[12rem] px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={creatingCat || !newCatName.trim()}
-                    className="px-4 py-2 rounded-xl bg-[#0E7A0E] text-white text-xs font-bold hover:bg-[#0D720D] disabled:opacity-50"
-                  >
-                    {creatingCat ? "Creando…" : "Crear categoría"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewCatOpen(false)
-                      setNewCatName("")
-                    }}
-                    className="px-3 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[#EDEAE4]"
-                  >
-                    Cancelar
-                  </button>
-                </form>
-              ) : (
-                <button
-                  onClick={() => setNewCatOpen(true)}
-                  aria-expanded={false}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-dashed border-[#0E7A0E]/40 text-[#0E7A0E] hover:bg-[#E7F8EE]"
-                >
-                  + Nueva categoría
-                </button>
-              )}
+              <NewCategoryControl onCreated={handleCategoryCreated} busy={busy} />
             </div>
 
             {/* Selección explícita: todos los filtrados o sólo algunos */}
