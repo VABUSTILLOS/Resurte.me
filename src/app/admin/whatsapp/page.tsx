@@ -173,6 +173,7 @@ export default function AdminWhatsAppPage() {
   // consecuencia exacta (cuántos productos quedan sin categoría).
   const [armDeleteCategoryId, setArmDeleteCategoryId] = useState<number | null>(null)
   const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(null)
+  const [armDeleteAllEmpty, setArmDeleteAllEmpty] = useState(false)
 
   // Agregar TODO un proveedor de un clic (sin pasar por el modo selección).
   const [armSupplierAdd, setArmSupplierAdd] = useState(false)
@@ -407,6 +408,25 @@ export default function AdminWhatsAppPage() {
   }, [products])
 
   /**
+   * Categorías SIN ningún producto en toda la tienda.
+   *
+   * Son las únicas borrables desde este panel con seguridad: no dejan huérfano
+   * a nadie. Las que tienen productos se excluyen a propósito — borrarlas es una
+   * operación de toda la tienda (`ON DELETE SET NULL`), no del catálogo.
+   *
+   * No se limita a las que están en el catálogo: los duplicados vacíos no
+   * aparecen ahí (no tienen productos curados), y son justo lo que hay que poder
+   * borrar.
+   */
+  const emptyCategories = useMemo(
+    () =>
+      categories
+        .filter((c) => (totalProductsByCategory.get(c.id) ?? 0) === 0)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [categories, totalProductsByCategory]
+  )
+
+  /**
    * Borra una categoría. Doble confirmación: la primera pulsación sólo arma y
    * muestra cuántos productos quedarían sin categoría; la segunda borra.
    */
@@ -438,6 +458,49 @@ export default function AdminWhatsAppPage() {
           ? `Categoría “${r.name}” borrada. ${r.orphaned} producto(s) quedaron sin categoría.`
           : `Categoría “${r.name}” borrada.`
     ).finally(() => setDeletingCategoryId(null))
+  }
+
+  /**
+   * Borra TODAS las categorías vacías, de una en una.
+   *
+   * Una petición por categoría (no un endpoint nuevo) para que cada borrado
+   * quede auditado por separado con su nombre — y para que un fallo a mitad no
+   * deje el resto a medias en silencio: se cuentan y se reportan.
+   */
+  const handleDeleteAllEmpty = () => {
+    if (!armDeleteAllEmpty) {
+      setArmDeleteAllEmpty(true)
+      return
+    }
+    setArmDeleteAllEmpty(false)
+    run(
+      async () => {
+        let ok = 0
+        let failed = 0
+        for (const category of emptyCategories) {
+          try {
+            const res = await fetch("/api/admin/categories/delete", {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ categoryId: category.id }),
+            })
+            if (res.ok) {
+              ok++
+              setCategories((prev) => prev.filter((c) => c.id !== category.id))
+            } else {
+              failed++
+            }
+          } catch {
+            failed++
+          }
+        }
+        return { ok, failed }
+      },
+      (r) =>
+        r.failed > 0
+          ? `${r.ok} categorías vacías borradas; ${r.failed} no se pudieron.`
+          : `${r.ok} categorías vacías borradas.`
+    )
   }
 
   /**
@@ -1954,6 +2017,11 @@ export default function AdminWhatsAppPage() {
               Confirmación visible + sobre qué actúa "Ordenar por categoría".
               Sin esto, crear desde aquí no cambiaba NADA a la vista y el usuario
               reintentó tres veces (tres "Frutas y Verduras" en la base).
+
+              SIN ✕: borrar una categoría CON productos es una operación de toda
+              la tienda (`ON DELETE SET NULL` deja huérfanos a TODOS sus
+              productos, no sólo a los del catálogo), y este panel es del
+              catálogo de WhatsApp. El borrado vive abajo, limitado a las vacías.
             */}
             {curatedCategoryTally.length > 0 && (
               <div className="mb-4">
@@ -1961,76 +2029,24 @@ export default function AdminWhatsAppPage() {
                   Categorías en este catálogo
                 </p>
                 <div className="space-y-1">
-                  {curatedCategoryTally.map((c) => {
-                    const total = totalProductsByCategory.get(c.id) ?? 0
-                    const armed = armDeleteCategoryId === c.id
-                    return (
-                      <div
-                        key={c.id}
-                        className={`rounded-lg border px-2.5 py-1.5 ${
-                          c.id === lastCreatedCategoryId
-                            ? "border-[#0E7A0E]/30 bg-[#E7F8EE]"
-                            : "border-[#F0F1F2] bg-[#FAFAF9]"
-                        }`}
+                  {curatedCategoryTally.map((c) => (
+                    <div
+                      key={c.id}
+                      className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${
+                        c.id === lastCreatedCategoryId
+                          ? "border-[#0E7A0E]/30 bg-[#E7F8EE]"
+                          : "border-[#F0F1F2] bg-[#FAFAF9]"
+                      }`}
+                    >
+                      <span className="flex-1 min-w-0 text-xs text-[#242529] truncate">{c.name}</span>
+                      <span
+                        className="text-[10px] font-bold text-[var(--text-secondary)]"
+                        title={`${c.count} en este catálogo · ${totalProductsByCategory.get(c.id) ?? 0} en total`}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="flex-1 min-w-0 text-xs text-[#242529] truncate">
-                            {c.name}
-                          </span>
-                          <span
-                            className="text-[10px] font-bold text-[var(--text-secondary)]"
-                            title={`${c.count} en este catálogo · ${total} en total`}
-                          >
-                            {c.count}
-                          </span>
-                          {armed ? (
-                            <button
-                              onClick={() => setArmDeleteCategoryId(null)}
-                              className="px-2 py-0.5 rounded text-[11px] font-semibold text-[var(--text-secondary)] hover:bg-[#EDEAE4]"
-                            >
-                              No
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setArmDeleteCategoryId(c.id)}
-                              disabled={busy || deletingCategoryId === c.id}
-                              aria-label={`Borrar la categoría ${c.name}`}
-                              title={`Borrar “${c.name}”`}
-                              className="p-1 text-[#B0B3B8] hover:text-red-700 disabled:opacity-40"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-
-                        {/*
-                          La consecuencia va ANTES de borrar, con el número
-                          exacto: `products.category_id` es ON DELETE SET NULL,
-                          así que los productos no se pierden pero quedan SIN
-                          categoría. Ocultarlo convertiría un borrado de 200
-                          productos en una sorpresa.
-                        */}
-                        {armed && (
-                          <div className="mt-1.5 space-y-1.5">
-                            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                              {total > 0
-                                ? `${total} producto(s) quedarán sin categoría (no se borran ni se despublican).`
-                                : "No tiene productos: se puede borrar sin consecuencias."}
-                            </p>
-                            <button
-                              onClick={() => handleDeleteCategory(c.id)}
-                              disabled={busy || deletingCategoryId === c.id}
-                              className="w-full px-3 py-1.5 rounded-lg bg-red-600 text-white text-[11px] font-bold hover:bg-red-700 disabled:opacity-50"
-                            >
-                              {deletingCategoryId === c.id
-                                ? "Borrando…"
-                                : `¿Confirmar? Borrar “${c.name}”`}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                        {c.count}
+                      </span>
+                    </div>
+                  ))}
                 </div>
                 {lastCreatedCategoryId !== null &&
                   curatedCategoryTally.some((c) => c.id === lastCreatedCategoryId && c.count === 0) && (
@@ -2039,6 +2055,76 @@ export default function AdminWhatsAppPage() {
                       categoría” en la tarjeta de al lado.
                     </p>
                   )}
+              </div>
+            )}
+
+            {/*
+              Borrar SÓLO categorías vacías.
+
+              Es lo único borrable con seguridad desde aquí: una categoría sin
+              productos no deja huérfano a nadie, así que borrarla no toca la
+              tienda. Las que sí tienen productos no ofrecen borrado en este
+              panel a propósito — el `ON DELETE SET NULL` de `products.category_id`
+              las convierte en una operación de toda la tienda.
+            */}
+            {emptyCategories.length > 0 && (
+              <div className="mb-4 rounded-xl border border-[#E8E9EB] bg-[#FAFAF9] p-3">
+                <p className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-1.5">
+                  Categorías vacías ({emptyCategories.length})
+                </p>
+                <p className="text-[11px] text-[var(--text-secondary)] mb-2">
+                  No tienen productos, así que borrarlas no afecta a ningún producto de la tienda.
+                </p>
+                <div className="space-y-1">
+                  {emptyCategories.map((c) => (
+                    <div key={c.id} className="flex items-center gap-2 rounded-lg border border-[#F0F1F2] bg-white px-2.5 py-1.5">
+                      <span className="flex-1 min-w-0 text-xs text-[#242529] truncate">{c.name}</span>
+                      <span className="text-[10px] text-[var(--text-secondary)]">{c.slug}</span>
+                      {armDeleteCategoryId === c.id ? (
+                        <>
+                          <button
+                            onClick={() => setArmDeleteCategoryId(null)}
+                            className="px-2 py-0.5 rounded text-[11px] font-semibold text-[var(--text-secondary)] hover:bg-[#EDEAE4]"
+                          >
+                            No
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCategory(c.id)}
+                            disabled={busy || deletingCategoryId === c.id}
+                            className="px-2 py-0.5 rounded bg-red-600 text-white text-[11px] font-bold hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {deletingCategoryId === c.id ? "Borrando…" : "Sí, borrar"}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setArmDeleteCategoryId(c.id)}
+                          disabled={busy}
+                          aria-label={`Borrar la categoría vacía ${c.name}`}
+                          title={`Borrar “${c.name}”`}
+                          className="p-1 text-[#B0B3B8] hover:text-red-700 disabled:opacity-40"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {emptyCategories.length > 1 && (
+                  <button
+                    onClick={handleDeleteAllEmpty}
+                    disabled={busy}
+                    className={`w-full mt-2 px-3 py-1.5 rounded-lg text-[11px] font-bold disabled:opacity-50 ${
+                      armDeleteAllEmpty
+                        ? "bg-red-700 text-white hover:bg-red-800"
+                        : "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                    }`}
+                  >
+                    {armDeleteAllEmpty
+                      ? `¿Confirmar? Borrar las ${emptyCategories.length} categorías vacías`
+                      : `Borrar las ${emptyCategories.length} categorías vacías`}
+                  </button>
+                )}
               </div>
             )}
 
