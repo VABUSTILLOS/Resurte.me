@@ -1079,7 +1079,11 @@ export default function AdminWhatsAppPage() {
   const handleCategoryCreated = (created: AdminWhatsappCategory, existed: boolean) => {
     setCategories((prev) => (prev.some((c) => c.id === created.id) ? prev : [...prev, created]))
     setAssignCategoryId(String(created.id))
-    setLastCreatedCategoryId(created.id)
+    // `lastCreatedCategoryId` sólo cuando de VERDAD se creó. Marcarlo también en
+    // el caso "ya existía" resaltaba en verde una categoría vieja con el texto
+    // "La categoría nueva ya está guardada", que la presentaba como recién
+    // creada — y eso invita a borrarla creyendo que es un duplicado.
+    setLastCreatedCategoryId(existed ? null : created.id)
     setMessage({
       ok: true,
       text: existed
