@@ -622,6 +622,22 @@
   reordena. Los productos **sin categoría van al final** (única excepción
   declarada). Es idempotente, y la escritura se delega en `reorderWaCatalog`,
   que sigue siendo el único escritor de `position`.
+- **El panel del catálogo sólo borra categorías VACÍAS (WH10)**: las categorías
+  son **globales** —`products.category_id` apunta a la misma tabla que usa la
+  tienda—, así que **no existe** "borrar una categoría del catálogo de WhatsApp":
+  borrarla es una operación de toda la tienda y, por el `ON DELETE SET NULL` de
+  `00001`, deja huérfanos a **todos** sus productos, no sólo a los curados. Por
+  eso el ✕ se quitó de "Categorías en este catálogo" y el borrado vive en
+  "Categorías vacías (N)": una categoría sin productos no deja huérfano a nadie,
+  así que borrarla no toca la tienda. Ese apartado lista **todas** las vacías, no
+  sólo las del catálogo — los duplicados del bug del alta no aparecen en el
+  catálogo porque no tienen productos curados, y son justo lo que hay que borrar.
+  El borrado masivo es una petición por categoría (no un endpoint nuevo) para que
+  cada una quede auditada con su nombre y un fallo a mitad se cuente, no se
+  pierda. **Caso real que lo motivó**: se borró "Frutas y Verduras" (la del seed)
+  creyendo que era un duplicado y dejó 109 productos sin categoría; se
+  restauraron con `00222`, identificando las filas por su `updated_at` compartido
+  (`products_touch_updated_at`, `00119`, escribe el instante de la transacción).
 - **Borrar categoría: la consecuencia va ANTES del clic (WH9)**: cada fila de
   "Categorías en este catálogo" tiene un ✕ que borra la categoría
   (`DELETE /api/admin/categories/delete`, con body JSON como el de productos).
