@@ -17,6 +17,7 @@ import { getCategoryIcon } from "@/lib/utils"
 import { resolveDefaultCatalog } from "@/lib/whatsapp-default-catalog"
 import {
   addableSupplierProductIds,
+  orderCatalogCategories,
   countAddableSupplierProducts,
   isCatalogSyncable,
   splitSyncable,
@@ -37,6 +38,8 @@ import {
   getWaMembershipReconcile,
   applyWaMembershipReconcile,
   reorderWaCatalogByCategory,
+  getWaCatalogCategoryOrder,
+  reorderWaCatalogCategories,
   getWaCatalogItems,
   setWaCatalogProduct,
   reorderWaCatalog,
@@ -175,6 +178,11 @@ export default function AdminWhatsAppPage() {
   const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(null)
   const [armDeleteAllEmpty, setArmDeleteAllEmpty] = useState(false)
 
+  // Orden de categorías declarado por el admin (00223) + arrastre (DnD nativo).
+  const [categoryOrder, setCategoryOrder] = useState<number[]>([])
+  const [catDragId, setCatDragId] = useState<number | null>(null)
+  const [catDragOverId, setCatDragOverId] = useState<number | null>(null)
+
   // Agregar TODO un proveedor de un clic (sin pasar por el modo selección).
   const [armSupplierAdd, setArmSupplierAdd] = useState(false)
   // Si el resumen de proveedores no llega, se dice: un control que desaparece
@@ -246,16 +254,18 @@ export default function AdminWhatsAppPage() {
 
   const loadItems = useCallback(async () => {
     if (!selectedCatalog) return
-    const [items, runs, queued, queueList] = await Promise.all([
+    const [items, runs, queued, queueList, order] = await Promise.all([
       getWaCatalogItems(selectedCatalog.id),
       getWaCatalogSyncHistory(selectedCatalog.id, 5).catch(() => [] as WaSyncRunSummary[]),
       getWaCatalogQueueCount(selectedCatalog.id).catch(() => 0),
       getWaCatalogQueue(selectedCatalog.id).catch(() => [] as WaQueueItem[]),
+      getWaCatalogCategoryOrder(selectedCatalog.id).catch(() => [] as number[]),
     ])
     setCatalogItems(items)
     setHistory(runs)
     setQueueCount(queued)
     setQueueItems(queueList)
+    setCategoryOrder(order)
   }, [selectedCatalog])
 
   useEffect(() => {
@@ -306,7 +316,8 @@ export default function AdminWhatsAppPage() {
   // agrupado por categoría, máx 30 ítems).
   const previewSections = useMemo(() => {
     const catName = new Map(categories.map((c) => [c.id, c.name]))
-    const byCat = new Map<string, AdminWhatsappProduct[]>()
+    const byCat = new Map<string, { categoryId: number | null; products: AdminWhatsappProduct[] }>()
+    const appearance: string[] = []
     let count = 0
     for (const item of curated) {
       if (count >= 30) break
@@ -314,12 +325,26 @@ export default function AdminWhatsAppPage() {
       if (!p) continue
       count++
       const title = (p.category_id ? catName.get(p.category_id) : null) ?? "Catálogo"
-      const list = byCat.get(title) ?? []
-      list.push(p)
-      byCat.set(title, list)
+      let group = byCat.get(title)
+      if (!group) {
+        group = { categoryId: p.category_id ?? null, products: [] }
+        byCat.set(title, group)
+        appearance.push(title)
+      }
+      group.products.push(p)
     }
-    return [...byCat.entries()].map(([title, prods]) => ({ title: title.slice(0, 24), products: prods }))
-  }, [curated, productById, categories])
+    // Mismo orden que el mensaje real: el declarado manda, el resto conserva el
+    // de la curaduría. Si no coincidieran, la vista previa mentiría.
+    const rank = new Map(categoryOrder.map((id, index) => [id, index]))
+    const rankOf = (title: string) => {
+      const categoryId = byCat.get(title)?.categoryId
+      if (categoryId == null || !rank.has(categoryId)) return Number.MAX_SAFE_INTEGER
+      return rank.get(categoryId) as number
+    }
+    return [...appearance]
+      .sort((a, b) => rankOf(a) - rankOf(b))
+      .map((title) => ({ title: title.slice(0, 24), products: byCat.get(title)?.products ?? [] }))
+  }, [curated, productById, categories, categoryOrder])
 
   /**
    * Ids de producto del proveedor elegido (`null` = sin filtro de proveedor).
@@ -504,6 +529,40 @@ export default function AdminWhatsAppPage() {
   }
 
   /**
+   * Mueve (o inserta) una categoría antes de `targetId` y guarda el orden.
+   *
+   * Sirve para los dos gestos: reordenar dentro de la tarjeta del catálogo, y
+   * arrastrar una categoría desde los chips de "Agregar productos" — que llega
+   * sin estar en la lista, así que se inserta en la posición donde se soltó.
+   */
+  const handleCategoryDrop = (targetId: number) =>
+    run(
+      async () => {
+        if (!selectedCatalog || catDragId == null || catDragId === targetId) return { saved: 0 }
+        const ids = catalogCategoryList.map((c) => c.id)
+        const from = ids.indexOf(catDragId)
+        if (from >= 0) ids.splice(from, 1)
+        const to = ids.indexOf(targetId)
+        ids.splice(to < 0 ? ids.length : to, 0, catDragId)
+        setCategoryOrder(ids)
+        return reorderWaCatalogCategories(selectedCatalog.id, ids)
+      },
+      (r) => `Orden de categorías guardado (${r.saved}).`
+    )
+
+  const endCategoryDrag = () => {
+    setCatDragId(null)
+    setCatDragOverId(null)
+  }
+
+  /** Props de arrastre de un chip/row de categoría (mismo gesto en las dos tarjetas). */
+  const categoryDragProps = (categoryId: number) => ({
+    draggable: true,
+    onDragStart: () => setCatDragId(categoryId),
+    onDragEnd: endCategoryDrag,
+  })
+
+  /**
    * Cómo está repartido el catálogo por categoría, para la tarjeta del catálogo.
    *
    * Se calcula con lo que YA está cargado (`curated` + `productById`), sin
@@ -523,6 +582,32 @@ export default function AdminWhatsAppPage() {
       .map((c) => ({ id: c.id, name: c.name, count: counts.get(c.id) ?? 0 }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
   }, [curated, productById, categories, lastCreatedCategoryId])
+
+  /**
+   * Categorías que el panel muestra, en el orden declarado por el admin.
+   *
+   * Une tres fuentes: las que tienen productos curados, las DECLARADAS (aunque
+   * hoy no tengan productos, porque el admin las colocó) y la recién creada.
+   * El orden lo decide `orderCatalogCategories`: lo declarado primero, el resto
+   * conserva el de la curaduría.
+   *
+   * Sin `useMemo` a propósito: es una lista de decenas de elementos y el React
+   * Compiler no puede preservar la memoización de esta cadena (`curatedCategoryTally`
+   * ya es un memo), así que declararla memoizada sólo producía un error de lint
+   * sin ganancia real.
+   */
+  const catalogCategoryList = (() => {
+    const inCatalog = new Map(curatedCategoryTally.map((c) => [c.id, c.count]))
+    const ids = new Set<number>([...inCatalog.keys(), ...categoryOrder])
+    if (lastCreatedCategoryId !== null) ids.add(lastCreatedCategoryId)
+    const present = [...ids].map((id) => ({
+      id,
+      name: categories.find((c) => c.id === id)?.name ?? `#${id}`,
+      count: inCatalog.get(id) ?? 0,
+    }))
+    return orderCatalogCategories(categoryOrder, present)
+  })()
+
 
   async function run<T>(fn: () => Promise<T>, okText?: (r: T) => string) {
     setBusy(true)
@@ -2028,16 +2113,32 @@ export default function AdminWhatsAppPage() {
                 <p className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-1.5">
                   Categorías en este catálogo
                 </p>
+                <p className="text-[11px] text-[var(--text-secondary)] mb-1.5">
+                  Arrástralas para ordenarlas: este orden es el de las <strong>secciones</strong> del
+                  mensaje. También puedes traer una categoría desde los chips de al lado.
+                </p>
                 <div className="space-y-1">
-                  {curatedCategoryTally.map((c) => (
+                  {catalogCategoryList.map((c) => (
                     <div
                       key={c.id}
-                      className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${
-                        c.id === lastCreatedCategoryId
-                          ? "border-[#0E7A0E]/30 bg-[#E7F8EE]"
-                          : "border-[#F0F1F2] bg-[#FAFAF9]"
-                      }`}
+                      {...categoryDragProps(c.id)}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        if (catDragOverId !== c.id) setCatDragOverId(c.id)
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        handleCategoryDrop(c.id).catch(() => {})
+                      }}
+                      className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 cursor-grab active:cursor-grabbing ${
+                        catDragOverId === c.id && catDragId !== c.id
+                          ? "border-[#0E7A0E] bg-[#E7F8EE] ring-2 ring-[#0E7A0E]/30"
+                          : c.id === lastCreatedCategoryId
+                            ? "border-[#0E7A0E]/30 bg-[#E7F8EE]"
+                            : "border-[#F0F1F2] bg-[#FAFAF9]"
+                      } ${catDragId === c.id ? "opacity-50" : ""}`}
                     >
+                      <GripVertical className="w-3.5 h-3.5 text-[#B0B3B8] shrink-0" aria-hidden="true" />
                       <span className="flex-1 min-w-0 text-xs text-[#242529] truncate">{c.name}</span>
                       <span
                         className="text-[10px] font-bold text-[var(--text-secondary)]"
@@ -2049,7 +2150,7 @@ export default function AdminWhatsAppPage() {
                   ))}
                 </div>
                 {lastCreatedCategoryId !== null &&
-                  curatedCategoryTally.some((c) => c.id === lastCreatedCategoryId && c.count === 0) && (
+                  catalogCategoryList.some((c) => c.id === lastCreatedCategoryId && c.count === 0) && (
                     <p className="text-[11px] text-[#0F7A3D] mt-1.5">
                       La categoría nueva ya está guardada. Asígnale productos con “Mover a la
                       categoría” en la tarjeta de al lado.
@@ -2528,8 +2629,12 @@ export default function AdminWhatsAppPage() {
               {categories.map((cat) => (
                 <button
                   key={cat.id}
+                  {...categoryDragProps(cat.id)}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium ${selectedCategory === cat.id ? "bg-[#0E7A0E] text-white" : "bg-[#F5F3F0] text-[var(--text-secondary)]"}`}
+                  title={`${cat.name} — clic para filtrar, o arrástrala a “Categorías en este catálogo” para colocarla en el orden`}
+                  className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium cursor-grab active:cursor-grabbing ${
+                    selectedCategory === cat.id ? "bg-[#0E7A0E] text-white" : "bg-[#F5F3F0] text-[var(--text-secondary)]"
+                  } ${catDragId === cat.id ? "opacity-50" : ""}`}
                 >
                   {getCategoryIcon(cat.icon ?? "", cat.slug)} {cat.name}
                 </button>

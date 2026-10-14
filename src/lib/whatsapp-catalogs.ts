@@ -168,13 +168,19 @@ export interface AdminProductListSection {
 /**
  * Secciones product_list agrupadas por categoría (máx 30 ítems), con el
  * ORDEN EXACTO de la curaduría del admin.
+ *
+ * `categoryOrder` es el orden de categorías declarado por el admin (00223).
+ * Vacío = comportamiento histórico: orden de primera aparición en la curaduría.
+ * Las categorías no declaradas van después, conservando ese mismo orden.
  */
 export function buildAdminProductListSections(
   curated: WaCatalogItemRow[],
-  products: AdminProduct[]
+  products: AdminProduct[],
+  categoryOrder: number[] = []
 ): AdminProductListSection[] {
   const byId = new Map(products.map((p) => [p.id, p]))
-  const byCat = new Map<string, { product_retailer_id: string }[]>()
+  const byCat = new Map<string, { categoryId: number | null; items: { product_retailer_id: string }[] }>()
+  const appearance: string[] = []
   let count = 0
   for (const item of orderCatalogItems(curated.filter((i) => i.is_visible))) {
     if (count >= 30) break
@@ -182,14 +188,28 @@ export function buildAdminProductListSections(
     if (!p) continue
     count++
     const title = p.category_name ?? "Catálogo"
-    const list = byCat.get(title) ?? []
-    list.push({ product_retailer_id: String(p.id) })
-    byCat.set(title, list)
+    let group = byCat.get(title)
+    if (!group) {
+      group = { categoryId: p.category_id ?? null, items: [] }
+      byCat.set(title, group)
+      appearance.push(title)
+    }
+    group.items.push({ product_retailer_id: String(p.id) })
   }
-  return [...byCat.entries()].map(([title, product_items]) => ({
-    title: title.slice(0, 24),
-    product_items,
-  }))
+
+  const rank = new Map(categoryOrder.map((id, index) => [id, index]))
+  const rankOf = (title: string) => {
+    const categoryId = byCat.get(title)?.categoryId
+    if (categoryId == null || !rank.has(categoryId)) return Number.MAX_SAFE_INTEGER
+    return rank.get(categoryId) as number
+  }
+
+  return [...appearance]
+    .sort((a, b) => rankOf(a) - rankOf(b))
+    .map((title) => ({
+      title: title.slice(0, 24),
+      product_items: byCat.get(title)?.items ?? [],
+    }))
 }
 
 /**

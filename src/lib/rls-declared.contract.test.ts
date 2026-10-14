@@ -164,6 +164,7 @@ const MODELO_DE_ACCESO: Record<string, string> = {
     "RPC consume_rate_limit (EXECUTE sólo a service_role desde 00165) desde src/lib/rate-limit.ts, con el cliente de servicio",
   suppliers: "createServiceClient() desde src/app/api/admin/suppliers/route.ts",
   whatsapp_automation_sends: "createServiceClient() desde src/app/admin/actions.ts",
+  whatsapp_catalog_categories: "createServiceClient() desde src/app/admin/actions.ts",
   whatsapp_catalog_items: "createServiceClient() desde src/app/admin/actions.ts",
   whatsapp_catalogs: "createServiceClient() desde src/app/admin/actions.ts",
   whatsapp_sync_items: "createServiceClient() desde src/app/admin/actions.ts",
@@ -225,7 +226,10 @@ describe("perímetro — RLS sin políticas", () => {
 
   it("el registro cubre exactamente el perímetro medido", () => {
     expect(DECLARADAS).toEqual(MEDICION.sinPoliticas)
-    expect(DECLARADAS).toHaveLength(25)
+    // Conteo fijo a propósito: es un tripwire, no un dato. Al añadir una tabla
+    // con RLS y sin políticas hay que venir aquí y actualizarlo, que es lo que
+    // obliga a mirar si de verdad está declarada en el registro.
+    expect(DECLARADAS).toHaveLength(26)
   })
 
   it("ninguna entrada está vacía y todas nombran dónde vive el acceso", () => {

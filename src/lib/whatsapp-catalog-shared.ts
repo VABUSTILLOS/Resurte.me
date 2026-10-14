@@ -16,6 +16,25 @@
 // ============================================================
 
 /**
+ * Orden efectivo de las categorías de un catálogo.
+ *
+ * Las **declaradas** van primero, en su orden; el resto conserva el orden en que
+ * llegan (estable). Es el orden que se usa tanto para pintar la lista del panel
+ * como para las secciones del mensaje, así que lo que el admin ve y lo que el
+ * cliente recibe no pueden discrepar.
+ */
+export function orderCatalogCategories<T extends { id: number }>(
+  declared: number[],
+  present: T[]
+): T[] {
+  const rank = new Map(declared.map((id, index) => [id, index]))
+  const positionOf = (id: number) =>
+    rank.has(id) ? (rank.get(id) as number) : Number.MAX_SAFE_INTEGER
+  // `sort` es estable desde ES2019: los empates conservan el orden de llegada.
+  return [...present].sort((a, b) => positionOf(a.id) - positionOf(b.id))
+}
+
+/**
  * ¿Se puede sincronizar a Meta? Un producto sin precio (o en 0) no se puede
  * publicar en el catálogo, así que tampoco se puede vender.
  *

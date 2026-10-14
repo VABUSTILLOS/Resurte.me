@@ -16,6 +16,7 @@ import {
   addableSupplierProductIds,
   countAddableSupplierProducts,
   isCatalogSyncable,
+  orderCatalogCategories,
   splitSyncable,
 } from "./whatsapp-catalog-shared"
 
@@ -261,6 +262,40 @@ describe("buildAdminCatalogProducts", () => {
   })
 })
 
+describe("orderCatalogCategories", () => {
+  const cats = [{ id: 10 }, { id: 20 }, { id: 30 }]
+
+  it("sin orden declarado conserva el orden de llegada", () => {
+    expect(orderCatalogCategories([], cats).map((c) => c.id)).toEqual([10, 20, 30])
+  })
+
+  it("las declaradas van primero, en su orden", () => {
+    expect(orderCatalogCategories([30, 10], cats).map((c) => c.id)).toEqual([30, 10, 20])
+  })
+
+  it("las no declaradas van después, conservando su orden", () => {
+    expect(orderCatalogCategories([20], cats).map((c) => c.id)).toEqual([20, 10, 30])
+  })
+
+  it("ignora ids declarados que ya no existen", () => {
+    // Una categoría borrada deja su id en el orden guardado: no debe crear un
+    // hueco ni desplazar a las demás.
+    expect(orderCatalogCategories([99, 30], cats).map((c) => c.id)).toEqual([30, 10, 20])
+  })
+
+  it("no pierde ni duplica elementos", () => {
+    const out = orderCatalogCategories([30, 10, 20], cats)
+    expect(out).toHaveLength(3)
+    expect(new Set(out.map((c) => c.id)).size).toBe(3)
+  })
+
+  it("es idempotente: aplicar el resultado como orden no cambia nada", () => {
+    const once = orderCatalogCategories([30, 10], cats)
+    const again = orderCatalogCategories(once.map((c) => c.id), cats)
+    expect(again.map((c) => c.id)).toEqual(once.map((c) => c.id))
+  })
+})
+
 describe("buildAdminProductListSections", () => {
   it("agrupa por categoría preservando el orden y limita a 30", () => {
     const products = [
@@ -275,6 +310,51 @@ describe("buildAdminProductListSections", () => {
       product_items: [{ product_retailer_id: "1" }, { product_retailer_id: "3" }],
     })
     expect(sections[1]?.title).toBe("Frutas")
+  })
+
+  it("respeta el orden de categorías declarado por el admin", () => {
+    // Sin orden: Lácteos (aparece primero), Frutas. Con el orden declarado,
+    // Frutas pasa delante — es el gesto de arrastrar.
+    const products = [
+      product({ id: 1, category_id: 10, category_name: "Lácteos" }),
+      product({ id: 2, category_id: 20, category_name: "Frutas" }),
+      product({ id: 3, category_id: 10, category_name: "Lácteos" }),
+    ]
+    const rows = [item(1, 1), item(2, 2), item(3, 3)]
+    expect(buildAdminProductListSections(rows, products).map((s) => s.title)).toEqual([
+      "Lácteos",
+      "Frutas",
+    ])
+    expect(buildAdminProductListSections(rows, products, [20, 10]).map((s) => s.title)).toEqual([
+      "Frutas",
+      "Lácteos",
+    ])
+  })
+
+  it("las categorías no declaradas van después de las declaradas", () => {
+    const products = [
+      product({ id: 1, category_id: 10, category_name: "Lácteos" }),
+      product({ id: 2, category_id: 20, category_name: "Frutas" }),
+      product({ id: 3, category_id: 30, category_name: "Carnes" }),
+    ]
+    const sections = buildAdminProductListSections(
+      [item(1, 1), item(2, 2), item(3, 3)],
+      products,
+      [30]
+    )
+    expect(sections.map((s) => s.title)).toEqual(["Carnes", "Lácteos", "Frutas"])
+  })
+
+  it("dentro de una sección conserva el orden de la curaduría", () => {
+    const products = [
+      product({ id: 3, category_id: 10, category_name: "Lácteos" }),
+      product({ id: 1, category_id: 10, category_name: "Lácteos" }),
+    ]
+    const sections = buildAdminProductListSections([item(3, 1), item(1, 2)], products, [10])
+    expect(sections[0]?.product_items).toEqual([
+      { product_retailer_id: "3" },
+      { product_retailer_id: "1" },
+    ])
   })
 })
 

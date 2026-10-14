@@ -5474,6 +5474,88 @@ export async function reorderWaCatalogByCategory(catalogId: string): Promise<{
   return { moved: ordered.length }
 }
 
+// ------------------------------------------------------------
+// Orden de categorías por catálogo (00223)
+// ------------------------------------------------------------
+
+/**
+ * Orden de categorías declarado por el catálogo, o `[]`.
+ *
+ * Degrada a `[]` si la migración `00223` no está aplicada: el catálogo sigue
+ * funcionando con el orden histórico (primera aparición en la curaduría) en vez
+ * de romperse. Es una preferencia de presentación, no un dato crítico.
+ */
+async function readWaCategoryOrder(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  catalogId: string
+): Promise<number[]> {
+  const { data, error } = await supabase
+    .from("whatsapp_catalog_categories")
+    .select("category_id, position")
+    .eq("catalog_id", catalogId)
+    .order("position")
+  if (error) return []
+  return (data ?? []).map((r) => r.category_id as number)
+}
+
+/** Acción: el orden declarado del catálogo (lo lee el panel al abrirlo). */
+export async function getWaCatalogCategoryOrder(catalogId: string): Promise<number[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+  return readWaCategoryOrder(supabase, catalogId)
+}
+
+/**
+ * Guarda el orden de categorías del catálogo.
+ *
+ * Es un **reemplazo completo**, no un ajuste incremental: lo que llega es la
+ * lista ordenada entera, tal como quedó después de arrastrar. Así el estado del
+ * servidor es exactamente lo que el admin ve, sin merges que puedan divergir.
+ *
+ * No toca `categories` ni ningún producto: sólo la preferencia de este catálogo.
+ */
+export async function reorderWaCatalogCategories(
+  catalogId: string,
+  orderedCategoryIds: number[]
+): Promise<{ saved: number }> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  // Deduplicar conservando la primera aparición: una lista con repetidos
+  // violaría el UNIQUE (catalog_id, category_id).
+  const seen = new Set<number>()
+  const ids = orderedCategoryIds.filter((id) => {
+    if (!Number.isInteger(id) || id <= 0 || seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
+
+  const { error: deleteError } = await supabase
+    .from("whatsapp_catalog_categories")
+    .delete()
+    .eq("catalog_id", catalogId)
+  if (deleteError) {
+    if (isMissingRelationError(deleteError)) {
+      throw new Error(
+        "Falta aplicar la migración 00223 (orden de categorías). Corre: npx supabase db push"
+      )
+    }
+    throw new Error(deleteError.message)
+  }
+
+  if (ids.length > 0) {
+    const { error } = await supabase
+      .from("whatsapp_catalog_categories")
+      .insert(ids.map((category_id, index) => ({ catalog_id: catalogId, category_id, position: index + 1 })))
+    if (error) throw new Error(error.message)
+  }
+
+  revalidatePath("/admin/whatsapp")
+  return { saved: ids.length }
+}
+
 export interface WaSyncRunSummary {
   id: string
   trigger_kind: string
@@ -5822,7 +5904,9 @@ export async function broadcastWaCatalog(
   }))
   const sections = wa.buildAdminProductListSections(
     (items ?? []) as WaCatalogs.WaCatalogItemRow[],
-    adminProducts
+    adminProducts,
+    // Orden declarado por el admin (00223): manda sobre el de primera aparición.
+    await readWaCategoryOrder(supabase, catalogId)
   )
   if (!sections.length) throw new Error("El catálogo está vacío")
 
@@ -6111,7 +6195,9 @@ export async function sendWaCatalogToPhone(
   }))
   const sections = wa.buildAdminProductListSections(
     (items ?? []) as WaCatalogs.WaCatalogItemRow[],
-    adminProducts
+    adminProducts,
+    // Orden declarado por el admin (00223): manda sobre el de primera aparición.
+    await readWaCategoryOrder(supabase, catalogId)
   )
   if (!sections.length) throw new Error("El catálogo está vacío")
 
