@@ -622,6 +622,20 @@
   reordena. Los productos **sin categoría van al final** (única excepción
   declarada). Es idempotente, y la escritura se delega en `reorderWaCatalog`,
   que sigue siendo el único escritor de `position`.
+- **Orden de categorías POR CATÁLOGO, arrastrable (WH11)**: las categorías del
+  catálogo se arrastran para ordenarlas y ese orden es el de las **secciones** del
+  mensaje `product_list`. Vive en `whatsapp_catalog_categories` (00223) y **no** en
+  una columna de `categories`: esas filas son globales (las usan la tienda y los
+  listados), así que un `sort_order` ahí cambiaría el orden en toda la tienda. Es
+  una preferencia de presentación: no crea ni borra categorías, no mueve
+  productos, y una categoría declarada sin productos curados sólo declara su
+  posición para cuando los tenga. **Una sola regla de orden para los tres sitios**
+  —el panel, la vista previa "Así lo verá tu cliente" y el mensaje real—: lo
+  declarado primero y lo demás después conservando el de la curaduría (sort
+  estable), o la vista previa mentiría. Arrastrar una categoría desde los chips de
+  "Agregar productos" la **inserta** en la posición donde se suelta (llega sin
+  estar en la lista). El guardado es un **reemplazo completo** de la lista, no un
+  merge, para que el servidor tenga exactamente lo que el admin ve.
 - **El panel del catálogo sólo borra categorías VACÍAS (WH10)**: las categorías
   son **globales** —`products.category_id` apunta a la misma tabla que usa la
   tienda—, así que **no existe** "borrar una categoría del catálogo de WhatsApp":
