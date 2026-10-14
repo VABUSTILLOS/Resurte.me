@@ -5498,12 +5498,93 @@ async function readWaCategoryOrder(
   return (data ?? []).map((r) => r.category_id as number)
 }
 
-/** Acción: el orden declarado del catálogo (lo lee el panel al abrirlo). */
-export async function getWaCatalogCategoryOrder(catalogId: string): Promise<number[]> {
+export interface WaCategoryMeta {
+  /** Orden declarado por el admin (00223). */
+  order: number[]
+  /** Portada por categoría (00224): category_id -> url. */
+  covers: Record<number, string>
+}
+
+/**
+ * Orden + portadas del catálogo, en una sola lectura.
+ *
+ * Degrada a vacío si `00223`/`00224` no están aplicadas: el catálogo sigue
+ * funcionando con el orden histórico y sin portadas en vez de romperse. Son
+ * preferencias de presentación, no datos críticos.
+ */
+export async function getWaCatalogCategoryMeta(catalogId: string): Promise<WaCategoryMeta> {
   const { response: adminDenied } = await requireAdmin()
   if (adminDenied) throw new Error("Acceso restringido a administradores")
   const supabase = await createServiceClient()
-  return readWaCategoryOrder(supabase, catalogId)
+
+  const { data, error } = await supabase
+    .from("whatsapp_catalog_categories")
+    .select("category_id, position, cover_image_url")
+    .eq("catalog_id", catalogId)
+    .order("position")
+  if (error) return { order: [], covers: {} }
+
+  const order: number[] = []
+  const covers: Record<number, string> = {}
+  for (const row of (data ?? []) as { category_id: number; cover_image_url: string | null }[]) {
+    order.push(row.category_id)
+    if (row.cover_image_url) covers[row.category_id] = row.cover_image_url
+  }
+  return { order, covers }
+}
+
+/**
+ * Guarda (o quita) la portada de una categoría en el catálogo.
+ *
+ * Hace upsert de la fila: poner portada a una categoría que aún no estaba
+ * declarada la declara, al final del orden. Es coherente — si le pones portada
+ * es porque la quieres en el catálogo — y evita un estado imposible (una
+ * portada sin fila donde vivir).
+ */
+export async function setWaCatalogCategoryCover(
+  catalogId: string,
+  categoryId: number,
+  coverImageUrl: string | null
+): Promise<void> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const url = (coverImageUrl ?? "").trim()
+  const { data: existing } = await supabase
+    .from("whatsapp_catalog_categories")
+    .select("category_id")
+    .eq("catalog_id", catalogId)
+    .eq("category_id", categoryId)
+    .maybeSingle()
+
+  if (existing) {
+    const { error } = await supabase
+      .from("whatsapp_catalog_categories")
+      .update({ cover_image_url: url || null })
+      .eq("catalog_id", catalogId)
+      .eq("category_id", categoryId)
+    if (error) throw new Error(error.message)
+  } else if (url) {
+    const { data: maxRow } = await supabase
+      .from("whatsapp_catalog_categories")
+      .select("position")
+      .eq("catalog_id", catalogId)
+      .order("position", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const { error } = await supabase
+      .from("whatsapp_catalog_categories")
+      .insert({
+        catalog_id: catalogId,
+        category_id: categoryId,
+        position: positionAfter(maxRow?.position as number | undefined),
+        cover_image_url: url,
+      })
+    if (error) throw new Error(error.message)
+  }
+
+  revalidatePath("/admin/whatsapp")
 }
 
 /**

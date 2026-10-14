@@ -38,7 +38,8 @@ import {
   getWaMembershipReconcile,
   applyWaMembershipReconcile,
   reorderWaCatalogByCategory,
-  getWaCatalogCategoryOrder,
+  getWaCatalogCategoryMeta,
+  setWaCatalogCategoryCover,
   reorderWaCatalogCategories,
   getWaCatalogItems,
   setWaCatalogProduct,
@@ -180,6 +181,8 @@ export default function AdminWhatsAppPage() {
 
   // Orden de categorías declarado por el admin (00223) + arrastre (DnD nativo).
   const [categoryOrder, setCategoryOrder] = useState<number[]>([])
+  const [categoryCovers, setCategoryCovers] = useState<Record<number, string>>({})
+  const [coverBusyId, setCoverBusyId] = useState<number | null>(null)
   const [catDragId, setCatDragId] = useState<number | null>(null)
   const [catDragOverId, setCatDragOverId] = useState<number | null>(null)
 
@@ -254,18 +257,19 @@ export default function AdminWhatsAppPage() {
 
   const loadItems = useCallback(async () => {
     if (!selectedCatalog) return
-    const [items, runs, queued, queueList, order] = await Promise.all([
+    const [items, runs, queued, queueList, meta] = await Promise.all([
       getWaCatalogItems(selectedCatalog.id),
       getWaCatalogSyncHistory(selectedCatalog.id, 5).catch(() => [] as WaSyncRunSummary[]),
       getWaCatalogQueueCount(selectedCatalog.id).catch(() => 0),
       getWaCatalogQueue(selectedCatalog.id).catch(() => [] as WaQueueItem[]),
-      getWaCatalogCategoryOrder(selectedCatalog.id).catch(() => [] as number[]),
+      getWaCatalogCategoryMeta(selectedCatalog.id).catch(() => ({ order: [], covers: {} })),
     ])
     setCatalogItems(items)
     setHistory(runs)
     setQueueCount(queued)
     setQueueItems(queueList)
-    setCategoryOrder(order)
+    setCategoryOrder(meta.order)
+    setCategoryCovers(meta.covers)
   }, [selectedCatalog])
 
   useEffect(() => {
@@ -531,29 +535,99 @@ export default function AdminWhatsAppPage() {
   /**
    * Mueve (o inserta) una categoría antes de `targetId` y guarda el orden.
    *
-   * Sirve para los dos gestos: reordenar dentro de la tarjeta del catálogo, y
-   * arrastrar una categoría desde los chips de "Agregar productos" — que llega
-   * sin estar en la lista, así que se inserta en la posición donde se soltó.
+   * Si la categoría **llega de fuera** (se arrastró desde los chips de "Agregar
+   * productos", así que no estaba en la lista), además **mete sus productos** al
+   * catálogo: es lo que se espera de "arrastrar una categoría hasta el catálogo".
+   *
+   * Sólo entran los que Meta aceptaría (`isCatalogSyncable`): meter productos sin
+   * precio sería encolar trabajo que el sync rechaza. Los que se quedan fuera se
+   * **declaran** en el resultado, no se omiten en silencio.
    */
   const handleCategoryDrop = (targetId: number) =>
     run(
       async () => {
-        if (!selectedCatalog || catDragId == null || catDragId === targetId) return { saved: 0 }
+        if (!selectedCatalog || catDragId == null || catDragId === targetId) {
+          return { saved: 0, added: 0, skipped: 0 }
+        }
         const ids = catalogCategoryList.map((c) => c.id)
+        const isNew = !ids.includes(catDragId)
+
         const from = ids.indexOf(catDragId)
         if (from >= 0) ids.splice(from, 1)
         const to = ids.indexOf(targetId)
         ids.splice(to < 0 ? ids.length : to, 0, catDragId)
+
         setCategoryOrder(ids)
-        return reorderWaCatalogCategories(selectedCatalog.id, ids)
+        await reorderWaCatalogCategories(selectedCatalog.id, ids)
+
+        let added = 0
+        let skipped = 0
+        if (isNew) {
+          const candidates = products.filter(
+            (p) => p.category_id === catDragId && !curatedIds.has(p.id)
+          )
+          const syncable = candidates.filter(isCatalogSyncable).map((p) => p.id)
+          skipped = candidates.length - syncable.length
+          if (syncable.length > 0) {
+            added = await bulkAddWaCatalogProducts(selectedCatalog.id, syncable)
+          }
+        }
+        return { saved: ids.length, added, skipped }
       },
-      (r) => `Orden de categorías guardado (${r.saved}).`
+      (r) =>
+        r.added > 0
+          ? `${r.added} producto(s) agregados al catálogo.` +
+            (r.skipped > 0 ? ` ${r.skipped} sin precio quedaron fuera.` : "")
+          : r.saved > 0
+            ? `Orden de categorías guardado (${r.saved}).`
+            : "Sin cambios."
     )
 
   const endCategoryDrag = () => {
     setCatDragId(null)
     setCatDragOverId(null)
   }
+
+  /**
+   * Sube la portada de una categoría.
+   *
+   * Reusa `/api/admin/products/upload-image` (bucket `productos`, mismo permiso
+   * `productos`) en vez de montar otra ruta de subida: ya valida formato y
+   * tamaño, y ya devuelve la URL pública.
+   */
+  const handleCoverFile = async (categoryId: number, file: File) => {
+    if (!selectedCatalog) return
+    setCoverBusyId(categoryId)
+    setError(null)
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      const res = await fetch("/api/admin/products/upload-image", { method: "POST", body: form })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "No se pudo subir la imagen")
+      await setWaCatalogCategoryCover(selectedCatalog.id, categoryId, data.url as string)
+      setCategoryCovers((prev) => ({ ...prev, [categoryId]: data.url as string }))
+      setMessage({ ok: true, text: "Portada guardada." })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al subir la portada")
+    } finally {
+      setCoverBusyId(null)
+    }
+  }
+
+  const handleRemoveCover = (categoryId: number) =>
+    run(
+      async () => {
+        if (!selectedCatalog) return
+        await setWaCatalogCategoryCover(selectedCatalog.id, categoryId, null)
+        setCategoryCovers((prev) => {
+          const next = { ...prev }
+          delete next[categoryId]
+          return next
+        })
+      },
+      () => "Portada quitada."
+    )
 
   /** Props de arrastre de un chip/row de categoría (mismo gesto en las dos tarjetas). */
   const categoryDragProps = (categoryId: number) => ({
@@ -2139,6 +2213,50 @@ export default function AdminWhatsAppPage() {
                       } ${catDragId === c.id ? "opacity-50" : ""}`}
                     >
                       <GripVertical className="w-3.5 h-3.5 text-[#B0B3B8] shrink-0" aria-hidden="true" />
+
+                      {/* Portada: clic en la miniatura para ponerla o cambiarla */}
+                      <label
+                        className="relative shrink-0 cursor-pointer"
+                        title={
+                          categoryCovers[c.id]
+                            ? "Cambiar la portada"
+                            : "Poner una portada a esta categoría"
+                        }
+                      >
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/avif"
+                          className="sr-only"
+                          disabled={coverBusyId !== null}
+                          aria-label={`Portada de ${c.name}`}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            e.target.value = ""
+                            if (file) void handleCoverFile(c.id, file)
+                          }}
+                        />
+                        {coverBusyId === c.id ? (
+                          <span className="w-8 h-8 rounded-lg bg-[#F5F3F0] flex items-center justify-center">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0E7A0E]" />
+                          </span>
+                        ) : categoryCovers[c.id] ? (
+                          <Image
+                            src={categoryCovers[c.id] as string}
+                            alt=""
+                            width={32}
+                            height={32}
+                            className="w-8 h-8 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <span
+                            aria-hidden="true"
+                            className="w-8 h-8 rounded-lg bg-[#F5F3F0] border border-dashed border-[#B0B3B8] flex items-center justify-center text-[10px] font-bold text-[var(--text-secondary)]"
+                          >
+                            +
+                          </span>
+                        )}
+                      </label>
+
                       <span className="flex-1 min-w-0 text-xs text-[#242529] truncate">{c.name}</span>
                       <span
                         className="text-[10px] font-bold text-[var(--text-secondary)]"
@@ -2146,6 +2264,17 @@ export default function AdminWhatsAppPage() {
                       >
                         {c.count}
                       </span>
+                      {categoryCovers[c.id] && (
+                        <button
+                          onClick={() => handleRemoveCover(c.id)}
+                          disabled={busy || coverBusyId !== null}
+                          aria-label={`Quitar la portada de ${c.name}`}
+                          title="Quitar la portada"
+                          className="p-0.5 text-[#B0B3B8] hover:text-red-700 disabled:opacity-40"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
