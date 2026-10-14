@@ -622,6 +622,23 @@
   reordena. Los productos **sin categoría van al final** (única excepción
   declarada). Es idempotente, y la escritura se delega en `reorderWaCatalog`,
   que sigue siendo el único escritor de `position`.
+- **Arrastrar una categoría mete sus productos (WH12)**: si la categoría **llega de
+  fuera** —se arrastró desde los chips de "Agregar productos", así que no estaba en
+  la lista— el arrastre además **agrega sus productos** al catálogo. Arrastrar
+  dentro de la lista sigue siendo sólo reordenar: no vuelve a meter los que ya
+  están. Sólo entran los que Meta aceptaría (`isCatalogSyncable`); los que se
+  quedan fuera se **declaran** en el resultado, mismo criterio que "Agregar todo
+  el proveedor". La distinción "llega de fuera" es la que decide si se agregan
+  productos, así que no hay que perderla al tocar el drop.
+- **Portadas por categoría (WH12)**: `whatsapp_catalog_categories.cover_image_url`
+  (00224). Vive ahí y **no** en `categories`: esa tabla es global, así que una
+  portada ahí sería de toda la tienda. **No se envía a Meta** — las secciones de
+  un `product_list` no admiten imagen por sección (solo el encabezado del mensaje
+  lleva una, y es una sola para todo el mensaje), así que es presentación del
+  panel. Reusa `/api/admin/products/upload-image` (bucket `productos`, mismo
+  permiso) en vez de montar otra ruta de subida. Poner portada a una categoría no
+  declarada la **declara** (upsert al final del orden): evita el estado imposible
+  de una portada sin fila donde vivir.
 - **Orden de categorías POR CATÁLOGO, arrastrable (WH11)**: las categorías del
   catálogo se arrastran para ordenarlas y ese orden es el de las **secciones** del
   mensaje `product_list`. Vive en `whatsapp_catalog_categories` (00223) y **no** en
