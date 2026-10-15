@@ -21,6 +21,7 @@ import {
   groupCategoriesByName,
   isCatalogSyncable,
   orderCatalogCategories,
+  productsInCategoryScope,
   splitSyncable,
 } from "@/lib/whatsapp-catalog-shared"
 import { parseSupplierOverview, type SupplierOverview } from "@/lib/admin-supplier-panel"
@@ -374,6 +375,23 @@ export default function AdminWhatsAppPage() {
     return new Set(supplier?.productIds ?? [])
   }, [supplierFilter, suppliers])
 
+  /**
+   * Productos de una categoría que están EN ALCANCE ahora mismo.
+   *
+   * Con un proveedor seleccionado, **sólo los suyos**: el filtro de proveedor
+   * acota las operaciones del catálogo. Sin filtro, todos los de la categoría.
+   *
+   * Es la regla que faltaba: arrastrar o pulsar "＋" en una categoría metía
+   * TODOS sus productos aunque hubiera un proveedor elegido — productos del
+   * proveedor o no, que es justo lo que se pidió evitar.
+   */
+  /** Nombre del proveedor filtrado (para decir a qué se limita la operación). */
+  const activeSupplierName =
+    supplierFilter === null ? null : suppliers.find((s) => s.id === supplierFilter)?.name ?? null
+
+  const categoryProductsInScope = (categoryId: number) =>
+    productsInCategoryScope(products, categoryId, supplierProductIds)
+
   const available = useMemo(
     () =>
       products.filter((p) => {
@@ -724,9 +742,7 @@ export default function AdminWhatsAppPage() {
     if (!confirmed) {
       const isNewCategory = !catalogCategoryIds.has(categoryId)
       if (isNewCategory) {
-        const candidates = products.filter(
-          (p) => p.category_id === categoryId && !curatedIds.has(p.id)
-        )
+        const candidates = categoryProductsInScope(categoryId).filter((p) => !curatedIds.has(p.id))
         const syncableCount = candidates.filter(isCatalogSyncable).length
         if (syncableCount >= PICK_CONFIRM_FROM) {
           setPendingCategoryBring({
@@ -761,8 +777,8 @@ export default function AdminWhatsAppPage() {
         let added = 0
         let skipped = 0
         if (isNew) {
-          const candidates = products.filter(
-            (p) => p.category_id === categoryId && !curatedIds.has(p.id)
+          const candidates = categoryProductsInScope(categoryId).filter(
+            (p) => !curatedIds.has(p.id)
           )
           const syncable = candidates.filter(isCatalogSyncable).map((p) => p.id)
           skipped = candidates.length - syncable.length
@@ -908,7 +924,11 @@ export default function AdminWhatsAppPage() {
         if (!selectedCatalog) return 0
         // TODOS los ids del grupo: dos categorías con el mismo nombre son una
         // sola fila aquí, así que quitarla tiene que quitarlas enteras.
-        const ids = categoryIds.flatMap((id) => curatedIdsByCategory.get(id) ?? [])
+        const all = categoryIds.flatMap((id) => curatedIdsByCategory.get(id) ?? [])
+        // Mismo alcance que el alta: con un proveedor seleccionado sólo salen
+        // SUS productos. Si el filtro acotara el alta pero no el quitado, quitar
+        // borraría de más — y eso ya sorprendió antes.
+        const ids = supplierProductIds ? all.filter((id) => supplierProductIds.has(id)) : all
         if (ids.length === 0) return 0
         return bulkRemoveWaCatalogProducts(selectedCatalog.id, ids)
       },
@@ -2455,8 +2475,15 @@ export default function AdminWhatsAppPage() {
                 <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
                   <p className="text-[11px] text-amber-800 mb-2">
                     Traer <strong>{pendingCategoryBring.name}</strong> agregará{" "}
-                    <strong>{pendingCategoryBring.count} productos</strong> al catálogo. Es la
-                    categoría completa, no sólo los de un proveedor.
+                    <strong>{pendingCategoryBring.count} productos</strong> al catálogo.{" "}
+                    {activeSupplierName ? (
+                      <>
+                        Sólo los de <strong>{activeSupplierName}</strong>: con un proveedor
+                        seleccionado la operación se limita a los suyos.
+                      </>
+                    ) : (
+                      <>Es la categoría completa.</>
+                    )}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -2486,8 +2513,14 @@ export default function AdminWhatsAppPage() {
               <p className="text-[11px] text-[var(--text-secondary)] mb-1.5">
                 Arrástralas para ordenarlas: este orden es el de las <strong>secciones</strong> del
                 mensaje. Para traer productos, arrastra un <strong>proveedor</strong> desde los chips
-                de al lado (trae <strong>sólo los suyos</strong>); para traer una categoría completa,
-                arrástrala o pulsa <strong>＋</strong> en su chip.
+                de al lado; para traer una categoría, arrástrala o pulsa <strong>＋</strong> en su chip.
+                {activeSupplierName && (
+                  <>
+                    {" "}
+                    Con <strong>{activeSupplierName}</strong> seleccionado, tanto traer como quitar
+                    se limita a <strong>sus</strong> productos.
+                  </>
+                )}
               </p>
 
               {/*
@@ -2609,8 +2642,10 @@ export default function AdminWhatsAppPage() {
                           }
                           title={
                             armRemoveCategoryId === c.id
-                              ? `¿Confirmar? Salen los ${c.count} productos del catálogo`
-                              : `Quitar del catálogo los ${c.count} productos de esta categoría`
+                              ? `¿Confirmar? Salen ${c.count} productos del catálogo`
+                              : activeSupplierName
+                                ? `Quitar del catálogo los ${c.count} productos de ${activeSupplierName} en esta categoría`
+                                : `Quitar del catálogo los ${c.count} productos de esta categoría`
                           }
                           className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
                             armRemoveCategoryId === c.id
@@ -3193,11 +3228,17 @@ export default function AdminWhatsAppPage() {
                     <button
                       onClick={() => placeCategoryInCatalog(cat.id, null).catch(() => {})}
                       disabled={busy || inCatalog}
-                      aria-label={`Traer ${cat.name} al catálogo con sus productos`}
+                      aria-label={
+                        activeSupplierName
+                          ? `Traer ${cat.name} al catálogo con los productos de ${activeSupplierName}`
+                          : `Traer ${cat.name} al catálogo con sus productos`
+                      }
                       title={
                         inCatalog
                           ? `${cat.name} ya está en el catálogo`
-                          : `Traer “${cat.name}” al catálogo (con sus productos)`
+                          : activeSupplierName
+                            ? `Traer “${cat.name}” al catálogo con los productos de ${activeSupplierName}`
+                            : `Traer “${cat.name}” al catálogo (con sus productos)`
                       }
                       className={`px-2 py-1.5 rounded-r-lg text-xs font-bold border-l disabled:opacity-40 ${
                         inCatalog

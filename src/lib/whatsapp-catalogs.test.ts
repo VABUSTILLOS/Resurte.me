@@ -16,6 +16,7 @@ import {
   addableSupplierProductIds,
   countAddableSupplierProducts,
   groupCategoriesByName,
+  productsInCategoryScope,
   isCatalogSyncable,
   orderCatalogCategories,
   splitSyncable,
@@ -574,5 +575,38 @@ describe("groupCategoriesByName", () => {
 
   it("sin entradas devuelve vacío", () => {
     expect(groupCategoriesByName([])).toEqual([])
+  })
+})
+
+describe("productsInCategoryScope", () => {
+  const p = (id: number, category_id: number | null) => ({ id, category_id })
+  const all = [p(1, 10), p(2, 10), p(3, 20), p(4, null)]
+
+  it("sin proveedor devuelve toda la categoría", () => {
+    expect(productsInCategoryScope(all, 10, null).map((x) => x.id)).toEqual([1, 2])
+  })
+
+  it("con proveedor devuelve SÓLO sus productos de esa categoría", () => {
+    // El caso reportado: elegir un proveedor y traer una categoría metía todos
+    // sus productos, del proveedor o no.
+    expect(productsInCategoryScope(all, 10, new Set([2])).map((x) => x.id)).toEqual([2])
+  })
+
+  it("no cruza a otra categoría aunque el producto sea del proveedor", () => {
+    expect(productsInCategoryScope(all, 10, new Set([3])).map((x) => x.id)).toEqual([])
+  })
+
+  it("un proveedor sin productos en la categoría devuelve vacío", () => {
+    expect(productsInCategoryScope(all, 20, new Set([1, 2]))).toEqual([])
+  })
+
+  it("los productos sin categoría nunca entran", () => {
+    expect(productsInCategoryScope(all, 10, null).some((x) => x.id === 4)).toBe(false)
+  })
+
+  it("un conjunto de proveedor vacío no devuelve nada (no equivale a 'sin filtro')", () => {
+    // Importante: `null` es "sin filtro", un Set vacío es "este proveedor no
+    // tiene nada". Confundirlos haría que un proveedor vacío trajera todo.
+    expect(productsInCategoryScope(all, 10, new Set())).toEqual([])
   })
 })

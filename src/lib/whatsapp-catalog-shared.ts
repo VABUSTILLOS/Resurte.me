@@ -156,3 +156,26 @@ export function groupCategoriesByName(
   }
   return [...byName.values()]
 }
+
+/**
+ * Productos de una categoría que están EN ALCANCE para una operación del catálogo.
+ *
+ * La regla: **con un proveedor seleccionado, sólo sus productos**. Sin proveedor,
+ * todos los de la categoría.
+ *
+ * Es la corrección de un fallo real: arrastrar (o pulsar "＋" en) una categoría
+ * metía TODOS sus productos aunque hubiera un proveedor elegido — del proveedor o
+ * no. El filtro de proveedor tiene que acotar las operaciones del catálogo, o
+ * "escoger un proveedor" no significa nada al agregar.
+ *
+ * Puro y sin dependencias: recibe los productos y el conjunto del proveedor.
+ */
+export function productsInCategoryScope<
+  T extends { id: number; category_id: number | null },
+>(products: readonly T[], categoryId: number, supplierProductIds: ReadonlySet<number> | null): T[] {
+  return products.filter((p) => {
+    if (p.category_id !== categoryId) return false
+    if (supplierProductIds && !supplierProductIds.has(p.id)) return false
+    return true
+  })
+}
