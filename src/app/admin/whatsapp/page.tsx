@@ -543,46 +543,6 @@ export default function AdminWhatsAppPage() {
    * precio sería encolar trabajo que el sync rechaza. Los que se quedan fuera se
    * **declaran** en el resultado, no se omiten en silencio.
    */
-  const handleCategoryDrop = (targetId: number) =>
-    run(
-      async () => {
-        if (!selectedCatalog || catDragId == null || catDragId === targetId) {
-          return { saved: 0, added: 0, skipped: 0 }
-        }
-        const ids = catalogCategoryList.map((c) => c.id)
-        const isNew = !ids.includes(catDragId)
-
-        const from = ids.indexOf(catDragId)
-        if (from >= 0) ids.splice(from, 1)
-        const to = ids.indexOf(targetId)
-        ids.splice(to < 0 ? ids.length : to, 0, catDragId)
-
-        setCategoryOrder(ids)
-        await reorderWaCatalogCategories(selectedCatalog.id, ids)
-
-        let added = 0
-        let skipped = 0
-        if (isNew) {
-          const candidates = products.filter(
-            (p) => p.category_id === catDragId && !curatedIds.has(p.id)
-          )
-          const syncable = candidates.filter(isCatalogSyncable).map((p) => p.id)
-          skipped = candidates.length - syncable.length
-          if (syncable.length > 0) {
-            added = await bulkAddWaCatalogProducts(selectedCatalog.id, syncable)
-          }
-        }
-        return { saved: ids.length, added, skipped }
-      },
-      (r) =>
-        r.added > 0
-          ? `${r.added} producto(s) agregados al catálogo.` +
-            (r.skipped > 0 ? ` ${r.skipped} sin precio quedaron fuera.` : "")
-          : r.saved > 0
-            ? `Orden de categorías guardado (${r.saved}).`
-            : "Sin cambios."
-    )
-
   const endCategoryDrag = () => {
     setCatDragId(null)
     setCatDragOverId(null)
@@ -629,12 +589,85 @@ export default function AdminWhatsAppPage() {
       () => "Portada quitada."
     )
 
-  /** Props de arrastre de un chip/row de categoría (mismo gesto en las dos tarjetas). */
+  /**
+   * Props de arrastre de un chip/row de categoría (mismo gesto en las dos tarjetas).
+   *
+   * `dataTransfer.setData` NO es decorativo: **Firefox no inicia el arrastre si
+   * no se llama** en `dragstart`. Además deja el id en el portapapeles de arrastre,
+   * que el drop usa como respaldo si el estado de React se perdiera.
+   */
   const categoryDragProps = (categoryId: number) => ({
     draggable: true,
-    onDragStart: () => setCatDragId(categoryId),
+    onDragStart: (e: React.DragEvent) => {
+      e.dataTransfer.setData("text/plain", String(categoryId))
+      e.dataTransfer.effectAllowed = "move"
+      setCatDragId(categoryId)
+    },
     onDragEnd: endCategoryDrag,
   })
+
+  /**
+   * Id que se está arrastrando: el estado de React o, si se perdió, el
+   * `dataTransfer` del propio evento. Sin este respaldo, un arrastre que empiece
+   * fuera del árbol (o un navegador que no dispare `dragstart` en React) llegaría
+   * al drop con `catDragId` en null y no haría nada.
+   */
+  const draggedCategoryId = (e: React.DragEvent): number | null => {
+    if (catDragId != null) return catDragId
+    const raw = e.dataTransfer.getData("text/plain")
+    const parsed = Number(raw)
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+  }
+
+  /**
+   * Coloca una categoría en el catálogo: la declara en el orden (insertada antes
+   * de `targetId`, o al final si es `null`) y, si **llega de fuera**, mete sus
+   * productos.
+   *
+   * Es el cuerpo compartido de los dos gestos: soltar (arrastrar) y el botón
+   * "＋" de cada chip. El botón existe porque el arrastre HTML5 **no funciona en
+   * pantallas táctiles**, y depender sólo de él dejaba la función inalcanzable en
+   * móvil/tablet.
+   */
+  const placeCategoryInCatalog = (categoryId: number, targetId: number | null) =>
+    run(
+      async () => {
+        if (!selectedCatalog) return { saved: 0, added: 0, skipped: 0 }
+        if (targetId != null && targetId === categoryId) return { saved: 0, added: 0, skipped: 0 }
+
+        const ids = catalogCategoryList.map((c) => c.id)
+        const isNew = !ids.includes(categoryId)
+
+        const from = ids.indexOf(categoryId)
+        if (from >= 0) ids.splice(from, 1)
+        const to = targetId == null ? -1 : ids.indexOf(targetId)
+        ids.splice(to < 0 ? ids.length : to, 0, categoryId)
+
+        setCategoryOrder(ids)
+        await reorderWaCatalogCategories(selectedCatalog.id, ids)
+
+        let added = 0
+        let skipped = 0
+        if (isNew) {
+          const candidates = products.filter(
+            (p) => p.category_id === categoryId && !curatedIds.has(p.id)
+          )
+          const syncable = candidates.filter(isCatalogSyncable).map((p) => p.id)
+          skipped = candidates.length - syncable.length
+          if (syncable.length > 0) {
+            added = await bulkAddWaCatalogProducts(selectedCatalog.id, syncable)
+          }
+        }
+        return { saved: ids.length, added, skipped }
+      },
+      (r) =>
+        r.added > 0
+          ? `${r.added} producto(s) agregados al catálogo.` +
+            (r.skipped > 0 ? ` ${r.skipped} sin precio quedaron fuera.` : "")
+          : r.saved > 0
+            ? `Orden de categorías guardado (${r.saved}).`
+            : "Sin cambios."
+    )
 
   /**
    * Cómo está repartido el catálogo por categoría, para la tarjeta del catálogo.
@@ -681,6 +714,10 @@ export default function AdminWhatsAppPage() {
     }))
     return orderCatalogCategories(categoryOrder, present)
   })()
+
+  /** Ids ya presentes en la lista del catálogo (para el estado del botón ＋). */
+  const catalogCategoryIds = new Set(catalogCategoryList.map((c) => c.id))
+
 
 
   async function run<T>(fn: () => Promise<T>, okText?: (r: T) => string) {
@@ -2182,16 +2219,45 @@ export default function AdminWhatsAppPage() {
               productos, no sólo a los del catálogo), y este panel es del
               catálogo de WhatsApp. El borrado vive abajo, limitado a las vacías.
             */}
-            {curatedCategoryTally.length > 0 && (
-              <div className="mb-4">
-                <p className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-1.5">
-                  Categorías en este catálogo
-                </p>
-                <p className="text-[11px] text-[var(--text-secondary)] mb-1.5">
-                  Arrástralas para ordenarlas: este orden es el de las <strong>secciones</strong> del
-                  mensaje. También puedes traer una categoría desde los chips de al lado.
-                </p>
-                <div className="space-y-1">
+            <div className="mb-4">
+              <p className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-1.5">
+                Categorías en este catálogo
+              </p>
+              <p className="text-[11px] text-[var(--text-secondary)] mb-1.5">
+                Arrástralas para ordenarlas: este orden es el de las <strong>secciones</strong> del
+                mensaje. Para traer una, arrástrala desde los chips de al lado o pulsa{" "}
+                <strong>＋</strong> en el chip.
+              </p>
+
+              {/*
+                La zona de soltado existe SIEMPRE, aunque no haya categorías.
+                Antes el bloque se ocultaba con la lista vacía, así que en un
+                catálogo sin categorías NO había dónde soltar — justo cuando más
+                hace falta traer la primera. Esa era la causa de "no puedo
+                arrastrar la categoría".
+              */}
+              {catalogCategoryList.length === 0 && (
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    setCatDragOverId(-1)
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const id = draggedCategoryId(e)
+                    if (id != null) placeCategoryInCatalog(id, null).catch(() => {})
+                  }}
+                  className={`rounded-lg border border-dashed px-3 py-4 text-center text-[11px] transition-colors ${
+                    catDragOverId === -1
+                      ? "border-[#0E7A0E] bg-[#E7F8EE] text-[#0E7A0E]"
+                      : "border-[#B0B3B8] text-[var(--text-secondary)]"
+                  }`}
+                >
+                  Suelta aquí una categoría para traerla con sus productos
+                </div>
+              )}
+
+              <div className="space-y-1">
                   {catalogCategoryList.map((c) => (
                     <div
                       key={c.id}
@@ -2202,7 +2268,8 @@ export default function AdminWhatsAppPage() {
                       }}
                       onDrop={(e) => {
                         e.preventDefault()
-                        handleCategoryDrop(c.id).catch(() => {})
+                        const id = draggedCategoryId(e)
+                        if (id != null) placeCategoryInCatalog(id, c.id).catch(() => {})
                       }}
                       className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 cursor-grab active:cursor-grabbing ${
                         catDragOverId === c.id && catDragId !== c.id
@@ -2285,8 +2352,30 @@ export default function AdminWhatsAppPage() {
                       categoría” en la tarjeta de al lado.
                     </p>
                   )}
+
+                {/* Zona para soltar AL FINAL: sin ella sólo se puede insertar
+                    antes de una fila, nunca como última categoría. */}
+                {catalogCategoryList.length > 0 && (
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      setCatDragOverId(-1)
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const id = draggedCategoryId(e)
+                      if (id != null) placeCategoryInCatalog(id, null).catch(() => {})
+                    }}
+                    className={`mt-1 rounded-lg border border-dashed px-3 py-2 text-center text-[11px] transition-colors ${
+                      catDragOverId === -1
+                        ? "border-[#0E7A0E] bg-[#E7F8EE] text-[#0E7A0E]"
+                        : "border-[#E8E9EB] text-[#B0B3B8]"
+                    }`}
+                  >
+                    Suelta aquí para dejarla al final
+                  </div>
+                )}
               </div>
-            )}
 
             {/*
               Borrar SÓLO categorías vacías.
@@ -2755,19 +2844,44 @@ export default function AdminWhatsAppPage() {
               >
                 Todas
               </button>
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  {...categoryDragProps(cat.id)}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  title={`${cat.name} — clic para filtrar, o arrástrala a “Categorías en este catálogo” para colocarla en el orden`}
-                  className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium cursor-grab active:cursor-grabbing ${
-                    selectedCategory === cat.id ? "bg-[#0E7A0E] text-white" : "bg-[#F5F3F0] text-[var(--text-secondary)]"
-                  } ${catDragId === cat.id ? "opacity-50" : ""}`}
-                >
-                  {getCategoryIcon(cat.icon ?? "", cat.slug)} {cat.name}
-                </button>
-              ))}
+              {categories.map((cat) => {
+                const inCatalog = catalogCategoryIds.has(cat.id)
+                return (
+                  // Dos botones HERMANOS, no anidados: el chip filtra al pulsarlo
+                  // y el "＋" lo trae al catálogo. El ＋ existe porque el arrastre
+                  // HTML5 no funciona en pantallas táctiles — sin él, traer una
+                  // categoría era inalcanzable en móvil/tablet.
+                  <span key={cat.id} className="shrink-0 inline-flex items-stretch">
+                    <button
+                      {...categoryDragProps(cat.id)}
+                      onClick={() => setSelectedCategory(cat.id)}
+                      title={`${cat.name} — clic para filtrar, o arrástrala a “Categorías en este catálogo”`}
+                      className={`px-3 py-1.5 rounded-l-lg text-xs font-medium cursor-grab active:cursor-grabbing ${
+                        selectedCategory === cat.id ? "bg-[#0E7A0E] text-white" : "bg-[#F5F3F0] text-[var(--text-secondary)]"
+                      } ${catDragId === cat.id ? "opacity-50" : ""}`}
+                    >
+                      {getCategoryIcon(cat.icon ?? "", cat.slug)} {cat.name}
+                    </button>
+                    <button
+                      onClick={() => placeCategoryInCatalog(cat.id, null).catch(() => {})}
+                      disabled={busy || inCatalog}
+                      aria-label={`Traer ${cat.name} al catálogo con sus productos`}
+                      title={
+                        inCatalog
+                          ? `${cat.name} ya está en el catálogo`
+                          : `Traer “${cat.name}” al catálogo (con sus productos)`
+                      }
+                      className={`px-2 py-1.5 rounded-r-lg text-xs font-bold border-l disabled:opacity-40 ${
+                        inCatalog
+                          ? "bg-[#F5F3F0] text-[var(--text-secondary)] border-[#E8E9EB]"
+                          : "bg-[#E7F8EE] text-[#0E7A0E] border-[#D5F1E0] hover:bg-[#D5F1E0]"
+                      }`}
+                    >
+                      {inCatalog ? "✓" : "＋"}
+                    </button>
+                  </span>
+                )
+              })}
             </div>
 
             {/*
