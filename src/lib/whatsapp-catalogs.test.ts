@@ -15,6 +15,7 @@ import {
 import {
   addableSupplierProductIds,
   countAddableSupplierProducts,
+  groupCategoriesByName,
   isCatalogSyncable,
   orderCatalogCategories,
   splitSyncable,
@@ -513,5 +514,65 @@ describe("computeCatalogHealth", () => {
     expect(byId.get("2")).toBe("alta")
     expect(byId.get("3")).toBe("media")
     expect(byId.get("4")).toBe("info")
+  })
+})
+
+describe("groupCategoriesByName", () => {
+  const entry = (id: number, name: string, count: number) => ({ id, name, count })
+
+  it("suma en una sola fila las categorías que se llaman igual", () => {
+    // Es el caso pedido: dos categorías distintas con el mismo nombre son UNA
+    // sección en el mensaje (agrupa por nombre), así que el panel tiene que
+    // verlas igual — sin tocar la tienda.
+    const groups = groupCategoriesByName([
+      entry(2, "Abarrotes", 10),
+      entry(20, "Abarrotes", 5),
+    ])
+    expect(groups).toHaveLength(1)
+    expect(groups[0]?.count).toBe(15)
+    expect(groups[0]?.ids).toEqual([2, 20])
+    expect(groups[0]?.lead).toBe(2)
+  })
+
+  it("ignora mayúsculas y acentos al agrupar", () => {
+    const groups = groupCategoriesByName([
+      entry(11, "Café e insumos", 3),
+      entry(30, "cafe e insumos", 4),
+    ])
+    expect(groups).toHaveLength(1)
+    expect(groups[0]?.count).toBe(7)
+  })
+
+  it("no agrupa nombres distintos", () => {
+    const groups = groupCategoriesByName([
+      entry(2, "Abarrotes", 10),
+      entry(3, "Abarrotes secos", 2),
+    ])
+    expect(groups).toHaveLength(2)
+  })
+
+  it("el lead es el primero del orden recibido", () => {
+    // El orden que llega ya viene resuelto por orderCatalogCategories, así que
+    // el lead respeta la posición que el admin eligió.
+    const groups = groupCategoriesByName([
+      entry(20, "Abarrotes", 5),
+      entry(2, "Abarrotes", 10),
+    ])
+    expect(groups[0]?.lead).toBe(20)
+  })
+
+  it("no pierde ni duplica ids", () => {
+    const groups = groupCategoriesByName([
+      entry(1, "A", 1),
+      entry(2, "B", 1),
+      entry(3, "A", 1),
+    ])
+    const all = groups.flatMap((g) => g.ids)
+    expect(all).toHaveLength(3)
+    expect(new Set(all).size).toBe(3)
+  })
+
+  it("sin entradas devuelve vacío", () => {
+    expect(groupCategoriesByName([])).toEqual([])
   })
 })

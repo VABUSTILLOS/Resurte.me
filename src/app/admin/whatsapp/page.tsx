@@ -17,9 +17,10 @@ import { getCategoryIcon } from "@/lib/utils"
 import { resolveDefaultCatalog } from "@/lib/whatsapp-default-catalog"
 import {
   addableSupplierProductIds,
-  orderCatalogCategories,
   countAddableSupplierProducts,
+  groupCategoriesByName,
   isCatalogSyncable,
+  orderCatalogCategories,
   splitSyncable,
 } from "@/lib/whatsapp-catalog-shared"
 import { parseSupplierOverview, type SupplierOverview } from "@/lib/admin-supplier-panel"
@@ -741,7 +742,9 @@ export default function AdminWhatsAppPage() {
         if (!selectedCatalog) return { saved: 0, added: 0, skipped: 0 }
         if (targetId != null && targetId === categoryId) return { saved: 0, added: 0, skipped: 0 }
 
-        const ids = catalogCategoryList.map((c) => c.id)
+        // Aplanado: cada grupo aporta TODOS sus ids, así el orden guardado
+        // mantiene juntas las categorías que comparten nombre.
+        const ids = catalogCategoryGroups.flatMap((g) => g.ids)
         const isNew = !ids.includes(categoryId)
 
         const from = ids.indexOf(categoryId)
@@ -810,20 +813,30 @@ export default function AdminWhatsAppPage() {
    * ya es un memo), así que declararla memoizada sólo producía un error de lint
    * sin ganancia real.
    */
-  const catalogCategoryList = (() => {
+  const catalogCategoryGroups = (() => {
     const inCatalog = new Map(curatedCategoryTally.map((c) => [c.id, c.count]))
     const ids = new Set<number>([...inCatalog.keys(), ...categoryOrder])
     if (lastCreatedCategoryId !== null) ids.add(lastCreatedCategoryId)
-    const present = [...ids].map((id) => ({
-      id,
-      name: categories.find((c) => c.id === id)?.name ?? `#${id}`,
-      count: inCatalog.get(id) ?? 0,
-    }))
-    return orderCatalogCategories(categoryOrder, present)
+
+    // Se agrupa por NOMBRE, no por id. Dos categorías distintas con el mismo
+    // nombre (los duplicados que creó el bug del alta) son UNA sola sección en
+    // el mensaje de WhatsApp —`buildAdminProductListSections` agrupa por
+    // `category_name`— así que el panel tiene que verlas igual o mostraría algo
+    // distinto de lo que recibe el cliente. Sumar por nombre es lo que permite
+    // que "se sumen aunque se llamen igual", sin tocar la tienda.
+    const ordered = orderCatalogCategories(
+      categoryOrder,
+      [...ids].map((id) => ({
+        id,
+        name: categories.find((c) => c.id === id)?.name ?? `#${id}`,
+        count: inCatalog.get(id) ?? 0,
+      }))
+    )
+    return groupCategoriesByName(ordered)
   })()
 
   /** Ids ya presentes en la lista del catálogo (para el estado del botón ＋). */
-  const catalogCategoryIds = new Set(catalogCategoryList.map((c) => c.id))
+  const catalogCategoryIds = new Set(catalogCategoryGroups.flatMap((g) => g.ids))
 
   /**
    * Productos del catálogo agrupados por categoría.
@@ -851,7 +864,9 @@ export default function AdminWhatsAppPage() {
    * Es reversible: los productos salen de la curaduría y quedan **fuera de stock
    * en Meta**, no se borran. Volver a traer la categoría los reactiva.
    */
-  const handleRemoveCategoryFromCatalog = (categoryId: number, categoryName: string) => {
+  const handleRemoveCategoryFromCatalog = (categoryIds: number[], categoryName: string) => {
+    const categoryId = categoryIds[0]
+    if (categoryId == null) return
     if (armRemoveCategoryId !== categoryId) {
       setArmRemoveCategoryId(categoryId)
       return
@@ -860,7 +875,9 @@ export default function AdminWhatsAppPage() {
     run(
       async () => {
         if (!selectedCatalog) return 0
-        const ids = curatedIdsByCategory.get(categoryId) ?? []
+        // TODOS los ids del grupo: dos categorías con el mismo nombre son una
+        // sola fila aquí, así que quitarla tiene que quitarlas enteras.
+        const ids = categoryIds.flatMap((id) => curatedIdsByCategory.get(id) ?? [])
         if (ids.length === 0) return 0
         return bulkRemoveWaCatalogProducts(selectedCatalog.id, ids)
       },
@@ -2449,7 +2466,7 @@ export default function AdminWhatsAppPage() {
                 hace falta traer la primera. Esa era la causa de "no puedo
                 arrastrar la categoría".
               */}
-              {catalogCategoryList.length === 0 && (
+              {catalogCategoryGroups.length === 0 && (
                 <div
                   onDragOver={(e) => {
                     e.preventDefault()
@@ -2467,9 +2484,17 @@ export default function AdminWhatsAppPage() {
               )}
 
               <div className="space-y-1">
-                  {catalogCategoryList.map((c) => (
+                  {catalogCategoryGroups.map((g) => {
+                    // El grupo se representa por su primer id: es el que se
+                    // declara en el orden, el que lleva la portada y el que
+                    // recibe los arrastres. Los demás ids viajan con él.
+                    const c = { id: g.lead, name: g.name, count: g.count }
+                    // La portada puede estar guardada en cualquier id del grupo
+                    // (si la pusiste cuando eran filas separadas).
+                    const coverUrl = g.ids.map((id) => categoryCovers[id]).find(Boolean)
+                    return (
                     <div
-                      key={c.id}
+                      key={g.key}
                       {...categoryDragProps(c.id)}
                       onDragOver={(e) => {
                         e.preventDefault()
@@ -2489,11 +2514,7 @@ export default function AdminWhatsAppPage() {
                       {/* Portada: clic en la miniatura para ponerla o cambiarla */}
                       <label
                         className="relative shrink-0 cursor-pointer"
-                        title={
-                          categoryCovers[c.id]
-                            ? "Cambiar la portada"
-                            : "Poner una portada a esta categoría"
-                        }
+                        title={coverUrl ? "Cambiar la portada" : "Poner una portada a esta categoría"}
                       >
                         <input
                           type="file"
@@ -2511,9 +2532,9 @@ export default function AdminWhatsAppPage() {
                           <span className="w-8 h-8 rounded-lg bg-[#F5F3F0] flex items-center justify-center">
                             <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0E7A0E]" />
                           </span>
-                        ) : categoryCovers[c.id] ? (
+                        ) : coverUrl ? (
                           <Image
-                            src={categoryCovers[c.id] as string}
+                            src={coverUrl}
                             alt=""
                             width={32}
                             height={32}
@@ -2547,7 +2568,7 @@ export default function AdminWhatsAppPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleRemoveCategoryFromCatalog(c.id, c.name)
+                            handleRemoveCategoryFromCatalog(g.ids, c.name)
                           }}
                           disabled={busy}
                           aria-label={
@@ -2570,9 +2591,9 @@ export default function AdminWhatsAppPage() {
                         </button>
                       )}
 
-                      {categoryCovers[c.id] && (
+                      {coverUrl && (
                         <button
-                          onClick={() => handleRemoveCover(c.id)}
+                          onClick={() => g.ids.forEach((id) => handleRemoveCover(id))}
                           disabled={busy || coverBusyId !== null}
                           aria-label={`Quitar la portada de ${c.name}`}
                           title="Quitar la portada"
@@ -2582,10 +2603,13 @@ export default function AdminWhatsAppPage() {
                         </button>
                       )}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
                 {lastCreatedCategoryId !== null &&
-                  catalogCategoryList.some((c) => c.id === lastCreatedCategoryId && c.count === 0) && (
+                  catalogCategoryGroups.some(
+                    (g) => g.ids.includes(lastCreatedCategoryId) && g.count === 0
+                  ) && (
                     <p className="text-[11px] text-[#0F7A3D] mt-1.5">
                       La categoría nueva ya está guardada. Asígnale productos con “Mover a la
                       categoría” en la tarjeta de al lado.
@@ -2594,7 +2618,7 @@ export default function AdminWhatsAppPage() {
 
                 {/* Zona para soltar AL FINAL: sin ella sólo se puede insertar
                     antes de una fila, nunca como última categoría. */}
-                {catalogCategoryList.length > 0 && (
+                {catalogCategoryGroups.length > 0 && (
                   <div
                     onDragOver={(e) => {
                       e.preventDefault()

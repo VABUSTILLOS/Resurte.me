@@ -10,9 +10,10 @@
 // (unos 400 KB de `crypto-browserify`) y enviaba al cliente la ruta de
 // descifrado de tokens.
 //
-// La regla, entonces: **aquí sólo entran funciones puras sin un solo import
-// de runtime**. Si algo necesita credenciales, red o criptografía, va en
-// `whatsapp-catalogs.ts` (servidor), no aquí.
+// La regla, entonces: **aquí sólo entran funciones puras**. Se permite importar
+// otros módulos puros (como `category-name`), nunca nada que toque credenciales,
+// red, almacenamiento o criptografía — eso va en `whatsapp-catalogs.ts`
+// (servidor). Un import de servidor aquí vuelve a meter `crypto` en el bundle.
 // ============================================================
 
 /**
@@ -23,6 +24,8 @@
  * como para las secciones del mensaje, así que lo que el admin ve y lo que el
  * cliente recibe no pueden discrepar.
  */
+import { normalizeCategoryName } from "@/lib/category-name"
+
 export function orderCatalogCategories<T extends { id: number }>(
   declared: number[],
   present: T[]
@@ -104,4 +107,52 @@ export function countAddableSupplierProducts(
   knownIds: ReadonlySet<number>
 ): number {
   return addableSupplierProductIds(productIds, curatedIds, knownIds).length
+}
+
+/**
+ * Agrupa categorías por NOMBRE (sumando sus conteos).
+ *
+ * POR QUÉ POR NOMBRE Y NO POR ID
+ * ------------------------------
+ * El mensaje de WhatsApp agrupa las secciones por `category_name`
+ * (`buildAdminProductListSections`), así que dos categorías distintas con el
+ * mismo nombre son **una sola sección** para el cliente. Si el panel las
+ * mostrara por id, enseñaría dos filas donde el cliente ve una — el panel y el
+ * mensaje dirían cosas distintas.
+ *
+ * Sumar por nombre es lo que hace que "se sumen aunque se llamen igual" **sin
+ * tocar la tienda**: no reasigna `products.category_id` ni fusiona categorías,
+ * sólo presenta junto lo que ya se envía junto.
+ *
+ * `lead` es el id que representa al grupo (el que se declara en el orden, el que
+ * lleva la portada y el que recibe los arrastres); `ids` son todos los suyos.
+ * La comparación de nombres es la de `normalizeCategoryName`, así que "Café" y
+ * "Cafe" son el mismo grupo.
+ */
+export interface CategoryNameGroup {
+  key: string
+  name: string
+  lead: number
+  ids: number[]
+  count: number
+}
+
+export function groupCategoriesByName(
+  entries: readonly { id: number; name: string; count: number }[]
+): CategoryNameGroup[] {
+  const byName = new Map<string, CategoryNameGroup>()
+  for (const entry of entries) {
+    const key = normalizeCategoryName(entry.name)
+    const group = byName.get(key) ?? {
+      key,
+      name: entry.name,
+      lead: entry.id,
+      ids: [],
+      count: 0,
+    }
+    group.ids.push(entry.id)
+    group.count += entry.count
+    byName.set(key, group)
+  }
+  return [...byName.values()]
 }
