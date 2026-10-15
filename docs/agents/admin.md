@@ -669,6 +669,21 @@
   "Agregar productos" la **inserta** en la posición donde se suelta (llega sin
   estar en la lista). El guardado es un **reemplazo completo** de la lista, no un
   merge, para que el servidor tenga exactamente lo que el admin ve.
+- **Tres formas de sacar una categoría, y sólo una toca la tienda (WH14)**:
+  conviene no confundirlas. **"−"** vacía la categoría pero la deja en la lista
+  (conserva su posición, útil para que los productos nuevos caigan ahí);
+  **"Categorías vacías"** borra la fila de `categories`, que es **global** —afecta
+  a toda la tienda—; y el **botón de papelera** de cada fila quita la categoría
+  **del catálogo**: saca sus productos de la curaduría (vía `removeFromWaCuration`,
+  que encola `hide`: reversible, fuera de stock en Meta, sin borrar) y borra su
+  lugar en `whatsapp_catalog_categories`, **sin tocar `categories`** — así la
+  categoría sigue en la tienda y se puede volver a traer con el mismo nombre (su
+  chip recupera el "＋"). `removeWaCatalogCategory` lee por categoría y cruza en
+  memoria en vez de un `.in()` con cientos de ids, que viajaría en la URL. El
+  contrato de `whatsapp-default-catalog.contract.test.ts` fija las cuatro
+  invariantes (borra el orden, saca de la curaduría, y **nunca** hace
+  `delete`/`update` sobre `categories` ni escribe `category_id`), y está **probado
+  por mutación**: metiendo un `delete` sobre `categories` el test falla.
 - **El panel del catálogo sólo borra categorías VACÍAS (WH10)**: las categorías
   son **globales** —`products.category_id` apunta a la misma tabla que usa la
   tienda—, así que **no existe** "borrar una categoría del catálogo de WhatsApp":
