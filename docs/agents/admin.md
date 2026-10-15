@@ -622,6 +622,22 @@
   reordena. Los productos **sin categoría van al final** (única excepción
   declarada). Es idempotente, y la escritura se delega en `reorderWaCatalog`,
   que sigue siendo el único escritor de `position`.
+- **El arrastre de categorías: las tres formas de romperse (WH13)**: reportado
+  dos veces como "no puedo arrastrar". Las tres causas eran reales y ninguna se ve
+  leyendo el handler: (1) **no había dónde soltar** —el bloque "Categorías en este
+  catálogo" se ocultaba con la lista vacía, así que en un catálogo sin categorías
+  no existía zona de soltado, justo cuando hace falta traer la primera; ahora se
+  pinta siempre, con estado vacío y una zona extra para soltar **al final**
+  (antes sólo se podía insertar antes de una fila)—; (2) **el arrastre no
+  empezaba** —un `<button>` sin `dataTransfer`: **Firefox no inicia el arrastre si
+  no se llama a `setData()`** en `dragstart`, y el drop ahora lo lee como respaldo
+  si el estado de React se pierde—; (3) **en táctil el DnD HTML5 no existe**, así
+  que la función era inalcanzable en móvil/tablet: cada chip tiene un botón **"＋"**
+  (hermano, nunca anidado: el chip filtra y el ＋ trae) que hace lo mismo que
+  soltar y muestra "✓" cuando la categoría ya está. **Lección para cualquier
+  arrastre futuro en este repo**: comprobar las tres —zona de soltado presente,
+  `setData` en `dragstart`, y una alternativa que no sea arrastrar—. Los dos gestos
+  comparten `placeCategoryInCatalog`.
 - **Arrastrar una categoría mete sus productos (WH12)**: si la categoría **llega de
   fuera** —se arrastró desde los chips de "Agregar productos", así que no estaba en
   la lista— el arrastre además **agrega sus productos** al catálogo. Arrastrar
