@@ -122,3 +122,98 @@ y `00202` usan el snapshot del **1-oct-2026**.
 
 Para refrescar: `node scripts/alsuper-prices-sync.mjs` y volver a empujar
 `00202`.
+
+## Refresco de la lista de AB Foods (`00225`, vigencia 13-oct-2026)
+
+La lista mayoreo de AB Foods se renueva por vigencia: la del `10-sep-2026` quedó
+sustituida por la del **13-oct-2026**. `00225` actualiza los costos y recalcula
+los precios con la misma regla de arriba (margen 1.18, tope de la competencia).
+
+| | |
+| --- | --- |
+| Artículos con costo actualizado | **54** (50 que ya existían + 4 altas) |
+| Costos que se movieron | **35** de los 50 que ya existían |
+| Altas (artículos nuevos en la lista) | **4**, en `is_visible = false` |
+| Precios de venta recalculados | **19** |
+| Ocultos por tope | **0** |
+
+Dos acotaciones que hacen que el número de precios movidos (19) sea menor que el
+de costos movidos (35), y que no son un olvido:
+
+1. **Solo se recalcula donde AB Foods es `is_primary`.** En los otros 21
+   artículos que ya existían, la tienda compra a Weber/Distmar y el precio se
+   rige por el costo de ese proveedor; lo que cambia es solo el costo de
+   referencia de AB Foods.
+2. **Solo se recalcula si el costo cambió.** `00225` no re-normaliza el margen de
+   un artículo cuyo costo es idéntico en las dos listas: `papa-select-516-sc-caja-1361kg`
+   es el único artículo de AB Foods que quedó en el régimen de `00214` (1.20, sin
+   tope, $696) y se queda así. Es deuda anotada, no un cambio de precio
+   silencioso. Por lo mismo, `hamburguesa-bm-sirloin-caja-30pzs` subió de costo
+   ($564.90 → $574.90) pero **no** de precio: el tope del rival ($618.39) sigue
+   mandando.
+
+### Precios ajustados (19)
+
+| Producto | Antes | Ahora | Costo nuevo |
+| --- | --- | --- | --- |
+| arrachera-premium-sukarne | $343.00 | **$354.00** | $299.90 |
+| boneless-buffalo-freskecito | $160.00 | **$162.90** | $138.90 |
+| camaron-cocido-100200 | $134.00 | **$140.00** | $117.90 |
+| camaron-cocido-4150 | $146.00 | **$150.00** | $126.90 |
+| cordon-bleu-mini | $157.00 | **$163.00** | $137.90 |
+| hamburguesa-empanizada-pilgrims | $110.00 | **$112.00** | $94.90 |
+| papa-conquest-delivery-teja-65-caja-1361kg | $968.00 | **$1,003.00** | $849.90 |
+| papa-curly-savory-caja-1361kg | $1,039.00 | **$1,062.00** | $899.90 |
+| papa-hash-brown-patty-caja-952kg | $649.00 | **$673.00** | $569.90 |
+| papa-megacrunch-14-caja-1224kg | $850.00 | **$917.00** | $776.90 |
+| papa-select-38-cascara-caja-1361kg | $885.00 | **$921.00** | $779.90 |
+| papa-thunder-38-sc-caja-1361kg | $838.00 | **$885.00** | $749.90 |
+| pechuga-grill-fc-pilgrims | $201.00 | **$207.00** | $174.90 |
+| pechuga-sh-am-soles-caja-10kg | $70.00 | **$74.00** | $61.90 |
+| pechuga-sh-br-soles-caja-10kg | $74.00 | **$77.00** | $64.90 |
+| pechuga-sh-pilgrims-caja-12kg | $97.00 | **$102.00** | $85.90 |
+| pechuga-sin-hueso-br | $74.00 | **$77.00** | $64.90 |
+| pollo-entero-congelado-pilgrims-caja-145kg | $71.00 | **$74.00** | $62.50 |
+| queso-crema-krol-barra-136kg | $142.00 | **$148.00** | $124.90 |
+
+Todos siguen por debajo del tope del rival y por encima del costo: las dos reglas
+se verifican dentro de la migración (guardas en positivo) y no hubo ningún
+artículo que se tuviera que ocultar.
+
+### Las 4 altas nacen ocultas
+
+La lista trae 4 artículos que el catálogo no tenía: papa francesa 1/4 McCain
+(12.24 kg), papa ondulada McCain (16.33 kg), papa gajo McCain (13.61 kg) y papa
+Conquest Delivery 3/8 **con** cáscara (13.61 kg). Entran con `is_visible = false`.
+
+Los tres primeros son el mismo corte y la misma presentación que un artículo que
+ya está a la venta, **a costo por kilo idéntico** (McCain 1/4 y Payette 1/4 a
+$40.84/kg; gajo McCain y gajo 10 cut a $55.10/kg; ondulada McCain y ondulada
+Payette a ~$40.4/kg): publicarlos dejaría dos fichas indistinguibles al mismo
+precio. El cuarto sí es una especificación nueva —la tienda vende la versión
+**sin** cáscara— y ya vende el par S/C-C/C de Select 3/8, así que es el candidato
+natural a publicar primero.
+
+Ocultos no se pierde nada: el SKU y su costo entran al ledger y la siguiente
+lista los sigue actualizando. Publicarlos es un toggle en `/admin/productos`; la
+razón de cada uno está en `products.admin_note`. Es el mismo camino que
+recorrieron los 51 originales (`seed_ab_foods.sql` los dio de alta ocultos y
+`00191` los publicó después).
+
+### El artículo que la lista nueva ya no trae
+
+`boneless-natural-freskecito` (SKU `8567`) **no aparece** en la lista del
+13-oct-2026. No se borra ni se oculta: la tienda lo compra a `carnes-weber`
+($118.90), así que su precio no depende de AB Foods. Se le cambia solo la nota y
+conserva `list_date = 2026-09-10`, que es de dónde salió el costo que tiene. Si
+AB Foods dejó de surtirlo, el artículo sigue vendiéndose con el costo de Weber.
+
+### Cómo se leyó la lista
+
+El PDF de AB Foods es un escaneo **sin capa de texto** (cada celda es una imagen),
+así que los 54 renglones se extrajeron con OCR. Como un dígito mal leído se
+convierte en un costo equivocado, cada una de las **43 celdas de precio distintas**
+se verificó a 12 combinaciones de escala (2×–12×) y nivel de reconocimiento antes
+de escribir un número: todas dieron una única lectura consistente. Los artículos
+y las presentaciones se validaron además contra el catálogo y contra la lista
+anterior (mismo SKU, mismo corte, mismos kg).

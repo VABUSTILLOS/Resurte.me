@@ -198,6 +198,51 @@ Dos detalles que no son obvios:
   marca**: representar «Queso crema Krol» con una foto de Philadelphia sería
   engañoso para el cliente. Se dice en `/creditos`.
 
+## AB Foods: refresco de lista (`00225`, vigencia 13-oct-2026)
+
+La lista mayoreo de AB Foods se renueva por vigencia (la del `10-sep-2026` quedó
+sustituida). `00225` hace el refresco completo:
+
+| | |
+| --- | --- |
+| Artículos con costo actualizado | **54** (50 que ya existían + 4 altas) |
+| Costos que se movieron | **35** de los 50 que ya existían |
+| Altas (artículos que la lista trae y el catálogo no tenía) | **4**, en `is_visible = false` |
+| Precios de venta recalculados | **19** |
+| Filas de `product_suppliers` para `ab-foods` | **55** (51 + 4 altas) |
+
+Reglas que respeta, y que conviene no romper:
+
+- **Solo se recalcula el precio donde AB Foods es `is_primary`.** En los otros 21
+  artículos el precio lo manda el costo de Weber/Distmar; ahí lo único que cambia
+  es el costo de referencia de AB Foods, que sirve para comparar proveedores.
+- **Solo se recalcula el precio de un artículo cuyo costo cambió.** `00225` no es
+  una re-normalización de margen: `papa-select-516-sc-caja-1361kg` es el único
+  artículo de AB Foods que quedó en el régimen de `00214` (1.20, sin tope, $696) y
+  su costo es idéntico en las dos listas, así que se queda como está. Es deuda
+  anotada, no un efecto colateral silencioso.
+- **La regla A/B sigue mandando** (ver `docs/precios-reglas.md`): el precio nuevo
+  es `LEAST(CEIL(costo × 1.18), cap_kg × kg)`. Si el tope del rival hubiera
+  quedado por debajo del costo, el artículo se oculta y se le limpian
+  `publish_at`/`unpublish_at`. En este refresco no hubo ninguno.
+- **El SKU `8567` (`boneless-natural-freskecito`) ya no viene en la lista.** No se
+  borra ni se oculta: la tienda lo compra a `carnes-weber`, así que su precio no
+  depende de AB Foods. Se le cambia solo la nota y conserva `list_date` del
+  `10-sep-2026`, que es de donde salió el costo que tiene.
+
+Las 4 altas nacieron **ocultas** porque tres son el mismo corte y la misma
+presentación que un artículo que ya está a la venta, a costo por kilo idéntico
+(papa francesa 1/4 McCain vs Payette, gajo McCain vs gajo 10 cut, ondulada McCain
+vs ondulada Payette): publicarlas dejaría dos fichas indistinguibles al mismo
+precio. La cuarta —papa Conquest Delivery 3/8 **con** cáscara— sí es una
+especificación nueva y la tienda ya vende el par S/C-C/C de Select 3/8. La razón
+de cada una vive en `products.admin_note` (columna privada). Es el mismo camino
+de los 51 originales: nacen ocultos con costo y vínculo a proveedor, y se
+publican cuando el margen está decidido. De las 4, tres reutilizan una imagen
+`.webp` que ya existía del mismo corte (`public/images/products/ai/**`) y la de
+Conquest Delivery 3/8 **con** cáscara queda sin foto a propósito: reutilizar la
+de la versión **sin** cáscara sería engañosa (criterio de `00194`).
+
 ## Precios de proveedor FRUGASA y tope de la competencia (`00196`–`00200`)
 
 El segundo proveedor con lista cargada es **FRUGASA** (frutas, verduras, chiles
