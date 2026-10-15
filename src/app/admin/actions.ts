@@ -5534,6 +5534,54 @@ export async function reorderWaCatalogByCategory(catalogId: string): Promise<{
 }
 
 // ------------------------------------------------------------
+// Estado de la conexión con WhatsApp
+// ------------------------------------------------------------
+
+export interface WaConnectionStatus {
+  /** Hay credenciales utilizables (propias del catálogo o la WABA de plataforma). */
+  hasCredentials: boolean
+  /** A qué catálogo de Meta apuntaría el sync (propio o de la env). */
+  metaCatalogId: string | null
+  /** Cuántos productos llegaron alguna vez a Meta (marcados por el sync). */
+  syncedProducts: number
+}
+
+/**
+ * ¿Está este catálogo conectado a WhatsApp?
+ *
+ * Existe porque la respuesta era **un error opaco**: cinco acciones lanzan "No
+ * hay credenciales de WhatsApp configuradas" cuando no hay credenciales, y Next
+ * enmascara el mensaje de un error lanzado en producción. El usuario veía
+ * `Minified React error #441` (digest `935887900`) al pulsar un botón, sin
+ * ninguna pista de qué pasaba ni de qué hacer.
+ *
+ * Con esto el panel puede decirlo **antes** de que pulses nada, y responder la
+ * pregunta obvia: si `syncedProducts` es 0, el catálogo nunca se publicó en
+ * WhatsApp por más que esté armado en Resurte.me.
+ */
+export async function getWaConnectionStatus(catalogId: string): Promise<WaConnectionStatus> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const wa = await import("@/lib/whatsapp-catalogs")
+  const { config, catalog } = await wa.getCatalogWhatsAppConfig(supabase, catalogId)
+
+  // `whatsapp_product_id` lo escribe el sync al confirmar con Meta: es la única
+  // marca fiable de "este producto YA está en WhatsApp".
+  const { count } = await supabase
+    .from("products")
+    .select("id", { count: "exact", head: true })
+    .not("whatsapp_product_id", "is", null)
+
+  return {
+    hasCredentials: Boolean(config),
+    metaCatalogId: catalog?.catalog_id ?? process.env.WHATSAPP_CATALOG_ID ?? null,
+    syncedProducts: count ?? 0,
+  }
+}
+
+// ------------------------------------------------------------
 // Orden de categorías por catálogo (00223)
 // ------------------------------------------------------------
 

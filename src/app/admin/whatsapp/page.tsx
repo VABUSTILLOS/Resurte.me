@@ -41,6 +41,7 @@ import {
   applyWaMembershipReconcile,
   reorderWaCatalogByCategory,
   getWaCatalogCategoryMeta,
+  getWaConnectionStatus,
   removeWaCatalogCategory,
   setWaCatalogCategoryCover,
   reorderWaCatalogCategories,
@@ -189,6 +190,13 @@ export default function AdminWhatsAppPage() {
   const [categoryOrder, setCategoryOrder] = useState<number[]>([])
   const [categoryCovers, setCategoryCovers] = useState<Record<number, string>>({})
   const [coverBusyId, setCoverBusyId] = useState<number | null>(null)
+  // Estado de la conexión con WhatsApp: sin credenciales, cualquier acción que
+  // hable con Meta lanza un error que producción enmascara como React #441.
+  const [waStatus, setWaStatus] = useState<{
+    hasCredentials: boolean
+    metaCatalogId: string | null
+    syncedProducts: number
+  } | null>(null)
   const [catDragId, setCatDragId] = useState<number | null>(null)
   // Un proveedor también se puede arrastrar (trae SÓLO sus productos).
   const [supplierDragId, setSupplierDragId] = useState<number | null>(null)
@@ -272,12 +280,13 @@ export default function AdminWhatsAppPage() {
 
   const loadItems = useCallback(async () => {
     if (!selectedCatalog) return
-    const [items, runs, queued, queueList, meta] = await Promise.all([
+    const [items, runs, queued, queueList, meta, status] = await Promise.all([
       getWaCatalogItems(selectedCatalog.id),
       getWaCatalogSyncHistory(selectedCatalog.id, 5).catch(() => [] as WaSyncRunSummary[]),
       getWaCatalogQueueCount(selectedCatalog.id).catch(() => 0),
       getWaCatalogQueue(selectedCatalog.id).catch(() => [] as WaQueueItem[]),
       getWaCatalogCategoryMeta(selectedCatalog.id).catch(() => ({ order: [], covers: {} })),
+      getWaConnectionStatus(selectedCatalog.id).catch(() => null),
     ])
     setCatalogItems(items)
     setHistory(runs)
@@ -285,6 +294,7 @@ export default function AdminWhatsAppPage() {
     setQueueItems(queueList)
     setCategoryOrder(meta.order)
     setCategoryCovers(meta.covers)
+    setWaStatus(status)
   }, [selectedCatalog])
 
   useEffect(() => {
@@ -2345,6 +2355,57 @@ export default function AdminWhatsAppPage() {
           </button>
         </form>
       </div>
+
+      {/*
+        Estado de la conexión con WhatsApp.
+
+        Sin credenciales, CUALQUIER acción que hable con Meta lanza "No hay
+        credenciales de WhatsApp configuradas", y Next enmascara ese mensaje en
+        producción: el usuario sólo veía `Minified React error #441`. Decirlo
+        aquí convierte un error opaco en una instrucción.
+
+        Y responde la pregunta que no tiene nada que ver con las credenciales:
+        si `syncedProducts` es 0, el catálogo NUNCA se publicó en WhatsApp.
+      */}
+      {waStatus && (
+        <div
+          className={`mb-4 rounded-xl border p-3 text-xs ${
+            waStatus.hasCredentials && waStatus.syncedProducts > 0
+              ? "border-[#0E7A0E]/30 bg-[#E7F8EE]"
+              : "border-amber-200 bg-amber-50"
+          }`}
+        >
+          {!waStatus.hasCredentials ? (
+            <p className="flex flex-wrap items-center gap-2 text-amber-800">
+              <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>
+                <strong>Este catálogo no está conectado a WhatsApp.</strong> Faltan las credenciales
+                de Meta, así que sincronizar, difundir o probar la conexión fallarán.
+              </span>
+              <button
+                onClick={() => setShowCreds(true)}
+                className="font-bold text-[#0E7A3D] underline"
+              >
+                Configurar credenciales
+              </button>
+            </p>
+          ) : waStatus.syncedProducts === 0 ? (
+            <p className="text-amber-800">
+              <strong>Todavía no hay nada publicado en WhatsApp.</strong> Las credenciales están
+              puestas, pero ningún producto ha llegado a Meta aún
+              {waStatus.metaCatalogId
+                ? ` (catálogo de Meta: ${waStatus.metaCatalogId})`
+                : " — y no hay Catalog ID configurado"}. Pulsa <strong>Sincronizar</strong> y revisa
+              el <strong>Explorador Meta</strong> para confirmar.
+            </p>
+          ) : (
+            <p className="text-[#0F7A3D]">
+              Conectado a WhatsApp: <strong>{waStatus.syncedProducts}</strong> productos publicados en
+              Meta{waStatus.metaCatalogId ? ` (catálogo ${waStatus.metaCatalogId})` : ""}.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Catálogo principal (00221): el que gobierna la marca de /admin/productos */}
       {selectedCatalog && (
