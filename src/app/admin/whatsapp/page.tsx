@@ -372,6 +372,33 @@ export default function AdminWhatsAppPage() {
     [products, curatedIds, supplierProductIds, selectedCategory, search]
   )
 
+  /**
+   * Por qué la lista de "Agregar productos" está vacía.
+   *
+   * Antes decía siempre "Sin productos por agregar." y eso confunde en el caso
+   * que importa: al **arrastrar una categoría** (o pulsar su "＋") sus productos
+   * pasan al catálogo y **desaparecen de aquí**, porque esta lista sólo ofrece lo
+   * que NO está en el catálogo. Sin explicación, parece que la categoría se
+   * esfumó. El aviso tiene que decir a dónde fueron.
+   */
+  const availableEmptyReason = useMemo(() => {
+    if (products.length === 0) return "No hay productos en la tienda."
+    const matching = products.filter((p) => {
+      if (supplierProductIds && !supplierProductIds.has(p.id)) return false
+      if (selectedCategory && p.category_id !== selectedCategory) return false
+      if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
+      return true
+    })
+    if (matching.length === 0) {
+      return "Ningún producto coincide con el filtro."
+    }
+    const alreadyCurated = matching.filter((p) => curatedIds.has(p.id)).length
+    if (alreadyCurated === matching.length) {
+      return `Los ${alreadyCurated} producto(s) de este filtro ya están en el catálogo. Esta lista sólo muestra los que faltan por agregar.`
+    }
+    return "Sin productos por agregar."
+  }, [products, supplierProductIds, selectedCategory, search, curatedIds])
+
   /** De los visibles, los que de verdad se pueden publicar (precio > 0). */
   const { syncable: selectable, unsyncable } = useMemo(() => splitSyncable(available), [available])
 
@@ -2977,7 +3004,9 @@ export default function AdminWhatsAppPage() {
 
             <div className="space-y-1.5 max-h-[55vh] overflow-y-auto">
               {available.length === 0 ? (
-                <p className="text-sm text-[#B0B3B8] py-8 text-center">Sin productos por agregar.</p>
+                <p className="text-sm text-[var(--text-secondary)] py-8 text-center px-4">
+                  {availableEmptyReason}
+                </p>
               ) : (
                 available.map((p) => {
                   const syncable = isCatalogSyncable(p)
