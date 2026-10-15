@@ -178,6 +178,7 @@ export default function AdminWhatsAppPage() {
   const [armDeleteCategoryId, setArmDeleteCategoryId] = useState<number | null>(null)
   const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(null)
   const [armDeleteAllEmpty, setArmDeleteAllEmpty] = useState(false)
+  const [armRemoveCategoryId, setArmRemoveCategoryId] = useState<number | null>(null)
 
   // Orden de categorías declarado por el admin (00223) + arrastre (DnD nativo).
   const [categoryOrder, setCategoryOrder] = useState<number[]>([])
@@ -744,6 +745,49 @@ export default function AdminWhatsAppPage() {
 
   /** Ids ya presentes en la lista del catálogo (para el estado del botón ＋). */
   const catalogCategoryIds = new Set(catalogCategoryList.map((c) => c.id))
+
+  /**
+   * Productos del catálogo agrupados por categoría.
+   *
+   * Sirve para la operación inversa del arrastre: quitar del catálogo TODOS los
+   * productos de una categoría de una vez. Sin esto, deshacer un "traer la
+   * categoría entera" (que puede ser un centenar de productos) obligaba a
+   * marcarlos a mano uno por uno.
+   */
+  const curatedIdsByCategory = (() => {
+    const map = new Map<number, number[]>()
+    for (const item of curated) {
+      const categoryId = productById.get(item.product_id)?.category_id
+      if (categoryId == null) continue
+      const list = map.get(categoryId) ?? []
+      list.push(item.product_id)
+      map.set(categoryId, list)
+    }
+    return map
+  })()
+
+  /**
+   * Quita del catálogo todos los productos de una categoría.
+   *
+   * Es reversible: los productos salen de la curaduría y quedan **fuera de stock
+   * en Meta**, no se borran. Volver a traer la categoría los reactiva.
+   */
+  const handleRemoveCategoryFromCatalog = (categoryId: number, categoryName: string) => {
+    if (armRemoveCategoryId !== categoryId) {
+      setArmRemoveCategoryId(categoryId)
+      return
+    }
+    setArmRemoveCategoryId(null)
+    run(
+      async () => {
+        if (!selectedCatalog) return 0
+        const ids = curatedIdsByCategory.get(categoryId) ?? []
+        if (ids.length === 0) return 0
+        return bulkRemoveWaCatalogProducts(selectedCatalog.id, ids)
+      },
+      (n) => `${n} producto(s) de “${categoryName}” quitados del catálogo.`
+    )
+  }
 
 
 
@@ -2358,6 +2402,40 @@ export default function AdminWhatsAppPage() {
                       >
                         {c.count}
                       </span>
+
+                      {/*
+                        Operación inversa del arrastre: quitar de una vez TODOS
+                        los productos de esta categoría. Es lo que permite deshacer
+                        un "traer la categoría entera" (que puede ser un centenar)
+                        sin marcarlos a mano uno por uno.
+                      */}
+                      {c.count > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRemoveCategoryFromCatalog(c.id, c.name)
+                          }}
+                          disabled={busy}
+                          aria-label={
+                            armRemoveCategoryId === c.id
+                              ? `Confirmar: quitar los ${c.count} productos de ${c.name} del catálogo`
+                              : `Quitar del catálogo los ${c.count} productos de ${c.name}`
+                          }
+                          title={
+                            armRemoveCategoryId === c.id
+                              ? `¿Confirmar? Salen los ${c.count} productos del catálogo`
+                              : `Quitar del catálogo los ${c.count} productos de esta categoría`
+                          }
+                          className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                            armRemoveCategoryId === c.id
+                              ? "bg-red-600 text-white hover:bg-red-700"
+                              : "text-[var(--text-secondary)] hover:text-red-700"
+                          } disabled:opacity-40`}
+                        >
+                          {armRemoveCategoryId === c.id ? `¿Quitar ${c.count}?` : "−"}
+                        </button>
+                      )}
+
                       {categoryCovers[c.id] && (
                         <button
                           onClick={() => handleRemoveCover(c.id)}
