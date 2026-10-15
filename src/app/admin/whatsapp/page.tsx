@@ -40,6 +40,7 @@ import {
   applyWaMembershipReconcile,
   reorderWaCatalogByCategory,
   getWaCatalogCategoryMeta,
+  removeWaCatalogCategory,
   setWaCatalogCategoryCover,
   reorderWaCatalogCategories,
   getWaCatalogItems,
@@ -180,6 +181,8 @@ export default function AdminWhatsAppPage() {
   const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(null)
   const [armDeleteAllEmpty, setArmDeleteAllEmpty] = useState(false)
   const [armRemoveCategoryId, setArmRemoveCategoryId] = useState<number | null>(null)
+  // Quitar la categoría DEL CATÁLOGO (la categoría sigue en la tienda).
+  const [armRemoveRowId, setArmRemoveRowId] = useState<number | null>(null)
 
   // Orden de categorías declarado por el admin (00223) + arrastre (DnD nativo).
   const [categoryOrder, setCategoryOrder] = useState<number[]>([])
@@ -857,6 +860,34 @@ export default function AdminWhatsAppPage() {
     }
     return map
   })()
+
+  /**
+   * Quita la categoría DEL CATÁLOGO (no de la tienda).
+   *
+   * Sus productos salen del catálogo y la fila desaparece de esta lista, pero la
+   * categoría sigue existiendo en la tienda —así que se puede volver a traer con
+   * el mismo nombre—. No confundir con el borrado de "Categorías vacías", que sí
+   * borra la categoría global.
+   */
+  const handleRemoveCategoryFromCatalogOnly = (categoryIds: number[], categoryName: string) => {
+    const categoryId = categoryIds[0]
+    if (categoryId == null) return
+    if (armRemoveRowId !== categoryId) {
+      setArmRemoveRowId(categoryId)
+      return
+    }
+    setArmRemoveRowId(null)
+    run(
+      async () => {
+        if (!selectedCatalog) return { removedProducts: 0, removedCategory: false }
+        return removeWaCatalogCategory(selectedCatalog.id, categoryIds)
+      },
+      (r) =>
+        `“${categoryName}” salió del catálogo` +
+        (r.removedProducts > 0 ? ` con sus ${r.removedProducts} productos.` : ".") +
+        " La categoría sigue en la tienda: puedes volver a traerla cuando quieras."
+    )
+  }
 
   /**
    * Quita del catálogo todos los productos de una categoría.
@@ -2590,6 +2621,37 @@ export default function AdminWhatsAppPage() {
                           {armRemoveCategoryId === c.id ? `¿Quitar ${c.count}?` : "−"}
                         </button>
                       )}
+
+                      {/*
+                        Quitar la CATEGORÍA del catálogo (no de la tienda).
+                        Distinto del "−": aquél la vacía pero la deja en la lista
+                        (conserva su posición); éste la saca del todo. Y distinto
+                        de "Categorías vacías", que borra la categoría GLOBAL.
+                      */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleRemoveCategoryFromCatalogOnly(g.ids, c.name)
+                        }}
+                        disabled={busy}
+                        aria-label={
+                          armRemoveRowId === c.id
+                            ? `Confirmar: quitar ${c.name} del catálogo`
+                            : `Quitar ${c.name} del catálogo (la categoría sigue en la tienda)`
+                        }
+                        title={
+                          armRemoveRowId === c.id
+                            ? `¿Confirmar? “${c.name}” sale del catálogo; la categoría sigue en la tienda`
+                            : `Quitar “${c.name}” del catálogo — la categoría NO se borra de la tienda`
+                        }
+                        className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                          armRemoveRowId === c.id
+                            ? "bg-red-600 text-white hover:bg-red-700"
+                            : "text-[var(--text-secondary)] hover:text-red-700"
+                        } disabled:opacity-40`}
+                      >
+                        {armRemoveRowId === c.id ? "¿Sí?" : <Trash2 className="w-3 h-3" />}
+                      </button>
 
                       {coverUrl && (
                         <button

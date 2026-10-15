@@ -5416,6 +5416,65 @@ export async function setDefaultWaCatalog(catalogId: string): Promise<{
   return { marked: toMark.length, hidden: toUnmark.length }
 }
 
+/**
+ * Quita una categoría DEL CATÁLOGO de WhatsApp (no de la tienda).
+ *
+ * Hace las dos cosas que significa "quitarla de aquí":
+ *   1. saca del catálogo sus productos (`whatsapp_catalog_items` + `hide` a Meta);
+ *   2. borra su lugar en el orden declarado (`whatsapp_catalog_categories`).
+ *
+ * **NO toca `categories`**: la categoría sigue existiendo en la tienda con sus
+ * productos, así que se puede volver a traer al catálogo cuando se quiera. Es la
+ * diferencia con el borrado de "Categorías vacías", que sí borra la fila global
+ * y por eso afecta a toda la tienda.
+ *
+ * Los productos salen de la curaduría y quedan **fuera de stock en Meta**
+ * (reversible); no se borran ni se despublican de la tienda.
+ */
+export async function removeWaCatalogCategory(
+  catalogId: string,
+  categoryIds: number[]
+): Promise<{ removedProducts: number; removedCategory: boolean }> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  if (categoryIds.length === 0) return { removedProducts: 0, removedCategory: false }
+  const supabase = await createServiceClient()
+
+  // Qué productos del catálogo pertenecen a estas categorías. Se lee por
+  // categoría (lista corta) y se cruza en memoria: evita un `.in()` con cientos
+  // de ids, que viajaría en la URL.
+  const { data: items } = await supabase
+    .from("whatsapp_catalog_items")
+    .select("product_id")
+    .eq("catalog_id", catalogId)
+  const curatedIds = (items ?? []).map((r) => r.product_id as number)
+
+  let toRemove: number[] = []
+  if (curatedIds.length > 0) {
+    const { data: prods } = await supabase
+      .from("products")
+      .select("id")
+      .in("category_id", categoryIds)
+    const ofCategory = new Set((prods ?? []).map((p) => p.id as number))
+    toRemove = curatedIds.filter((id) => ofCategory.has(id))
+  }
+
+  if (toRemove.length > 0) {
+    await removeFromWaCuration(supabase, catalogId, toRemove, "catalog_category_remove")
+  }
+
+  // Sólo se borra el lugar en el orden del catálogo. `categories` no se toca.
+  const { error } = await supabase
+    .from("whatsapp_catalog_categories")
+    .delete()
+    .eq("catalog_id", catalogId)
+    .in("category_id", categoryIds)
+  if (error) throw new Error(error.message)
+
+  revalidatePath("/admin/whatsapp")
+  return { removedProducts: toRemove.length, removedCategory: true }
+}
+
 /** Reordena la curaduría: array ordenado de product_ids (posiciones 1..N). */
 export async function reorderWaCatalog(
   catalogId: string,

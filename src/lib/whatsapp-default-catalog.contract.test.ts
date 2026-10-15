@@ -158,3 +158,40 @@ describe("00221 — el trigger del puente", () => {
     expect(sql).not.toMatch(/UPDATE products\s+SET show_in_whatsapp/)
   })
 })
+
+describe("quitar una categoría del catálogo NO toca la tienda", () => {
+  const actions = readFileSync(join(process.cwd(), "src", "app", "admin", "actions.ts"), "utf8")
+
+  /** Cuerpo de `removeWaCatalogCategory`. */
+  function body(): string {
+    const start = actions.indexOf("export async function removeWaCatalogCategory")
+    expect(start).toBeGreaterThan(-1)
+    const end = actions.indexOf("\n}\n", start)
+    expect(end).toBeGreaterThan(start)
+    return actions.slice(start, end)
+  }
+
+  it("borra el lugar en el orden del catálogo", () => {
+    // Es lo que hace que la fila desaparezca de la lista.
+    expect(body()).toMatch(/from\("whatsapp_catalog_categories"\)[\s\S]*?\.delete\(\)/)
+  })
+
+  it("saca los productos de la curaduría (reversible)", () => {
+    expect(body()).toMatch(/removeFromWaCuration\(/)
+  })
+
+  it("NUNCA borra la fila de `categories`", () => {
+    // El punto entero de la función: la categoría sigue en la tienda, así que se
+    // puede volver a traer al catálogo con el mismo nombre. Un `delete` sobre
+    // `categories` aquí sería el borrado global, que es justo lo que no se pide.
+    const src = body()
+    expect(src).not.toMatch(/from\("categories"\)[\s\S]{0,80}?\.delete\(/)
+    expect(src).not.toMatch(/from\("categories"\)[\s\S]{0,80}?\.update\(/)
+  })
+
+  it("no reasigna la categoría de ningún producto", () => {
+    // Tampoco debe tocar `products.category_id`: eso movería productos en toda
+    // la tienda.
+    expect(body()).not.toMatch(/category_id\s*:/)
+  })
+})
