@@ -185,6 +185,15 @@ export default function AdminWhatsAppPage() {
   const [categoryCovers, setCategoryCovers] = useState<Record<number, string>>({})
   const [coverBusyId, setCoverBusyId] = useState<number | null>(null)
   const [catDragId, setCatDragId] = useState<number | null>(null)
+  // Un proveedor también se puede arrastrar (trae SÓLO sus productos).
+  const [supplierDragId, setSupplierDragId] = useState<number | null>(null)
+  // Traer una categoría entera puede ser un centenar de productos: se confirma.
+  const [pendingCategoryBring, setPendingCategoryBring] = useState<{
+    id: number
+    name: string
+    count: number
+    targetId: number | null
+  } | null>(null)
   const [catDragOverId, setCatDragOverId] = useState<number | null>(null)
 
   // Agregar TODO un proveedor de un clic (sin pasar por el modo selección).
@@ -573,6 +582,7 @@ export default function AdminWhatsAppPage() {
    */
   const endCategoryDrag = () => {
     setCatDragId(null)
+    setSupplierDragId(null)
     setCatDragOverId(null)
   }
 
@@ -624,15 +634,39 @@ export default function AdminWhatsAppPage() {
    * no se llama** en `dragstart`. Además deja el id en el portapapeles de arrastre,
    * que el drop usa como respaldo si el estado de React se perdiera.
    */
-  const categoryDragProps = (categoryId: number) => ({
+  /**
+   * Props de arrastre con TIPO en el payload.
+   *
+   * El `dataTransfer` no lleva sólo un id: lleva `"category:12"` o
+   * `"supplier:7"`. Sin el tipo, la zona de soltado no puede distinguir qué se
+   * arrastró y no sabría si traer una categoría (todos sus productos) o un
+   * proveedor (sólo los suyos) — que es justo lo que hay que diferenciar.
+   */
+  const dragProps = (kind: "category" | "supplier", id: number) => ({
     draggable: true,
     onDragStart: (e: React.DragEvent) => {
-      e.dataTransfer.setData("text/plain", String(categoryId))
+      e.dataTransfer.setData("text/plain", `${kind}:${id}`)
       e.dataTransfer.effectAllowed = "move"
-      setCatDragId(categoryId)
+      if (kind === "category") setCatDragId(id)
+      else setSupplierDragId(id)
     },
     onDragEnd: endCategoryDrag,
   })
+
+  /** Lee el payload del arrastre (o el estado, si el evento no lo trae). */
+  const readDragPayload = (e: React.DragEvent): { kind: string; id: number } | null => {
+    const raw = e.dataTransfer.getData("text/plain")
+    const [kind, idText] = raw.split(":")
+    const id = Number(idText)
+    if (kind !== "category" && kind !== "supplier") return null
+    return Number.isInteger(id) && id > 0 ? { kind, id } : null
+  }
+
+  const categoryDragProps = (categoryId: number) =>
+    dragProps("category", categoryId)
+
+  /** Un proveedor arrastrable: al soltarlo trae SÓLO sus productos. */
+  const supplierDragProps = (supplierId: number) => dragProps("supplier", supplierId)
 
   /**
    * Id que se está arrastrando: el estado de React o, si se perdió, el
@@ -642,9 +676,30 @@ export default function AdminWhatsAppPage() {
    */
   const draggedCategoryId = (e: React.DragEvent): number | null => {
     if (catDragId != null) return catDragId
-    const raw = e.dataTransfer.getData("text/plain")
-    const parsed = Number(raw)
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+    const payload = readDragPayload(e)
+    return payload?.kind === "category" ? payload.id : null
+  }
+
+  /** Id del proveedor arrastrado (o `null` si lo que se arrastra es otra cosa). */
+  const draggedSupplierId = (e: React.DragEvent): number | null => {
+    if (supplierDragId != null) return supplierDragId
+    const payload = readDragPayload(e)
+    return payload?.kind === "supplier" ? payload.id : null
+  }
+
+  /**
+   * Suelta sobre la lista de categorías: un proveedor trae SUS productos; una
+   * categoría se coloca en el orden (y, si es grande, pide confirmación).
+   */
+  const handleCategoryAreaDrop = (e: React.DragEvent, targetCategoryId: number | null) => {
+    e.preventDefault()
+    const supplierId = draggedSupplierId(e)
+    if (supplierId != null) {
+      handleAddWholeSupplier(supplierId)
+      return
+    }
+    const categoryId = draggedCategoryId(e)
+    if (categoryId != null) placeCategoryInCatalog(categoryId, targetCategoryId).catch(() => {})
   }
 
   /**
@@ -657,8 +712,31 @@ export default function AdminWhatsAppPage() {
    * pantallas táctiles**, y depender sólo de él dejaba la función inalcanzable en
    * móvil/tablet.
    */
-  const placeCategoryInCatalog = (categoryId: number, targetId: number | null) =>
-    run(
+  const placeCategoryInCatalog = (categoryId: number, targetId: number | null, confirmed = false) => {
+    // Traer una categoría NUEVA mete todos sus productos, y puede ser un
+    // centenar. Si es un lote grande se confirma ANTES de tocar nada: el usuario
+    // ya reportó que se le agregaron más productos de los que esperaba, y un
+    // alta masiva silenciosa es exactamente eso.
+    if (!confirmed) {
+      const isNewCategory = !catalogCategoryIds.has(categoryId)
+      if (isNewCategory) {
+        const candidates = products.filter(
+          (p) => p.category_id === categoryId && !curatedIds.has(p.id)
+        )
+        const syncableCount = candidates.filter(isCatalogSyncable).length
+        if (syncableCount >= PICK_CONFIRM_FROM) {
+          setPendingCategoryBring({
+            id: categoryId,
+            name: categories.find((c) => c.id === categoryId)?.name ?? "la categoría",
+            count: syncableCount,
+            targetId,
+          })
+          return Promise.resolve()
+        }
+      }
+    }
+
+    return run(
       async () => {
         if (!selectedCatalog) return { saved: 0, added: 0, skipped: 0 }
         if (targetId != null && targetId === categoryId) return { saved: 0, added: 0, skipped: 0 }
@@ -696,6 +774,7 @@ export default function AdminWhatsAppPage() {
             ? `Orden de categorías guardado (${r.saved}).`
             : "Sin cambios."
     )
+  }
 
   /**
    * Cómo está repartido el catálogo por categoría, para la tarjeta del catálogo.
@@ -863,23 +942,51 @@ export default function AdminWhatsAppPage() {
    * selección. Ignora los filtros de categoría y búsqueda a propósito: el botón
    * promete "todo el proveedor" y el número que muestra es el de esa promesa.
    */
-  const handleAddWholeSupplier = () => {
-    if (supplierAddableSyncable.length === 0) return
-    if (supplierAddableSyncable.length >= PICK_CONFIRM_FROM && !armSupplierAdd) {
+  /**
+   * Productos agregables de UN proveedor, sin depender del filtro activo.
+   *
+   * Hace falta porque un proveedor también se puede **arrastrar** al catálogo: en
+   * ese caso el id viene del arrastre, no del filtro, y hay que calcular sus
+   * productos en el momento. Sólo los suyos — nunca la categoría entera.
+   */
+  const supplierAddableIds = (supplierId: number) => {
+    const supplier = suppliers.find((s) => s.id === supplierId)
+    if (!supplier) return { syncable: [] as number[], unsyncable: 0 }
+    const addable = addableSupplierProductIds(
+      supplier.productIds,
+      curatedIds,
+      new Set(productById.keys())
+    )
+    const syncable = addable.filter((id) => {
+      const p = productById.get(id)
+      return p ? isCatalogSyncable(p) : false
+    })
+    return { syncable, unsyncable: addable.length - syncable.length }
+  }
+
+  /**
+   * Trae al catálogo los productos de un proveedor (los suyos, no los de su
+   * categoría). Sin argumento usa el proveedor filtrado — es el botón.
+   */
+  const handleAddWholeSupplier = (supplierIdArg?: number) => {
+    const supplierId = supplierIdArg ?? supplierFilter
+    if (supplierId == null) return
+    const { syncable, unsyncable } = supplierAddableIds(supplierId)
+    if (syncable.length === 0) return
+    if (syncable.length >= PICK_CONFIRM_FROM && !armSupplierAdd) {
       setArmSupplierAdd(true)
       return
     }
     setArmSupplierAdd(false)
+    const name = suppliers.find((s) => s.id === supplierId)?.name ?? "el proveedor"
     run(
       async () => {
         if (!selectedCatalog) return 0
-        return bulkAddWaCatalogProducts(selectedCatalog.id, supplierAddableSyncable)
+        return bulkAddWaCatalogProducts(selectedCatalog.id, syncable)
       },
       (n) =>
-        `${n} productos del proveedor agregados a la curaduría de ${selectedCatalog?.name}.` +
-        (supplierUnsyncableCount > 0
-          ? ` ${supplierUnsyncableCount} quedaron fuera por no tener precio.`
-          : "")
+        `${n} producto(s) de ${name} agregados a la curaduría de ${selectedCatalog?.name}.` +
+        (unsyncable > 0 ? ` ${unsyncable} quedaron fuera por no tener precio.` : "")
     )
   }
 
@@ -2291,13 +2398,48 @@ export default function AdminWhatsAppPage() {
               catálogo de WhatsApp. El borrado vive abajo, limitado a las vacías.
             */}
             <div className="mb-4">
+              {/*
+                Confirmación de un alta masiva: traer una categoría nueva mete
+                TODOS sus productos. Sin este paso, soltar la categoría equivocada
+                agregaba un centenar de productos sin avisar (reportado).
+              */}
+              {pendingCategoryBring && (
+                <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-[11px] text-amber-800 mb-2">
+                    Traer <strong>{pendingCategoryBring.name}</strong> agregará{" "}
+                    <strong>{pendingCategoryBring.count} productos</strong> al catálogo. Es la
+                    categoría completa, no sólo los de un proveedor.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        const pending = pendingCategoryBring
+                        setPendingCategoryBring(null)
+                        void placeCategoryInCatalog(pending.id, pending.targetId, true)
+                      }}
+                      disabled={busy}
+                      className="px-3 py-1.5 rounded-lg bg-[#0E7A0E] text-white text-[11px] font-bold hover:bg-[#0D720D] disabled:opacity-50"
+                    >
+                      Sí, traer {pendingCategoryBring.count} productos
+                    </button>
+                    <button
+                      onClick={() => setPendingCategoryBring(null)}
+                      className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-[var(--text-secondary)] hover:bg-[#EDEAE4]"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <p className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-1.5">
                 Categorías en este catálogo
               </p>
               <p className="text-[11px] text-[var(--text-secondary)] mb-1.5">
                 Arrástralas para ordenarlas: este orden es el de las <strong>secciones</strong> del
-                mensaje. Para traer una, arrástrala desde los chips de al lado o pulsa{" "}
-                <strong>＋</strong> en el chip.
+                mensaje. Para traer productos, arrastra un <strong>proveedor</strong> desde los chips
+                de al lado (trae <strong>sólo los suyos</strong>); para traer una categoría completa,
+                arrástrala o pulsa <strong>＋</strong> en su chip.
               </p>
 
               {/*
@@ -2313,18 +2455,14 @@ export default function AdminWhatsAppPage() {
                     e.preventDefault()
                     setCatDragOverId(-1)
                   }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    const id = draggedCategoryId(e)
-                    if (id != null) placeCategoryInCatalog(id, null).catch(() => {})
-                  }}
+                  onDrop={(e) => handleCategoryAreaDrop(e, null)}
                   className={`rounded-lg border border-dashed px-3 py-4 text-center text-[11px] transition-colors ${
                     catDragOverId === -1
                       ? "border-[#0E7A0E] bg-[#E7F8EE] text-[#0E7A0E]"
                       : "border-[#B0B3B8] text-[var(--text-secondary)]"
                   }`}
                 >
-                  Suelta aquí una categoría para traerla con sus productos
+                  Suelta aquí un proveedor (trae sólo sus productos) o una categoría
                 </div>
               )}
 
@@ -2337,11 +2475,7 @@ export default function AdminWhatsAppPage() {
                         e.preventDefault()
                         if (catDragOverId !== c.id) setCatDragOverId(c.id)
                       }}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        const id = draggedCategoryId(e)
-                        if (id != null) placeCategoryInCatalog(id, c.id).catch(() => {})
-                      }}
+                      onDrop={(e) => handleCategoryAreaDrop(e, c.id)}
                       className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 cursor-grab active:cursor-grabbing ${
                         catDragOverId === c.id && catDragId !== c.id
                           ? "border-[#0E7A0E] bg-[#E7F8EE] ring-2 ring-[#0E7A0E]/30"
@@ -2466,11 +2600,7 @@ export default function AdminWhatsAppPage() {
                       e.preventDefault()
                       setCatDragOverId(-1)
                     }}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      const id = draggedCategoryId(e)
-                      if (id != null) placeCategoryInCatalog(id, null).catch(() => {})
-                    }}
+                    onDrop={(e) => handleCategoryAreaDrop(e, null)}
                     className={`mt-1 rounded-lg border border-dashed px-3 py-2 text-center text-[11px] transition-colors ${
                       catDragOverId === -1
                         ? "border-[#0E7A0E] bg-[#E7F8EE] text-[#0E7A0E]"
@@ -2881,14 +3011,21 @@ export default function AdminWhatsAppPage() {
                     Todos
                   </button>
                   {supplierChips.map((s) => (
+                    // Arrastrable: al soltarlo en "Categorías en este catálogo"
+                    // trae SÓLO los productos de este proveedor — nunca la
+                    // categoría entera. Es la diferencia con arrastrar una
+                    // categoría, y el payload del arrastre lleva el tipo para que
+                    // la zona de soltado no las confunda.
                     <button
                       key={s.id}
+                      {...supplierDragProps(s.id)}
                       onClick={() => chooseSupplier(s.id)}
-                      className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                      title={`${s.name} — clic para filtrar, o arrástralo a “Categorías en este catálogo” para traer SÓLO sus productos`}
+                      className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-grab active:cursor-grabbing ${
                         supplierFilter === s.id
                           ? "bg-[#0F7A3D] text-white"
                           : "bg-[#F5F3F0] text-[var(--text-secondary)]"
-                      }`}
+                      } ${supplierDragId === s.id ? "opacity-50" : ""}`}
                     >
                       {s.name}
                       <span
@@ -2904,7 +3041,7 @@ export default function AdminWhatsAppPage() {
                 {supplierFilter !== null && (
                   <div className="mt-2 space-y-1.5">
                     <button
-                      onClick={handleAddWholeSupplier}
+                      onClick={() => handleAddWholeSupplier()}
                       disabled={busy || supplierAddableSyncable.length === 0}
                       className={`w-full px-3 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-60 ${
                         armSupplierAdd
