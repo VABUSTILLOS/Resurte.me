@@ -1,12 +1,11 @@
 import type { SitemapEntry } from "@/lib/structured-data"
-import { getCachedActiveCities } from "@/lib/catalog-cache"
 
 const BASE_URL = "https://resurte.me"
 
 export async function GET() {
   // Dynamic imports to avoid build-time evaluation when DB isn't ready
   const [
-    { MEXICO_CITIES },
+    { ACTIVE_CITIES },
     { getAllPosts },
     { generateSitemapXml },
     { BLOG_CATEGORIES },
@@ -55,18 +54,9 @@ export async function GET() {
     // Supabase not configured — skip dynamic URLs
   }
 
-  // Ciudades: las activas en DB cuando Supabase está disponible; si la tabla
-  // no devuelve nada (DB vacía o sin configurar), se usan todas las estáticas.
-  let activeCitySlugs: string[] = []
-  try {
-    const cities = await getCachedActiveCities()
-    if (cities.length > 0) activeCitySlugs = cities.map((c) => c.slug)
-  } catch {
-    // Supabase not configured — fallback to all static cities
-  }
-
-  for (const city of MEXICO_CITIES) {
-    if (activeCitySlugs.length > 0 && !activeCitySlugs.includes(city.slug)) continue
+  // Solo ciudades con cobertura. Las páginas "próximamente" se conservan
+  // accesibles, pero llevan noindex y no deben anunciarse en el sitemap.
+  for (const city of ACTIVE_CITIES) {
     entries.push({ url: `${BASE_URL}/${city.slug}`, changeFrequency: "daily", priority: 0.9 })
     // /buscar y /carrito llevan noindex (páginas transaccionales / resultados
     // de búsqueda interna) y no deben estar en el sitemap.

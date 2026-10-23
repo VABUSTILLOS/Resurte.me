@@ -1,4 +1,5 @@
-import { MEXICO_CITIES } from "@/lib/cities"
+import { MEXICO_CITIES, isCityActive } from "@/lib/cities"
+import { ComingSoonCity } from "@/components/city/coming-soon-city"
 
 /**
  * Layout del segmento dinámico /[slug].
@@ -21,6 +22,18 @@ export function generateStaticParams() {
   return MEXICO_CITIES.map((c) => ({ slug: c.slug }))
 }
 
-export default function CityLayout({ children }: { children: React.ReactNode }) {
+interface CityLayoutProps {
+  children: React.ReactNode
+  params: Promise<{ slug: string }>
+}
+
+export default async function CityLayout({ children, params }: CityLayoutProps) {
+  const { slug } = await params
+  // Las ciudades sin cobertura conservan su URL, pero muestran la página
+  // "próximamente" en lugar del catálogo (y sin checkout).
+  if (!isCityActive(slug)) {
+    const city = MEXICO_CITIES.find((c) => c.slug === slug)
+    if (city) return <ComingSoonCity city={city} />
+  }
   return children
 }

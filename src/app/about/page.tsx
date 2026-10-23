@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowRight, Leaf, Truck, Users, Shield, Building2, BadgeCheck } from "lucide-react"
-import { MEXICO_CITIES } from "@/lib/cities"
-import { DELIVERY_CITIES } from "@/lib/commercial-facts"
+import { ACTIVE_CITIES } from "@/lib/cities"
+import { DELIVERY_COVERAGE_PROSE } from "@/lib/commercial-facts"
 import { PRIMARY_AUTHOR, getPersonSchema, ORGANIZATION_ID, SITE_URL, SITE_NAME } from "@/lib/author"
 
 export const metadata: Metadata = {
@@ -14,10 +14,12 @@ export const metadata: Metadata = {
 const STATS = [
   { value: "5,000+", label: "Negocios activos" },
   { value: "98%", label: "Entregas a tiempo" },
-  // Se deriva de MEXICO_CITIES en vez de escribirlo a mano: antes decía "6"
-  // mientras el sitio ya cubría 20, y una cifra contradictoria en la propia
-  // página debilita la entidad ante los motores de respuesta.
-  { value: String(MEXICO_CITIES.length), label: "Ciudades con cobertura" },
+  // Se deriva de ACTIVE_CITIES: una cifra contradictoria en la propia página
+  // debilita la entidad ante los motores de respuesta.
+  {
+    value: String(ACTIVE_CITIES.length),
+    label: ACTIVE_CITIES.length === 1 ? "Ciudad con cobertura" : "Ciudades con cobertura",
+  },
   { value: "24h", label: "Respuesta en crédito" },
 ]
 
@@ -168,8 +170,9 @@ export default function AboutPage() {
           con entrega al siguiente día y factura a solicitud.
         </p>
         <p className="text-[#5C6068] leading-relaxed">
-          Surtimos a restaurantes, fondas, cafeterías y hoteles en {DELIVERY_CITIES} ciudades
-          de México. Y apenas vamos empezando.
+          Surtimos a restaurantes, fondas, cafeterías y hoteles en{" "}
+          {DELIVERY_COVERAGE_PROSE}. Y muy pronto en tu ciudad: apenas vamos
+          empezando.
         </p>
       </section>
 

@@ -11,6 +11,7 @@ import {
 } from "./structured-data"
 import { ORGANIZATION_ID, PRIMARY_AUTHOR, SITE_URL } from "./author"
 import { FREE_SHIPPING_MXN, MIN_ORDER_MXN, formatMxn } from "./commercial-facts"
+import { ACTIVE_CITIES } from "./cities"
 
 describe("getProductSchema", () => {
   it("usa la imagen real del producto cuando se pasa", () => {
@@ -65,12 +66,15 @@ describe("getOrganizationSchema", () => {
     expect(founder["@id"]).toBe(PRIMARY_AUTHOR.id)
   })
 
-  it("cubre las 20 ciudades como `City` estructuradas", () => {
+  it("declara solo las ciudades con cobertura como `City` estructuradas", () => {
     const schema = getOrganizationSchema()
-    expect(schema.areaServed.length).toBeGreaterThan(1)
+    expect(schema.areaServed.length).toBe(ACTIVE_CITIES.length)
     for (const area of schema.areaServed) {
       expect(area["@type"]).toBe("City")
     }
+    expect(schema.areaServed.map((area) => area.name)).toEqual(
+      ACTIVE_CITIES.map((city) => city.name)
+    )
   })
 
   it("declara temas de especialidad (knowsAbout) no vacíos", () => {

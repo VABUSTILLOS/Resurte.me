@@ -4,6 +4,7 @@ import {
   CREDIT_DAYS,
   CREDIT_DAYS_PROSE,
   DELIVERY_CITIES,
+  DELIVERY_COVERAGE_PROSE,
   FREE_SHIPPING_MXN,
   INVOICING,
   MEMBERSHIP_FEE_MXN,
@@ -12,7 +13,7 @@ import {
   getCommercialFacts,
   getCommercialFactsSummary,
 } from "./commercial-facts"
-import { MEXICO_CITIES } from "./cities"
+import { ACTIVE_CITIES } from "./cities"
 
 describe("commercial-facts", () => {
   it("usa las cifras comerciales verificadas", () => {
@@ -23,9 +24,9 @@ describe("commercial-facts", () => {
     expect([...CREDIT_DAYS]).toEqual([7, 15, 30])
   })
 
-  it("deriva la cobertura del listado real de ciudades", () => {
-    expect(DELIVERY_CITIES).toBe(MEXICO_CITIES.length)
-    expect(DELIVERY_CITIES).toBeGreaterThan(0)
+  it("deriva la cobertura del listado real de ciudades activas", () => {
+    expect(DELIVERY_CITIES).toBe(ACTIVE_CITIES.length)
+    expect(DELIVERY_CITIES).toBe(1)
   })
 
   it("formatea montos en pesos mexicanos con separador de miles", () => {
@@ -66,7 +67,7 @@ describe("commercial-facts", () => {
     expect(texto).toContain(formatMxn(FREE_SHIPPING_MXN))
     expect(texto).toContain("CFDI 4.0")
     expect(texto).toContain("7, 15, 30 días")
-    expect(texto).toContain(String(MEXICO_CITIES.length))
+    expect(texto).toContain("Chihuahua")
   })
 
   it("el resumen en prosa cubre las mismas condiciones", () => {
@@ -175,15 +176,19 @@ describe("cifras publicadas en src coinciden con la fuente de verdad", () => {
   })
 })
 
-describe("la lista de ciudades del FAQ coincide con la cobertura real", () => {
-  it("nombra todas las ciudades del catálogo", () => {
+describe("la cobertura del FAQ coincide con las ciudades activas", () => {
+  it("nombra todas las ciudades con cobertura", () => {
     const faq = readFileSync(new URL("../app/faq/page.tsx", import.meta.url), "utf8")
-    const faltantes = MEXICO_CITIES.filter((ciudad) => {
-      // El FAQ usa el nombre corto para la capital, igual que el resto del sitio.
-      const etiqueta = ciudad.slug === "cdmx" ? "CDMX" : ciudad.name
-      return !faq.includes(etiqueta)
-    }).map((ciudad) => ciudad.name)
+    expect(faq).toContain("DELIVERY_COVERAGE_PROSE")
+    const faltantes = ACTIVE_CITIES.filter(
+      (ciudad) => !DELIVERY_COVERAGE_PROSE.includes(ciudad.name)
+    ).map((ciudad) => ciudad.name)
     expect(faltantes).toEqual([])
+  })
+
+  it("promete la expansión a otras ciudades", () => {
+    const faq = readFileSync(new URL("../app/faq/page.tsx", import.meta.url), "utf8")
+    expect(faq).toMatch(/muy pronto en tu ciudad/i)
   })
 })
 

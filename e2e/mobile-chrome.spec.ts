@@ -75,13 +75,13 @@ test.describe("móvil: chrome de navegación", { tag: "@ci" }, () => {
 
   test("header móvil: botón 'Ver todos los productos' navega al catálogo", async ({ page, isMobile }) => {
     test.skip(!isMobile, "solo viewport móvil")
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
 
     const todosBtn = page.locator("header").getByRole("link", { name: "Ver todos los productos" })
     await expect(todosBtn).toBeVisible({ timeout: 8000 })
-    await expect(todosBtn).toHaveAttribute("href", /\/cdmx\/buscar$/)
+    await expect(todosBtn).toHaveAttribute("href", /\/chihuahua\/buscar$/)
     await todosBtn.tap()
-    await page.waitForURL(/\/cdmx\/buscar$/, { timeout: 8000 })
+    await page.waitForURL(/\/chihuahua\/buscar$/, { timeout: 8000 })
 
     // Estado activo en /buscar (aria-current) y título del catálogo visible.
     await expect(todosBtn).toHaveAttribute("aria-current", "page")
@@ -90,7 +90,7 @@ test.describe("móvil: chrome de navegación", { tag: "@ci" }, () => {
 
   test("producto en móvil: breadcrumb con Atrás y ruta visible", async ({ page, isMobile }) => {
     test.skip(!isMobile, "solo viewport móvil")
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
 
     // Navega al primer producto disponible; sin datos locales se omite.
     const productLink = page.locator('a[href*="/producto/"]').first()
@@ -109,7 +109,7 @@ test.describe("móvil: chrome de navegación", { tag: "@ci" }, () => {
 
     // Atrás regresa a la página anterior del historial.
     await nav.getByRole("button", { name: "Atrás" }).tap()
-    await page.waitForURL(/\/cdmx$/, { timeout: 8000 })
+    await page.waitForURL(/\/chihuahua$/, { timeout: 8000 })
   })
 })
 

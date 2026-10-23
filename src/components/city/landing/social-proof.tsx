@@ -9,8 +9,12 @@ export function SocialProof() {
             {[
               { value: formatMxn(MIN_ORDER_MXN), label: "Pedido mínimo", icon: Wallet },
               { value: "0", label: "Costo de membresía", icon: BadgeCheck },
-              { value: String(DELIVERY_CITIES), label: "Ciudades en México", icon: MapPin },
-              { value: "Hoy", label: "Tiempo de entrega", icon: Truck },
+              {
+                value: String(DELIVERY_CITIES),
+                label: DELIVERY_CITIES === 1 ? "Ciudad activa" : "Ciudades activas",
+                icon: MapPin,
+              },
+              { value: "Pronto", label: "Tu ciudad", icon: Truck },
             ].map((stat) => (
               <div key={stat.label} className="flex flex-col items-center gap-1.5">
                 <stat.icon className="w-5 h-5 text-[#0E7A0E] mb-1" />

@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { Shield } from "lucide-react"
 import { PREGUNTAS } from "@/lib/preguntas"
-import { CREDIT_DAYS_PROSE, DELIVERY_CITIES, FREE_SHIPPING_MXN, INVOICING, MIN_ORDER_MXN, formatMxn } from "@/lib/commercial-facts"
+import { CREDIT_DAYS_PROSE, DELIVERY_COVERAGE_PROSE, FREE_SHIPPING_MXN, INVOICING, MIN_ORDER_MXN, formatMxn } from "@/lib/commercial-facts"
 
 export const metadata: Metadata = {
   title: "Preguntas frecuentes — Resurte.me",
@@ -49,7 +49,7 @@ const FAQS = [
   },
   {
     q: "¿En qué ciudades entregan?",
-    a: `Estamos en ${DELIVERY_CITIES} ciudades: CDMX, Guadalajara, Monterrey, Puebla, Toluca, Querétaro, León, Tijuana, Mérida, San Luis Potosí, Aguascalientes, Hermosillo, Saltillo, Culiacán, Morelia, Chihuahua, Veracruz, Villahermosa, Cancún y Torreón. Y cada mes sumamos zonas nuevas. Si la tuya aún no aparece, avísanos y te notificamos cuando lleguemos.`,
+    a: `Hoy entregamos solo en ${DELIVERY_COVERAGE_PROSE}. Estamos preparando el resto del país: muy pronto en tu ciudad. Si la tuya aún no aparece, avísanos y te notificamos en cuanto lleguemos.`,
   },
 ]
 

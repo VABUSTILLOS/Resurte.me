@@ -17,7 +17,7 @@
 
 import {
   CREDIT_DAYS_PROSE,
-  DELIVERY_CITIES,
+  DELIVERY_COVERAGE_PROSE,
   FREE_SHIPPING_MXN,
   INVOICING,
   MIN_ORDER_MXN,
@@ -216,7 +216,7 @@ export const PREGUNTAS: Pregunta[] = [
     slug: "donde-comprar-insumos-para-restaurante-al-mayoreo-en-mexico",
     question: "¿Dónde compro insumos para restaurante al mayoreo en México?",
     answer:
-      `Tienes cuatro rutas: central de abasto, mayoristas especializados, distribuidores regionales y proveeduría en línea. Resurte.me cubre la cuarta: abarrotes, frutas, verduras, carnes, lácteos y desechables con entrega a domicilio en ${DELIVERY_CITIES} ciudades, sin membresía, pedido mínimo de ${formatMxn(MIN_ORDER_MXN)} y envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`,
+      `Tienes cuatro rutas: central de abasto, mayoristas especializados, distribuidores regionales y proveeduría en línea. Resurte.me cubre la cuarta: abarrotes, frutas, verduras, carnes, lácteos y desechables con entrega a domicilio en ${DELIVERY_COVERAGE_PROSE}, sin membresía, pedido mínimo de ${formatMxn(MIN_ORDER_MXN)} y envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`,
     theme: "proveeduria",
     links: [
       { label: "Comprar insumos al mayoreo", href: "/catalogo" },
@@ -271,7 +271,7 @@ export const PREGUNTAS: Pregunta[] = [
     slug: "que-es-el-pedido-minimo-de-resurte-me",
     question: "¿Cuál es el pedido mínimo de Resurte.me?",
     answer:
-      `El pedido mínimo es de ${formatMxn(MIN_ORDER_MXN)} y no hay costo de membresía. Si tu pedido supera los ${formatMxn(FREE_SHIPPING_MXN)}, el envío va por nuestra cuenta. Entregamos en ${DELIVERY_CITIES} ciudades de México y todas las compras se pueden facturar con ${INVOICING}, sin costo extra.`,
+      `El pedido mínimo es de ${formatMxn(MIN_ORDER_MXN)} y no hay costo de membresía. Si tu pedido supera los ${formatMxn(FREE_SHIPPING_MXN)}, el envío va por nuestra cuenta. Entregamos en ${DELIVERY_COVERAGE_PROSE} y todas las compras se pueden facturar con ${INVOICING}, sin costo extra. Muy pronto en tu ciudad.`,
     theme: "proveeduria",
     links: [
       { label: "Preguntas frecuentes", href: "/faq" },
@@ -617,7 +617,7 @@ export const PREGUNTAS: Pregunta[] = [
     slug: "que-es-resurte-me-y-como-funciona",
     question: "¿Qué es Resurte.me y cómo funciona?",
     answer:
-      `Resurte.me es una proveeduría en línea de insumos para restaurantes en México. Vendes abarrotes, frutas, verduras, carnes, lácteos y desechables al mayoreo, con entrega a domicilio en ${DELIVERY_CITIES} ciudades, sin membresía, pedido mínimo de ${formatMxn(MIN_ORDER_MXN)}, envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}, facturación ${INVOICING} y crédito a ${CREDIT_DAYS_PROSE} días.`,
+      `Resurte.me es una proveeduría en línea de insumos para restaurantes en México. Vendes abarrotes, frutas, verduras, carnes, lácteos y desechables al mayoreo, con entrega a domicilio en ${DELIVERY_COVERAGE_PROSE}, sin membresía, pedido mínimo de ${formatMxn(MIN_ORDER_MXN)}, envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}, facturación ${INVOICING} y crédito a ${CREDIT_DAYS_PROSE} días.`,
     theme: "industria",
     links: [
       { label: "Sobre Resurte.me", href: "/about" },
@@ -628,7 +628,7 @@ export const PREGUNTAS: Pregunta[] = [
     slug: "cuantas-ciudades-cubre-resurte-me",
     question: "¿Cuántas ciudades cubre Resurte.me?",
     answer:
-      `Resurte.me entrega en ${DELIVERY_CITIES} ciudades de México: CDMX, Guadalajara, Monterrey, Puebla, Toluca, Querétaro, León, Tijuana, Mérida, San Luis Potosí, Aguascalientes, Hermosillo, Saltillo, Culiacán, Morelia, Chihuahua, Veracruz, Villahermosa, Cancún y Torreón. La cobertura crece cada mes; en la página de ciudades puedes ver la lista vigente y las zonas de entrega.`,
+      `Hoy Resurte.me entrega solo en ${DELIVERY_COVERAGE_PROSE}. Estamos preparando la cobertura para el resto del país: muy pronto en tu ciudad. En la página de ciudades puedes ver la lista vigente y las zonas de entrega. Si tu ciudad aún no aparece, escríbenos y te avisamos en cuanto lleguemos con la operación.`,
     theme: "industria",
     links: [
       { label: "Ciudades con entrega", href: "/ciudades" },

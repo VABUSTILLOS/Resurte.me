@@ -71,9 +71,9 @@ test.describe("móvil: render, touch-target y sin overflow", { tag: "@ci" }, () 
   const pages: Array<[string, string]> = [
     ["home", "/"],
     ["marketplace", "/comer"],
-    ["ciudad", "/cdmx"],
-    ["carrito", "/cdmx/carrito"],
-    ["busqueda", "/cdmx/buscar"],
+    ["ciudad", "/chihuahua"],
+    ["carrito", "/chihuahua/carrito"],
+    ["busqueda", "/chihuahua/buscar"],
     ["recompensas", "/recompensas"],
     ["panel", "/panel"],
   ]
@@ -99,7 +99,7 @@ test.describe("móvil: render, touch-target y sin overflow", { tag: "@ci" }, () 
   //    móvil: la regla CSS .touch-target:not(.hidden) es @media (max-width: 640px).
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
   test("touch-targets visibles miden al menos 44px", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     const bad = await page.locator(".touch-target:not(.hidden)").evaluateAll((els) => {
       const failures: string[] = []
       for (const el of els) {
@@ -132,7 +132,7 @@ test.describe("móvil: render, touch-target y sin overflow", { tag: "@ci" }, () 
 // Descubre un enlace de producto real desde la ciudad. Sin datos en el entorno
 // local (Supabase vacío) devuelve null y el test se salta — mismo patrón que a11y.spec.ts.
 async function discoverProductHref(page: Page): Promise<string | null> {
-  await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+  await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
   // Los product links viven bajo ScrollReveal con content-visibility:auto — pueden
   // tardar en entrar en el árbol de accesibilidad. Reintenta hasta 5s.
   const productLink = page.locator('a[href*="/producto/"]').first()
@@ -162,7 +162,7 @@ test.describe("móvil: producto — barra sticky add-to-cart", { tag: "@ci" }, (
 
   test("la barra sticky aparece en producto y el stepper funciona", async ({ page }) => {
     const productHref = await discoverProductHref(page)
-    test.skip(!productHref, "no hay enlace de producto en /cdmx (sin datos locales)")
+    test.skip(!productHref, "no hay enlace de producto en /chihuahua (sin datos locales)")
 
     await page.goto(productHref!, { waitUntil: "domcontentloaded" })
     await dismissCookieBanner(page)
@@ -192,7 +192,7 @@ test.describe("móvil: producto — barra sticky add-to-cart", { tag: "@ci" }, (
 
   test("la barra sticky add-to-cart se oculta cuando hay items (cart-bar-active)", async ({ page }) => {
     const productHref = await discoverProductHref(page)
-    test.skip(!productHref, "no hay enlace de producto en /cdmx (sin datos locales)")
+    test.skip(!productHref, "no hay enlace de producto en /chihuahua (sin datos locales)")
 
     await page.goto(productHref!, { waitUntil: "domcontentloaded" })
     await dismissCookieBanner(page)
@@ -261,7 +261,7 @@ test.describe("móvil: producto — accordion defaults Fase 2", { tag: "@ci" }, 
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
   test("en móvil Descripción va cerrado y Calidad y Origen abierto", async ({ page }) => {
     const productHref = await discoverProductHref(page)
-    test.skip(!productHref, "no hay enlace de producto en /cdmx (sin datos locales)")
+    test.skip(!productHref, "no hay enlace de producto en /chihuahua (sin datos locales)")
 
     await page.goto(productHref!, { waitUntil: "domcontentloaded" })
 
@@ -282,7 +282,7 @@ test.describe("móvil: carrito — drawer, trash y toast Fase 2", { tag: "@ci" }
   // Agrega el primer producto con quick-add y abre el drawer desde la barra flotante.
   // Devuelve false si no hay quick-adds (sin datos en el entorno local).
   async function addFirstAndOpenCart(page: Page): Promise<boolean> {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     const quickAdd = page.locator(".quick-add-btn").first()
     if ((await quickAdd.count()) === 0) return false
     await expect(quickAdd).toBeVisible()
@@ -300,7 +300,7 @@ test.describe("móvil: carrito — drawer, trash y toast Fase 2", { tag: "@ci" }
 
   test("el trash del drawer es visible (sin group-hover) en móvil", async ({ page }) => {
     const hasData = await addFirstAndOpenCart(page)
-    test.skip(!hasData, "no hay productos en /cdmx (sin datos locales)")
+    test.skip(!hasData, "no hay productos en /chihuahua (sin datos locales)")
     const trash = page.getByRole("button", { name: /Eliminar .* del carrito/ }).first()
     await expect(trash).toBeVisible()
     // El botón debe ser tocable (>= 44px) aunque el dedo esté encima — sin opacity 0.
@@ -311,10 +311,10 @@ test.describe("móvil: carrito — drawer, trash y toast Fase 2", { tag: "@ci" }
   })
 
   test("agregar desde quick-add muestra toast 'agregado al carrito'", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     const quickAdd = page.locator(".quick-add-btn").first()
     if ((await quickAdd.count()) === 0) {
-      test.skip(true, "no hay productos en /cdmx (sin datos locales)")
+      test.skip(true, "no hay productos en /chihuahua (sin datos locales)")
       return
     }
     await expect(quickAdd).toBeVisible()
@@ -336,12 +336,12 @@ test.describe("móvil: carrito — drawer, trash y toast Fase 2", { tag: "@ci" }
 test.describe("móvil: grid — altura uniforme del quick-add Fase 2", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
   test("las cards de una misma fila tienen la misma altura (agotadas y en stock)", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
 
     // Espera reveal + hidratación: las cards del grid principal aparecen.
     const card = page.locator(".product-card").first()
     if ((await card.count()) === 0) {
-      test.skip(true, "no hay productos en /cdmx (sin datos locales)")
+      test.skip(true, "no hay productos en /chihuahua (sin datos locales)")
       return
     }
     await expect(card).toBeVisible()
@@ -399,7 +399,7 @@ async function tapQuickAdd(page: Page, quickAdd: Locator): Promise<boolean> {
 // Agrega el primer producto con quick-add para poblar el carrito persistido.
 // (compartido por varios describe de Fase 3)
 async function seedCart(page: Page): Promise<boolean> {
-  await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+  await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
   const quickAdd = page.locator(".quick-add-btn").first()
   if ((await quickAdd.count()) === 0) return false
   await expect(quickAdd).toBeVisible()
@@ -423,7 +423,7 @@ test.describe("móvil: carrito — touch-targets de conversión Fase 3", { tag: 
 
   test("steppers y trash de /cart miden al menos 44px", async ({ page }) => {
     const hasData = await seedCart(page)
-    test.skip(!hasData, "no hay productos en /cdmx (sin datos locales)")
+    test.skip(!hasData, "no hay productos en /chihuahua (sin datos locales)")
 
     await page.goto("/cart", { waitUntil: "domcontentloaded" })
     // El trash del ítem.
@@ -451,9 +451,9 @@ test.describe("móvil: carrito — touch-targets de conversión Fase 3", { tag: 
 
   test("el CTA de WhatsApp del checkout mide al menos 44px", async ({ page }) => {
     const hasData = await seedCart(page)
-    test.skip(!hasData, "no hay productos en /cdmx (sin datos locales)")
+    test.skip(!hasData, "no hay productos en /chihuahua (sin datos locales)")
 
-    await page.goto("/cdmx/checkout", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua/checkout", { waitUntil: "domcontentloaded" })
 
     // Paso 1: dirección — rellena el formulario guest y continúa.
     const street = page.getByPlaceholder("Av. Insurgentes Sur")
@@ -490,7 +490,7 @@ test.describe("móvil: checkout drawer — ancho consistente Fase 3", { tag: "@c
     // Seed del carrito en viewport móvil, luego ampliamos a tablet.
     await page.setViewportSize({ width: 412, height: 915 })
     const hasData = await seedCart(page)
-    test.skip(!hasData, "no hay productos en /cdmx (sin datos locales)")
+    test.skip(!hasData, "no hay productos en /chihuahua (sin datos locales)")
 
     // Abrimos el checkout drawer desde la barra móvil en tablet.
     await page.setViewportSize({ width: 800, height: 900 })
@@ -514,7 +514,7 @@ test.describe("móvil: búsqueda en contexto — overlay Fase 3", { tag: "@ci" }
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   async function openSearchOverlay(page: Page): Promise<boolean> {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     const searchBtn = page
       .getByRole("banner")
       .getByRole("button", { name: "Buscar productos" })
@@ -556,7 +556,7 @@ test.describe("móvil: búsqueda en contexto — overlay Fase 3", { tag: "@ci" }
 
   test("en móvil el cart bar ya no tiene 'Ver más productos' y la búsqueda abre desde el header", async ({ page }) => {
     const hasData = await seedCart(page)
-    test.skip(!hasData, "no hay productos en /cdmx (sin datos locales)")
+    test.skip(!hasData, "no hay productos en /chihuahua (sin datos locales)")
 
     // Fase 9: el botón del cart bar desapareció en móvil (redundante con el
     // StickyCatalogButton "Ver todos" y los links "Ver todo" por categoría).
@@ -581,13 +581,13 @@ test.describe("móvil: micro-conversión — touch targets Fase 4", { tag: "@ci"
   test("el stepper principal del producto mide al menos 44px", async ({ page }) => {
     // Descubre todos los enlaces de producto; el primer en stock (con stepper
     // in-page además del de la sticky bar) es el que se valida.
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     const links = await page.getByRole("link").evaluateAll((els) =>
       els
         .map((a) => (a as HTMLAnchorElement).href)
         .filter((h) => h.includes("/producto/"))
     )
-    test.skip(links.length === 0, "no hay enlace de producto en /cdmx (sin datos locales)")
+    test.skip(links.length === 0, "no hay enlace de producto en /chihuahua (sin datos locales)")
 
     let stepperFound = false
     for (const href of links.slice(0, 6)) {
@@ -609,12 +609,12 @@ test.describe("móvil: micro-conversión — touch targets Fase 4", { tag: "@ci"
       stepperFound = true
       break
     }
-    test.skip(!stepperFound, "sin producto en stock en /cdmx")
+    test.skip(!stepperFound, "sin producto en stock en /chihuahua")
   })
 
   test("el botón cerrar del checkout drawer mide al menos 44px", async ({ page }) => {
     const hasData = await seedCart(page)
-    test.skip(!hasData, "no hay productos en /cdmx (sin datos locales)")
+    test.skip(!hasData, "no hay productos en /chihuahua (sin datos locales)")
 
     const cartBar = page.getByText(/Ver carrito ·/).filter({ visible: true }).first()
     await expect(cartBar).toBeVisible()
@@ -634,7 +634,7 @@ test.describe("móvil: micro-conversión — touch targets Fase 4", { tag: "@ci"
   })
 
   test("chips de categoría y select de orden de /buscar miden al menos 44px", async ({ page }) => {
-    await page.goto("/cdmx/buscar", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua/buscar", { waitUntil: "domcontentloaded" })
     const todoChip = page.getByRole("button", { name: /Todo/ }).first()
     await expect(todoChip).toBeVisible()
 
@@ -700,7 +700,7 @@ test.describe("móvil: micro-conversión — touch targets Fase 4", { tag: "@ci"
 
   // El back arrow de mis-pedidos (único alcanzable sin sesión) mide >= 44px.
   test("el back arrow de mis-pedidos mide al menos 44px", async ({ page }) => {
-    await page.goto("/cdmx/mis-pedidos", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua/mis-pedidos", { waitUntil: "domcontentloaded" })
     const back = page.getByRole("link", { name: "Volver a inicio" })
     await expect(back).toBeVisible({ timeout: 5000 })
     const box = await boundingBoxSettled(back)
@@ -711,7 +711,7 @@ test.describe("móvil: micro-conversión — touch targets Fase 4", { tag: "@ci"
 
   // Los chips de categoría del catálogo de ciudad (con touch-target) miden >= 44px.
   test("los chips de categoría de la ciudad miden al menos 44px", async ({ page }) => {
-    await page.goto("/catalogo/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/catalogo/chihuahua", { waitUntil: "domcontentloaded" })
     const todoChip = page.getByRole("button", { name: "Todos", exact: true }).first()
     await expect(todoChip).toBeVisible()
     const todoBox = await todoChip.boundingBox()
@@ -912,7 +912,7 @@ test.describe("móvil: colecciones — SearchBar abre overlay Fase 6", { tag: "@
   test("la SearchBar de una colección abre el overlay en móvil", async ({ page }) => {
     // Descubre el primer enlace de colección desde la landing de la ciudad.
     // Reintenta por hidratación lenta en preview frío.
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     let href: string | null = null
     for (let attempt = 0; attempt < 5 && !href; attempt++) {
       href = await page
@@ -925,7 +925,7 @@ test.describe("móvil: colecciones — SearchBar abre overlay Fase 6", { tag: "@
         })
       if (!href) await page.waitForTimeout(500)
     }
-    test.skip(!href, "no hay colecciones en /cdmx")
+    test.skip(!href, "no hay colecciones en /chihuahua")
     const collectionUrl = href!
 
     await page.goto(collectionUrl, { waitUntil: "load" })
@@ -978,10 +978,10 @@ test.describe("móvil: Fase 7 — quick-add uniforme y sin solapes", { tag: "@ci
   // a la misma altura vertical (mismo boundingBox.y ± 2px). Esto valida que el
   // card sea flex-col con el botón anclado al fondo (7A).
   test("los quick-add de una misma fila están a la misma altura", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     const quickAdd = page.locator(".quick-add-btn").first()
     if ((await quickAdd.count()) === 0) {
-      test.skip(true, "no hay productos en /cdmx (sin datos locales)")
+      test.skip(true, "no hay productos en /chihuahua (sin datos locales)")
       return
     }
     await expect(quickAdd).toBeVisible()
@@ -1056,7 +1056,7 @@ test.describe("móvil: Fase 7 — quick-add uniforme y sin solapes", { tag: "@ci
   // ocultan para que la franja ancha no intercepte taps (7B).
   test("el cookie banner oculta los flotantes mientras está visible", async ({ page }) => {
     // localStorage limpio en este contexto → el banner aparece tras 800ms.
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     const accept = page.getByRole("button", { name: "Aceptar todas" })
     await expect(accept).toBeVisible({ timeout: 5000 })
 
@@ -1110,7 +1110,7 @@ test.describe("móvil: Fase 7 — quick-add uniforme y sin solapes", { tag: "@ci
     // que corran los scripts diferidos. Con la caché fría y dos navegadores en
     // paralelo, hidratar puede tardar más que el presupuesto de 5 s y el test
     // fallaba por la señal de espera, no por el banner.
-    await page.goto("/cdmx", { waitUntil: "load" })
+    await page.goto("/chihuahua", { waitUntil: "load" })
     const accept = page.getByRole("button", { name: "Aceptar todas" })
     await expect(accept).toBeVisible({ timeout: 5000 })
     const essential = page.getByRole("button", { name: "Solo necesarias" })
@@ -1146,7 +1146,7 @@ test.describe("móvil: Fase 8 — h2 sin saltos de línea y cart bar sin empalme
   // debajo — sin solapes ni empalmes (8B).
   test("en móvil el cart bar es una fila sin 'Ver más productos' ni solapes", async ({ page }) => {
     const hasData = await seedCart(page)
-    test.skip(!hasData, "no hay productos en /cdmx")
+    test.skip(!hasData, "no hay productos en /chihuahua")
     await dismissCookieBanner(page)
 
     // Fase 9: "Ver más productos" ya NO aparece en móvil (redundante con el
@@ -1182,7 +1182,7 @@ test.describe("móvil: Fase 8 — h2 sin saltos de línea y cart bar sin empalme
   test("sin overflow horizontal a 320px con carrito lleno", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 740 })
     const hasData = await seedCart(page)
-    test.skip(!hasData, "no hay productos en /cdmx")
+    test.skip(!hasData, "no hay productos en /chihuahua")
     await dismissCookieBanner(page)
     await expect(page.getByRole("button", { name: "Hacer Checkout" })).toBeVisible({ timeout: 5000 })
 
@@ -1201,7 +1201,7 @@ test.describe("móvil: Fase 8 — h2 sin saltos de línea y cart bar sin empalme
   // El H2 "Todo lo que tu cocina necesita" (categorías y catálogo) mide una
   // sola línea en el viewport móvil tras la escala text-2xl + text-balance (8A).
   test("el H2 'Todo lo que tu cocina necesita' queda en una sola línea en móvil", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1200) // reveal + hidratación
     const lines = await page
       .getByRole("heading", { name: "Todo lo que tu cocina necesita" })
@@ -1228,7 +1228,7 @@ test.describe("Fase 9: placeholder animado de búsqueda", { tag: "@ci" }, () => 
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   test("el marquee del catálogo está visible y animado con input vacío", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1200) // reveal + hidratación
 
     const input = page.locator("#catalog-search")
@@ -1241,7 +1241,7 @@ test.describe("Fase 9: placeholder animado de búsqueda", { tag: "@ci" }, () => 
   })
 
   test("el marquee desaparece al enfocar o escribir", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1200)
 
     const input = page.locator("#catalog-search")
@@ -1268,10 +1268,10 @@ test.describe("Fase 10 móvil: botones Agregar y grid de catálogo", { tag: "@ci
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   test("en /buscar las cards y los botones Agregar quedan a la misma altura por fila", async ({ page }) => {
-    await page.goto("/cdmx/buscar", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua/buscar", { waitUntil: "domcontentloaded" })
     const card = page.locator(".product-card").first()
     if ((await card.count()) === 0) {
-      test.skip(true, "no hay productos en /cdmx/buscar (sin datos locales)")
+      test.skip(true, "no hay productos en /chihuahua/buscar (sin datos locales)")
       return
     }
     await expect(card).toBeVisible()
@@ -1304,10 +1304,10 @@ test.describe("Fase 10 móvil: botones Agregar y grid de catálogo", { tag: "@ci
   })
 
   test("el botón Agregar queda despegado del box y mide al menos 44px", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     const quickAdd = page.locator(".quick-add-btn").first()
     if ((await quickAdd.count()) === 0) {
-      test.skip(true, "no hay quick-adds en /cdmx (sin datos locales)")
+      test.skip(true, "no hay quick-adds en /chihuahua (sin datos locales)")
       return
     }
     await expect(quickAdd).toBeVisible()
@@ -1329,7 +1329,7 @@ test.describe("Fase 10 móvil: botones Agregar y grid de catálogo", { tag: "@ci
   })
 
   test("la sección 'Hecho para ti' se muestra en 2 columnas en móvil", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     const heading = page.getByRole("heading", { name: "¿Para quién es?" })
     await expect(heading).toBeVisible({ timeout: 8000 })
 
@@ -1351,7 +1351,7 @@ test.describe("Fase 11 móvil: footer 2 columnas y tamaños de texto", { tag: "@
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   test("el footer muestra el bloque de marca arriba y los links en 2 filas de 2", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1200) // reveal + hidratación
 
     const footer = page.locator("footer.site-footer")
@@ -1394,7 +1394,7 @@ test.describe("Fase 11 móvil: footer 2 columnas y tamaños de texto", { tag: "@
   })
 
   test("el hero kicker mide al menos 12px y el tagline de card al menos 11px", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1200) // reveal + hidratación
 
     // Hero kicker — el label uppercase del hero.
@@ -1406,7 +1406,7 @@ test.describe("Fase 11 móvil: footer 2 columnas y tamaños de texto", { tag: "@
     // Tagline de card — p italic line-clamp-1 dentro de .product-card.
     const tagline = page.locator(".product-card .line-clamp-1.italic").first()
     if ((await tagline.count()) === 0) {
-      test.skip(true, "no hay product-cards en /cdmx (sin datos locales)")
+      test.skip(true, "no hay product-cards en /chihuahua (sin datos locales)")
       return
     }
     await expect(tagline).toBeVisible()
@@ -1430,7 +1430,7 @@ test.describe("Fase 12 móvil: tamaños de texto de lectura (13px)", { tag: "@ci
   }
 
   test("homepage: labels de stats, contador, Ver todo, subtexto CTA y fine print ≥13px", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1200) // reveal + hidratación
 
     await expectFontGe13(page, page.getByText("Negocios abastecidos").first(), "stat label")
@@ -1449,10 +1449,10 @@ test.describe("Fase 12 móvil: tamaños de texto de lectura (13px)", { tag: "@ci
   })
 
   test("carrito: brand del ítem, cross-sell y Seguir comprando ≥13px", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     const quickAdd = page.locator(".quick-add-btn").first()
     if ((await quickAdd.count()) === 0) {
-      test.skip(true, "no hay productos en /cdmx (sin datos locales)")
+      test.skip(true, "no hay productos en /chihuahua (sin datos locales)")
       return
     }
     await expect(quickAdd).toBeVisible()
@@ -1479,7 +1479,7 @@ test.describe("Fase 12 móvil: tamaños de texto de lectura (13px)", { tag: "@ci
   })
 
   test("búsqueda: contadores de categoría ≥13px", async ({ page }) => {
-    await page.goto("/cdmx/buscar", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua/buscar", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1200)
 
     const chips = page.locator("button").filter({ hasText: /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ ]+ \d+$/ }).first()
@@ -1492,10 +1492,10 @@ test.describe("Fase 12 móvil: tamaños de texto de lectura (13px)", { tag: "@ci
   })
 
   test("producto: nota de stock, info de envío y Total ≥13px", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     const firstCard = page.locator(".product-card a[href*='/producto/']").first()
     if ((await firstCard.count()) === 0) {
-      test.skip(true, "no hay product-cards en /cdmx (sin datos locales)")
+      test.skip(true, "no hay product-cards en /chihuahua (sin datos locales)")
       return
     }
     const href = await firstCard.getAttribute("href")
@@ -1522,7 +1522,7 @@ test.describe("Fase 12 móvil: tamaños de texto de lectura (13px)", { tag: "@ci
   })
 
   test("cookie banner: texto de aviso ≥13px", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1200) // delay del banner ~800ms
 
     const body = page.getByText(/Usamos cookies para analizar tráfico/).first()
@@ -1555,7 +1555,7 @@ test.describe("móvil: Fase 13 — testimonios (tamaño + swipe) y sección de 3
 
   // 13A: el quote del testimonio usa text-base (16px) en móvil, no text-lg (18px).
   test("el quote del testimonio usa ≤16px en móvil", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1500) // reveal + hidratación
 
     const section = await testimonialSection(page)
@@ -1573,7 +1573,7 @@ test.describe("móvil: Fase 13 — testimonios (tamaño + swipe) y sección de 3
 
   // 13B: swipe horizontal (CDP Input.dispatchTouchEvent) cambia de testimonio.
   test("swipe horizontal en testimonios cambia de autor", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1500)
 
     const section = await testimonialSection(page)
@@ -1610,7 +1610,7 @@ test.describe("móvil: Fase 13 — testimonios (tamaño + swipe) y sección de 3
 
   // 13C: la sección "Abastece tu negocio en 3 pasos" cabe en una sola pantalla.
   test("la sección 'Abastece tu negocio en 3 pasos' cabe en una pantalla", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1500)
     await dismissCookieBanner(page)
 
@@ -1632,7 +1632,7 @@ test.describe("móvil: Fase 13 — testimonios (tamaño + swipe) y sección de 3
 
   // 13A: los h3 de los pasos usan text-sm (14px) en móvil, alineado con "Hecho para ti".
   test("los h3 de los 3 pasos usan ≤16px en móvil", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1500)
 
     const heading = page.getByRole("heading", { name: "Abastece tu negocio en 3 pasos" })
@@ -1666,7 +1666,7 @@ test.describe("Fase 14 móvil: footer compacto, landings de negocio y hub del pa
 
   // 14A: el footer mide menos de 560px de alto en móvil (antes 677px).
   test("el footer mide menos de 560px de alto en móvil", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1500)
 
     const footer = page.locator("footer.site-footer")
@@ -1735,7 +1735,7 @@ test.describe("Fase 15 — logo móvil: tap-target amplio y navegación al home"
 
   test("el logo mide ≥44px y un tap en el borde del header navega al home", async ({ page }) => {
     // Bug reportado desde la página de búsqueda.
-    await page.goto("/cdmx/buscar?q=cebolla", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua/buscar?q=cebolla", { waitUntil: "domcontentloaded" })
     const header = page.locator("header")
     await header.waitFor({ state: "visible", timeout: 10000 })
 
@@ -1757,7 +1757,7 @@ test.describe("Fase 15 — logo móvil: tap-target amplio y navegación al home"
     for (let attempt = 0; attempt < 3; attempt++) {
       await page.touchscreen.tap(tapX, tapY)
       try {
-        await page.waitForURL(/\/cdmx$/, { timeout: 6000 })
+        await page.waitForURL(/\/chihuahua$/, { timeout: 6000 })
         return
       } catch {
         // siguiente intento

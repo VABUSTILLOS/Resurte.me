@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { FuentesMetodologia } from "./fuentes-metodologia"
-import { DELIVERY_CITIES, FREE_SHIPPING_MXN, MIN_ORDER_MXN, formatMxn } from "@/lib/commercial-facts"
+import { DELIVERY_COVERAGE_PROSE, FREE_SHIPPING_MXN, MIN_ORDER_MXN, formatMxn } from "@/lib/commercial-facts"
 
 const html = renderToStaticMarkup(FuentesMetodologia({}))
 
@@ -32,7 +32,7 @@ describe("FuentesMetodologia", () => {
   it("cita las condiciones desde la fuente única de datos comerciales", () => {
     expect(html).toContain(formatMxn(MIN_ORDER_MXN))
     expect(html).toContain(formatMxn(FREE_SHIPPING_MXN))
-    expect(html).toContain(String(DELIVERY_CITIES))
+    expect(html).toContain(DELIVERY_COVERAGE_PROSE)
   })
 
   it("enlaza el índice de precios para profundizar", () => {

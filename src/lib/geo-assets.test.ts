@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { AI_CRAWLERS, CITABLE_AI_CRAWLERS } from "./ai-crawlers"
 import { BLOG_CATEGORIES } from "./blog-categories"
-import { MEXICO_CITIES } from "./cities"
+import { ACTIVE_CITIES } from "./cities"
 import { computeGeoInventory } from "./geo-assets"
 import { GEO_ENGINES, GEO_QUERIES } from "./geo-queries"
 import { PREGUNTAS } from "./preguntas"
@@ -28,12 +28,12 @@ describe("computeGeoInventory", () => {
   })
 
   it("cuenta las ciudades reales", () => {
-    expect(inv.groups.find((g) => g.id === "ciudades")?.count).toBe(MEXICO_CITIES.length)
+    expect(inv.groups.find((g) => g.id === "ciudades")?.count).toBe(ACTIVE_CITIES.length)
   })
 
   it("las combinaciones categoría×ciudad cubren el producto cartesiano", () => {
     expect(inv.groups.find((g) => g.id === "datos-clave")?.count).toBe(
-      BLOG_CATEGORIES.length * MEXICO_CITIES.length
+      BLOG_CATEGORIES.length * ACTIVE_CITIES.length
     )
   })
 

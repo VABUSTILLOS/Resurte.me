@@ -7,7 +7,7 @@ import { getItemListSchema } from "@/lib/structured-data"
 import { SITE_URL } from "@/lib/author"
 import {
   CREDIT_DAYS_PROSE,
-  DELIVERY_CITIES,
+  DELIVERY_COVERAGE_PROSE,
   FREE_SHIPPING_MXN,
   INVOICING,
   MIN_ORDER_MXN,
@@ -103,7 +103,7 @@ export default function PreguntasPage() {
           <p className="text-[#242529] leading-relaxed">
             Resurte.me es una proveeduría en línea de insumos para restaurantes en
             México: abarrotes, frutas, verduras, carnes, lácteos y desechables al
-            mayoreo, con entrega a domicilio en {DELIVERY_CITIES} ciudades, sin
+            mayoreo, con entrega a domicilio en {DELIVERY_COVERAGE_PROSE}, sin
             membresía, pedido mínimo de {formatMxn(MIN_ORDER_MXN)}, envío gratis
             desde {formatMxn(FREE_SHIPPING_MXN)}, facturación {INVOICING} y crédito
             a {CREDIT_DAYS_PROSE} días. Incluye herramientas gratuitas de

@@ -6,7 +6,7 @@ import {
   type BlogPostMeta,
 } from "@/lib/blog"
 import { getCategory, getContentType } from "@/lib/blog-categories"
-import { MEXICO_CITIES } from "@/lib/cities"
+import { ACTIVE_CITIES, COMING_SOON_CITIES } from "@/lib/cities"
 import { DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 import {
   CREDIT_DAYS_PROSE,
@@ -68,8 +68,9 @@ function authorUrl(meta: BlogPostMeta): string {
 }
 
 function buildCoverageLine(): string {
-  const cities = MEXICO_CITIES.map((c) => `${c.name} (${c.state})`).join(", ")
-  return `- Cobertura de entrega: ${MEXICO_CITIES.length} ciudades — ${cities}`
+  const cities = ACTIVE_CITIES.map((c) => `${c.name} (${c.state})`).join(", ")
+  const comingSoon = COMING_SOON_CITIES.map((c) => `${c.name} (${c.state})`).join(", ")
+  return `- Cobertura de entrega: ${cities}. Muy pronto en tu ciudad.\n- Ciudades próximamente (sin cobertura todavía): ${comingSoon}`
 }
 
 function buildHeader(
@@ -112,12 +113,21 @@ Este archivo se genera automáticamente en el build del sitio a partir de la mis
 }
 
 function buildCityIndex(): string {
-  const items = MEXICO_CITIES.map(
+  const active = ACTIVE_CITIES.map(
     (city) => `- ${city.name} (${city.state}) — ${BASE_URL}/${city.slug}`
+  )
+  const comingSoon = COMING_SOON_CITIES.map(
+    (city) => `- ${city.name} (${city.state}) — ${BASE_URL}/${city.slug} (próximamente)`
   )
   return `## Índice de ciudades
 
-${items.join("\n")}`
+### Cobertura actual
+
+${active.join("\n")}
+
+### Próximamente (sin cobertura todavía)
+
+${comingSoon.join("\n")}`
 }
 
 function buildDocumentIndex(metas: BlogPostMeta[]): string {

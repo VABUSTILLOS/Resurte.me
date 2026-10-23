@@ -5,7 +5,7 @@ import {
   getCachedCategories,
   getCachedVisibleProducts,
 } from "@/lib/catalog-cache"
-import { MEXICO_CITIES } from "@/lib/cities"
+import { ACTIVE_CITIES } from "@/lib/cities"
 import type { Category, Product, RestaurantCollection } from "@/types"
 
 // ============================================================
@@ -70,9 +70,10 @@ interface FeedItem {
 }
 
 export async function GET() {
-  // Ciudades: las activas en DB cuando Supabase está disponible; si la tabla
-  // no devuelve nada (DB vacía o sin configurar), se usan todas las estáticas.
-  let cities: FeedCity[] = MEXICO_CITIES.map((city) => ({
+  // Ciudades con cobertura real. La DB puede marcar más como activas para el
+  // panel interno, pero el feed público solo anuncia donde ya se entrega.
+  const coverageSlugs = new Set(ACTIVE_CITIES.map((c) => c.slug))
+  let cities: FeedCity[] = ACTIVE_CITIES.map((city) => ({
     id: city.id,
     name: city.name,
     slug: city.slug,
@@ -92,8 +93,9 @@ export async function GET() {
       getCachedVisibleProducts(),
     ])
 
-    if (dbCities.length > 0) {
-      cities = dbCities.map((city) => ({
+    const coveredCities = dbCities.filter((city) => coverageSlugs.has(city.slug))
+    if (coveredCities.length > 0) {
+      cities = coveredCities.map((city) => ({
         id: city.id,
         name: city.name,
         slug: city.slug,

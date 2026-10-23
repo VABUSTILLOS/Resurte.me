@@ -16,7 +16,7 @@ import {
 } from "@/lib/structured-data"
 import { getSpeakableSpec } from "@/lib/blog-schema"
 import { SITE_URL } from "@/lib/author"
-import { DELIVERY_CITIES } from "@/lib/commercial-facts"
+import { DELIVERY_COVERAGE_PROSE } from "@/lib/commercial-facts"
 
 // Contenido generado desde `price_index` con unstable_cache (tag
 // "price-index"). Sin cookies()/headers(): la ruta se cachea y se refresca
@@ -201,7 +201,7 @@ export default async function PreciosPage() {
               referencia de insumos para restaurantes en México, por ciudad, con
               fecha, unidad y número de tiendas observadas. Mientras el primer
               snapshot se publica, puedes consultar el catálogo con precios de hoy
-              en las {DELIVERY_CITIES} ciudades donde entregamos.
+              en {DELIVERY_COVERAGE_PROSE}, donde entregamos hoy.
             </p>
           )}
         </div>

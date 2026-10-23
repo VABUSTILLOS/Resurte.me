@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { MEXICO_CITIES } from "@/lib/cities"
+import { DEFAULT_CITY_SLUG, MEXICO_CITIES, isCityActive } from "@/lib/cities"
 import { buildStaticCspHeader } from "@/lib/csp"
 import { detectCityFromHeaders } from "@/lib/geo-city"
 import { updateSession } from "@/lib/supabase/middleware"
@@ -7,6 +7,11 @@ import { updateSession } from "@/lib/supabase/middleware"
 const VALID_SLUGS = MEXICO_CITIES.map((c) => c.slug)
 
 const CITY_COOKIE = "city-slug"
+/**
+ * Ciudad detectada por IP que aún no tiene cobertura. La operación sigue en
+ * Chihuahua, pero el cliente la lee para mostrar "Muy pronto en tu ciudad".
+ */
+const DETECTED_CITY_COOKIE = "city-detected"
 /**
  * Origen de `city-slug`: `manual` (el visitante eligió en el selector) o
  * `auto` (geolocalización por IP). Solo una elección manual se respeta por
@@ -130,8 +135,10 @@ export async function proxy(request: NextRequest) {
     const savedSlug =
       cookieSlug && VALID_SLUGS.includes(cookieSlug) ? cookieSlug : null
 
-    // Elección explícita del visitante: manda sobre la IP.
-    if (cookieSource === "manual" && savedSlug) {
+    // Elección explícita del visitante: manda sobre la IP, pero solo si esa
+    // ciudad ya tiene cobertura. Una elección vieja (p. ej. CDMX) se sanea a
+    // Chihuahua para no dejar al visitante en una ciudad sin operación.
+    if (cookieSource === "manual" && savedSlug && isCityActive(savedSlug)) {
       const redirect = NextResponse.redirect(new URL(`/${savedSlug}`, request.url))
       copyAuthCookies(supabaseResponse, redirect)
       return redirect
@@ -140,16 +147,41 @@ export async function proxy(request: NextRequest) {
     // Detección por IP (cabeceras x-vercel-ip-*): define la ciudad del
     // visitante en cada entrada a la raíz, salvo que haya elegido una.
     const detectedSlug = detectCityFromHeaders(request.headers)
-    if (detectedSlug) {
+    if (detectedSlug && isCityActive(detectedSlug)) {
       const response = NextResponse.redirect(new URL(`/${detectedSlug}`, request.url))
       setCityCookie(response, detectedSlug, "auto")
       copyAuthCookies(supabaseResponse, response)
       return response
     }
 
-    // Sin geolocalización disponible: se conserva la última ciudad conocida.
-    if (savedSlug) {
+    // Detectó una ciudad sin cobertura: se opera en Chihuahua y se recuerda la
+    // ciudad detectada para el aviso "Muy pronto en tu ciudad".
+    if (detectedSlug) {
+      const response = NextResponse.redirect(
+        new URL(`/${DEFAULT_CITY_SLUG}`, request.url)
+      )
+      setCityCookie(response, DEFAULT_CITY_SLUG, "auto")
+      response.cookies.set(DETECTED_CITY_COOKIE, detectedSlug, {
+        maxAge: CITY_COOKIE_MAX_AGE,
+        path: "/",
+      })
+      copyAuthCookies(supabaseResponse, response)
+      return response
+    }
+
+    // Sin geolocalización disponible: se conserva la última ciudad conocida,
+    // saneando también aquí cualquier slug sin cobertura.
+    if (savedSlug && isCityActive(savedSlug)) {
       const redirect = NextResponse.redirect(new URL(`/${savedSlug}`, request.url))
+      copyAuthCookies(supabaseResponse, redirect)
+      return redirect
+    }
+
+    if (savedSlug) {
+      const redirect = NextResponse.redirect(
+        new URL(`/${DEFAULT_CITY_SLUG}`, request.url)
+      )
+      setCityCookie(redirect, DEFAULT_CITY_SLUG, "auto")
       copyAuthCookies(supabaseResponse, redirect)
       return redirect
     }
@@ -165,11 +197,15 @@ export async function proxy(request: NextRequest) {
   // Valid city slug → set cookie and continue (preserves auth cookies).
   // No se marca como `manual`: navegar a una ciudad no es elegirla, así que
   // la próxima visita a la raíz vuelve a resolverla por IP.
+  // Las ciudades sin cobertura conservan la página "próximamente" pero NO
+  // pisan la ciudad activa: la operación sigue siendo Chihuahua.
   if (citySlug && VALID_SLUGS.includes(citySlug)) {
-    supabaseResponse.cookies.set(CITY_COOKIE, citySlug, {
-      maxAge: CITY_COOKIE_MAX_AGE,
-      path: "/",
-    })
+    if (isCityActive(citySlug)) {
+      supabaseResponse.cookies.set(CITY_COOKIE, citySlug, {
+        maxAge: CITY_COOKIE_MAX_AGE,
+        path: "/",
+      })
+    }
     return supabaseResponse
   }
 

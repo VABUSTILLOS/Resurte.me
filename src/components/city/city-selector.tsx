@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation"
 import { Search, MapPin, X, Check } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { useEscapeKey } from "@/hooks/use-escape-key"
-import { CITIES_BY_STATE } from "@/lib/cities"
+import { CITIES_BY_STATE, MEXICO_CITIES, isCityActive } from "@/lib/cities"
+import type { City } from "@/types"
 
 interface CitySelectorProps {
   onClose: () => void
@@ -27,22 +28,24 @@ export function CitySelector({ onClose }: CitySelectorProps) {
   useEscapeKey(onClose)
 
   const needle = fold(search.trim())
-  const filtered = needle
-    ? Object.entries(CITIES_BY_STATE).reduce(
-        (acc, [state, cities]) => {
-          const filteredCities = cities.filter((c) =>
-            fold(c.name).includes(needle)
-          )
-          if (filteredCities.length > 0) {
-            acc[state] = filteredCities
-          }
-          return acc
-        },
-        {} as typeof CITIES_BY_STATE
-      )
-    : CITIES_BY_STATE
+  const matches = (c: City) => !needle || fold(c.name).includes(needle)
+
+  // Solo las ciudades con cobertura se pueden elegir; el resto se lista como
+  // "próximamente" para que el visitante sepa que llegaremos.
+  const activeCities = MEXICO_CITIES.filter((c) => c.is_active && matches(c))
+  const comingSoonByState = Object.entries(CITIES_BY_STATE).reduce(
+    (acc, [state, cities]) => {
+      const comingSoon = cities.filter((c) => !c.is_active && matches(c))
+      if (comingSoon.length > 0) acc[state] = comingSoon
+      return acc
+    },
+    {} as typeof CITIES_BY_STATE
+  )
+  const hasResults =
+    activeCities.length > 0 || Object.keys(comingSoonByState).length > 0
 
   const handleSelect = (slug: string) => {
+    if (!isCityActive(slug)) return
     setCity(slug, { manual: true })
     onClose()
     router.push(`/${slug}`)
@@ -96,46 +99,74 @@ export function CitySelector({ onClose }: CitySelectorProps) {
 
         {/* City list */}
         <div className="overflow-y-auto overscroll-contain flex-1 p-4">
-          {Object.keys(filtered).length === 0 ? (
+          {!hasResults ? (
             <p className="text-center text-[var(--text-secondary)] py-8">
               No se encontraron ciudades{search.trim() ? ` para “${search.trim()}”` : ""}.
             </p>
           ) : (
-            Object.entries(filtered).map(([state, cities]) => (
-              <div key={state} className="mb-6">
-                <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-                  {state}
-                </h3>
-                <div className="space-y-1">
-                  {cities.map((c) => {
-                    const isActive = currentCity?.slug === c.slug
-                    return (
+            <>
+              {activeCities.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+                    Disponible ahora
+                  </h3>
+                  <div className="space-y-1">
+                    {activeCities.map((c) => {
+                      const isCurrent = currentCity?.slug === c.slug
+                      return (
+                        <button
+                          key={c.slug}
+                          onClick={() => handleSelect(c.slug)}
+                          aria-current={isCurrent ? "true" : undefined}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-[10px] text-sm text-left transition-colors ${
+                            isCurrent
+                              ? "bg-brand-50 text-brand-700 font-medium"
+                              : "hover:bg-[#F7F5F0] text-[#343538]"
+                          }`}
+                        >
+                          <MapPin
+                            className={`w-4 h-4 shrink-0 ${
+                              isCurrent ? "text-[#0E7A0E]" : "text-[var(--text-secondary)]"
+                            }`}
+                            aria-hidden="true"
+                          />
+                          {c.name}
+                          {isCurrent && (
+                            <Check className="w-4 h-4 ml-auto text-[#0E7A0E]" aria-label="Ciudad actual" />
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {Object.entries(comingSoonByState).map(([state, cities]) => (
+                <div key={state} className="mb-6">
+                  <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+                    {state}
+                  </h3>
+                  <div className="space-y-1">
+                    {cities.map((c) => (
                       <button
                         key={c.slug}
-                        onClick={() => handleSelect(c.slug)}
-                        aria-current={isActive ? "true" : undefined}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-[10px] text-sm text-left transition-colors ${
-                          isActive
-                            ? "bg-brand-50 text-brand-700 font-medium"
-                            : "hover:bg-[#F7F5F0] text-[#343538]"
-                        }`}
+                        type="button"
+                        disabled
+                        aria-disabled="true"
+                        title={`Muy pronto en ${c.name}`}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-[10px] text-sm text-left text-[var(--text-secondary)] opacity-70 cursor-not-allowed"
                       >
-                        <MapPin
-                          className={`w-4 h-4 shrink-0 ${
-                            isActive ? "text-[#0E7A0E]" : "text-[var(--text-secondary)]"
-                          }`}
-                          aria-hidden="true"
-                        />
+                        <MapPin className="w-4 h-4 shrink-0" aria-hidden="true" />
                         {c.name}
-                        {isActive && (
-                          <Check className="w-4 h-4 ml-auto text-[#0E7A0E]" aria-label="Ciudad actual" />
-                        )}
+                        <span className="ml-auto rounded-full bg-[#F1F0EC] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#5C6068]">
+                          Próximamente
+                        </span>
                       </button>
-                    )
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </>
           )}
         </div>
       </div>

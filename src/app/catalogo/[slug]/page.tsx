@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation"
 import { Metadata } from "next"
-import { MEXICO_CITIES } from "@/lib/cities"
+import { MEXICO_CITIES, isCityActive } from "@/lib/cities"
 import { CityPageClient } from "@/components/city/city-page-client"
+import { ComingSoonCity } from "@/components/city/coming-soon-city"
 import { logger } from "@/lib/logger"
 import {
   filterByCityAvailability,
@@ -46,12 +47,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const city = await resolveCity(slug)
   if (!city) return { title: "Catálogo — Resurte.me" }
 
-  const title = `Catálogo completo en ${city.name} — Resurte.me`
-  const description = `Catálogo completo de productos por mayoreo en ${city.name}, ${city.state}. Frutas, verduras, carnes, abarrotes y más, con búsqueda y categorías.`
+  const active = isCityActive(city.slug)
+  const title = active
+    ? `Catálogo completo en ${city.name} — Resurte.me`
+    : `Próximamente en ${city.name} — Resurte.me`
+  const description = active
+    ? `Catálogo completo de productos por mayoreo en ${city.name}, ${city.state}. Frutas, verduras, carnes, abarrotes y más, con búsqueda y categorías.`
+    : `Muy pronto en ${city.name}, ${city.state}. Por ahora Resurte.me opera solo en Chihuahua, Chihuahua.`
 
   return {
     title,
     description,
+    ...(active ? {} : { robots: { index: false, follow: true } }),
     alternates: {
       canonical: `https://resurte.me/catalogo/${city.slug}`,
     },
@@ -70,6 +77,8 @@ export default async function CatalogPage({ params }: Props) {
   const { slug } = await params
   const city = await resolveCity(slug)
   if (!city) notFound()
+
+  if (!isCityActive(city.slug)) return <ComingSoonCity city={city} />
 
   // Sin Supabase configurado (dev local/preview) el catálogo renderiza vacío
   // en lugar de fallar, igual que la landing.

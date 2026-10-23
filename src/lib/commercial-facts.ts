@@ -1,4 +1,4 @@
-import { MEXICO_CITIES } from "./cities"
+import { ACTIVE_CITIES } from "./cities"
 
 /**
  * Fuente única de los datos comerciales que más se citan de Resurte.me.
@@ -37,8 +37,20 @@ export const MEMBERSHIP_FEE_MXN = 0
  */
 export const INVOICING = "CFDI 4.0"
 
-/** Ciudades con entrega a domicilio del mismo catálogo. */
-export const DELIVERY_CITIES = MEXICO_CITIES.length
+/** Ciudades con entrega a domicilio del mismo catálogo (hoy solo Chihuahua). */
+export const DELIVERY_CITIES = ACTIVE_CITIES.length
+
+/**
+ * Frase autocontenida de cobertura: hoy "Chihuahua, Chihuahua". Cuando se
+ * activen más ciudades vuelve a "N ciudades de México" automáticamente.
+ */
+export const DELIVERY_COVERAGE_PROSE =
+  DELIVERY_CITIES === 1 && ACTIVE_CITIES[0]
+    ? `${ACTIVE_CITIES[0].name}, ${ACTIVE_CITIES[0].state}`
+    : `${DELIVERY_CITIES} ciudades de México`
+
+/** Promesa de expansión que acompaña a la cobertura actual. */
+export const DELIVERY_COMING_SOON_PROSE = "muy pronto en tu ciudad"
 
 /** Formato de moneda usado en las tablas citables. */
 export function formatMxn(amount: number): string {
@@ -70,17 +82,17 @@ export function getCommercialFacts(): CommercialFact[] {
     {
       label: "Pedido mínimo",
       value: formatMxn(MIN_ORDER_MXN),
-      detail: "Aplica igual en todas las ciudades",
+      detail: `Aplica en ${DELIVERY_COVERAGE_PROSE} y en las ciudades que se activen`,
     },
     {
       label: "Envío",
       value: `Gratis desde ${formatMxn(FREE_SHIPPING_MXN)}`,
-      detail: "Entrega el mismo día en las ciudades con cobertura",
+      detail: `Entrega el mismo día en ${DELIVERY_COVERAGE_PROSE}`,
     },
     {
       label: "Cobertura",
-      value: `${DELIVERY_CITIES} ciudades de México`,
-      detail: "Mismo catálogo y mismos precios en todas",
+      value: DELIVERY_COVERAGE_PROSE,
+      detail: `Por ahora solo ahí; ${DELIVERY_COMING_SOON_PROSE}`,
     },
     {
       label: "Membresía",
@@ -111,7 +123,7 @@ export function getCommercialFactsSummary(): string {
   return [
     `Pedido mínimo ${formatMxn(MIN_ORDER_MXN)}`,
     `envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}`,
-    `entrega en ${DELIVERY_CITIES} ciudades de México`,
+    `entrega en ${DELIVERY_COVERAGE_PROSE} (${DELIVERY_COMING_SOON_PROSE})`,
     MEMBERSHIP_FEE_MXN === 0 ? "sin membresía" : null,
     `facturación ${INVOICING} a solicitud`,
     `crédito a ${CREDIT_DAYS.join(", ")} días`,

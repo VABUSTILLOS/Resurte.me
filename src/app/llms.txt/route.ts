@@ -10,7 +10,7 @@ import {
 import { getAllPosts, getPostUrl, type BlogPostMeta } from "@/lib/blog"
 import { BLOG_CATEGORIES } from "@/lib/blog-categories"
 import { getCachedCategories } from "@/lib/catalog-cache"
-import { MEXICO_CITIES } from "@/lib/cities"
+import { ACTIVE_CITIES, COMING_SOON_CITIES } from "@/lib/cities"
 import { PREGUNTAS } from "@/lib/preguntas"
 
 // ============================================================
@@ -161,12 +161,15 @@ async function resolveCatalogCategories(): Promise<{ name: string; slug: string 
 }
 
 function buildCoverageSection(): string {
-  const names = MEXICO_CITIES.map((c) => c.name)
+  const names = ACTIVE_CITIES.map((c) => c.name)
+  const comingSoon = COMING_SOON_CITIES.map((c) => c.name)
   return `## Cobertura
 
-${joinSpanish(names)}.
+Hoy la entrega a domicilio está disponible solo en ${joinSpanish(names)}.
 
-Entrega a domicilio en ${MEXICO_CITIES.length} ciudades de México, con el mismo catálogo por mayoreo y pedido mínimo de ${formatMxn(MIN_ORDER_MXN)} en todas. El envío es gratis a partir de ${formatMxn(FREE_SHIPPING_MXN)} de compra; por debajo de ese monto la tarifa de entrega es de ${formatMxn(DELIVERY_FEE_FLAT)}.`
+Muy pronto en tu ciudad. Estas ciudades aún no tienen cobertura: ${joinSpanish(comingSoon)}.
+
+El catálogo por mayoreo tiene pedido mínimo de ${formatMxn(MIN_ORDER_MXN)} y el envío es gratis a partir de ${formatMxn(FREE_SHIPPING_MXN)} de compra; por debajo de ese monto la tarifa de entrega es de ${formatMxn(DELIVERY_FEE_FLAT)}.`
 }
 
 function buildSiteSection(): string {
@@ -200,7 +203,7 @@ function buildCityCatalogSection(
   if (categories.length === 0) return ""
 
   // Ejemplo guiado con la primera ciudad de cobertura.
-  const exampleCity = MEXICO_CITIES[0]
+  const exampleCity = ACTIVE_CITIES[0]
   if (!exampleCity) return ""
   const example = categories
     .map(
@@ -216,7 +219,7 @@ ${example}
 El mismo catálogo existe para cada ciudad con el patrón \`${BASE_URL}/{ciudad}/categoria/{categoria}\`.`
 
   // Mapa completo ciudad × categoría, generado desde datos.
-  const matrix = MEXICO_CITIES.map((city) => {
+  const matrix = ACTIVE_CITIES.map((city) => {
     const links = categories
       .map((c) => `[${c.name}](${BASE_URL}/${city.slug}/categoria/${c.slug})`)
       .join(", ")
@@ -225,7 +228,7 @@ El mismo catálogo existe para cada ciudad con el patrón \`${BASE_URL}/{ciudad}
 
   const matrixSection = `## Categorías de catálogo por ciudad
 
-${MEXICO_CITIES.length} ciudades × ${categories.length} categorías de insumo. Cada página lista productos con precio por mayoreo, unidad y disponibilidad de la ciudad.
+${ACTIVE_CITIES.length} ${ACTIVE_CITIES.length === 1 ? "ciudad" : "ciudades"} × ${categories.length} categorías de insumo. Cada página lista productos con precio por mayoreo, unidad y disponibilidad de la ciudad.
 
 ${matrix}`
 

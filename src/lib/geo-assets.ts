@@ -14,7 +14,7 @@ import { unstable_cache } from "next/cache"
 import { AI_CRAWLERS, CITABLE_AI_CRAWLERS } from "./ai-crawlers"
 import { getAllPosts } from "./blog"
 import { BLOG_CATEGORIES } from "./blog-categories"
-import { MEXICO_CITIES } from "./cities"
+import { ACTIVE_CITIES } from "./cities"
 import { GEO_ENGINES, GEO_PANEL_SIZE, GEO_QUERIES } from "./geo-queries"
 import { PREGUNTAS } from "./preguntas"
 
@@ -78,7 +78,7 @@ export function computeGeoInventory(): GeoInventory {
       title: "Datos clave en páginas de categoría y colección",
       why: "Condiciones comerciales en tabla: pedido mínimo, envío gratis, facturación.",
       where: "/<ciudad>/categoria/<categoria>",
-      count: BLOG_CATEGORIES.length * MEXICO_CITIES.length,
+      count: BLOG_CATEGORIES.length * ACTIVE_CITIES.length,
       unit: "combinaciones",
     },
     {
@@ -110,7 +110,7 @@ export function computeGeoInventory(): GeoInventory {
       title: "Páginas por ciudad",
       why: "Cobertura geográfica: responde consultas locales, donde la IA tiene poco material.",
       where: "/<ciudad>",
-      count: MEXICO_CITIES.length,
+      count: ACTIVE_CITIES.length,
       unit: "ciudades",
     },
     {

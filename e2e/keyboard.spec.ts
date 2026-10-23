@@ -74,7 +74,7 @@ test.describe("accesibilidad navegación por teclado", { tag: "@ci" }, () => {
 
   test("Escape cierra el selector de ciudad", async ({ page }) => {
     test.setTimeout(60_000)
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     const trigger = page
       .locator('button[aria-label="Cambiar ciudad"]:visible')
       .first()
@@ -99,7 +99,7 @@ test.describe("accesibilidad navegación por teclado", { tag: "@ci" }, () => {
     // `domcontentloaded` + esperar el contenido, no `networkidle`: la red de un
     // `next dev` puede no callarse nunca (HMR + peticiones de fondo) y agota el
     // presupuesto del test sin que el producto tenga nada que ver.
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForSelector("main#main-content")
     const opener = page
       .locator('button[aria-label*="Abrir carrito"]:visible')
@@ -116,14 +116,14 @@ test.describe("accesibilidad navegación por teclado", { tag: "@ci" }, () => {
   })
 
   test("Escape cierra el drawer de checkout", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     await page.waitForSelector("main#main-content")
     const addButton = page
       .locator('button[aria-label^="Agregar"][aria-label$="al carrito"]:visible')
       .first()
     test.skip(
       (await addButton.count()) === 0,
-      "no hay productos con botón de agregar en /cdmx",
+      "no hay productos con botón de agregar en /chihuahua",
     )
     await addButton.click()
     const opener = page
@@ -159,7 +159,7 @@ test.describe("accesibilidad navegación por teclado", { tag: "@ci" }, () => {
   // 640px (el viewport más angosto donde existe) no debe salirse de la ventana.
   test("el mega-menú de categorías cabe en la ventana y cierra con Escape", async ({ page }) => {
     test.setTimeout(60_000)
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
 
     const trigger = page.locator('button[aria-controls="category-mega-menu"]:visible').first()
     test.skip((await trigger.count()) === 0, "el mega-menú solo existe en desktop")

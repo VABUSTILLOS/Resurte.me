@@ -1,4 +1,4 @@
-import { MEXICO_CITIES } from "@/lib/cities"
+import { ACTIVE_CITIES, MEXICO_CITIES } from "@/lib/cities"
 import {
   CREDIT_DAYS_PROSE,
   FREE_SHIPPING_MXN,
@@ -68,7 +68,9 @@ interface OrganizationSchema {
 }
 
 export function getOrganizationSchema(): OrganizationSchema {
-  const cities = MEXICO_CITIES.map((c) => `${c.name}, ${c.state}, MX`)
+  // Solo las ciudades con cobertura: declarar 20 areaServed cuando se entrega
+  // en una es una señal falsa para buscadores y motores de respuesta.
+  const cities = ACTIVE_CITIES.map((c) => `${c.name}, ${c.state}, MX`)
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -87,7 +89,7 @@ export function getOrganizationSchema(): OrganizationSchema {
     knowsAbout: ORGANIZATION_KNOWS_ABOUT,
     founder: getAuthorReference(PRIMARY_AUTHOR),
     sameAs: BRAND_PROFILES,
-    areaServed: MEXICO_CITIES.map((c) => ({ "@type": "City" as const, name: c.name })),
+    areaServed: ACTIVE_CITIES.map((c) => ({ "@type": "City" as const, name: c.name })),
     contactPoint: {
       "@type": "ContactPoint",
       telephone: "+" + WHATSAPP_NUMBER,
@@ -145,7 +147,7 @@ export function getWholesaleServiceSchema() {
       `Surtido de abarrotes, frutas, verduras, carnes, lácteos y desechables por mayoreo para restaurantes, fondas, cafeterías y hoteles. Sin membresía, pedido mínimo ${formatMxn(MIN_ORDER_MXN)}, envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}, facturación ${INVOICING} y crédito a ${CREDIT_DAYS_PROSE} días.`,
     serviceType: "Distribución mayorista de alimentos y abarrotes",
     provider: { "@id": ORGANIZATION_ID },
-    areaServed: MEXICO_CITIES.map((c) => ({ "@type": "City" as const, name: c.name })),
+    areaServed: ACTIVE_CITIES.map((c) => ({ "@type": "City" as const, name: c.name })),
     availableChannel: {
       "@type": "ServiceChannel",
       serviceUrl: `${SITE_URL}/ciudades`,

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { DELIVERY_CITIES, FREE_SHIPPING_MXN, formatMxn, MIN_ORDER_MXN } from "@/lib/commercial-facts"
+import { DELIVERY_COVERAGE_PROSE, FREE_SHIPPING_MXN, formatMxn, MIN_ORDER_MXN } from "@/lib/commercial-facts"
 
 interface FuentesMetodologiaProps {
   /** Tema del artículo, para que la sección se lea autocontenida. */
@@ -73,8 +73,8 @@ export function FuentesMetodologia({
             <dt className="font-semibold text-[#242529]">Condiciones vigentes</dt>
             <dd>
               Pedido mínimo de {formatMxn(MIN_ORDER_MXN)}, envío gratis desde{" "}
-              {formatMxn(FREE_SHIPPING_MXN)} y entrega en {DELIVERY_CITIES} ciudades de México.
-              Sin membresía ni suscripción.
+              {formatMxn(FREE_SHIPPING_MXN)} y entrega en {DELIVERY_COVERAGE_PROSE}.
+              Muy pronto en tu ciudad. Sin membresía ni suscripción.
             </dd>
           </div>
           <div>

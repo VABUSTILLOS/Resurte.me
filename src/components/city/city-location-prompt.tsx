@@ -6,7 +6,7 @@ import { Loader2, MapPin, Navigation, X } from "lucide-react"
 
 import { useCity } from "@/contexts/city-context"
 import { CitySelector } from "@/components/city/city-selector"
-import { MEXICO_CITIES } from "@/lib/cities"
+import { DEFAULT_CITY_SLUG, MEXICO_CITIES } from "@/lib/cities"
 
 const VALID_SLUGS = new Set(MEXICO_CITIES.map((c) => c.slug))
 
@@ -31,6 +31,7 @@ async function geolocationPermission(): Promise<PermissionState | null> {
 }
 
 const DISMISS_KEY = "city-prompt-dismissed"
+const COMING_SOON_DISMISS_KEY = "city-coming-soon-dismissed"
 
 /**
  * La ciudad que resuelve la IP es una aproximación: los proveedores registran
@@ -44,8 +45,14 @@ const DISMISS_KEY = "city-prompt-dismissed"
  * el proxy ya no vuelve a imponer la ciudad de la IP.
  */
 export function CityLocationPrompt() {
-  const { city, citySource, requestBrowserLocation, isDetecting, detectionError } =
-    useCity()
+  const {
+    city,
+    citySource,
+    requestBrowserLocation,
+    isDetecting,
+    detectionError,
+    detectedOutsideCity,
+  } = useCity()
   const pathname = usePathname()
   const router = useRouter()
   // `citySource` nace en null y lo resuelve CityProvider tras el mount, así que
@@ -59,6 +66,13 @@ export function CityLocationPrompt() {
     }
   })
   const [showSelector, setShowSelector] = useState(false)
+  const [comingSoonDismissed, setComingSoonDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem(COMING_SOON_DISMISS_KEY) === "1"
+    } catch {
+      return false
+    }
+  })
   const attempted = useRef(false)
 
   const onCityRoot = isCityRootPath(pathname)
@@ -93,9 +107,53 @@ export function CityLocationPrompt() {
     }
   }
 
+  const handleComingSoonDismiss = () => {
+    setComingSoonDismissed(true)
+    document.cookie = "city-detected=;max-age=0;path=/"
+    try {
+      sessionStorage.setItem(COMING_SOON_DISMISS_KEY, "1")
+    } catch {
+      // sessionStorage puede no estar disponible
+    }
+  }
+
   const handleDetect = async () => {
     const detected = await requestBrowserLocation()
     if (detected && detected.slug !== city?.slug) router.replace(`/${detected.slug}`)
+  }
+
+  if (detectedOutsideCity && !comingSoonDismissed) {
+    return (
+      <div className="pointer-events-none fixed inset-x-0 top-[calc(5rem+var(--header-inset-top))] z-40 flex justify-center px-4">
+        <div
+          role="region"
+          aria-label="Cobertura próximamente"
+          className="pointer-events-auto flex w-full max-w-md items-center gap-2 rounded-[12px] border border-[#E8E9EB] bg-white/95 px-3 py-2.5 shadow-lg backdrop-blur"
+        >
+          <MapPin className="size-4 shrink-0 text-[#0E7A0E]" aria-hidden="true" />
+          <p className="min-w-0 flex-1 text-xs leading-snug text-[#343538]">
+            Muy pronto en{" "}
+            <span className="font-semibold">{detectedOutsideCity.name}</span>. Por
+            ahora operamos solo en Chihuahua, Chihuahua.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push(`/${DEFAULT_CITY_SLUG}`)}
+            className="shrink-0 rounded-full bg-[#0E7A0E] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#0D720D]"
+          >
+            Ver Chihuahua
+          </button>
+          <button
+            type="button"
+            onClick={handleComingSoonDismiss}
+            aria-label="Descartar aviso de cobertura"
+            className="shrink-0 rounded-full p-1.5 text-[#5C6068] transition-colors hover:bg-[#F7F5F0] hover:text-[#242529]"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (!shouldCorrect) return null

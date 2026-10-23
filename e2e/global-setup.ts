@@ -40,9 +40,9 @@ const ROUTES = [
   "/restaurantes",
   "/soporte",
   // Ciudad y sus derivadas
-  "/cdmx",
-  "/cdmx/carrito",
-  "/cdmx/buscar",
+  "/chihuahua",
+  "/chihuahua/carrito",
+  "/chihuahua/buscar",
   // Cuenta y monedero
   "/recompensas",
   // Panel y admin (redirigen a login sin sesión: también compilan)
@@ -82,7 +82,7 @@ const ROUTES = [
   // compilación del segmento dentro de su propio timeout. Caso medido:
   // /compartir fallaba en frío y pasaba en caliente en el mismo server.
   // Se calienta un slug por segmento — la compilación es del segmento, no del
-  // valor — por eso basta /cdmx/checkout y no también /chihuahua/checkout.
+  // valor — por eso basta /chihuahua/checkout.
   "/admin/marketing",
   "/admin/pedidos",
   "/admin/productos",
@@ -96,9 +96,9 @@ const ROUTES = [
   "/negocio/credito",
   "/panel/comanda",
   "/panel/rentabilidad",
-  "/cdmx/checkout",
-  "/cdmx/mis-pedidos",
-  "/catalogo/cdmx",
+  "/chihuahua/checkout",
+  "/chihuahua/mis-pedidos",
+  "/catalogo/chihuahua",
   "/blog/guia-marketing-restaurantes",
   // --- Auditoría de rutas (ronda 15) ---
   // Rutas que un spec `@ci` visita y que el calentamiento no cubría. Se midió
@@ -283,25 +283,25 @@ const BROWSER_ROUTES = [
   // Raíces de los segmentos grandes: el chunk más caro de cada uno.
   "/",
   "/comer",
-  "/cdmx",
+  "/chihuahua",
   "/panel",
   "/admin",
   // Primera aserción de a11y.spec.ts y keyboard.spec.ts (presupuesto 30 s).
   "/blog",
-  "/cdmx/carrito",
-  "/cdmx/buscar",
+  "/chihuahua/carrito",
+  "/chihuahua/buscar",
   "/recompensas",
   "/ruta-inexistente-xyz",
   // Primera aserción de first-visit.spec.ts (presupuesto 8 s) y del carrito.
-  "/cdmx/checkout",
+  "/chihuahua/checkout",
   // Rutas dinámicas: a11y.spec.ts descubre estos enlaces en tiempo de ejecución
   // y navega a ellos. Si el módulo `[slug]` no está compilado, la primera
   // navegación compila y el servidor de desarrollo tira la conexión
   // (`net::ERR_ABORTED` / `ECONNRESET`) dentro del presupuesto de 30 s.
   // Los slugs son de `supabase/seed.sql`; si el dato no existe la ruta se
   // compila igual (renderiza 404), que es justo lo que hace falta.
-  "/cdmx/categoria/frutas-verduras",
-  "/cdmx/producto/manzana-roja",
+  "/chihuahua/categoria/frutas-verduras",
+  "/chihuahua/producto/manzana-roja",
 ]
 
 /** Timeout por ruta en la pasada de navegador. */

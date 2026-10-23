@@ -54,10 +54,10 @@ test.describe("accesibilidad WCAG (axe-core)", { tag: "@ci" }, () => {
     ["home", "/"],
     ["marketplace", "/comer"],
     ["blog", "/blog"],
-    ["ciudad", "/cdmx"],
+    ["ciudad", "/chihuahua"],
     ["soporte", "/soporte"],
-    ["carrito", "/cdmx/carrito"],
-    ["busqueda", "/cdmx/buscar"],
+    ["carrito", "/chihuahua/carrito"],
+    ["busqueda", "/chihuahua/buscar"],
     ["recompensas", "/recompensas"],
     ["404", "/ruta-inexistente-xyz"],
   ]
@@ -114,7 +114,7 @@ test.describe("accesibilidad WCAG (axe-core)", { tag: "@ci" }, () => {
   })
 
   test("categoría y producto no tienen violaciones serias", async ({ page }) => {
-    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     // Descubre enlaces reales de categoría y producto desde la ciudad.
     const categoryHref = await page.getByRole("link").evaluateAll((links) => {
       const l = links.map((a) => (a as HTMLAnchorElement).href)
@@ -130,7 +130,7 @@ test.describe("accesibilidad WCAG (axe-core)", { tag: "@ci" }, () => {
       ["producto", productHref],
     ] as Array<[string, string | null]>) {
       if (!href) {
-        console.log(`SKIP ${label}: no se encontró enlace en /cdmx`)
+        console.log(`SKIP ${label}: no se encontró enlace en /chihuahua`)
         continue
       }
       await page.goto(href, { waitUntil: "domcontentloaded" })

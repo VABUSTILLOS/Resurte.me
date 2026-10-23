@@ -13,25 +13,39 @@ export function DeliveryZones({ currentCitySlug }: { currentCitySlug: string }) 
             Zonas de entrega
           </h2>
           <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-3">
-            Entregamos en {MEXICO_CITIES.length} ciudades de México. ¿No está la tuya? Escríbenos.
+            Hoy entregamos solo en Chihuahua, Chihuahua. Muy pronto en tu
+            ciudad: escríbenos y te avisamos.
           </p>
         </div>
         <div className="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto">
-          {MEXICO_CITIES.map((c) => (
-            <a
-              key={c.slug}
-              href={`/${c.slug}`}
-              className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-sm transition-all",
-                c.slug === currentCitySlug
-                  ? "bg-[#0E7A0E] text-white border-[#0E7A0E]"
-                  : "border-[#E8E9EB] text-[var(--text-secondary)] hover:border-[#0E7A0E]/40 hover:text-[#0E7A0E] hover:bg-[#E9FBE9]"
-              )}
-            >
-              <MapPin className="w-3 h-3" />
-              {c.name}
-            </a>
-          ))}
+          {MEXICO_CITIES.map((c) =>
+            c.is_active ? (
+              <a
+                key={c.slug}
+                href={`/${c.slug}`}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-sm transition-all",
+                  c.slug === currentCitySlug
+                    ? "bg-[#0E7A0E] text-white border-[#0E7A0E]"
+                    : "border-[#E8E9EB] text-[var(--text-secondary)] hover:border-[#0E7A0E]/40 hover:text-[#0E7A0E] hover:bg-[#E9FBE9]"
+                )}
+              >
+                <MapPin className="w-3 h-3" />
+                {c.name}
+              </a>
+            ) : (
+              <span
+                key={c.slug}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-[#E8E9EB] text-sm text-[var(--text-secondary)] opacity-70"
+              >
+                <MapPin className="w-3 h-3" />
+                {c.name}
+                <span className="rounded-full bg-[#F1F0EC] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#5C6068]">
+                  Próximamente
+                </span>
+              </span>
+            )
+          )}
         </div>
       </section>
   )

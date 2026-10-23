@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { MEXICO_CITIES } from "@/lib/cities"
+import { MEXICO_CITIES, isCityActive } from "@/lib/cities"
 import { Metadata } from "next"
 import { CityLanding } from "@/components/city/city-landing"
 import { logger } from "@/lib/logger"
@@ -53,12 +53,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!city) return { title: "Ciudad no encontrada — Resurte.me" }
 
-  const title = `Resurte.me en ${city.name} — Central de Abastos Digital`
-  const description = `Central de abastos en línea para tu negocio en ${city.name}, ${city.state}. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`
+  // Las ciudades sin cobertura se conservan para no romper enlaces, pero no
+  // se indexan como si ya operáramos ahí: solo Chihuahua tiene entrega hoy.
+  const active = isCityActive(city.slug)
+  const title = active
+    ? `Resurte.me en ${city.name} — Central de Abastos Digital`
+    : `Próximamente en ${city.name} — Resurte.me`
+  const description = active
+    ? `Central de abastos en línea para tu negocio en ${city.name}, ${city.state}. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`
+    : `Muy pronto en ${city.name}, ${city.state}. Por ahora Resurte.me opera solo en Chihuahua, Chihuahua, con entrega el mismo día.`
 
   return {
     title,
     description,
+    ...(active ? {} : { robots: { index: false, follow: true } }),
     alternates: {
       canonical: `https://resurte.me/${city.slug}`,
     },

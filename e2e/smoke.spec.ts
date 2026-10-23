@@ -71,8 +71,8 @@ test.describe("smoke: páginas públicas", { tag: "@ci" }, () => {
     }
   })
 
-  test("ciudad /cdmx responde", async ({ page }) => {
-    const response = await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+  test("ciudad /chihuahua responde", async ({ page }) => {
+    const response = await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
     expect(response?.status()).toBe(200)
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible()
   })

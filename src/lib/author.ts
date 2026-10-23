@@ -10,7 +10,7 @@
 // structured-data.ts), la página /autor/[slug], el byline del post y
 // llms.txt. No duplicar estos datos en otro sitio.
 
-import { DELIVERY_CITIES } from "./commercial-facts"
+import { DELIVERY_COVERAGE_PROSE } from "./commercial-facts"
 
 export interface AuthorProfile {
   /** Slug de la ruta pública /autor/[slug]. */
@@ -56,7 +56,7 @@ const VICTOR_BUSTILLOS: AuthorProfile = {
     "Su enfoque es práctico: cada guía sale de datos reales de compra —precios por ciudad, mermas medidas en cocina y márgenes de menús que están operando hoy— y no de teoría de manual. Por eso el blog de Resurte.me publica tablas de costos, comparativas de formas de surtir y el índice de precios de insumos por ciudad.",
   ],
   credentials: [
-    `Fundador de Resurte.me, central de abastos digital con cobertura en ${DELIVERY_CITIES} ciudades de México.`,
+    `Fundador de Resurte.me, central de abastos digital con cobertura en ${DELIVERY_COVERAGE_PROSE} y muy pronto en tu ciudad.`,
     "Trabajo directo con restaurantes, fondas y negocios de comida en el diseño de su proveeduría y su costeo.",
     "Autor de las guías pilar de costos, proveeduría, operación de cocina y crecimiento de Resurte.me.",
   ],
