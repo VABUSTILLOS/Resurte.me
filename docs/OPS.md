@@ -2231,6 +2231,31 @@ Hay dos caminos y **no son intercambiables**:
 | Reusar el catálogo de Meta de take.app | Ya tienes el catálogo a mano y quieres conservar los `retailer_id` | Hay que purgar lo que subió take.app (queda como `only_meta` en el Explorador y se borra con confirmación explícita) |
 | Crear un catálogo NUEVO en Meta | Prefieres partir limpio | La primera corrida sólo crea; no hay nada que purgar. **Es el camino recomendado** |
 
+### 16.1-bis ⚠️ La WABA de PRUEBA no sirve para catálogos
+
+**Síntoma**: en WhatsApp Manager la opción **Catálogo** aparece deshabilitada y
+no hay forma de crear uno. Arriba a la derecha el selector dice
+**"Test WhatsApp Business Account"** y el número listado es
+**+1 555-202-2075 · Test Number**.
+
+**Causa**: los **números de prueba** de Meta son sólo para desarrollo de
+mensajería. No admiten comercio, así que el catálogo queda deshabilitado en esa
+cuenta. No es un problema de Resurte.me ni de permisos del panel.
+
+**Qué hace falta** (todo en Meta):
+
+1. Un **portafolio empresarial** (Business Portfolio) real, con la empresa.
+2. Una **WABA real** (no la de prueba) y un **número de teléfono propio**,
+   verificado — no el número de prueba.
+3. **Verificación de la empresa** en Business Manager (Commerce suele pedirla).
+4. Con eso, crear el catálogo en **Commerce Manager**
+   (`business.facebook.com/commerce`) o en WhatsApp Manager → Catálogo, que ya
+   aparece habilitado.
+5. Conectar el catálogo a esa WABA (un catálogo por WABA).
+
+**Cómo comprobarlo**: si el selector de cuenta dice "Test…", estás en la cuenta
+de prueba. Cambia al portafolio real en la esquina superior derecha.
+
 ### 16.2 En Meta (una sola vez)
 
 1. **Commerce Manager** → crear el catálogo (si se eligió el camino nuevo).
