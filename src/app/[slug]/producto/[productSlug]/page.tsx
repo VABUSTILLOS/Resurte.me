@@ -153,7 +153,10 @@ export default async function ProductPage({ params }: Props) {
     ),
     getBreadcrumbSchema([
       { name: city.name, url: `https://resurte.me/${slug}` },
-      { name: category?.name ?? "Catálogo", url: category ? `https://resurte.me/${slug}/categoria/${category.slug}` : `https://resurte.me/${slug}/catalogo` },
+      // El breadcrumb sin categoría apuntaba a `/{ciudad}/catalogo`, que no existe
+      // (el catálogo de la ciudad es `/{ciudad}`). Un JSON-LD que enlaza a un 404
+      // es una señal mala para los buscadores.
+      { name: category?.name ?? "Catálogo", url: category ? `https://resurte.me/${slug}/categoria/${category.slug}` : `https://resurte.me/${slug}` },
       { name: product.name, url },
     ]),
   ]
