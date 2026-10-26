@@ -1,4 +1,5 @@
 import { ArrowRight } from "lucide-react"
+import { WHATSAPP_HREF } from "@/lib/business"
 
 export function NewsletterCta({ citySlug }: { citySlug: string }) {
   return (
@@ -16,7 +17,7 @@ export function NewsletterCta({ citySlug }: { citySlug: string }) {
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
             <a
-              href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}?text=Quiero%20recibir%20la%20lista%20de%20precios%20semanal`}
+              href={`${WHATSAPP_HREF}?text=Quiero%20recibir%20la%20lista%20de%20precios%20semanal`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#0F7A3D] text-white text-sm font-semibold px-6 py-3 rounded-[10px] hover:bg-[#0F6B3A] transition-colors"

@@ -55,13 +55,13 @@ export default function CareersPage() {
           {
             title: "Ejecutivo de Cuenta (Ventas B2B)",
             area: "Comercial",
-            type: "CDMX / MTY / GDL",
+            type: "Chihuahua / Remoto",
             desc: "Responsable de abrir y crecer cuentas de restaurantes y hoteles. Bono por resultados.",
           },
           {
             title: "Coordinador de Logística",
             area: "Operaciones",
-            type: "CDMX",
+            type: "Chihuahua",
             desc: "Dueño de la última milla. Optimiza rutas, gestiona flotilla y asegura que cada pedido llegue a tiempo.",
           },
           {

@@ -1,17 +1,17 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowRight, Clock, CreditCard, MessageCircle, ShieldCheck, Star } from "lucide-react"
+import { WHATSAPP_HREF } from "@/lib/business"
 import { CREDIT_DAYS_PROSE } from "@/lib/commercial-facts"
 
 export const metadata: Metadata = {
-  title: "Línea de crédito para tu negocio — Resurte.me",
+  title: "Línea de crédito para tu negocio en Chihuahua — Resurte.me",
   description:
-    "Paga tus insumos a 7, 15 o 30 días. Sin aval, sin consulta a buró. Arreglamos tu línea con un ejecutivo según tu historial de compras.",
+    "Paga tus insumos a 7, 15 o 30 días. Sin aval, sin consulta a buró. Arreglamos tu línea con un ejecutivo en Chihuahua según tu historial de compras.",
+  alternates: { canonical: "https://resurte.me/negocio/credito" },
 }
 
 export default function CreditoPage() {
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
-
   return (
     <div className="min-h-screen bg-white">
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-12 sm:py-20 px-4">
@@ -115,7 +115,7 @@ export default function CreditoPage() {
         <div className="text-center mt-8 sm:mt-10">
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Hola, quiero información sobre la línea de crédito para mi negocio.")}`}
+              href={`${WHATSAPP_HREF}?text=${encodeURIComponent("Hola, quiero información sobre la línea de crédito para mi negocio.")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 bg-[#0E7A0E] text-white font-semibold px-6 sm:px-8 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"

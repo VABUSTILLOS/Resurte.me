@@ -34,6 +34,7 @@ import {
 } from "@/lib/foodos-entitlements"
 import { getBreadcrumbSchema, getWebSiteSchema } from "@/lib/structured-data"
 import { SITE_URL } from "@/lib/author"
+import { WHATSAPP_HREF } from "@/lib/business"
 
 // Landing comercial. Sin cookies()/headers(): se prerenderiza y se refresca
 // por ISR. La calculadora y el calificador son islas cliente.
@@ -177,8 +178,7 @@ export const metadata: Metadata = {
   },
 }
 
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
-const WHATSAPP_HREF = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+const FOODOS_WHATSAPP_HREF = `${WHATSAPP_HREF}?text=${encodeURIComponent(
   "Hola, tengo un restaurante y quiero saber cómo funciona FoodOS."
 )}`
 
@@ -252,7 +252,7 @@ export default function RestaurantesPage() {
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
             <a
-              href={WHATSAPP_HREF}
+              href={FOODOS_WHATSAPP_HREF}
               target="_blank"
               rel="noopener noreferrer"
               className="touch-target inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
@@ -422,7 +422,7 @@ export default function RestaurantesPage() {
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <a
-              href={WHATSAPP_HREF}
+              href={FOODOS_WHATSAPP_HREF}
               target="_blank"
               rel="noopener noreferrer"
               className="touch-target inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-100"

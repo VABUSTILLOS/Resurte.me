@@ -20,6 +20,7 @@ import { AnalyticsEvents } from "@/lib/analytics"
 import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 import { ProductReviews } from "@/components/product/product-reviews"
 import type { ProductReviewStats } from "@/lib/product-reviews"
+import { WHATSAPP_NUMBER } from "@/lib/business"
 
 interface ProductDetailClientProps {
   product: Product
@@ -363,7 +364,7 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
               </button>
 
               <OrderByWhatsAppButton
-                phoneNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}
+                phoneNumber={WHATSAPP_NUMBER}
                 productName={product.name}
                 productPrice={displayPrice}
                 quantity={quantity}

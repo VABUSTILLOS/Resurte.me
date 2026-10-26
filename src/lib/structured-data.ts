@@ -7,30 +7,29 @@ import {
   formatMxn,
 } from "./commercial-facts"
 import { PRIMARY_AUTHOR, getAuthorReference, ORGANIZATION_ID, SITE_NAME, SITE_URL } from "@/lib/author"
-import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
+import {
+  BRAND_PROFILES,
+  BUSINESS_EMAIL,
+  BUSINESS_GEO,
+  BUSINESS_LOCATION_LABEL,
+  GOOGLE_BUSINESS_URL,
+  HOME_CITY,
+  PHONE_E164,
+  WHATSAPP_HREF,
+  getOpeningHoursSpecification,
+  getPostalAddress,
+} from "@/lib/business"
+import { CHIHUAHUA_DELIVERY_ZONES } from "@/lib/local-content"
 
 /**
  * Structured data helpers for JSON-LD schema.org markup.
  * Injects into pages via <script type="application/ld+json">.
- */
-
-// WhatsApp number for structured data — resolves at build time via Next.js env inlining
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
-
-/**
- * Perfiles externos de la marca. Los motores de respuesta consolidan la
- * entidad "Resurte.me" cruzando estos enlaces con el Knowledge Graph: cuanto
- * más `sameAs` verificables, menos ambigüedad entre "Resurte" y "Resurte.me".
  *
- * PENDIENTE: agregar aquí las URLs reales de Google Business Profile,
- * Wikidata, LinkedIn y YouTube cuando existan. No se inventan: un `sameAs`
- * que no resuelve debilita la entidad en vez de reforzarla (ver Fase 8).
+ * El NAP (nombre, dirección, teléfono) vive en `@/lib/business`: aquí solo se
+ * compone en los nodos schema.org. Un `sameAs` que no resuelve debilita la
+ * entidad en vez de reforzarla, por eso los perfiles se declaran solo cuando
+ * existen (ver `BRAND_PROFILES`).
  */
-const BRAND_PROFILES = [
-  "https://www.facebook.com/resurteme",
-  "https://www.instagram.com/resurteme",
-  "https://wa.me/" + WHATSAPP_NUMBER,
-]
 
 /** Temas que la organización declara dominar. Deben coincidir con el contenido real. */
 const ORGANIZATION_KNOWS_ABOUT = [
@@ -57,6 +56,11 @@ interface OrganizationSchema {
   knowsAbout: string[]
   founder: ReturnType<typeof getAuthorReference>
   sameAs: string[]
+  address: ReturnType<typeof getPostalAddress>
+  telephone: string
+  email: string
+  foundingLocation: { "@type": "Place"; name: string }
+  openingHoursSpecification: ReturnType<typeof getOpeningHoursSpecification>
   areaServed: { "@type": "City"; name: string }[]
   contactPoint: {
     "@type": "ContactPoint"
@@ -84,15 +88,22 @@ export function getOrganizationSchema(): OrganizationSchema {
     url: SITE_URL,
     logo: "https://resurte.me/images/store/logo.webp",
     description:
-      "Central de abastos digital para restaurantes y negocios en México. Abarrotes, frutas, verduras y carnes por mayoreo — entregados a tu puerta.",
-    slogan: "La central de abastos digital de México.",
+      "Central de abastos digital para restaurantes y negocios en Chihuahua, Chihuahua. Abarrotes, frutas, verduras y carnes por mayoreo — entregados a tu puerta.",
+    slogan: "La central de abastos digital de Chihuahua.",
     knowsAbout: ORGANIZATION_KNOWS_ABOUT,
     founder: getAuthorReference(PRIMARY_AUTHOR),
     sameAs: BRAND_PROFILES,
+    // Sin `address` la entidad no tiene geografía: Google no puede asociarla
+    // con Chihuahua ni resolverla en el Local Pack.
+    address: getPostalAddress(),
+    telephone: PHONE_E164,
+    email: BUSINESS_EMAIL,
+    foundingLocation: { "@type": "Place", name: BUSINESS_LOCATION_LABEL },
+    openingHoursSpecification: getOpeningHoursSpecification(),
     areaServed: ACTIVE_CITIES.map((c) => ({ "@type": "City" as const, name: c.name })),
     contactPoint: {
       "@type": "ContactPoint",
-      telephone: "+" + WHATSAPP_NUMBER,
+      telephone: PHONE_E164,
       contactType: "customer service",
       areaServed: cities,
       availableLanguage: "es",
@@ -151,7 +162,7 @@ export function getWholesaleServiceSchema() {
     availableChannel: {
       "@type": "ServiceChannel",
       serviceUrl: `${SITE_URL}/ciudades`,
-      servicePhone: "+" + WHATSAPP_NUMBER,
+      servicePhone: PHONE_E164,
       availableLanguage: "es",
     },
     offers: {
@@ -161,6 +172,42 @@ export function getWholesaleServiceSchema() {
       description:
         `Sin costo de membresía. Pedido mínimo ${formatMxn(MIN_ORDER_MXN)}. Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`,
     },
+  }
+}
+
+/**
+ * Schema de la página de zonas de entrega.
+ *
+ * Declara el reparto como un `Service` con `areaServed` explícito. El alcance
+ * real es **toda la ciudad** (`City`), así que ese nodo va primero y es el que
+ * define la cobertura; las colonias son `Place` de ejemplo —no `City`, porque
+ * no son entidades administrativas— para que un buscador pueda emparejar una
+ * colonia concreta sin que la lista se lea como el límite del servicio.
+ */
+export function getDeliveryZonesSchema(pageUrl: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "@id": `${pageUrl}#zonas-de-entrega`,
+    name: `Entrega de insumos por mayoreo en toda la ciudad de ${HOME_CITY.name}`,
+    description:
+      `Reparto de abarrotes, frutas, verduras, carnes, lácteos y desechables ` +
+      `por mayoreo a restaurantes y negocios en toda la ciudad de ` +
+      `${BUSINESS_LOCATION_LABEL}, sin colonias excluidas. ` +
+      `Pedido mínimo ${formatMxn(MIN_ORDER_MXN)} y envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`,
+    serviceType: "Entrega a domicilio de insumos para restaurantes",
+    provider: { "@id": ORGANIZATION_ID },
+    areaServed: [
+      { "@type": "City" as const, name: HOME_CITY.name },
+      ...CHIHUAHUA_DELIVERY_ZONES.map((zone) => ({ "@type": "Place" as const, name: zone })),
+    ],
+    availableChannel: {
+      "@type": "ServiceChannel",
+      serviceUrl: pageUrl,
+      servicePhone: PHONE_E164,
+      availableLanguage: "es",
+    },
+    hoursAvailable: getOpeningHoursSpecification(),
   }
 }
 
@@ -212,52 +259,119 @@ interface LocalBusinessSchema {
   name: string
   description: string
   image: string
+  url: string
+  inLanguage: string
   parentOrganization: { "@id": string }
-  address: {
-    "@type": "PostalAddress"
-    addressLocality: string
-    addressRegion: string
-    addressCountry: string
-  }
+  address: ReturnType<typeof getPostalAddress>
   geo: {
     "@type": "GeoCoordinates"
     latitude: number
     longitude: number
   }
-  areaServed: {
-    "@type": "City"
-    name: string
-  }
+  telephone: string
+  email: string
+  priceRange: string
+  currenciesAccepted: string
+  paymentAccepted: string
+  openingHoursSpecification: ReturnType<typeof getOpeningHoursSpecification>
+  hasMap: string
+  sameAs: string[]
+  areaServed: (
+    | { "@type": "City"; name: string }
+    | { "@type": "Place"; name: string }
+  )[]
 }
 
 export function getCityLandingSchema(cityName: string, state: string, lat: number, lng: number): LocalBusinessSchema {
   const slug = MEXICO_CITIES.find((c) => c.name === cityName)?.slug ?? cityName.toLowerCase()
+  const url = `${SITE_URL}/${slug}`
   return {
     "@context": "https://schema.org",
     "@type": "WholesaleStore",
-    "@id": `${SITE_URL}/${slug}#store`,
+    "@id": `${url}#store`,
     name: `Resurte.me — ${cityName}`,
     description: `Central de abastos digital en ${cityName}, ${state}. Abarrotes, frutas, verduras y carnes por mayoreo para restaurantes y negocios.`,
+    url,
+    inLanguage: "es-MX",
 
     image: "https://resurte.me/opengraph-image",
     // Sin esto cada ciudad sería una tienda huérfana; con esto cuelgan de la
     // misma organización y el asistente entiende la cobertura como una red.
     parentOrganization: { "@id": ORGANIZATION_ID },
 
-    address: {
-      "@type": "PostalAddress",
-      addressLocality: cityName,
-      addressRegion: state,
-      addressCountry: "MX",
-    },
+    // El NAP completo es lo que permite resolver la tienda en el Local Pack.
+    // La calle y el CP solo aparecen si están configurados: un negocio de área
+    // de servicio declara localidad, estado y país, y eso es válido.
+    address: getPostalAddress(),
     geo: {
       "@type": "GeoCoordinates",
       latitude: lat,
       longitude: lng,
     },
-    areaServed: {
-      "@type": "City",
-      name: cityName,
+    telephone: PHONE_E164,
+    email: BUSINESS_EMAIL,
+    priceRange: "$",
+    currenciesAccepted: "MXN",
+    paymentAccepted: "Efectivo, Transferencia SPEI, Tarjeta de crédito, Tarjeta de débito",
+    openingHoursSpecification: getOpeningHoursSpecification(),
+    hasMap: GOOGLE_BUSINESS_URL ?? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+    sameAs: BRAND_PROFILES,
+    // La ciudad es el alcance real de la cobertura; las colonias que la
+    // landing lista de forma visible van como `Place` de ejemplo, no como
+    // frontera del servicio. `Place` y no `City` porque no son entidades
+    // administrativas: así el marcado describe exactamente lo que se lee.
+    areaServed: [
+      { "@type": "City" as const, name: cityName },
+      ...(cityName === HOME_CITY.name
+        ? CHIHUAHUA_DELIVERY_ZONES.map((zone) => ({
+            "@type": "Place" as const,
+            name: `${zone}, ${cityName}`,
+          }))
+        : []),
+    ],
+  }
+}
+
+/**
+ * `LocalBusiness` de la empresa (no de una ciudad). Se emite en las páginas
+ * donde el visitante busca el NAP —/contact y /soporte— para que el rastreador
+ * encuentre la misma entidad que declara la portada, con dirección, teléfono
+ * y horario en un solo nodo.
+ */
+export function getLocalBusinessSchema(pageUrl: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "@id": `${SITE_URL}/#localbusiness`,
+    name: SITE_NAME,
+    description:
+      "Central de abastos digital para restaurantes y negocios en Chihuahua: abarrotes, frutas, verduras y carnes por mayoreo con entrega a domicilio.",
+    url: pageUrl,
+    image: "https://resurte.me/opengraph-image",
+    logo: "https://resurte.me/images/store/logo.webp",
+    inLanguage: "es-MX",
+    parentOrganization: { "@id": ORGANIZATION_ID },
+    address: getPostalAddress(),
+    geo: {
+      "@type": "GeoCoordinates",
+      latitude: BUSINESS_GEO.latitude,
+      longitude: BUSINESS_GEO.longitude,
+    },
+    telephone: PHONE_E164,
+    email: BUSINESS_EMAIL,
+    priceRange: "$",
+    currenciesAccepted: "MXN",
+    paymentAccepted: "Efectivo, Transferencia SPEI, Tarjeta de crédito, Tarjeta de débito",
+    openingHoursSpecification: getOpeningHoursSpecification(),
+    hasMap:
+      GOOGLE_BUSINESS_URL ??
+      `https://www.google.com/maps/search/?api=1&query=${BUSINESS_GEO.latitude},${BUSINESS_GEO.longitude}`,
+    sameAs: BRAND_PROFILES,
+    areaServed: ACTIVE_CITIES.map((c) => ({ "@type": "City" as const, name: c.name })),
+    potentialAction: {
+      "@type": "CommunicateAction",
+      name: "Pedir por WhatsApp",
+      target: WHATSAPP_HREF,
     },
   }
 }
@@ -418,17 +532,20 @@ export interface SitemapEntry {
 }
 
 export function generateSitemapXml(entries: SitemapEntry[]): string {
-  // El `<lastmod>` por defecto es el día local del negocio, no el día UTC.
-  const fallbackDay = dayKeyOf(DEFAULT_TIMEZONE)
+  // `<lastmod>` solo se emite cuando la fecha es real. Antes se rellenaba con
+  // el día de hoy en todas las entradas —incluidas /privacy y /terms—, y un
+  // lastmod que cambia a diario sin que el contenido cambie enseña a Google a
+  // ignorarlo. Sin fecha es mejor que con una falsa.
   const items = entries
     .map(
       (entry) =>
         `  <url>
-    <loc>${entry.url}</loc>
-    <lastmod>${entry.lastModified || fallbackDay}</lastmod>
+    <loc>${entry.url}</loc>${
+      entry.lastModified ? `\n    <lastmod>${entry.lastModified}</lastmod>` : ""
+    }
     <changefreq>${entry.changeFrequency || "weekly"}</changefreq>
     <priority>${entry.priority || 0.8}</priority>
-  </url>`
+  </url>`,
     )
     .join("\n")
 

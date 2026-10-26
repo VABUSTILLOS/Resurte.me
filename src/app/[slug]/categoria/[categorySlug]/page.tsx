@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { MEXICO_CITIES } from "@/lib/cities"
+import { DEFAULT_CITY_SLUG, MEXICO_CITIES } from "@/lib/cities"
 import {
   filterByCityAvailability,
   getCachedCategories,
@@ -21,7 +21,7 @@ export const revalidate = 300
 export async function generateStaticParams() {
   const categories = await getCachedCategories()
   return categories.map((c) => ({
-    slug: "chihuahua",
+    slug: DEFAULT_CITY_SLUG,
     categorySlug: c.slug,
   }))
 }

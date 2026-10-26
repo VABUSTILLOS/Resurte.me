@@ -3,9 +3,10 @@ import Link from "next/link"
 import { ArrowRight, FileText, CheckCircle, Download, Shield } from "lucide-react"
 
 export const metadata: Metadata = {
-  title: "Facturación electrónica (CFDI 4.0) — Resurte.me",
+  title: "Facturación electrónica (CFDI 4.0) en Chihuahua — Resurte.me",
   description:
-    "Todas tus compras se pueden facturar. Pide tu CFDI 4.0 y te lo emitimos listo para deducir. Sin costo extra.",
+    "Todas tus compras se pueden facturar. Pide tu CFDI 4.0 y te lo emitimos listo para deducir. Sin costo extra, para negocios en Chihuahua.",
+  alternates: { canonical: "https://resurte.me/negocio/facturacion" },
 }
 
 export default function FacturacionPage() {

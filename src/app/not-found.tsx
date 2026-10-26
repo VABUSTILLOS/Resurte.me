@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { MapPin, Search, MessageCircle, HelpCircle } from "lucide-react"
+import { WHATSAPP_HREF } from "@/lib/business"
 
 export default function NotFound() {
   return (
@@ -38,7 +39,7 @@ export default function NotFound() {
           Preguntas frecuentes
         </Link>
         <a
-          href={`https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486").replace(/\D/g, "")}`}
+          href={WHATSAPP_HREF}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-brand-600 hover:text-brand-700 font-medium"

@@ -40,16 +40,20 @@ export default async function BlogIndexPage() {
   const jsonLd = [
     getBlogIndexSchema(posts),
     getBlogBreadcrumbSchema("blog"),
+    // El `WebSite` con su `SearchAction` ya lo emite el layout raíz con
+    // `@id: /#website`. Repetirlo aquí creaba un segundo nodo `WebSite` sin
+    // `@id` —dos entidades distintas para el mismo sitio— y el buscador tenía
+    // que adivinar cuál era la buena. El blog solo declara su relación con el
+    // sitio, no un sitio nuevo.
     {
       "@context": "https://schema.org",
-      "@type": "WebSite",
-      name: "Resurte.me",
-      url: "https://resurte.me",
-      potentialAction: {
-        "@type": "SearchAction",
-        target: "https://resurte.me/blog?q={search_term_string}",
-        "query-input": "required name=search_term_string",
-      },
+      "@type": "CollectionPage",
+      "@id": "https://resurte.me/blog#collectionpage",
+      url: "https://resurte.me/blog",
+      name: "Blog de Resurte.me — Recursos para Restaurantes",
+      inLanguage: "es-MX",
+      isPartOf: { "@id": "https://resurte.me/#website" },
+      about: { "@id": "https://resurte.me/#organization" },
     },
   ]
 

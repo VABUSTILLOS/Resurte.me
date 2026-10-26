@@ -19,9 +19,9 @@ import {
 export const dynamic = "force-static"
 
 const PAGE_URL = `${SITE_URL}/preguntas`
-const PAGE_TITLE = "Preguntas de restauranteros, respondidas — Resurte.me"
+const PAGE_TITLE = "Preguntas de restauranteros en Chihuahua, respondidas — Resurte.me"
 const PAGE_DESCRIPTION =
-  "Respuestas directas a las preguntas más comunes de dueños de restaurante en México: food cost, precios, mayoreo, mermas, inventario, delivery y proveeduría."
+  "Respuestas directas a las preguntas más comunes de dueños de restaurante en Chihuahua: food cost, precios, mayoreo, mermas, inventario, delivery y proveeduría."
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,

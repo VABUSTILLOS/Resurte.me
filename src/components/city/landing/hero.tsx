@@ -32,6 +32,13 @@ export function HeroSection({
               <h1 className="text-[2rem] leading-[1.1] sm:text-5xl lg:text-[3.5rem] font-bold text-white tracking-tight text-balance">
                 Del campo a tu{" "}
                 <span className="text-[#3CC73C]">cocina</span>
+                {/* La ciudad va dentro del H1: es la señal local que Google y
+                    los motores de respuesta leen para asociar la marca con
+                    Chihuahua. Se deriva de la ciudad activa, nunca se escribe
+                    a mano. */}
+                <span className="mt-2 block text-[0.5em] font-semibold leading-tight text-white/85">
+                  Central de abastos digital en {cityName}
+                </span>
               </h1>
               <p className="mt-3 sm:mt-5 text-sm sm:text-lg text-white/75 leading-relaxed max-w-[480px]">
                 Pide los insumos de tu restaurante desde el cel. Te los entregamos el mismo día, frescos y al mejor precio. Sin madrugar, sin vueltas.

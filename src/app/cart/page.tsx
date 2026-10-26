@@ -12,6 +12,7 @@ import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
 import { calcCheckoutTotals, FREE_SHIPPING_THRESHOLD, DELIVERY_FEE_FLAT, countBumpUnits, countOrderUnits } from "@/lib/checkout-config"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
+import { WHATSAPP_HREF } from "@/lib/business"
 
 export default function CartPage() {
   const { cart, itemCount, subtotal, coupon, removeItem, updateQuantity, clearCart, addItem, isLoaded } = useCart()
@@ -420,7 +421,7 @@ export default function CartPage() {
       {/* Actions */}
       <div className="mt-6 flex flex-col sm:flex-row gap-3">
         <a
-          href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}?text=${encodeURIComponent(
+          href={`${WHATSAPP_HREF}?text=${encodeURIComponent(
             "🛒 *Pedido desde Resurte.me*\n\n" +
               cart.items
                 .map(

@@ -1,5 +1,11 @@
 import type { Metadata } from "next"
 import { Shield, Lock, FileCheck } from "lucide-react"
+import {
+  BUSINESS_EMAIL,
+  BUSINESS_LOCATION_LABEL,
+  PHONE_DISPLAY,
+  PHONE_TEL_HREF,
+} from "@/lib/business"
 
 export const metadata: Metadata = {
   title: "Política de privacidad — Resurte.me",
@@ -44,10 +50,19 @@ export default function PrivacyPage() {
         <div>
           <h2 className="text-xl font-bold text-[#242529] mb-3">1. Responsable del tratamiento</h2>
           <p className="text-[#5C6068] leading-relaxed">
-            Resurte.me, con domicilio en Chihuahua, Chihuahua, México, es el
+            Resurte.me, con domicilio en {BUSINESS_LOCATION_LABEL}, es el
             responsable del tratamiento de los datos personales que nos
             proporciones, conforme a la Ley Federal de Protección de Datos
-            Personales en Posesión de los Particulares (LFPDPPP).
+            Personales en Posesión de los Particulares (LFPDPPP). Para
+            cualquier asunto relacionado con tus datos puedes escribir a{" "}
+            <a href={`mailto:${BUSINESS_EMAIL}`} className="text-[#0E7A0E] hover:underline">
+              {BUSINESS_EMAIL}
+            </a>{" "}
+            o llamar al{" "}
+            <a href={PHONE_TEL_HREF} className="text-[#0E7A0E] hover:underline">
+              {PHONE_DISPLAY}
+            </a>
+            .
           </p>
         </div>
 

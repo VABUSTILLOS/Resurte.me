@@ -4,6 +4,7 @@ import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { CitySelector } from "@/components/city/city-selector"
 import { useState, useEffect, useMemo } from "react"
 import { MEXICO_CITIES } from "@/lib/cities"
+import { HOME_CITY } from "@/lib/business"
 import { StickyCatalogButton } from "@/components/ui/sticky-catalog-button"
 import { useRouter } from "next/navigation"
 import { useMediaQuery } from "@/hooks/use-media-query"
@@ -27,6 +28,7 @@ import { RewardsProgram } from "./landing/rewards-program"
 import { TestimonialsSection } from "./landing/testimonials"
 import { NewsletterCta } from "./landing/newsletter-cta"
 import { DeliveryZones } from "./landing/delivery-zones"
+import { LocalCoverage } from "./landing/local-coverage"
 
 export function CityLanding({
   citySlug,
@@ -151,8 +153,8 @@ export function CityLanding({
   return (
     <div className="min-h-[80vh] flex flex-col">
       <HeroSection
-        cityName={currentCity?.name || "Ciudad de México"}
-        cityState={currentCity?.state || "CDMX"}
+        cityName={currentCity?.name || HOME_CITY.name}
+        cityState={currentCity?.state || HOME_CITY.state}
         citySlug={currentCity?.slug || DEFAULT_CITY_SLUG}
         heroSearch={heroSearch}
         onSearchChange={setHeroSearch}
@@ -207,6 +209,7 @@ export function CityLanding({
 
       <NewsletterCta citySlug={currentCity?.slug || DEFAULT_CITY_SLUG} />
 
+      <LocalCoverage citySlug={currentCity?.slug || DEFAULT_CITY_SLUG} />
       <DeliveryZones currentCitySlug={currentCity?.slug || DEFAULT_CITY_SLUG} />
 
       {/* City Selector Modal */}

@@ -31,6 +31,7 @@ import { BumpCards } from "@/components/checkout/BumpCards"
 import { RemoveLineDialog } from "@/components/checkout/RemoveLineDialog"
 import { useOrderLines } from "@/components/checkout/use-order-lines"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
+import { WHATSAPP_HREF } from "@/lib/business"
 import { calcCheckoutTotals, DELIVERY_FEE_FLAT, MIN_ITEM_QUANTITY, countBumpUnits } from "@/lib/checkout-config"
 import {
   FIRST_STEP,
@@ -368,7 +369,7 @@ export default function CheckoutPage() {
             Envía tu pedido directamente por WhatsApp y un asesor te atenderá.
           </p>
           <a
-            href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}?text=${encodeURIComponent(
+            href={`${WHATSAPP_HREF}?text=${encodeURIComponent(
               "🛒 *Pedido desde Resurte.me*\n\n" +
                 cart.items
                   .map(

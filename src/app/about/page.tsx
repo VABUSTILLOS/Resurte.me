@@ -8,7 +8,10 @@ import { PRIMARY_AUTHOR, getPersonSchema, ORGANIZATION_ID, SITE_URL, SITE_NAME }
 export const metadata: Metadata = {
   title: "Sobre nosotros — Resurte.me",
   description:
-    "Somos la Central de Abastos Digital que le ahorra tiempo y dinero a los negocios mexicanos. Proveeduría inteligente, sin intermediarios, con entregas al siguiente día.",
+    `Somos la Central de Abastos Digital de ${DELIVERY_COVERAGE_PROSE}: proveeduría inteligente para restaurantes y negocios, sin intermediarios, con entregas al siguiente día.`,
+  alternates: {
+    canonical: "https://resurte.me/about",
+  },
 }
 
 const STATS = [
@@ -104,7 +107,7 @@ export default function AboutPage() {
             {
               icon: Truck,
               title: "Tu cocina nunca se para",
-              desc: "Pedidos antes de las 5 PM se entregan al día siguiente. En CDMX tenemos entregas express el mismo día. Porque un restaurante sin insumos es un restaurante cerrado.",
+              desc: `Pedidos antes de las 5 PM se entregan al día siguiente en ${DELIVERY_COVERAGE_PROSE}. Porque un restaurante sin insumos es un restaurante cerrado.`,
             },
             {
               icon: Users,

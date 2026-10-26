@@ -17,7 +17,7 @@ const FAQS = [
   },
   {
     q: "¿En cuánto tiempo me entregan?",
-    a: "Pedidos antes de las 5 PM se entregan al siguiente día hábil en todas nuestras zonas. En CDMX tenemos ruta express: pides antes de las 11 AM y te llega el mismo día. Así no te quedas nunca sin insumos.",
+    a: `Pedidos antes de las 5 PM se entregan al siguiente día hábil en todas nuestras zonas de ${DELIVERY_COVERAGE_PROSE}. Así no te quedas nunca sin insumos.`,
   },
   {
     q: "¿Hay pedido mínimo?",

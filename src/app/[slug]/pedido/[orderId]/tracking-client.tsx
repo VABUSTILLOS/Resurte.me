@@ -30,6 +30,7 @@ import { usePolling } from "@/hooks/use-polling"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { RepeatOrderButton } from "@/components/shop/repeat-order-button"
 import type { OrderStatus, PaymentMethod, PaymentStatus } from "@/types"
+import { WHATSAPP_HREF } from "@/lib/business"
 
 const ORDER_STATUSES: OrderStatus[] = [
   "pending",
@@ -482,7 +483,7 @@ export function TrackingClient() {
           {order.status === "delivered" ? "Volver a comprar" : "Seguir comprando"}
         </Link>
         <a
-          href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? ""}?text=${encodeURIComponent(
+          href={`${WHATSAPP_HREF}?text=${encodeURIComponent(
             `Hola, tengo una duda sobre mi pedido #${order.id} en Resurte.me`
           )}`}
           target="_blank"

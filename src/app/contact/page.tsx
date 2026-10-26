@@ -1,11 +1,26 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowRight, Clock, MapPin, MessageCircle, Mail, Phone, ChevronRight } from "lucide-react"
+import {
+  BUSINESS_EMAIL,
+  BUSINESS_HOURS,
+  BUSINESS_HOURS_NOTE,
+  BUSINESS_LOCATION_LABEL,
+  PHONE_DISPLAY,
+  PHONE_TEL_HREF,
+  WHATSAPP_HREF,
+} from "@/lib/business"
+import { getBreadcrumbSchema, getLocalBusinessSchema } from "@/lib/structured-data"
+
+const PAGE_URL = "https://resurte.me/contact"
 
 export const metadata: Metadata = {
-  title: "Contacto — Resurte.me",
+  title: "Contacto en Chihuahua — Resurte.me",
   description:
-    "Háblanos sin miedo. Estamos en WhatsApp, correo y teléfono para resolver tus dudas, cotizar por volumen o ayudarte con tu pedido. Respuesta en minutos, sin bots.",
+    "Háblanos sin miedo. Estamos en WhatsApp, correo y teléfono en Chihuahua para resolver tus dudas, cotizar por volumen o ayudarte con tu pedido. Respuesta en minutos, sin bots.",
+  alternates: {
+    canonical: PAGE_URL,
+  },
 }
 
 const QUICK_ACTIONS = [
@@ -42,16 +57,34 @@ const QUICK_ACTIONS = [
 ]
 
 const HORARIO = [
-  { dia: "Lunes a viernes", hora: "8:00 AM — 6:00 PM" },
-  { dia: "Sábados", hora: "8:00 AM — 2:00 PM" },
-  { dia: "Domingos", hora: "Cerrado — pero el carrito sigue abierto 24/7" },
+  ...BUSINESS_HOURS.map(({ label, display }) => ({ dia: label, hora: display })),
+  { dia: "Domingos", hora: BUSINESS_HOURS_NOTE },
+]
+
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "ContactPage",
+    "@id": `${PAGE_URL}#contactpage`,
+    name: "Contacto de Resurte.me",
+    url: PAGE_URL,
+    inLanguage: "es-MX",
+    about: { "@id": "https://resurte.me/#organization" },
+  },
+  getLocalBusinessSchema(PAGE_URL),
+  getBreadcrumbSchema([
+    { name: "Inicio", url: "https://resurte.me" },
+    { name: "Contacto", url: PAGE_URL },
+  ]),
 ]
 
 export default function ContactPage() {
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
-
   return (
     <div className="min-h-screen bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Hero */}
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
@@ -94,7 +127,7 @@ export default function ContactPage() {
               icon: MessageCircle,
               title: "WhatsApp",
               desc: "El más rápido. Te contestamos en minutos, no en horas. Manda foto, audio, lo que necesites.",
-              href: `https://wa.me/${whatsappNumber}`,
+              href: WHATSAPP_HREF,
               label: "Abrir WhatsApp",
               bg: "bg-[#E8F5E8]",
               hoverBg: "hover:bg-[#0F7A3D] hover:text-white",
@@ -104,8 +137,8 @@ export default function ContactPage() {
               icon: Mail,
               title: "Correo",
               desc: "¿Prefieres dejar todo por escrito? Máximo 4 horas y tienes respuesta. Sin acuses automáticos.",
-              href: "mailto:hola@resurte.me",
-              label: "hola@resurte.me",
+              href: `mailto:${BUSINESS_EMAIL}`,
+              label: BUSINESS_EMAIL,
               bg: "bg-[#EEF2FF]",
               hoverBg: "hover:bg-[#0E7A0E] hover:text-white",
               iconColor: "text-[#0E7A0E]",
@@ -114,8 +147,8 @@ export default function ContactPage() {
               icon: Phone,
               title: "Teléfono",
               desc: "Para lo urgente. Una llamada directa, sin menú de extensiones. Atendemos en horario laboral.",
-              href: "tel:+526145337486",
-              label: "614 533 7486",
+              href: PHONE_TEL_HREF,
+              label: PHONE_DISPLAY,
               bg: "bg-[#FFF7ED]",
               hoverBg: "hover:bg-[#0E7A0E] hover:text-white",
               iconColor: "text-[#0E7A0E]",
@@ -162,7 +195,7 @@ export default function ContactPage() {
             {QUICK_ACTIONS.map(({ icon, label, message }) => (
               <a
                 key={label}
-                href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`}
+                href={`${WHATSAPP_HREF}?text=${encodeURIComponent(message)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-4 bg-white border border-[#E5E7EB] rounded-[12px] p-4 hover:border-[#25D366] hover:shadow-sm transition-all group"
@@ -222,7 +255,7 @@ export default function ContactPage() {
                 recibimos.
               </p>
               <p className="text-xs text-[#9CA3AF]">
-                Chihuahua, México
+                {BUSINESS_LOCATION_LABEL}
               </p>
             </div>
           </div>

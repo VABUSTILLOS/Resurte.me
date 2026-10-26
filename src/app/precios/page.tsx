@@ -26,9 +26,9 @@ export const revalidate = 3600
 
 const PAGE_URL = `${SITE_URL}/precios`
 const CSV_URL = `${PAGE_URL}/indice-precios.csv`
-const PAGE_TITLE = "Índice de precios de insumos para restaurantes en México — Resurte.me"
+const PAGE_TITLE = "Índice de precios de insumos para restaurantes en Chihuahua — Resurte.me"
 const PAGE_DESCRIPTION =
-  "Cuánto cuesta el kilo de jitomate, la caja de aguacate o el litro de aceite para un restaurante en México: precios de referencia por ciudad, con fecha, unidad y metodología."
+  "Cuánto cuesta el kilo de jitomate, la caja de aguacate o el litro de aceite para un restaurante en Chihuahua: precios de referencia por ciudad, con fecha, unidad y metodología."
 
 /** Insumos que se listan en la tabla del índice. */
 const TOP_INSUMOS = 40

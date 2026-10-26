@@ -1,16 +1,16 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowRight, Box, Calculator, MessageCircle, Clock } from "lucide-react"
+import { WHATSAPP_HREF } from "@/lib/business"
 
 export const metadata: Metadata = {
-  title: "Cotizaciones por volumen — Resurte.me",
+  title: "Cotizaciones por volumen en Chihuahua — Resurte.me",
   description:
-    "¿Compras por tonelada? Te damos precio de mayoreo real. Cotización personalizada con ejecutivo dedicado, normalmente en el mismo día.",
+    "¿Compras por tonelada? Te damos precio de mayoreo real en Chihuahua. Cotización personalizada con ejecutivo dedicado, normalmente en el mismo día.",
+  alternates: { canonical: "https://resurte.me/negocio/cotizaciones" },
 }
 
 export default function CotizacionesPage() {
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
-
   return (
     <div className="min-h-screen bg-white">
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-12 sm:py-20 px-4">
@@ -83,7 +83,7 @@ export default function CotizacionesPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Hola, quiero una cotización por volumen para mi negocio.")}`}
+              href={`${WHATSAPP_HREF}?text=${encodeURIComponent("Hola, quiero una cotización por volumen para mi negocio.")}`}
               target="_blank"
               rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 bg-[#0F7A3D] text-white font-semibold px-6 py-3 rounded-[10px] hover:bg-[#0F6B3A] transition-colors"

@@ -9,7 +9,7 @@ import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 // Next.js la sirve en /opengraph-image.
 // Nota: satori (motor de next/og) no soporta data-URI en webp, por eso
 // se usa el PNG público (icon-512.png, generado del logo en F23).
-export const alt = "Resurte.me — Central de Abastos Digital"
+export const alt = "Resurte.me — Central de Abastos Digital en Chihuahua"
 export const size = { width: 1200, height: 630 }
 // Se genera una vez en build y la sirve el CDN (no por request).
 export const dynamic = "force-static"
@@ -61,7 +61,7 @@ export default async function Image() {
             maxWidth: 900,
           }}
         >
-          Central de Abastos Digital para tu negocio
+          Central de Abastos Digital en Chihuahua
         </div>
         <div
           style={{

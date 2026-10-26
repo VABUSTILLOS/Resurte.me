@@ -58,13 +58,13 @@ export const TIER_BENEFITS: Record<Tier, string[]> = {
   ],
   oro: [
     "15% de cashback en todas tus compras",
-    "Envío gratis en pedidos desde $1,500",
+    "Envío gratis sin mínimo",
     "Asesor de cuenta dedicado",
     "Acceso anticipado a nuevos productos",
   ],
   diamante: [
     "20% de cashback en todas tus compras",
-    "Envío gratis sin mínimo",
+    "Envío prioritario sin mínimo",
     "Asesor de cuenta VIP 24/7",
     "Productos exclusivos por mayoreo",
     "Invitación a eventos de la industria",

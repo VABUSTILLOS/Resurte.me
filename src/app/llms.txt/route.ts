@@ -2,6 +2,7 @@ import { PRIMARY_AUTHOR } from "@/lib/author"
 import { DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 import {
   CREDIT_DAYS_PROSE,
+  DELIVERY_COVERAGE_PROSE,
   FREE_SHIPPING_MXN,
   INVOICING,
   MIN_ORDER_MXN,
@@ -319,9 +320,9 @@ export async function GET() {
   const sections = [
     `# Resurte.me
 
-> Central de abastos digital para restaurantes, fondas y negocios de comida en México. Venta por mayoreo de abarrotes, frutas, verduras, carnes, lácteos, bebidas, desechables y más, con entrega a domicilio. Sin membresía. Pedido mínimo ${formatMxn(MIN_ORDER_MXN)}. Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}. Facturación ${INVOICING} a solicitud. Crédito a ${CREDIT_DAYS_PROSE} días para clientes frecuentes.
+> Central de abastos digital para restaurantes, fondas y negocios de comida en ${DELIVERY_COVERAGE_PROSE}, México. Venta por mayoreo de abarrotes, frutas, verduras, carnes, lácteos, bebidas, desechables y más, con entrega a domicilio. Sin membresía. Pedido mínimo ${formatMxn(MIN_ORDER_MXN)}. Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}. Facturación ${INVOICING} a solicitud. Crédito a ${CREDIT_DAYS_PROSE} días para clientes frecuentes.
 
-Resurte.me es un marketplace B2B de proveeduría para la industria restaurantera mexicana, con catálogo en línea por ciudad y una suite gratuita de herramientas de gestión ("Mi Restaurante"): costeo de menú, control de mermas, inventario, planificador de pedidos y analítica.`,
+Resurte.me es un marketplace B2B de proveeduría para la industria restaurantera mexicana. Opera hoy en ${DELIVERY_COVERAGE_PROSE} —esa es su base de operaciones y su única zona de entrega activa— con catálogo en línea por ciudad y una suite gratuita de herramientas de gestión ("Mi Restaurante"): costeo de menú, control de mermas, inventario, planificador de pedidos y analítica.`,
     buildCoverageSection(),
     buildSiteSection(),
     buildAuthorSection(),

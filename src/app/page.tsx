@@ -14,11 +14,28 @@ import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 export const revalidate = 300
 
 export const metadata: Metadata = {
-  title: "Resurte.me — Central de Abastos Digital para tu Negocio",
+  title: "Resurte.me — Central de Abastos Digital en Chihuahua",
   description:
-    `Proveeduría para restaurantes, fondas y negocios. Frutas, verduras, carnes y abarrotes por mayoreo con envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}. Sin membresía.`,
+    `Proveeduría para restaurantes, fondas y negocios en Chihuahua. Frutas, verduras, carnes y abarrotes por mayoreo con envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}. Sin membresía.`,
+  keywords: [
+    "central de abastos Chihuahua",
+    "proveeduría restaurantes Chihuahua",
+    "abarrotes por mayoreo Chihuahua",
+    "frutas y verduras mayoreo Chihuahua",
+    "distribuidor de alimentos Chihuahua",
+    "insumos para restaurantes Chihuahua",
+  ],
   alternates: {
     canonical: "https://resurte.me",
+  },
+  openGraph: {
+    title: "Resurte.me — Central de Abastos Digital en Chihuahua",
+    description:
+      `Frutas, verduras, carnes y abarrotes por mayoreo para tu negocio en Chihuahua. Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`,
+    url: "https://resurte.me",
+    siteName: "Resurte.me",
+    locale: "es_MX",
+    type: "website",
   },
 }
 

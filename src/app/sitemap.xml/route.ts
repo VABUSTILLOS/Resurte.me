@@ -5,21 +5,31 @@ const BASE_URL = "https://resurte.me"
 export async function GET() {
   // Dynamic imports to avoid build-time evaluation when DB isn't ready
   const [
-    { ACTIVE_CITIES },
+    { ACTIVE_CITIES, DEFAULT_CITY_SLUG },
     { getAllPosts },
     { generateSitemapXml },
     { BLOG_CATEGORIES },
     { getPriceIndexUrlSlugs },
+    { DEFAULT_TIMEZONE, dayKeyOf },
   ] = await Promise.all([
     import("@/lib/cities"),
     import("@/lib/blog"),
     import("@/lib/structured-data"),
     import("@/lib/blog-categories"),
     import("@/lib/price-index"),
+    import("@/lib/local-date"),
   ])
 
+  // El catálogo cambia a diario, así que las páginas que lo muestran sí llevan
+  // `lastmod` real. Las institucionales (/privacy, /terms, /careers) no: su
+  // contenido no cambia y declarar lo contrario entrena a Google a ignorar la
+  // etiqueta.
+  const catalogDay = dayKeyOf(DEFAULT_TIMEZONE)
+
   const entries: SitemapEntry[] = [
-    { url: BASE_URL, changeFrequency: "daily", priority: 1.0 },
+    // La portada `/` NO se anuncia: `src/proxy.ts` la resuelve por IP y
+    // responde 307 hacia la ciudad activa, así que no es una URL indexable.
+    // La landing que sí se indexa es `/{ciudad}` (abajo, prioridad 1.0).
     // Páginas institucionales públicas (indexables). /auth/* se excluye:
     // llevan noindex y antes aparecían en el sitemap pese a estar
     // bloqueadas en robots.txt — señales contradictorias para Google.
@@ -57,9 +67,25 @@ export async function GET() {
   // Solo ciudades con cobertura. Las páginas "próximamente" se conservan
   // accesibles, pero llevan noindex y no deben anunciarse en el sitemap.
   for (const city of ACTIVE_CITIES) {
-    entries.push({ url: `${BASE_URL}/${city.slug}`, changeFrequency: "daily", priority: 0.9 })
+    // Cada ciudad es canónica de sí misma y es la landing que realmente se
+    // indexa (la portada redirige aquí), así que la ciudad por defecto va con
+    // la prioridad más alta del sitemap.
+    entries.push({
+      url: `${BASE_URL}/${city.slug}`,
+      changeFrequency: "daily",
+      priority: city.slug === DEFAULT_CITY_SLUG ? 1.0 : 0.9,
+      lastModified: catalogDay,
+    })
     // /buscar y /carrito llevan noindex (páginas transaccionales / resultados
     // de búsqueda interna) y no deben estar en el sitemap.
+
+    // Zonas de entrega: la página que responde "¿entregan en mi colonia?".
+    // Cambia poco, pero es la que captura la búsqueda local de cobertura.
+    entries.push({
+      url: `${BASE_URL}/${city.slug}/zonas-de-entrega`,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    })
 
     // Category pages per city
     for (const catSlug of categorySlugs) {
@@ -67,6 +93,7 @@ export async function GET() {
         url: `${BASE_URL}/${city.slug}/categoria/${catSlug}`,
         changeFrequency: "daily",
         priority: 0.7,
+        lastModified: catalogDay,
       })
     }
 
@@ -76,6 +103,7 @@ export async function GET() {
         url: `${BASE_URL}/${city.slug}/coleccion/${collSlug}`,
         changeFrequency: "weekly",
         priority: 0.6,
+        lastModified: catalogDay,
       })
     }
   }
@@ -99,7 +127,12 @@ export async function GET() {
   }
 
   // Marketplace hoyquecomemos
-  entries.push({ url: `${BASE_URL}/comer`, changeFrequency: "daily", priority: 0.9 })
+  entries.push({
+    url: `${BASE_URL}/comer`,
+    changeFrequency: "daily",
+    priority: 0.9,
+    lastModified: catalogDay,
+  })
 
   // Micrositios de restaurantes y su sitio IA (Fase 6). Se listan el micrositio
   // de pedidos y la carta indexable de cada restaurante activo, más las páginas
@@ -124,11 +157,13 @@ export async function GET() {
         url: `${BASE_URL}${restaurantPath(slug)}`,
         changeFrequency: "daily",
         priority: 0.9,
+        lastModified: catalogDay,
       })
       entries.push({
         url: `${BASE_URL}${menuPath(slug)}`,
         changeFrequency: "weekly",
         priority: 0.8,
+        lastModified: catalogDay,
       })
 
       if (!supabase) continue

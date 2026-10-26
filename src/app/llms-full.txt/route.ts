@@ -10,6 +10,7 @@ import { ACTIVE_CITIES, COMING_SOON_CITIES } from "@/lib/cities"
 import { DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 import {
   CREDIT_DAYS_PROSE,
+  DELIVERY_COVERAGE_PROSE,
   FREE_SHIPPING_MXN,
   INVOICING,
   MIN_ORDER_MXN,
@@ -87,12 +88,13 @@ function buildHeader(
 
   return `# Resurte.me — Corpus completo para modelos de lenguaje
 
-> Central de abastos digital para restaurantes, fondas y negocios de comida en México. Venta por mayoreo de abarrotes, frutas, verduras, carnes, lácteos, bebidas, desechables y más, con entrega a domicilio. Sin membresía. Pedido mínimo ${formatMxn(MIN_ORDER_MXN)}. Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}. Facturación ${INVOICING} a solicitud. Crédito a ${CREDIT_DAYS_PROSE} días para clientes frecuentes.
+> Central de abastos digital para restaurantes, fondas y negocios de comida en ${DELIVERY_COVERAGE_PROSE}, México. Venta por mayoreo de abarrotes, frutas, verduras, carnes, lácteos, bebidas, desechables y más, con entrega a domicilio. Sin membresía. Pedido mínimo ${formatMxn(MIN_ORDER_MXN)}. Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}. Facturación ${INVOICING} a solicitud. Crédito a ${CREDIT_DAYS_PROSE} días para clientes frecuentes.
 
 ## Entidad y cobertura
 
 - Entidad: Resurte.me — ${BASE_URL}
 - Qué es: marketplace B2B de proveeduría para la industria restaurantera mexicana, con catálogo por ciudad y suite gratuita de gestión ("Mi Restaurante"): costeo de menú, control de mermas, inventario, planificador de pedidos y analítica.
+- Base de operaciones: ${DELIVERY_COVERAGE_PROSE}, México. Es la única zona con entrega activa hoy; el resto de las ciudades listadas están marcadas como "próximamente".
 - Autor de todo el contenido editorial: ${PRIMARY_AUTHOR.name} — ${PRIMARY_AUTHOR.jobTitle} (${PRIMARY_AUTHOR.url})
 - Blog: ${totalPosts} documentos publicados
 - Documentos incluidos en este archivo: ${includedPosts}${truncation}

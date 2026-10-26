@@ -17,7 +17,17 @@ import {
   ArrowRight,
 } from "lucide-react"
 import { ORGANIZATION_ID, SITE_NAME, SITE_URL } from "@/lib/author"
+import {
+  BUSINESS_EMAIL,
+  BUSINESS_HOURS,
+  BUSINESS_HOURS_NOTE,
+  BUSINESS_LOCATION_LABEL,
+  PHONE_DISPLAY,
+  PHONE_TEL_HREF,
+  WHATSAPP_HREF,
+} from "@/lib/business"
 import { getFAQSchema } from "@/lib/blog-schema"
+import { getLocalBusinessSchema } from "@/lib/structured-data"
 import { CREDIT_DAYS_PROSE, INVOICING, MIN_ORDER_MXN, formatMxn } from "@/lib/commercial-facts"
 
 // Contenido estático: se prerenderiza una sola vez, sin lectura de
@@ -42,27 +52,25 @@ export const metadata: Metadata = {
   },
 }
 
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
-
 /**
  * Datos de atención que exige Stripe en el sitio (nombre, contacto y
- * ubicación). Deben coincidir con los registrados en el panel de Stripe: si
- * cambias el teléfono, el correo o el domicilio allá, actualízalos aquí.
+ * ubicación). Salen de `@/lib/business` para que el NAP sea idéntico al del
+ * schema, el footer y /contact: si cambias el teléfono o el domicilio allá,
+ * cambia en todas las superficies a la vez.
  */
 const BUSINESS = {
   name: SITE_NAME,
-  email: "hola@resurte.me",
-  privacyEmail: "hola@resurte.me",
-  phoneLabel: "+52 1 614 533 7486",
-  phoneHref: "tel:+526145337486",
-  whatsappHref: `https://wa.me/${WHATSAPP_NUMBER}`,
-  location: "Chihuahua, México",
+  email: BUSINESS_EMAIL,
+  privacyEmail: BUSINESS_EMAIL,
+  phoneLabel: PHONE_DISPLAY,
+  phoneHref: PHONE_TEL_HREF,
+  whatsappHref: WHATSAPP_HREF,
+  location: BUSINESS_LOCATION_LABEL,
 }
 
 const HORARIO = [
-  { dia: "Lunes a viernes", hora: "8:00 AM — 6:00 PM" },
-  { dia: "Sábados", hora: "8:00 AM — 2:00 PM" },
-  { dia: "Domingos y días festivos", hora: "Cerrado — el carrito sigue abierto 24/7" },
+  ...BUSINESS_HOURS.map(({ label, display }) => ({ dia: label, hora: display })),
+  { dia: "Domingos y días festivos", hora: BUSINESS_HOURS_NOTE },
 ]
 
 const CANALES = [
@@ -204,6 +212,7 @@ const jsonLd = [
     about: { "@id": ORGANIZATION_ID },
   },
   getFAQSchema(FAQS_SOPORTE.map(({ q, a }) => ({ question: q, answer: a }))),
+  getLocalBusinessSchema(PAGE_URL),
 ]
 
 export default function SoportePage() {

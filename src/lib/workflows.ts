@@ -30,6 +30,7 @@ import {
   PAYMENT_RECOVERY_CANCEL_HOURS,
 } from "@/lib/payment-recovery"
 import type { WorkflowType } from "@/lib/workflow-types"
+import { WHATSAPP_NUMBER } from "@/lib/business"
 
 // ============================================================
 // Types
@@ -153,8 +154,7 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
   const rawItems = (items as unknown as RawOrderItemRow[]) || []
 
   // Use default WhatsApp number for staff contacts
-  const defaultWhatsapp = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
-  const staffPhones = [defaultWhatsapp]
+  const staffPhones = [WHATSAPP_NUMBER]
 
   return {
     id: rawOrder.id,

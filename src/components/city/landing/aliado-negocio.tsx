@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { WHATSAPP_HREF } from "@/lib/business"
 
 export function AliadoNegocio() {
   return (
@@ -75,7 +76,7 @@ export function AliadoNegocio() {
                   Registra tu negocio
                 </Link>
                 <a
-                  href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}?text=${encodeURIComponent("Me interesa conocer su catálogo de productos y programa de recompensas")}`}
+                  href={`${WHATSAPP_HREF}?text=${encodeURIComponent("Me interesa conocer su catálogo de productos y programa de recompensas")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 border border-[#C7CACD] text-[#5C6068] text-sm font-semibold px-5 py-2.5 rounded-[10px] hover:border-[#0E7A0E] hover:text-[#0E7A0E] transition-colors"

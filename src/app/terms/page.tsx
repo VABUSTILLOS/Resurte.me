@@ -131,7 +131,7 @@ export default function TermsPage() {
           <p className="text-[#5C6068] leading-relaxed">
             Estos términos se rigen por las leyes de los Estados Unidos
             Mexicanos. Cualquier controversia se resolverá ante los tribunales
-            competentes de la Ciudad de México.
+            competentes de Chihuahua, Chihuahua.
           </p>
         </div>
       </section>

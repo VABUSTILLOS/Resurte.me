@@ -5,31 +5,48 @@ import { MapPin, Truck, Building2 } from "lucide-react"
 import {
   ACTIVE_CITIES,
   COMING_SOON_CITIES,
-  DEFAULT_CITY_SLUG,
 } from "@/lib/cities"
+import { getBreadcrumbSchema, getCityLandingSchema } from "@/lib/structured-data"
 
 // ISR: catálogo revalidado cada 5 min (alineado con src/lib/catalog-cache.ts).
 export const revalidate = 300
 
 export const metadata: Metadata = {
-  title: "Zonas de entrega — Resurte.me",
+  title: "Zonas de entrega en Chihuahua — Resurte.me",
   description:
-    "Hoy entregamos solo en Chihuahua, Chihuahua. Muy pronto en tu ciudad: revisa la cobertura actual y avísanos dónde te gustaría pedir.",
+    "Hoy entregamos solo en Chihuahua, Chihuahua. Revisa la cobertura actual, confirma tu colonia por WhatsApp y avísanos dónde te gustaría pedir.",
+  alternates: {
+    canonical: "https://resurte.me/ciudades",
+  },
 }
 
-const ACTIVE_ZONES = [
-  {
-    name: "Chihuahua",
-    slug: DEFAULT_CITY_SLUG,
-    zonas:
-      "Ciudad de Chihuahua y zonas con cobertura. Escríbenos para confirmar tu colonia.",
-    entrega: "Entrega el mismo día",
-  },
-]
+// Derivado de ACTIVE_CITIES: cuando se active una ciudad nueva aparece aquí
+// sola. Antes era un array escrito a mano que se desincronizaba del sitemap.
+const ACTIVE_ZONES = ACTIVE_CITIES.map((city) => ({
+  name: city.name,
+  state: city.state,
+  slug: city.slug,
+  zonas: `Toda la ciudad de ${city.name} y su zona conurbada. Confirma tu colonia por WhatsApp y te decimos la ruta y el horario de entrega.`,
+  entrega: "Entrega el mismo día",
+}))
 
 export default function CiudadesPage() {
+  const jsonLd = [
+    getBreadcrumbSchema([
+      { name: "Inicio", url: "https://resurte.me" },
+      { name: "Zonas de entrega", url: "https://resurte.me/ciudades" },
+    ]),
+    ...ACTIVE_CITIES.map((city) =>
+      getCityLandingSchema(city.name, city.state, city.lat, city.lng),
+    ),
+  ]
+
   return (
     <div className="min-h-screen bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">

@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { MapPin, MessageCircle, Search } from "lucide-react"
+import { WHATSAPP_HREF } from "@/lib/business"
 
 /**
  * 404 propio del micrositio.
@@ -22,8 +23,6 @@ import { MapPin, MessageCircle, Search } from "lucide-react"
  * `notFound()`); `metadata` aquí no lo usaría Next.
  */
 export default function StorefrontNotFound() {
-  const whatsapp = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486").replace(/\D/g, "")
-
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-[#F7F5F0] px-4 py-12 text-center text-[#242529]">
       <h1 className="text-6xl font-bold text-[#0E7A0E]">404</h1>
@@ -51,7 +50,7 @@ export default function StorefrontNotFound() {
       </div>
 
       <a
-        href={`https://wa.me/${whatsapp}`}
+        href={WHATSAPP_HREF}
         target="_blank"
         rel="noopener noreferrer"
         className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-[#0E7A0E] hover:underline"

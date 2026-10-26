@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { MEXICO_CITIES, isCityActive } from "@/lib/cities"
+import { MEXICO_CITIES, DEFAULT_CITY_SLUG, isCityActive } from "@/lib/cities"
 import { Metadata } from "next"
 import { CityLanding } from "@/components/city/city-landing"
 import { logger } from "@/lib/logger"
@@ -11,6 +11,8 @@ import {
   getCityAvailabilityForSlug,
 } from "@/lib/catalog-cache"
 import { getCityLandingSchema } from "@/lib/structured-data"
+import { getLocalFaqSchema } from "@/lib/local-content"
+import { SITE_URL } from "@/lib/author"
 import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 import { getCityBySlug } from "@/lib/data"
 import { buildLandingPreview } from "@/lib/catalog-preview"
@@ -68,6 +70,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     ...(active ? {} : { robots: { index: false, follow: true } }),
     alternates: {
+      // Cada ciudad es canónica de sí misma. La portada `/` NO puede serlo:
+      // `src/proxy.ts` la resuelve por IP y responde 307 hacia la ciudad
+      // activa, así que declarar `/` como canónica de `/chihuahua` apuntaría
+      // a una URL que redirige de vuelta — Google descarta esa canónica y
+      // deja la señal en conflicto. La landing indexable es `/{ciudad}`.
       canonical: `https://resurte.me/${city.slug}`,
     },
     openGraph: {
@@ -131,7 +138,14 @@ export default async function CityPage({ params }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(getCityLandingSchema(city.name, city.state, city.lat, city.lng)),
+          __html: JSON.stringify([
+            getCityLandingSchema(city.name, city.state, city.lat, city.lng),
+            // La landing renderiza el mismo FAQ de forma visible, así que el
+            // marcado describe contenido real de la página.
+            getLocalFaqSchema(
+              city.slug === DEFAULT_CITY_SLUG ? SITE_URL : `${SITE_URL}/${city.slug}`
+            ),
+          ]),
         }}
       />
       {/* Solo se serializa lo que la landing renderiza (conteos + las

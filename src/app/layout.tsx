@@ -29,6 +29,7 @@ import {
   getWholesaleServiceSchema,
 } from "@/lib/structured-data"
 import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
+import { WHATSAPP_NUMBER } from "@/lib/business"
 import "./globals.css"
 
 /** Cifra de envío gratis en prosa: siempre sale de la fuente de verdad. */
@@ -205,7 +206,7 @@ export default async function RootLayout({
               <BackToTop />
               <InstallPrompt />
               <WhatsAppButton
-                phoneNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}
+                phoneNumber={WHATSAPP_NUMBER}
                 message="¡Hola! Quiero hacer un pedido en Resurte.me"
                 label="Pedir por WhatsApp"
               />

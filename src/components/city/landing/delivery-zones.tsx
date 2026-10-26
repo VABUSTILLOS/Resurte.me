@@ -1,5 +1,7 @@
+import Link from "next/link"
 import { MapPin } from "lucide-react"
 import { MEXICO_CITIES } from "@/lib/cities"
+import { DELIVERY_COVERAGE_PROSE } from "@/lib/commercial-facts"
 import { cn } from "@/lib/utils"
 
 export function DeliveryZones({ currentCitySlug }: { currentCitySlug: string }) {
@@ -13,14 +15,14 @@ export function DeliveryZones({ currentCitySlug }: { currentCitySlug: string }) 
             Zonas de entrega
           </h2>
           <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-3">
-            Hoy entregamos solo en Chihuahua, Chihuahua. Muy pronto en tu
+            Hoy entregamos solo en {DELIVERY_COVERAGE_PROSE}. Muy pronto en tu
             ciudad: escríbenos y te avisamos.
           </p>
         </div>
         <div className="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto">
           {MEXICO_CITIES.map((c) =>
             c.is_active ? (
-              <a
+              <Link
                 key={c.slug}
                 href={`/${c.slug}`}
                 className={cn(
@@ -32,7 +34,7 @@ export function DeliveryZones({ currentCitySlug }: { currentCitySlug: string }) 
               >
                 <MapPin className="w-3 h-3" />
                 {c.name}
-              </a>
+              </Link>
             ) : (
               <span
                 key={c.slug}

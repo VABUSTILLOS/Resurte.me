@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { MEXICO_CITIES } from "@/lib/cities"
+import { DEFAULT_CITY_SLUG, MEXICO_CITIES } from "@/lib/cities"
 import { Metadata } from "next"
 import {
   filterByCityAvailability,
@@ -26,7 +26,7 @@ export const revalidate = 300
 export async function generateStaticParams() {
   const products = await getCachedVisibleProducts()
   return products.slice(0, 100).map((p) => ({
-    slug: "chihuahua",
+    slug: DEFAULT_CITY_SLUG,
     productSlug: p.slug,
   }))
 }

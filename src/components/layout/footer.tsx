@@ -1,7 +1,12 @@
 import Link from "next/link"
-import { Heart, MessageCircle, Mail } from "lucide-react"
-
-const WHATSAPP_NUMBER = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486").replace(/\D/g, "")
+import { Heart, MessageCircle, Mail, MapPin, Phone, Clock } from "lucide-react"
+import {
+  BUSINESS_HOURS_SUMMARY,
+  BUSINESS_LOCATION_LABEL,
+  PHONE_DISPLAY,
+  PHONE_TEL_HREF,
+  WHATSAPP_HREF,
+} from "@/lib/business"
 
 export const FOOTER_LINKS = {
   Compañía: [
@@ -45,10 +50,29 @@ export function Footer() {
             <p className="text-[13px] sm:text-sm text-[#8F939B]">
               Central de Abastos Digital. Tu aliado en proveeduría para negocio.
             </p>
+            {/* NAP visible: la misma ciudad, teléfono y horario que declara el
+                schema. Es la señal local que Google cruza con el Local Pack. */}
+            <address className="mt-2 sm:mt-3 not-italic flex flex-col gap-1 text-[13px] text-[#8F939B]">
+              <span className="inline-flex items-center gap-2">
+                <MapPin className="w-4 h-4 shrink-0 text-[#3CC73C]" aria-hidden="true" />
+                {BUSINESS_LOCATION_LABEL}
+              </span>
+              <a
+                href={PHONE_TEL_HREF}
+                className="inline-flex items-center gap-2 hover:text-[#E8E9EB] transition-colors"
+              >
+                <Phone className="w-4 h-4 shrink-0 text-[#3CC73C]" aria-hidden="true" />
+                {PHONE_DISPLAY}
+              </a>
+              <span className="inline-flex items-center gap-2">
+                <Clock className="w-4 h-4 shrink-0 text-[#3CC73C]" aria-hidden="true" />
+                {BUSINESS_HOURS_SUMMARY}
+              </span>
+            </address>
             {/* Contacto directo: los dos canales que más usa un restaurantero */}
             <div className="mt-2 sm:mt-3 flex flex-col gap-2">
               <a
-                href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("¡Hola! Necesito ayuda con Resurte.me")}`}
+                href={`${WHATSAPP_HREF}?text=${encodeURIComponent("¡Hola! Necesito ayuda con Resurte.me")}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-[13px] text-[#3CC73C] hover:text-[#7ADE7A] transition-colors"
@@ -91,7 +115,7 @@ export function Footer() {
         <div className="mt-4 sm:mt-10 pt-3 sm:pt-6 border-t border-[#343538] text-center text-sm text-[#A0A4AD]">
           <p className="flex items-center justify-center gap-1">
             Hecho con <Heart className="w-3 h-3 text-red-500 fill-red-500" aria-hidden="true" /> en
-            México — Resurte.me © {new Date().getFullYear()}
+            Chihuahua, México — Resurte.me © {new Date().getFullYear()}
           </p>
         </div>
       </div>

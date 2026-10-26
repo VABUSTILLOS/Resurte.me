@@ -4,6 +4,7 @@ import { Building2, Store, Copy, Check, MessageCircle } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/components/toast"
 import { formatClabe, getSpeiAccount } from "@/lib/spei-account"
+import { WHATSAPP_NUMBER } from "@/lib/business"
 
 /**
  * Instrucciones de pago para métodos manuales (SPEI / OXXO) — R6.4 / A1 parcial.
@@ -34,7 +35,7 @@ interface PaymentInstructionsProps {
   orderRef?: string | null
 }
 
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
+
 
 function WhatsAppHelpLink({ message, label }: { message: string; label: string }) {
   return (

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   getCityLandingSchema,
   getDatasetSchema,
+  getDeliveryZonesSchema,
   getItemListSchema,
   getOrganizationSchema,
   getProductSchema,
@@ -12,6 +13,7 @@ import {
 import { ORGANIZATION_ID, PRIMARY_AUTHOR, SITE_URL } from "./author"
 import { FREE_SHIPPING_MXN, MIN_ORDER_MXN, formatMxn } from "./commercial-facts"
 import { ACTIVE_CITIES } from "./cities"
+import { CHIHUAHUA_DELIVERY_ZONES } from "./local-content"
 
 describe("getProductSchema", () => {
   it("usa la imagen real del producto cuando se pasa", () => {
@@ -262,6 +264,65 @@ describe("getCityLandingSchema", () => {
     // leería como una sola red de proveeduría.
     const schema = getCityLandingSchema("Chihuahua", "Chihuahua", 28.6, -106.07)
     expect(schema.parentOrganization["@id"]).toBe(ORGANIZATION_ID)
+  })
+
+  it("declara el NAP completo de Chihuahua", () => {
+    const schema = getCityLandingSchema("Chihuahua", "Chihuahua", 28.6, -106.07)
+    expect(schema.address.addressLocality).toBe("Chihuahua")
+    expect(schema.address.addressRegion).toBe("Chihuahua")
+    expect(schema.address.addressCountry).toBe("MX")
+    expect(schema.telephone).toBe("+526145337486")
+    expect(schema.email).toBe("hola@resurte.me")
+    expect(schema.openingHoursSpecification.length).toBeGreaterThan(0)
+  })
+
+  it("suma las colonias de entrega al areaServed de la ciudad sede", () => {
+    // El marcado tiene que describir lo que la landing lista de forma visible.
+    const schema = getCityLandingSchema("Chihuahua", "Chihuahua", 28.6, -106.07)
+    const places = schema.areaServed.filter((area) => area["@type"] === "Place")
+    expect(places).toHaveLength(CHIHUAHUA_DELIVERY_ZONES.length)
+    expect(places[0]?.name).toContain("Chihuahua")
+  })
+
+  it("no inventa colonias para ciudades sin operación", () => {
+    const schema = getCityLandingSchema("Guadalajara", "Jalisco", 20.6, -103.3)
+    expect(schema.areaServed).toHaveLength(1)
+    expect(schema.areaServed[0]?.["@type"]).toBe("City")
+  })
+})
+
+describe("getDeliveryZonesSchema", () => {
+  const pageUrl = "https://resurte.me/chihuahua/zonas-de-entrega"
+
+  it("declara la ciudad sede y todas las colonias como área de servicio", () => {
+    const schema = getDeliveryZonesSchema(pageUrl)
+    expect(schema["@type"]).toBe("Service")
+    expect(schema.areaServed).toHaveLength(CHIHUAHUA_DELIVERY_ZONES.length + 1)
+    expect(schema.areaServed[0]?.["@type"]).toBe("City")
+    expect(schema.areaServed[0]?.name).toBe("Chihuahua")
+  })
+
+  it("publica la ciudad como alcance y las colonias como ejemplo", () => {
+    // El `City` va primero porque es la cobertura real; las colonias son
+    // `Place` de muestra. Si el marcado dijera solo colonias, un motor leería
+    // la lista como el límite del servicio.
+    const schema = getDeliveryZonesSchema(pageUrl)
+    expect(schema.name).toContain("toda la ciudad")
+    expect(schema.description).toContain("toda la ciudad")
+    expect(schema.description).toContain("sin colonias excluidas")
+    expect(schema.areaServed[0]?.["@type"]).toBe("City")
+  })
+
+  it("cuelga el servicio de la organización y publica el teléfono", () => {
+    const schema = getDeliveryZonesSchema(pageUrl)
+    expect(schema.provider["@id"]).toBe(ORGANIZATION_ID)
+    expect(schema.availableChannel.servicePhone).toBe("+526145337486")
+    expect(schema.availableChannel.serviceUrl).toBe(pageUrl)
+  })
+
+  it("publica el horario de reparto", () => {
+    const schema = getDeliveryZonesSchema(pageUrl)
+    expect(schema.hoursAvailable.length).toBeGreaterThan(0)
   })
 })
 
