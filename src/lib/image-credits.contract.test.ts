@@ -37,6 +37,7 @@ const MIGRACION = join(REPO, "supabase", "migrations", "00194_ab_foods_fotos_rea
 
 /** Archivos `*-foto.webp` publicados. */
 function fotosPublicadas(): string[] {
+  if (!existsSync(DIR_FOTOS)) return []
   return readdirSync(DIR_FOTOS)
     .filter((f) => f.endsWith("-foto.webp"))
     .sort()
