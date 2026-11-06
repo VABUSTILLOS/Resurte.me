@@ -35,7 +35,6 @@ const SIZE = 1200
 // Paleta medida de la referencia
 const VERDE = "#2f5d1e"
 const VERDE_PILL = "#2f5d1e"
-const VERDE_OVERLAY = "rgba(47, 93, 30, 0.55)"
 const BLANCO = "#ffffff"
 const GRIS_TXT = "#6b6f66"
 
@@ -75,7 +74,10 @@ function tituloLineas(nombre) {
     const l1 = palabras.slice(0, i).join(" ")
     const l2 = palabras.slice(i).join(" ")
     const score = Math.abs(l1.length - l2.length) + (l2.length > l1.length ? 4 : 0)
-    if (score < mejor.score) mejor.score = score, mejor.i = i
+    if (score < mejor.score) {
+      mejor.score = score
+      mejor.i = i
+    }
   }
   const l1 = palabras.slice(0, mejor.i).join(" ").toUpperCase()
   const l2 = palabras.slice(mejor.i).join(" ").toUpperCase()
