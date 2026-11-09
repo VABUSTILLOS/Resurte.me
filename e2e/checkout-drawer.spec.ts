@@ -104,6 +104,31 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await expect(drawer.getByPlaceholder("Código de descuento")).toBeVisible()
   })
 
+  test("invitado ve envío prioritario y puede empezar capturando su dirección", async ({ page }) => {
+    seedCart(page, [aguacate])
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
+
+    await openCheckoutDrawer(page)
+
+    const priorityButton = page.getByRole("button", { name: /Obtén Envío Prioritario/ })
+    await expect(priorityButton).toBeVisible()
+    await priorityButton.click()
+
+    await expect(page.getByRole("heading", { name: "Dirección de entrega" })).toBeVisible()
+    await page.getByPlaceholder("Av. Insurgentes Sur").fill("Av. Juárez")
+    await page.getByPlaceholder("1234", { exact: true }).fill("123")
+    await page.getByPlaceholder("Roma Norte").fill("Centro")
+    await page.getByPlaceholder("06700").fill("31000")
+    await page.getByPlaceholder("55 1234 5678").fill("6141234567")
+    await page.getByPlaceholder("tucorreo@ejemplo.com").fill("guest@resurte.me")
+
+    await page.getByRole("button", { name: "Continuar", exact: true }).click()
+    await page.getByRole("button", { name: "Continuar", exact: true }).click()
+    await page.getByRole("button", { name: /Ir a pagar/ }).click()
+
+    await expect(page.getByRole("button", { name: /Confirmar y ver la CLABE/ })).toBeVisible()
+  })
+
   test("subtotal menor al umbral muestra la barra con lo que falta", async ({ page }) => {
     seedCart(page, [{ ...aguacate, price: 250 }])
     await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })

@@ -303,9 +303,10 @@
     (página completa y drawer) para que el mensaje no pueda divergir.
   - **En el drawer, el atajo instantáneo es la transferencia**: el CTA que antes
     era "Pedir al instante ··· 1234" (cobro 1-click con la tarjeta guardada) es
-    ahora **"Obtén Envío Prioritario"** y crea el pedido por SPEI en un clic con
-    la dirección preseleccionada (`handlePlaceOrder("spei")`, sin Stripe). En el
-    paso de pago se ofrece como alternativa cuando el método elegido es tarjeta.
+    ahora **"Obtén Envío Prioritario"**. Con dirección válida crea el pedido por
+    SPEI directamente; si falta, abre su captura y deja SPEI preseleccionado para
+    continuar por el flujo normal hasta confirmar la transferencia. En el paso de
+    pago también se ofrece como alternativa cuando el método elegido es tarjeta.
     El par de decisión del paso de revisión se lee por **subtítulo**, no por
     logística: **"Obtén Envío Prioritario" → "Pagando con transferencia"** contra
     **"Envío Normal" → "Pagando con tarjeta"** (el segundo avanza al paso de
@@ -313,7 +314,7 @@
     vive en el paso de dirección, y duplicarla ahí era ruido.
     Consecuencias deliberadas: **el drawer ya no cobra con tarjeta en 1 clic**
     (el cobro con tarjeta sigue existiendo vía "Confirmar pedido") y el CTA **no
-    exige tarjeta guardada** — exigirla era justo lo contrario del objetivo. El
+    exige tarjeta guardada ni una dirección previamente seleccionada**. El
     express con tarjeta (`handleExpressCheckout`) sobrevive en la **página
     completa**, cuyo paso de pago conserva su selector de métodos.
   - **El monto exacto y la referencia se muestran DESPUÉS de crear el pedido**
