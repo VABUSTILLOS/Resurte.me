@@ -557,39 +557,40 @@ export function CheckoutDrawer() {
                 </div>
               </div>
 
-              {/* Pago prioritario por transferencia: un clic con la dirección ya
-                  preseleccionada crea el pedido por SPEI (sin pasar por Stripe)
-                  y el cliente aterriza en la confirmación con la CLABE. Es el
-                  CTA que empuja la transferencia: fondos el mismo día y sin
-                  comisión, que es lo que cuida el margen. No exige tarjeta
-                  guardada — justo lo contrario. */}
-              {selectedAddressId !== null && isAddressValid && (
-                <button
-                  onClick={() => void startPriorityCheckout()}
-                  disabled={isProcessing || itemCount === 0}
-                  className="w-full flex flex-col items-center gap-0.5 px-6 py-3 mb-3 bg-[#5B21B6] text-white font-bold rounded-xl hover:bg-[#4C1D95] disabled:opacity-70 transition-colors"
-                >
-                  <span className="flex items-center gap-2">
-                    {isProcessing ? (
-                      <>
-                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Procesando...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="w-4 h-4 text-yellow-400" />
-                        Obtén Envío Prioritario
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </span>
-                  {!isProcessing && (
-                    <span className="text-[11px] font-normal text-white/80 truncate max-w-full">
-                      Pagando con transferencia
-                    </span>
+              {/* Con una dirección válida se crea el pedido SPEI directamente.
+                  Si falta, se recopila primero y se deja SPEI preseleccionado. */}
+              <button
+                onClick={() => {
+                  if (!isAddressValid) {
+                    setPaymentMethod("spei")
+                    setStep("address")
+                    return
+                  }
+                  void startPriorityCheckout()
+                }}
+                disabled={isProcessing || itemCount === 0}
+                className="w-full flex flex-col items-center gap-0.5 px-6 py-3 mb-3 bg-[#5B21B6] text-white font-bold rounded-xl hover:bg-[#4C1D95] disabled:opacity-70 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  {isProcessing ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4 text-yellow-400" />
+                      Obtén Envío Prioritario
+                      <ArrowRight className="w-4 h-4" />
+                    </>
                   )}
-                </button>
-              )}
+                </span>
+                {!isProcessing && (
+                  <span className="text-[11px] font-normal text-white/80 truncate max-w-full">
+                    Pagando con transferencia
+                  </span>
+                )}
+              </button>
 
               {/* Motivo del fallo del cobro rápido (o de crear la orden): el
                   paso de pago también lo pinta, pero si el avance no aplica el
