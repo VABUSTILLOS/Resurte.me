@@ -217,3 +217,59 @@ se verificó a 12 combinaciones de escala (2×–12×) y nivel de reconocimiento
 de escribir un número: todas dieron una única lectura consistente. Los artículos
 y las presentaciones se validaron además contra el catálogo y contra la lista
 anterior (mismo SKU, mismo corte, mismos kg).
+
+## Refresco de la lista de AB Foods (`00226`, vigencia 10-nov-2026)
+
+La lista mayoreo de AB Foods se renueva por vigencia: la del 13-oct-2026 quedó
+sustituida por la del **10-nov-2026**. `00226` actualiza los costos y recalcula
+los precios con la misma regla de arriba (margen 1.18, tope de la competencia).
+
+| | |
+| --- | --- |
+| Artículos en la lista | **49** (47 que ya existían + 2 altas) |
+| Costos que se movieron | **19** de los 47 (18 suben, 1 baja) |
+| Altas (artículos nuevos en la lista) | **2**, en `is_visible = false` |
+| Artículos que la lista ya no trae | **7** (conservan su costo del 13-oct; solo cambia su nota) |
+
+Las 2 altas son pechugas: **10144** (Pilgrims Nac. caja 12 kg, $99.90) y
+**26061** (C.H AM caja 10 kg, $69.90). Aunque la descripción coincide con
+artículos que ya existían (41451 y 8151), Victor confirmó que son artículos
+**distintos**, no un cambio de código: entran ocultos, sin foto propia, y los
+anteriores conservan su costo y su precio. La pechuga BR Soles (8160) tampoco
+viene ya en la lista, igual que las 4 papas McCain que entraron en `00225`.
+
+Los conteos de precios recalculados y de ocultos por tope los imprime la
+propia migración al correrla (`RAISE NOTICE`), y las guardas verifican las
+dos reglas sobre lo visible antes de confirmar.
+
+### Costos ajustados (19)
+
+| Artículo | Antes | Ahora |
+| --- | --- | --- |
+| PAPA FRANCESA 3/8 PAYETTE C/13.61 KG | $549.90 | **$579.90** |
+| PAPA FRANCESA 1/4 PAYETTE C/12.24 KG | $499.90 | **$524.90** |
+| PAPA ONDULADA 3/8 PAYETTE C/13.61 KG | $549.90 | **$579.90** |
+| PAPA HASH BROWN PATTY C/9.52 KG | $569.90 | **$579.90** |
+| PAPA RALLADA HASH BROWN C/8.16 KG | $649.90 | **$679.90** |
+| PAPA SELECT 5/16 S/C C/13.61 KG | $579.90 | **$599.90** |
+| PAPA SELECT 3/8 S/C C/13.61 KG | $579.90 | **$599.90** |
+| PAPA DULCE RECTA 3/8 C/6.80 KG | $769.90 | **$799.90** |
+| PAPA CONQST DELIVERY 3/8 S/C C/13.61 KG | $839.90 | **$869.90** |
+| PAPA SELECT 3/8 CASCARA C/13.61 KG | $779.90 | **$824.90** |
+| PAPA CONQUEST DELIVERY TEJA 6/5 C/13.61 KG | $849.90 | **$889.90** |
+| PAPA THUNDER 3/8 SC C/13.61KG | $749.90 | **$799.90** |
+| PAPA GAJO 10 CUT 6/5 C/13.61 KG | $749.90 | **$799.90** |
+| PAPA MEGACRUNCH 1/4 C/12.24KG | $776.90 | **$799.90** |
+| PAPA REJILLA SAVORY C/12.24 KG | $769.90 | **$799.90** |
+| PECHUGA SIN HUESO BR | $64.90 | **$76.90** |
+| CAMARON COCIDO 41/50 | $126.90 | **$132.90** |
+| CAMARON 41/50 | $169.90 | **$159.90** |
+| CAMARON COCIDO 100/200 | $117.90 | **$119.90** |
+
+### Cómo se leyó la lista
+
+El PDF de AB Foods es un escaneo **sin capa de texto**, así que los 49
+renglones se leyeron de la imagen. Las secciones con cambios (papas y
+pechugas) se verificaron en un render a 300 dpi, y los 28 artículos cuyo
+costo no cambió coinciden al centavo con la lista del 13-oct-2026, lo que
+valida la lectura de los que sí cambiaron.
