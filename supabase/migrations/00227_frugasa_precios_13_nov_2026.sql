@@ -44,6 +44,19 @@
 -- FRUGASA se cura a mano (`00196`/`00200`); esta migración no crea
 -- productos.
 --
+-- SANEAMIENTO DE PRECIOS QUE YA ROMPÍAN LAS REGLAS (paso 5c)
+-- -----------------------------------------------------------
+-- Al primer intento de correrla, la guarda final (paso 7) detuvo la
+-- migración por `achiote`: su costo NO cambió ($114.75 en las dos
+-- listas), pero su precio visible era $6.32 contra un tope de $6.318
+-- por unidad de 50 g — dos décimas de centavo por encima, un redondeo
+-- viejo. Como el paso 5 solo recalcula donde el costo cambió, ese
+-- precio quedaba fuera del alcance del refresco y la guarda no podía
+-- pasar. El paso 5c aplica la misma fórmula de `00202` a TODO
+-- primario visible de FRUGASA cuyo precio rompa las reglas aunque su
+-- costo no haya cambiado (oculta si el tope quedó bajo el costo). En
+-- este refresco solo alcanza a achiote: $6.32 -> $6.318.
+--
 -- LOS 6 QUE LA LISTA YA NO TRAE
 -- -----------------------------
 -- mango-ataulfo (R0035), germinado-de-soya (R0089), tuna-fruta (R0057),
@@ -76,6 +89,8 @@ DECLARE
   v_costos int;
   v_precios int;
   v_ocultos int;
+  v_saneo int;
+  v_saneo_slugs text;
   v_sin_cambio int;
   v_reactivables text;
   v_malos text;
@@ -440,6 +455,63 @@ BEGIN
 
   GET DIAGNOSTICS v_precios = ROW_COUNT;
 
+  -- 5c) Saneamiento: primarios VISIBLES de FRUGASA cuyo precio ya
+  --     rompía las reglas aunque su costo no haya cambiado (el caso
+  --     achiote). Se oculta si el tope quedó bajo el costo; si hay
+  --     precio válido, se aplica la fórmula. Los que el paso 5b ya
+  --     dejó en la fórmula no se tocan (su precio ya es la fórmula).
+  CREATE TEMP TABLE _saneo ON COMMIT DROP AS
+  SELECT p.id AS product_id,
+         p.slug,
+         ps.cost AS costo,
+         COALESCE(f.factor, 1) AS factor,
+         cap.cap_kg,
+         p.price AS precio_viejo,
+         LEAST(
+           CEIL(ps.cost * COALESCE(f.factor, 1) * 1.20),
+           COALESCE(cap.cap_kg * COALESCE(f.factor, 1),
+                    CEIL(ps.cost * COALESCE(f.factor, 1) * 1.20))
+         ) AS precio_nuevo
+  FROM public.products p
+  JOIN public.product_suppliers ps
+    ON ps.product_id = p.id
+   AND ps.supplier_id = v_supplier
+   AND ps.is_primary
+  LEFT JOIN _factor f ON f.slug = p.slug
+  LEFT JOIN (
+    SELECT product_id, MIN(unit_price) AS cap_kg
+    FROM public.competitor_prices
+    WHERE unit_price IS NOT NULL
+    GROUP BY product_id
+  ) cap ON cap.product_id = p.id
+  WHERE p.is_visible
+    AND (p.price < ps.cost * COALESCE(f.factor, 1)
+      OR (cap.cap_kg IS NOT NULL
+          AND p.price > cap.cap_kg * COALESCE(f.factor, 1)));
+
+  SELECT string_agg(slug, ', ' ORDER BY slug) INTO v_saneo_slugs FROM _saneo;
+
+  UPDATE public.products p
+  SET is_visible = false,
+      publish_at = NULL,
+      unpublish_at = NULL,
+      updated_at = now()
+  FROM _saneo s
+  WHERE p.id = s.product_id
+    AND s.cap_kg IS NOT NULL
+    AND s.cap_kg < s.costo;
+
+  UPDATE public.products p
+  SET price = s.precio_nuevo,
+      sale_price = NULL,
+      updated_at = now()
+  FROM _saneo s
+  WHERE p.id = s.product_id
+    AND (s.cap_kg IS NULL OR s.cap_kg >= s.costo)
+    AND p.price IS DISTINCT FROM s.precio_nuevo;
+
+  GET DIAGNOSTICS v_saneo = ROW_COUNT;
+
   -- 6) Los que salieron de la lista: solo la nota.
   UPDATE public.product_suppliers ps
   SET notes = 'La lista FRUGASA "Precios 1897" (13-nov-2026) ya no trae este artículo; se conserva el costo de la lista del 18-sep-2026 ("Precios 1853").',
@@ -477,6 +549,9 @@ BEGIN
   RAISE NOTICE '00227: % costos cambiaron, % quedaron igual.', v_costos, v_sin_cambio;
   RAISE NOTICE '00227: % precios recalculados (FRUGASA primario, costo cambiado).', v_precios;
   RAISE NOTICE '00227: % productos ocultados por tope bajo costo.', v_ocultos;
+  IF v_saneo_slugs IS NOT NULL THEN
+    RAISE NOTICE '00227: saneamiento de precios que ya rompían las reglas (costo sin cambio): %', v_saneo_slugs;
+  END IF;
   RAISE NOTICE '00227: 6 artículos fuera de la lista conservaron su costo del 18-sep-2026.';
   IF v_reactivables IS NOT NULL THEN
     RAISE NOTICE '00227: ocultos que ya admiten precio válido (reactivar desde /admin/productos): %', v_reactivables;
