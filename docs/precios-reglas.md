@@ -301,11 +301,16 @@ reactivarlos desde `/admin/productos` si se decide.
 Al primer intento de correrla, la guarda final detuvo la migración
 por un precio que ya rompía la regla B desde antes del refresco:
 `achiote` tenía precio $6.32 contra un tope de $6.318 por unidad de
-50 g (su costo no cambió: $114.75 en las dos listas). La migración
-incluye por eso un paso de saneamiento (5c) que aplica la fórmula a
-todo primario visible de FRUGASA cuyo precio rompa las reglas aunque
-su costo no haya cambiado; en este refresco solo alcanza a achiote
-($6.32 → $6.318).
+50 g (su costo no cambió: $114.75 en las dos listas). La columna
+`products.price` guarda solo 2 decimales (verificado en
+information_schema), así que $6.318 se almacena redondeado a $6.32
+y vuelve a romper el tope; por eso la fórmula de la migración
+redondea el tope hacia abajo al centavo — FLOOR(tope × 100) / 100 —
+y oculta cuando ni al centavo existe precio válido. La migración
+incluye además un paso de saneamiento (5c) que aplica la fórmula a
+todo primario visible de FRUGASA cuyo precio rompa las reglas
+aunque su costo no haya cambiado; en este refresco solo alcanza a
+achiote ($6.32 → $6.31).
 
 Los 6 que salieron de la lista: `mango-ataulfo` (R0035),
 `germinado-de-soya` (R0089), `tuna-fruta` (R0057), `uva-negra`

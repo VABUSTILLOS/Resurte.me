@@ -52,10 +52,15 @@
 -- por unidad de 50 g — dos décimas de centavo por encima, un redondeo
 -- viejo. Como el paso 5 solo recalcula donde el costo cambió, ese
 -- precio quedaba fuera del alcance del refresco y la guarda no podía
--- pasar. El paso 5c aplica la misma fórmula de `00202` a TODO
--- primario visible de FRUGASA cuyo precio rompa las reglas aunque su
--- costo no haya cambiado (oculta si el tope quedó bajo el costo). En
--- este refresco solo alcanza a achiote: $6.32 -> $6.318.
+-- pasar. Verificado con information_schema: la columna
+-- `products.price` es numérica de 2 decimales, así que $6.318 se
+-- guarda redondeado a $6.32 y vuelve a romper el tope. Por eso la
+-- fórmula de esta migración redondea el tope HACIA ABAJO al centavo
+-- (FLOOR(tope * 100) / 100) en los pasos 5b y 5c, y oculta cuando ni
+-- al centavo existe precio válido (tope al centavo < costo). El paso
+-- 5c aplica la fórmula a TODO primario visible de FRUGASA cuyo
+-- precio rompa las reglas aunque su costo no haya cambiado. En este
+-- refresco el saneamiento solo alcanza a achiote: $6.32 -> $6.31.
 --
 -- LOS 6 QUE LA LISTA YA NO TRAE
 -- -----------------------------
@@ -401,7 +406,7 @@ BEGIN
   WHERE is_primary
     AND NOT is_visible
     AND costo_nuevo <> costo_viejo
-    AND (cap_kg IS NULL OR cap_kg >= costo_nuevo);
+    AND (cap_kg IS NULL OR FLOOR(cap_kg * factor * 100) / 100 >= costo_nuevo * factor);
 
   -- 4) Costos: se refresca costo, presentación, fecha y nota de los 129.
   UPDATE public.product_suppliers ps
@@ -434,7 +439,7 @@ BEGIN
     AND c.is_primary
     AND c.costo_nuevo <> c.costo_viejo
     AND c.cap_kg IS NOT NULL
-    AND c.cap_kg < c.costo_nuevo;
+    AND FLOOR(c.cap_kg * c.factor * 100) / 100 < c.costo_nuevo * c.factor;
 
   GET DIAGNOSTICS v_ocultos = ROW_COUNT;
 
@@ -443,7 +448,7 @@ BEGIN
   UPDATE public.products p
   SET price = LEAST(
         CEIL(c.costo_nuevo * c.factor * 1.20),
-        COALESCE(c.cap_kg * c.factor, CEIL(c.costo_nuevo * c.factor * 1.20))
+        COALESCE(FLOOR(c.cap_kg * c.factor * 100) / 100, CEIL(c.costo_nuevo * c.factor * 1.20))
       ),
       sale_price = NULL,
       updated_at = now()
@@ -451,7 +456,8 @@ BEGIN
   WHERE p.id = c.product_id
     AND c.is_primary
     AND c.costo_nuevo <> c.costo_viejo
-    AND (c.cap_kg IS NULL OR c.cap_kg >= c.costo_nuevo);
+    AND (c.cap_kg IS NULL
+         OR FLOOR(c.cap_kg * c.factor * 100) / 100 >= c.costo_nuevo * c.factor);
 
   GET DIAGNOSTICS v_precios = ROW_COUNT;
 
@@ -469,7 +475,7 @@ BEGIN
          p.price AS precio_viejo,
          LEAST(
            CEIL(ps.cost * COALESCE(f.factor, 1) * 1.20),
-           COALESCE(cap.cap_kg * COALESCE(f.factor, 1),
+           COALESCE(FLOOR(cap.cap_kg * COALESCE(f.factor, 1) * 100) / 100,
                     CEIL(ps.cost * COALESCE(f.factor, 1) * 1.20))
          ) AS precio_nuevo
   FROM public.products p
@@ -499,7 +505,7 @@ BEGIN
   FROM _saneo s
   WHERE p.id = s.product_id
     AND s.cap_kg IS NOT NULL
-    AND s.cap_kg < s.costo;
+    AND FLOOR(s.cap_kg * s.factor * 100) / 100 < s.costo * s.factor;
 
   UPDATE public.products p
   SET price = s.precio_nuevo,
@@ -507,7 +513,8 @@ BEGIN
       updated_at = now()
   FROM _saneo s
   WHERE p.id = s.product_id
-    AND (s.cap_kg IS NULL OR s.cap_kg >= s.costo)
+    AND (s.cap_kg IS NULL
+         OR FLOOR(s.cap_kg * s.factor * 100) / 100 >= s.costo * s.factor)
     AND p.price IS DISTINCT FROM s.precio_nuevo;
 
   GET DIAGNOSTICS v_saneo = ROW_COUNT;
