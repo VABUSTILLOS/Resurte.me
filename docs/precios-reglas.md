@@ -273,3 +273,134 @@ renglones se leyeron de la imagen. Las secciones con cambios (papas y
 pechugas) se verificaron en un render a 300 dpi, y los 28 artículos cuyo
 costo no cambió coinciden al centavo con la lista del 13-oct-2026, lo que
 valida la lectura de los que sí cambiaron.
+
+## Refresco de la lista de FRUGASA (`00227`, vigencia 13-nov-2026)
+
+La lista de FRUGASA se renueva por vigencia: la "Precios 1853" del
+18-sep-2026 (la de `00196`/`00200`) quedó sustituida por la **"Precios
+1897" del 13-nov-2026**. `00227` actualiza los costos y recalcula los
+precios con la regla vigente (margen 1.20, tope de la competencia,
+ocultar si el tope queda bajo el costo).
+
+| | |
+| --- | --- |
+| Productos vinculados a FRUGASA | **135** |
+| Artículos en la lista nueva | **129** |
+| Costos que se movieron | **80** (41 suben, 39 bajan) |
+| Costos sin cambio | **49** |
+| Artículos que la lista ya no trae | **6** (conservan su costo del 18-sep; solo cambia su nota) |
+| Altas | **0** — los renglones sin vincular son variantes de artículos ya vinculados o artículos que `00200` dejó fuera a propósito (huevo, varios, carbonato, chiles que ya se venden) |
+
+Los conteos de precios recalculados y de ocultos por tope los imprime
+la propia migración al correrla (`RAISE NOTICE`), igual que en
+`00226`. La migración también avisa qué productos hoy ocultos ya
+admiten un precio válido con el costo nuevo (entre ellos
+`camote-amarillo`, `apio`, `cebolla-blanca` y `mandarina`), para
+reactivarlos desde `/admin/productos` si se decide.
+
+Los 6 que salieron de la lista: `mango-ataulfo` (R0035),
+`germinado-de-soya` (R0089), `tuna-fruta` (R0057), `uva-negra`
+(R0161), `te-de-limon` (R0212) y `chile-cascabel` (R0108, la variante
+"T Cascabel."; las demás variantes de R0108 sí vienen).
+
+### Costos que suben (41)
+
+| Producto | Antes | Ahora |
+| --- | ---: | ---: |
+| anis | $137.70 | **$270.00** |
+| jitomate-saladet | $33.50 | **$66.90** |
+| fresa | $59.00 | **$92.00** |
+| chile-poblano | $40.50 | **$71.75** |
+| kiwi | $97.50 | **$128.00** |
+| chile-caribe | $37.80 | **$63.45** |
+| jitomate-bola | $47.00 | **$69.15** |
+| arandano-fresco | $121.50 | **$141.75** |
+| tomate-verde | $27.05 | **$45.70** |
+| pimiento-morron | $50.00 | **$67.50** |
+| chile-chilaca | $61.25 | **$78.50** |
+| chile-habanero | $160.40 | **$176.10** |
+| chile-pasado | $232.90 | **$248.40** |
+| canela-en-polvo | $168.75 | **$182.25** |
+| granola | $68.90 | **$81.00** |
+| chile-jalapeno | $27.00 | **$37.80** |
+| piloncillo | $33.75 | **$44.55** |
+| jamaica | $108.00 | **$117.45** |
+| papaya-maradol | $33.15 | **$42.20** |
+| sandia | $13.50 | **$21.60** |
+| chile-serrano | $46.70 | **$54.00** |
+| ejote | $47.25 | **$54.00** |
+| melon-chino | $18.90 | **$25.50** |
+| pepino | $17.00 | **$22.50** |
+| manzana-golden | $44.00 | **$49.00** |
+| calabaza | $20.00 | **$24.50** |
+| jicama | $24.30 | **$28.30** |
+| aguacate-hass | $63.00 | **$66.20** |
+| col-blanca | $8.75 | **$10.65** |
+| sal-de-mar-fina-1kg | $11.65 | **$13.50** |
+| cebolla-cambray | $6.55 | **$8.30** |
+| poro | $25.00 | **$26.55** |
+| naranja-valencia | $39.70 | **$41.10** |
+| consome-de-pollo-1kg | $52.65 | **$54.00** |
+| melon-honeydew | $26.90 | **$28.25** |
+| espinaca | $8.20 | **$9.20** |
+| frijol-negro-1kg | $39.15 | **$39.85** |
+| acelga | $8.20 | **$8.90** |
+| betabel | $13.80 | **$14.20** |
+| papa-blanca | $39.95 | **$40.20** |
+| perejil | $6.90 | **$7.00** |
+
+### Costos que bajan (39)
+
+| Producto | Antes | Ahora |
+| --- | ---: | ---: |
+| cocoa-polvo-1kg | $309.70 | **$227.50** |
+| camote-amarillo | $67.50 | **$29.70** |
+| chile-colorin | $155.25 | **$121.50** |
+| ajo | $70.90 | **$39.85** |
+| mandarina | $84.40 | **$54.00** |
+| cebolla-blanca | $54.00 | **$30.00** |
+| lenteja-1kg | $40.50 | **$20.95** |
+| cacahuate-japones | $108.00 | **$91.80** |
+| quinoa-1kg | $129.60 | **$116.10** |
+| pimienta-negra-molida | $247.05 | **$236.25** |
+| brocoli | $40.00 | **$30.00** |
+| uvas-verdes | $115.00 | **$105.00** |
+| pina-miel | $42.95 | **$33.60** |
+| apio | $32.00 | **$23.00** |
+| pepita-de-calabaza | $157.30 | **$148.50** |
+| uvas-rojas | $105.00 | **$96.50** |
+| cebolla-morada | $35.10 | **$28.00** |
+| limon-agrio | $34.55 | **$27.70** |
+| amaranto | $94.50 | **$87.75** |
+| chile-de-la-tierra | $209.25 | **$202.50** |
+| pera | $61.00 | **$56.75** |
+| cacahuate-natural-tostado | $54.00 | **$49.95** |
+| coliflor | $40.50 | **$37.00** |
+| pasas | $91.80 | **$88.45** |
+| tamarindo | $97.20 | **$94.50** |
+| avena | $27.00 | **$24.30** |
+| cacahuate-enchilado | $59.40 | **$56.70** |
+| pepita-de-girasol | $59.40 | **$56.70** |
+| platano-macho | $28.70 | **$26.20** |
+| arroz-blanco-1kg | $29.45 | **$27.00** |
+| cebolla-amarilla | $25.00 | **$23.00** |
+| ajonjoli | $122.85 | **$121.50** |
+| chile-morita | $148.50 | **$147.15** |
+| toronja | $37.80 | **$36.45** |
+| guayaba | $48.95 | **$48.60** |
+| manzana-roja | $57.55 | **$57.20** |
+| chayote | $16.80 | **$16.75** |
+| rabano | $14.40 | **$14.35** |
+| cilantro | $5.20 | **$5.15** |
+
+### Cómo se leyó la lista
+
+El PDF de FRUGASA es digital (trae capa de texto), así que los 178
+renglones se extrajeron tal cual, sin OCR. Cada uno de los 129
+artículos vinculados se emparejó por SKU y columna "Opción" contra lo
+cargado en `00196`/`00200`; los 49 costos que no se movieron coinciden
+al centavo con la base, lo que valida el emparejamiento de los 80 que
+sí cambiaron. Dos presentaciones cambiaron de texto en el sistema de
+FRUGASA: `cebolla-amarilla` pasa de "T LG, O USA." a "T Jumbo, O USA."
+(único renglón R0014) y `ciruelo-rojo` conserva su costo porque el SKU
+R0066 sigue en $115.00.
