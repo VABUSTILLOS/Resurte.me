@@ -271,7 +271,7 @@ describe("getCityLandingSchema", () => {
     expect(schema.address.addressLocality).toBe("Chihuahua")
     expect(schema.address.addressRegion).toBe("Chihuahua")
     expect(schema.address.addressCountry).toBe("MX")
-    expect(schema.telephone).toBe("+526145337486")
+    expect(schema.telephone).toBe("+526141261296")
     expect(schema.email).toBe("hola@resurte.me")
     expect(schema.openingHoursSpecification.length).toBeGreaterThan(0)
   })
@@ -316,7 +316,7 @@ describe("getDeliveryZonesSchema", () => {
   it("cuelga el servicio de la organización y publica el teléfono", () => {
     const schema = getDeliveryZonesSchema(pageUrl)
     expect(schema.provider["@id"]).toBe(ORGANIZATION_ID)
-    expect(schema.availableChannel.servicePhone).toBe("+526145337486")
+    expect(schema.availableChannel.servicePhone).toBe("+526141261296")
     expect(schema.availableChannel.serviceUrl).toBe(pageUrl)
   })
 
