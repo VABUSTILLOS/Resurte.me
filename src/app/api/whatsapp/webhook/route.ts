@@ -5,7 +5,9 @@
  * Handles:
  * - GET: Webhook verification (Meta challenge)
  * - POST: Incoming messages, status updates, and other notifications
- * 
+ * - POST: mensajes de pedido del catálogo (type "order") → se convierten
+ *   en pedidos de la tienda vía src/lib/whatsapp-orders.ts
+ *
  * Setup in Meta Business App:
  * 1. Configure webhook URL: https://resurte.me/api/whatsapp/webhook
  * 2. Set verify token: WHATSAPP_WEBHOOK_VERIFY_TOKEN env var
@@ -13,8 +15,10 @@
  */
 
 import { createHmac, timingSafeEqual } from "crypto"
-import { NextRequest, NextResponse } from "next/server"
+import { after, NextRequest, NextResponse } from "next/server"
 import { verifyWebhook, sendTextMessage } from "@/lib/whatsapp"
+import { createWhatsAppOrder, findProfileByPhone } from "@/lib/whatsapp-orders"
+import { runNewOrderWorkflows } from "@/lib/workflows"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
 
@@ -125,6 +129,20 @@ interface WhatsAppTextPayload {
   body?: string
 }
 
+/** Pedido del catálogo tal como lo manda Meta en un mensaje type "order". */
+interface WhatsAppOrderPayload {
+  catalog_id?: string
+  /** Nota opcional que el cliente adjunta al enviar el pedido. */
+  text?: string
+  product_items?: {
+    product_retailer_id: string
+    quantity: number
+    /** Precio del catálogo al momento del pedido. NO es de confiar: se recalcula contra la BD. */
+    item_price?: number
+    currency?: string
+  }[]
+}
+
 interface WhatsAppMessage {
   from?: string
   id?: string
@@ -132,6 +150,7 @@ interface WhatsAppMessage {
   type?: string
   text?: WhatsAppTextPayload
   interactive?: unknown
+  order?: WhatsAppOrderPayload
 }
 
 interface WhatsAppValue {
@@ -283,12 +302,17 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
   const messageId = message.id || null
 
   // Contenido estructurado (texto simple por ahora; interactive/button
-  // se registran igualmente con su tipo para auditoría).
+  // se registran igualmente con su tipo para auditoría). Un pedido del
+  // catálogo se persiste como el JSON completo del payload: es la
+  // bitácora del intento aunque no se cree el pedido (p. ej. por no
+  // llegar al mínimo).
   let content: string | null = null
   if (messageType === "text" && message.text) {
     content = message.text.body ?? null
   } else if (messageType === "interactive" && message.interactive) {
     content = JSON.stringify(message.interactive)
+  } else if (messageType === "order" && message.order) {
+    content = JSON.stringify(message.order)
   }
 
   const supabase = await createServiceClient()
@@ -332,6 +356,15 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
     timestamp: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : null,
   })
 
+  // Pedido del catálogo (type "order"): se convierte en un pedido de
+  // la tienda ANTES del routing de texto. La creación es idempotente
+  // por wamid (Meta reintenta los webhooks) y responde al cliente
+  // según el resultado; ver handleOrderMessage.
+  if (messageType === "order" && message.order) {
+    await handleOrderMessage(supabase, { from, messageId, order: message.order })
+    return
+  }
+
   // Routing NLP por keywords — solo mensajes de texto reciben respuesta
   // (los replies de templates/interactive requieren el ID del botón).
   if (messageType === "text" && content) {
@@ -363,6 +396,100 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
   }
 }
 
+/**
+ * Pedido del catálogo (type "order"): lo convierte en un pedido de la
+ * tienda con createWhatsAppOrder y responde al cliente según el
+ * resultado. Todas las respuestas son texto libre dentro de la
+ * ventana de servicio de 24 h que abre el propio mensaje del cliente.
+ * Un duplicado (reintento de Meta) no responde ni crea nada de nuevo.
+ */
+async function handleOrderMessage(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  args: { from: string; messageId: string | null; order: WhatsAppOrderPayload }
+) {
+  const { from, messageId, order } = args
+
+  const result = await createWhatsAppOrder(supabase, {
+    from,
+    waMessageId: messageId,
+    catalogId: order.catalog_id ?? null,
+    productItems: order.product_items ?? [],
+    noteText: order.text ?? null,
+  })
+
+  switch (result.kind) {
+    case "created": {
+      // Mismos workflows que el checkout web (aviso a staff +
+      // confirmación al cliente + email), sin bloquear la respuesta
+      // a Meta.
+      after(() => {
+        void runNewOrderWorkflows(result.orderId)
+      })
+      const lines = [
+        "¡Pedido recibido! 🎉",
+        "",
+        `Tu pedido *#${result.orderId}* quedó registrado en Resurte.`,
+        `Total: *$${result.total.toFixed(2)} MXN*`,
+      ]
+      if (result.unresolved.length > 0) {
+        const named = result.unresolved
+          .map((u) => u.name)
+          .filter((n): n is string => Boolean(n))
+        lines.push(
+          "",
+          named.length > 0
+            ? `⚠️ No pudimos agregar: ${named.join(", ")}. Si los necesitas, escríbenos el nombre y la cantidad y los agregamos a tu pedido.`
+            : "⚠️ Algunos productos de tu pedido no pudimos identificarlos. Si te falta algo, escríbenos el nombre y la cantidad."
+        )
+      }
+      lines.push(
+        "",
+        "Para entregártelo, compárteme tu *dirección completa* (calle, número, colonia, CP y alguna referencia) y el nombre de quien recibe. 📍"
+      )
+      await sendTextMessage({ to: from, text: lines.join("\n") }).catch((err) =>
+        logger.error("WhatsApp webhook: order confirmation reply failed:", err)
+      )
+      break
+    }
+    case "below_minimum": {
+      await sendTextMessage({
+        to: from,
+        text:
+          `Tu pedido suma *$${result.subtotal.toFixed(2)} MXN* y el mínimo de compra es de *$${result.minimum.toFixed(2)} MXN*: te faltan *$${result.missingAmount.toFixed(2)} MXN*. 🙏\n\n` +
+          "Agrega más productos desde el catálogo y vuelve a enviar tu pedido. 🛍️",
+      }).catch((err) => logger.error("WhatsApp webhook: below-minimum reply failed:", err))
+      break
+    }
+    case "no_resolvable_items": {
+      await sendTextMessage({
+        to: from,
+        text:
+          "No pude identificar los productos de tu pedido. 😕\n\n" +
+          "Escríbeme tu pedido como texto (producto y cantidad) y lo registramos por aquí mismo.",
+      }).catch((err) => logger.error("WhatsApp webhook: no-items reply failed:", err))
+      break
+    }
+    case "insufficient_stock": {
+      await sendTextMessage({
+        to: from,
+        text:
+          `Algunos productos de tu pedido ya no tienen existencia suficiente: ${result.detail}.\n\n` +
+          "Ajusta las cantidades en el catálogo y vuelve a enviar tu pedido, por favor. 🙏",
+      }).catch((err) => logger.error("WhatsApp webhook: stock reply failed:", err))
+      break
+    }
+    case "duplicate": {
+      // Reintento de Meta: el pedido ya existe y ya se respondió.
+      logger.info("whatsapp.order.duplicate_ignored", { messageId, orderId: result.orderId })
+      break
+    }
+    case "error": {
+      logger.error("WhatsApp webhook: order creation failed:", { detail: result.detail, messageId })
+      break
+    }
+  }
+}
+
 /** Busca el perfil por teléfono (últimos 10 dígitos) y responde con el estado del último pedido. */
 async function handleOrderLookup(from: string) {
   // Meta envía el número en formato internacional sin '+': 5215512345678.
@@ -380,19 +507,15 @@ async function handleOrderLookup(from: string) {
 
   const supabase = await createServiceClient()
 
-  // 1) Encontrar el perfil cuyo teléfono termina en los mismos 10 dígitos.
-  const { data: profiles, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, full_name, phone")
-    .ilike("phone", `%${last10}`)
-    .limit(1)
+  // 1) Encontrar el perfil cuyo teléfono termina en los mismos 10 dígitos
+  // (helper compartido con la creación de pedidos: whatsapp-orders.ts).
+  const { profile, error: profileError } = await findProfileByPhone(supabase, from)
 
   if (profileError) {
     logger.error("WhatsApp webhook: profile lookup failed:", profileError)
     return
   }
 
-  const profile = profiles?.[0]
   if (!profile) {
     await sendTextMessage({
       to: from,
