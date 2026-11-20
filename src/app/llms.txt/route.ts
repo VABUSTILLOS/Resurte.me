@@ -292,7 +292,7 @@ Metodología: para cada insumo y ciudad se publica la **mediana** del precio ent
 function buildContactSection(): string {
   return `## Contacto
 
-- WhatsApp: +52 1 614 533 7486
+- WhatsApp: +52 1 614 126 1296
 - Redes: [Facebook](https://www.facebook.com/resurteme) · [Instagram](https://www.instagram.com/resurteme)`
 }
 

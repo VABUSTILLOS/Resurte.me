@@ -16,14 +16,14 @@ import { ACTIVE_CITIES, DEFAULT_CITY_SLUG } from "@/lib/cities"
 
 /** Número tal como lo espera wa.me (sin "+", con el 1 de móvil mexicano). */
 export const WHATSAPP_NUMBER = (
-  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
+  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216141261296"
 ).replace(/\D/g, "")
 
 /** E.164 para `tel:` y para `telephone` en schema.org. */
-export const PHONE_E164 = "+526145337486"
+export const PHONE_E164 = "+526141261296"
 
 /** Formato legible, idéntico en todas las superficies (consistencia NAP). */
-export const PHONE_DISPLAY = "+52 614 533 7486"
+export const PHONE_DISPLAY = "+52 614 126 1296"
 
 export const PHONE_TEL_HREF = `tel:${PHONE_E164}`
 

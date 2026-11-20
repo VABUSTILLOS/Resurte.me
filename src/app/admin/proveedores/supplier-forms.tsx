@@ -201,7 +201,7 @@ export function SupplierForm({
           label="WhatsApp"
           value={values.whatsapp}
           onChange={(v) => set("whatsapp", v)}
-          placeholder="614 533 7486"
+          placeholder="614 126 1296"
           hint="Es el canal del botón de contacto. Se guarda sin espacios."
         />
         <Field
