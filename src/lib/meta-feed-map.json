@@ -1,0 +1,1610 @@
+[
+ {
+  "slug": "achiote",
+  "id": "abarrotes-achiote",
+  "title": "Achiote",
+  "description": "Bolsa 50 g"
+ },
+ {
+  "slug": "ajonjoli",
+  "id": "abarrotes-ajonjoli",
+  "title": "Ajonjolí",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "albahaca",
+  "id": "abarrotes-albahaca",
+  "title": "Albahaca",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "almendras-500g",
+  "id": "abarrotes-almendras-500g",
+  "title": "Almendras 500g",
+  "description": "500 g"
+ },
+ {
+  "slug": "amaranto",
+  "id": "abarrotes-amaranto",
+  "title": "Amaranto",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "anis",
+  "id": "abarrotes-anis",
+  "title": "Anís",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "arroz-blanco-1kg",
+  "id": "abarrotes-arroz-blanco-1kg-verde-valle",
+  "title": "Arroz Blanco 1kg — Verde Valle",
+  "description": "1 kg"
+ },
+ {
+  "slug": "avena",
+  "id": "abarrotes-avena",
+  "title": "Avena",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "azucar-refinada-5kg",
+  "id": "abarrotes-azucar-refinada-5kg-zulka",
+  "title": "Azúcar Refinada 5kg — Zulka",
+  "description": "5 kg"
+ },
+ {
+  "slug": "cacahuate-enchilado",
+  "id": "abarrotes-cacahuate-enchilado",
+  "title": "Cacahuate Enchilado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cacahuate-japones",
+  "id": "abarrotes-cacahuate-japones",
+  "title": "Cacahuate Japonés",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cacahuate-natural-tostado",
+  "id": "abarrotes-cacahuate-natural-tostado",
+  "title": "Cacahuate Natural Tostado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "canela-en-polvo",
+  "id": "abarrotes-canela-en-polvo-mccormick",
+  "title": "Canela en Polvo — McCormick",
+  "description": "Frasco 100 g"
+ },
+ {
+  "slug": "chile-colorin",
+  "id": "abarrotes-chile-colorin",
+  "title": "Chile Colorín",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chile-de-la-tierra",
+  "id": "abarrotes-chile-de-la-tierra",
+  "title": "Chile De la Tierra",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chile-mirasol",
+  "id": "abarrotes-chile-mirasol",
+  "title": "Chile Mirasol",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chile-morita",
+  "id": "abarrotes-chile-morita",
+  "title": "Chile Morita",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chile-pasado",
+  "id": "abarrotes-chile-pasado",
+  "title": "Chile Pasado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "ciruela-pasa",
+  "id": "abarrotes-ciruela-pasa",
+  "title": "Ciruela Pasa",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "clavo",
+  "id": "abarrotes-clavo",
+  "title": "Clavo",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "coco-rayado",
+  "id": "abarrotes-coco-rayado",
+  "title": "Coco Rayado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cocoa-polvo-1kg",
+  "id": "abarrotes-cocoa-en-polvo-1kg-hershey-s",
+  "title": "Cocoa en Polvo 1kg — Hershey's",
+  "description": "1 kg"
+ },
+ {
+  "slug": "comino-molido",
+  "id": "abarrotes-comino-molido-500g-mccormick",
+  "title": "Comino Molido 500g — McCormick",
+  "description": "500 g"
+ },
+ {
+  "slug": "consome-de-pollo-1kg",
+  "id": "abarrotes-consome-de-pollo-1kg-knorr",
+  "title": "Consomé de Pollo 1kg — Knorr",
+  "description": "1 kg"
+ },
+ {
+  "slug": "curcuma",
+  "id": "abarrotes-curcuma",
+  "title": "Cúrcuma",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "frijol-negro-1kg",
+  "id": "abarrotes-frijol-negro-1kg",
+  "title": "Frijol Negro 1kg",
+  "description": "1 kg"
+ },
+ {
+  "slug": "gragea",
+  "id": "abarrotes-gragea",
+  "title": "Gragea",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "granola",
+  "id": "abarrotes-granola",
+  "title": "Granola",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "haba",
+  "id": "abarrotes-haba",
+  "title": "Haba",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "hoja-de-laurel",
+  "id": "abarrotes-hoja-de-laurel",
+  "title": "Hoja de Laurel",
+  "description": "Bolsa 20 g"
+ },
+ {
+  "slug": "jamaica",
+  "id": "abarrotes-jamaica",
+  "title": "Jamaica",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "lenteja-1kg",
+  "id": "abarrotes-lenteja-1kg",
+  "title": "Lenteja 1kg",
+  "description": "1 kg"
+ },
+ {
+  "slug": "linaza",
+  "id": "abarrotes-linaza",
+  "title": "Linaza",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "manteca-puerco",
+  "id": "abarrotes-manteca-de-puerco",
+  "title": "Manteca de puerco",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "oregano-molido-100g",
+  "id": "abarrotes-oregano-molido-100g",
+  "title": "Orégano Molido 100g",
+  "description": "Frasco 100 g"
+ },
+ {
+  "slug": "pasas",
+  "id": "abarrotes-pasas",
+  "title": "Pasas",
+  "description": "Bolsa 200 g"
+ },
+ {
+  "slug": "pepita-de-calabaza",
+  "id": "abarrotes-pepita-de-calabaza",
+  "title": "Pepita de Calabaza",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pepita-de-girasol",
+  "id": "abarrotes-pepita-de-girasol",
+  "title": "Pepita de Girasol",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "piloncillo",
+  "id": "abarrotes-piloncillo",
+  "title": "Piloncillo",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pimenton",
+  "id": "abarrotes-pimenton",
+  "title": "Pimentón",
+  "description": "Frasco 100 g"
+ },
+ {
+  "slug": "pimienta-negra-molida",
+  "id": "abarrotes-pimienta-negra-molida-500g",
+  "title": "Pimienta Negra Molida 500g",
+  "description": "500 g"
+ },
+ {
+  "slug": "quinoa-1kg",
+  "id": "abarrotes-quinoa-1kg",
+  "title": "Quinoa 1kg",
+  "description": "1 kg"
+ },
+ {
+  "slug": "sal-de-mar-fina-1kg",
+  "id": "abarrotes-sal-de-mar-fina-1kg",
+  "title": "Sal de Mar Fina 1kg",
+  "description": "1 kg"
+ },
+ {
+  "slug": "semilla-chia-1kg",
+  "id": "abarrotes-semilla-de-chia-1kg",
+  "title": "Semilla de Chía 1kg",
+  "description": "Pieza — bolsa 1 kg"
+ },
+ {
+  "slug": "tamarindo",
+  "id": "abarrotes-tamarindo",
+  "title": "Tamarindo",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "tapioca",
+  "id": "abarrotes-tapioca",
+  "title": "Tapioca",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "trigo-entero",
+  "id": "abarrotes-trigo-entero",
+  "title": "Trigo Entero",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "aguja-engorda",
+  "id": "carnes-aves-y-pescados-aguja-engorda",
+  "title": "Aguja (engorda)",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "ala-iqf-pilgrims-caja-12kg",
+  "id": "carnes-aves-y-pescados-ala-1-2-iqf-pilgrim-s",
+  "title": "Ala 1-2 IQF Pilgrim's",
+  "description": "Caja 12 kg — precio por kilo"
+ },
+ {
+  "slug": "ala-adobada-bolsa-5kg",
+  "id": "carnes-aves-y-pescados-ala-adobada-1-2",
+  "title": "Ala adobada 1-2",
+  "description": "Bolsa 5 kg — precio por kilo"
+ },
+ {
+  "slug": "ala-botanera-bolsa-5kg",
+  "id": "carnes-aves-y-pescados-ala-botanera-1-2",
+  "title": "Ala botanera 1-2",
+  "description": "Bolsa 5 kg — precio por kilo"
+ },
+ {
+  "slug": "ala-habanero-bolsa-5kg",
+  "id": "carnes-aves-y-pescados-ala-habanero-1-2",
+  "title": "Ala habanero 1-2",
+  "description": "Bolsa 5 kg — precio por kilo"
+ },
+ {
+  "slug": "arrachera-premium-sukarne",
+  "id": "carnes-aves-y-pescados-arrachera-premium",
+  "title": "Arrachera premium",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "atun-saku",
+  "id": "carnes-aves-y-pescados-atun-saku",
+  "title": "Atún saku",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "boneless-buffalo-freskecito",
+  "id": "carnes-aves-y-pescados-boneless-buffalo-freskecito",
+  "title": "Boneless buffalo Freskecito",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "boneless-pechuga-pilgrims",
+  "id": "carnes-aves-y-pescados-boneless-de-pechuga-pilgrim-s",
+  "title": "Boneless de pechuga Pilgrim's",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "boneless-natural-freskecito",
+  "id": "carnes-aves-y-pescados-boneless-natural-freskecito",
+  "title": "Boneless natural Freskecito",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "brisket-deshuesado",
+  "id": "carnes-aves-y-pescados-brisket-deshuesado",
+  "title": "Brisket deshuesado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cabeza-res-deshuesada",
+  "id": "carnes-aves-y-pescados-cabeza-de-res-deshuesada",
+  "title": "Cabeza de res deshuesada",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cachete-res",
+  "id": "carnes-aves-y-pescados-cachete-de-res",
+  "title": "Cachete de res",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "calamar-lonja-filete",
+  "id": "carnes-aves-y-pescados-calamar-lonja-o-filete",
+  "title": "Calamar lonja o filete",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "camaron-2125",
+  "id": "carnes-aves-y-pescados-camaron-21-25",
+  "title": "Camarón 21/25",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "camaron-2630",
+  "id": "carnes-aves-y-pescados-camaron-26-30",
+  "title": "Camarón 26/30",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "camaron-3135",
+  "id": "carnes-aves-y-pescados-camaron-31-35",
+  "title": "Camarón 31/35",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "camaron-3640",
+  "id": "carnes-aves-y-pescados-camaron-36-40",
+  "title": "Camarón 36/40",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "camaron-4150",
+  "id": "carnes-aves-y-pescados-camaron-41-50",
+  "title": "Camarón 41/50",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "camaron-5160",
+  "id": "carnes-aves-y-pescados-camaron-51-60",
+  "title": "Camarón 51/60",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "camaron-6170",
+  "id": "carnes-aves-y-pescados-camaron-61-70",
+  "title": "Camarón 61/70",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "camaron-7190",
+  "id": "carnes-aves-y-pescados-camaron-71-90",
+  "title": "Camarón 71/90",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "camaron-cocido-100200",
+  "id": "carnes-aves-y-pescados-camaron-cocido-100-200",
+  "title": "Camarón cocido 100/200",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "camaron-cocido-4150",
+  "id": "carnes-aves-y-pescados-camaron-cocido-41-50",
+  "title": "Camarón cocido 41/50",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "camaron-cabeza-2030",
+  "id": "carnes-aves-y-pescados-camaron-con-cabeza-20-30",
+  "title": "Camarón con cabeza 20/30",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "camaron-1620-gigante",
+  "id": "carnes-aves-y-pescados-camaron-gigante-16-20",
+  "title": "Camarón gigante 16/20",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "carne-al-pastor-100",
+  "id": "carnes-aves-y-pescados-carne-al-pastor-100-carne",
+  "title": "Carne al pastor 100% carne",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "carne-molida-90-10",
+  "id": "carnes-aves-y-pescados-carne-molida-90-10",
+  "title": "Carne molida 90/10",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "carne-molida-de-pulpa",
+  "id": "carnes-aves-y-pescados-carne-molida-de-pulpa",
+  "title": "Carne molida de pulpa",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "carne-molida-pulpa-natural",
+  "id": "carnes-aves-y-pescados-carne-molida-de-pulpa-natural",
+  "title": "Carne molida de pulpa natural",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "carne-molida-pulpa-extralimp",
+  "id": "carnes-aves-y-pescados-carne-molida-de-pulpa-natural-extralimpia",
+  "title": "Carne molida de pulpa natural extralimpia",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "carne-molida-economica",
+  "id": "carnes-aves-y-pescados-carne-molida-economica",
+  "title": "Carne molida económica",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "carne-molida-especial",
+  "id": "carnes-aves-y-pescados-carne-molida-especial",
+  "title": "Carne molida especial",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "carne-hamburguesa-arrachera-900g",
+  "id": "carnes-aves-y-pescados-carne-para-hamburguesa-arrachera-900-g",
+  "title": "Carne para hamburguesa arrachera (900 g)",
+  "description": "Paquete 900 g"
+ },
+ {
+  "slug": "carne-hamburguesa-san-francisco-12kg",
+  "id": "carnes-aves-y-pescados-carne-para-hamburguesa-san-francisco-1-2-kg",
+  "title": "Carne para hamburguesa San Francisco (1.2 kg)",
+  "description": "Paquete 1.2 kg"
+ },
+ {
+  "slug": "carne-hamburguesa-sirloin-900g",
+  "id": "carnes-aves-y-pescados-carne-para-hamburguesa-sirloin-900-g",
+  "title": "Carne para hamburguesa sirloin (900 g)",
+  "description": "Paquete 900 g"
+ },
+ {
+  "slug": "chamberete",
+  "id": "carnes-aves-y-pescados-chamberete",
+  "title": "Chamberete",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chamberete-cortado",
+  "id": "carnes-aves-y-pescados-chamberete-cortado",
+  "title": "Chamberete cortado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chamorro-puerco",
+  "id": "carnes-aves-y-pescados-chamorro-de-puerco",
+  "title": "Chamorro de puerco",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chicharron-pella",
+  "id": "carnes-aves-y-pescados-chicharron-pella",
+  "title": "Chicharrón pella",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chicharron-prensado",
+  "id": "carnes-aves-y-pescados-chicharron-prensado",
+  "title": "Chicharrón prensado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chorizo-grapa",
+  "id": "carnes-aves-y-pescados-chorizo-grapa",
+  "title": "Chorizo grapa",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cocido-pecho-c-h",
+  "id": "carnes-aves-y-pescados-cocido-de-pecho-c-h",
+  "title": "Cocido de pecho c/h",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cicido-rabo",
+  "id": "carnes-aves-y-pescados-cocido-de-rabo",
+  "title": "Cocido de rabo",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "codillo",
+  "id": "carnes-aves-y-pescados-codillo-de-puerco",
+  "title": "Codillo de puerco",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cordon-bleu-mini",
+  "id": "carnes-aves-y-pescados-cordon-bleu-mini",
+  "title": "Cordon bleu mini",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "costilla-back-rib",
+  "id": "carnes-aves-y-pescados-costilla-back-rib-de-puerco",
+  "title": "Costilla back rib de puerco",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "costilla-back-rib-tira-corta",
+  "id": "carnes-aves-y-pescados-costilla-back-rib-tira-corta",
+  "title": "Costilla back rib tira corta",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "costilla-cargada-delantera",
+  "id": "carnes-aves-y-pescados-costilla-cargada-delantera",
+  "title": "Costilla cargada delantera",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "costilla-cargada-prime",
+  "id": "carnes-aves-y-pescados-costilla-cargada-prime",
+  "title": "Costilla cargada prime",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "costilla-puerco-cargada",
+  "id": "carnes-aves-y-pescados-costilla-de-puerco-cargada",
+  "title": "Costilla de puerco cargada",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "costilla-puerco-cargada-cortada",
+  "id": "carnes-aves-y-pescados-costilla-de-puerco-cargada-cortada",
+  "title": "Costilla de puerco cargada cortada",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "costilla-tracera-chuleta",
+  "id": "carnes-aves-y-pescados-costilla-tracera-chuletas",
+  "title": "Costilla tracera (chuletas)",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "costilla-tracera-engorda",
+  "id": "carnes-aves-y-pescados-costilla-tracera-engorda",
+  "title": "Costilla tracera (engorda)",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cuero-puerco",
+  "id": "carnes-aves-y-pescados-cuero-de-puerco",
+  "title": "Cuero de puerco",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "desebrada-aldilla",
+  "id": "carnes-aves-y-pescados-deshebrada-aldilla",
+  "title": "Deshebrada aldilla",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "diezmillo-c-h-chuleta",
+  "id": "carnes-aves-y-pescados-diezmillo-c-h",
+  "title": "Diezmillo c/h",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "diezmillo-c-h-engorda",
+  "id": "carnes-aves-y-pescados-diezmillo-c-h-engorda",
+  "title": "Diezmillo c/h (engorda)",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "espinazo-cargado",
+  "id": "carnes-aves-y-pescados-espinazo-cargado",
+  "title": "Espinazo cargado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "espinazo",
+  "id": "carnes-aves-y-pescados-espinazo-de-puerco",
+  "title": "Espinazo de puerco",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "filete-guitarra",
+  "id": "carnes-aves-y-pescados-filete-de-guitarra",
+  "title": "Filete de guitarra",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "filete-salmon-premium",
+  "id": "carnes-aves-y-pescados-filete-de-salmon-premium",
+  "title": "Filete de salmón premium",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "filete-tilapia-35",
+  "id": "carnes-aves-y-pescados-filete-de-tilapia-3-5",
+  "title": "Filete de tilapia 3-5",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "filete-tilapia-comercial-50",
+  "id": "carnes-aves-y-pescados-filete-de-tilapia-comercial-50",
+  "title": "Filete de tilapia comercial 50%",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "hamburguesa-bm-arrachera-caja-30pzs",
+  "id": "carnes-aves-y-pescados-hamburguesa-bm-arrachera-caja-30-pzs-de-150-g",
+  "title": "Hamburguesa BM arrachera (caja 30 pzs de 150 g)",
+  "description": "Caja"
+ },
+ {
+  "slug": "hamburguesa-bm-mezquite-caja-30pzs",
+  "id": "carnes-aves-y-pescados-hamburguesa-bm-mezquite-caja-30-pzs-de-150-g",
+  "title": "Hamburguesa BM mezquite (caja 30 pzs de 150 g)",
+  "description": "Caja"
+ },
+ {
+  "slug": "hamburguesa-bm-sirloin-caja-30pzs",
+  "id": "carnes-aves-y-pescados-hamburguesa-bm-sirloin-caja-30-pzs-de-150-g",
+  "title": "Hamburguesa BM sirloin (caja 30 pzs de 150 g)",
+  "description": "Caja"
+ },
+ {
+  "slug": "hamburguesa-empanizada-pilgrims",
+  "id": "carnes-aves-y-pescados-hamburguesa-empanizada-pilgrim-s",
+  "title": "Hamburguesa empanizada Pilgrim's",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "hueso-menudo",
+  "id": "carnes-aves-y-pescados-hueso-para-menudo",
+  "title": "Hueso para menudo",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "labio-res",
+  "id": "carnes-aves-y-pescados-labio-de-res",
+  "title": "Labio de res",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "lomo-ahumado-chimex",
+  "id": "carnes-aves-y-pescados-lomo-ahumado-chimex",
+  "title": "Lomo ahumado Chimex",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "lomo-ahumado-cortado",
+  "id": "carnes-aves-y-pescados-lomo-ahumado-cortado",
+  "title": "Lomo ahumado cortado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "lomo-ahumado-cubicado-1kg",
+  "id": "carnes-aves-y-pescados-lomo-ahumado-cubicado-1-kg",
+  "title": "Lomo ahumado cubicado 1 kg",
+  "description": "Por kilo — bolsa 1 kg"
+ },
+ {
+  "slug": "lomo-engorda-premium",
+  "id": "carnes-aves-y-pescados-lomo-engorda-premium",
+  "title": "Lomo engorda premium",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "lomo-natural-cortado",
+  "id": "carnes-aves-y-pescados-lomo-natural-cortado",
+  "title": "Lomo natural cortado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "lomo-natural-puerco",
+  "id": "carnes-aves-y-pescados-lomo-natural-de-puerco",
+  "title": "Lomo natural de puerco",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "manitas-puerco",
+  "id": "carnes-aves-y-pescados-manitas-de-puerco",
+  "title": "Manitas de puerco",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "medallon-atun-mexicano",
+  "id": "carnes-aves-y-pescados-medallon-de-atun-mexicano-rebanado",
+  "title": "Medallón de atún mexicano rebanado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "menudo-americano",
+  "id": "carnes-aves-y-pescados-menudo-americano",
+  "title": "Menudo americano",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "menudo-americano-cortado",
+  "id": "carnes-aves-y-pescados-menudo-americano-cortado",
+  "title": "Menudo americano cortado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "menudo-mexicano",
+  "id": "carnes-aves-y-pescados-menudo-mexicano",
+  "title": "Menudo mexicano",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "menudo-mexicano-cortado",
+  "id": "carnes-aves-y-pescados-menudo-mexicano-cortado",
+  "title": "Menudo mexicano cortado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "morcon",
+  "id": "carnes-aves-y-pescados-morcon",
+  "title": "Morcón",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "muslo-bate",
+  "id": "carnes-aves-y-pescados-muslo-bate-de-pollo",
+  "title": "Muslo bate de pollo",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "nugget-pechuga-pilgrims",
+  "id": "carnes-aves-y-pescados-nugget-de-pechuga-pilgrim-s",
+  "title": "Nugget de pechuga Pilgrim's",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "nuggets-enchiladas-caja-10kg",
+  "id": "carnes-aves-y-pescados-nuggets-enchilados-caja-10-kg",
+  "title": "Nuggets enchilados (caja 10 kg)",
+  "description": "Caja 10 kg"
+ },
+ {
+  "slug": "paleta-engorda",
+  "id": "carnes-aves-y-pescados-paleta-engorda",
+  "title": "Paleta (engorda)",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pata-res",
+  "id": "carnes-aves-y-pescados-pata-de-res",
+  "title": "Pata de res",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pechuga-media-mariposa",
+  "id": "carnes-aves-y-pescados-pechuga-de-pollo-media-mariposa",
+  "title": "Pechuga de pollo media mariposa",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pechuga-sin-hueso-br",
+  "id": "carnes-aves-y-pescados-pechuga-de-pollo-sin-hueso-br",
+  "title": "Pechuga de pollo sin hueso BR",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pechuga-grill-fc-pilgrims",
+  "id": "carnes-aves-y-pescados-pechuga-grill-fc-pilgrim-s",
+  "title": "Pechuga grill FC Pilgrim's",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pechuga-picante-emp-pilgrims",
+  "id": "carnes-aves-y-pescados-pechuga-picante-empanizada-pilgrim-s",
+  "title": "Pechuga picante empanizada Pilgrim's",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pechuga-sh-am-soles-caja-10kg",
+  "id": "carnes-aves-y-pescados-pechuga-sin-hueso-am-soles-caja-10-kg",
+  "title": "Pechuga sin hueso AM Soles (caja 10 kg)",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pechuga-sh-br-soles-caja-10kg",
+  "id": "carnes-aves-y-pescados-pechuga-sin-hueso-br-soles-caja-10-kg",
+  "title": "Pechuga sin hueso BR Soles (caja 10 kg)",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pechuga-sh-pilgrims-caja-12kg",
+  "id": "carnes-aves-y-pescados-pechuga-sin-hueso-pilgrim-s-caja-12-kg",
+  "title": "Pechuga sin hueso Pilgrim's (caja 12 kg)",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "mojarra-importada",
+  "id": "carnes-aves-y-pescados-pescado-mojarra-importada",
+  "title": "Pescado mojarra importada",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pescuezo-res-con-hueso",
+  "id": "carnes-aves-y-pescados-pescuezo-de-res-con-hueso",
+  "title": "Pescuezo de res con hueso",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pescuezo-res-deshuesado",
+  "id": "carnes-aves-y-pescados-pescuezo-de-res-deshuesado",
+  "title": "Pescuezo de res deshuesado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pierna-puerco-natural",
+  "id": "carnes-aves-y-pescados-pierna-de-puerco-natural",
+  "title": "Pierna de puerco natural",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pierna-puerco-natural-cortada",
+  "id": "carnes-aves-y-pescados-pierna-de-puerco-natural-cortada",
+  "title": "Pierna de puerco natural cortada",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pierna-puerco-cubicada",
+  "id": "carnes-aves-y-pescados-pierna-de-puerco-natural-cubicada",
+  "title": "Pierna de puerco natural cubicada",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pollo-empanizado-kfc-caja-1361kg",
+  "id": "carnes-aves-y-pescados-pollo-empanizado-tipo-kfc-caja-13-61-kg",
+  "title": "Pollo empanizado tipo KFC (caja 13.61 kg)",
+  "description": "Caja 13.61 kg"
+ },
+ {
+  "slug": "pollo-entero-congelado-pilgrims-caja-145kg",
+  "id": "carnes-aves-y-pescados-pollo-entero-congelado-pilgrim-s-caja-14-5-kg",
+  "title": "Pollo entero congelado Pilgrim's (caja 14.5 kg)",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pork-belly-premium-tif",
+  "id": "carnes-aves-y-pescados-pork-belly-premium-tif",
+  "title": "Pork belly premium TIF",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pork-belly-seabord",
+  "id": "carnes-aves-y-pescados-pork-belly-seabord",
+  "title": "Pork belly Seabord",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "porter-house",
+  "id": "carnes-aves-y-pescados-porter-house",
+  "title": "Porter house",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pozole-dona-conchita-10pzs",
+  "id": "carnes-aves-y-pescados-pozole-dona-conchita-10-pzs",
+  "title": "Pozole Doña Conchita (10 pzs)",
+  "description": "Paquete 10 piezas"
+ },
+ {
+  "slug": "pulpa-bola",
+  "id": "carnes-aves-y-pescados-pulpa-bola",
+  "title": "Pulpa bola",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pulpa-bola-negra-natural",
+  "id": "carnes-aves-y-pescados-pulpa-bola-o-negra-natural",
+  "title": "Pulpa bola o negra natural",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pulpa-sirloin-cubicada-1x1",
+  "id": "carnes-aves-y-pescados-pulpa-de-sirloin-cubicada-1x1",
+  "title": "Pulpa de sirloin cubicada 1x1",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pulpa-milanesa",
+  "id": "carnes-aves-y-pescados-pulpa-milanesa",
+  "title": "Pulpa milanesa",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pulpa-negra",
+  "id": "carnes-aves-y-pescados-pulpa-negra",
+  "title": "Pulpa negra",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pulpa-alto-vacio",
+  "id": "carnes-aves-y-pescados-pulpas-alto-vacio-bola-o-negra",
+  "title": "Pulpas alto vacío (bola o negra)",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pulpo-12",
+  "id": "carnes-aves-y-pescados-pulpo-1-2",
+  "title": "Pulpo 1-2",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pulpo-24",
+  "id": "carnes-aves-y-pescados-pulpo-2-4",
+  "title": "Pulpo 2-4",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pulpo-cocido-picado-500g",
+  "id": "carnes-aves-y-pescados-pulpo-cocido-picado-500-g",
+  "title": "Pulpo cocido picado (500 g)",
+  "description": "Pieza 500 g"
+ },
+ {
+  "slug": "rib-eye",
+  "id": "carnes-aves-y-pescados-rib-eye",
+  "title": "Rib eye",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "suadero",
+  "id": "carnes-aves-y-pescados-suadero",
+  "title": "Suadero",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "t-bone-engorda",
+  "id": "carnes-aves-y-pescados-t-bone-engorda",
+  "title": "T-bone (engorda)",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "t-bone-engorda-premium",
+  "id": "carnes-aves-y-pescados-t-bone-engorda-premium",
+  "title": "T-bone engorda premium",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "tender-empanizado-pilgrims",
+  "id": "carnes-aves-y-pescados-tender-empanizado-pilgrim-s",
+  "title": "Tender empanizado Pilgrim's",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "tocino-cubicado-1kg",
+  "id": "carnes-aves-y-pescados-tocino-cubicado-1-kg",
+  "title": "Tocino cubicado 1 kg",
+  "description": "Por kilo — bolsa 1 kg"
+ },
+ {
+  "slug": "tocino-rebanado",
+  "id": "carnes-aves-y-pescados-tocino-rebanado",
+  "title": "Tocino rebanado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "tomahawk",
+  "id": "carnes-aves-y-pescados-tomahawk",
+  "title": "Tomahawk",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "tripa-puerco",
+  "id": "carnes-aves-y-pescados-tripa-de-puerco",
+  "title": "Tripa de puerco",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "tripa-res-americana-1361",
+  "id": "carnes-aves-y-pescados-tripa-de-res-americana-13-61",
+  "title": "Tripa de res americana (13.61)",
+  "description": "Caja 13.61 kg"
+ },
+ {
+  "slug": "tuetano-hueso-canoa",
+  "id": "carnes-aves-y-pescados-tuetano-hueso-canoa",
+  "title": "Tuétano hueso canoa",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "tuetano-hueso-cortar",
+  "id": "carnes-aves-y-pescados-tuetano-hueso-para-cortar",
+  "title": "Tuétano hueso para cortar",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "zancarron",
+  "id": "carnes-aves-y-pescados-zancarron",
+  "title": "Zancarrón",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "acelga",
+  "id": "frutas-y-verduras-acelga",
+  "title": "Acelga",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "aguacate-hass",
+  "id": "frutas-y-verduras-aguacate-hass",
+  "title": "Aguacate Hass",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "ajo",
+  "id": "frutas-y-verduras-ajo",
+  "title": "Ajo",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "alfalfa-germinado",
+  "id": "frutas-y-verduras-alfalfa-germinado",
+  "title": "Alfalfa Germinado",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "apio-palitos-aderezo-mr-lucky",
+  "id": "frutas-y-verduras-apio-en-palitos-con-aderezo-mr-lucky",
+  "title": "Apio en Palitos con Aderezo Mr. Lucky",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "arandano-fresco",
+  "id": "frutas-y-verduras-arandano-fresco",
+  "title": "Arándano Fresco",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "betabel",
+  "id": "frutas-y-verduras-betabel",
+  "title": "Betabel",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "blue-berry",
+  "id": "frutas-y-verduras-blue-berry",
+  "title": "Blue Berry",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "brocoli",
+  "id": "frutas-y-verduras-brocoli",
+  "title": "Brócoli",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "calabaza",
+  "id": "frutas-y-verduras-calabaza",
+  "title": "Calabaza",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cebolla-amarilla",
+  "id": "frutas-y-verduras-cebolla-amarilla",
+  "title": "Cebolla Amarilla",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cebolla-cambray",
+  "id": "frutas-y-verduras-cebolla-cambray",
+  "title": "Cebolla Cambray",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cebolla-morada",
+  "id": "frutas-y-verduras-cebolla-morada",
+  "title": "Cebolla Morada",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chacal",
+  "id": "frutas-y-verduras-chacal",
+  "title": "Chacal",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "champinon",
+  "id": "frutas-y-verduras-champinon",
+  "title": "Champiñón",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chayote",
+  "id": "frutas-y-verduras-chayote",
+  "title": "Chayote",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chicharo",
+  "id": "frutas-y-verduras-chicharo",
+  "title": "Chícharo",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chile-caribe",
+  "id": "frutas-y-verduras-chile-caribe",
+  "title": "Chile Caribe",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chile-chilaca",
+  "id": "frutas-y-verduras-chile-chilaca",
+  "title": "Chile Chilaca",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chile-habanero",
+  "id": "frutas-y-verduras-chile-habanero",
+  "title": "Chile Habanero",
+  "description": "Por 100 g"
+ },
+ {
+  "slug": "chile-jalapeno",
+  "id": "frutas-y-verduras-chile-jalapeno",
+  "title": "Chile Jalapeño",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "chile-poblano",
+  "id": "frutas-y-verduras-chile-poblano",
+  "title": "Chile Poblano",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "cilantro",
+  "id": "frutas-y-verduras-cilantro",
+  "title": "Cilantro",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "col-blanca",
+  "id": "frutas-y-verduras-col-blanca",
+  "title": "Col Blanca",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "coliflor",
+  "id": "frutas-y-verduras-coliflor",
+  "title": "Coliflor",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "ejote",
+  "id": "frutas-y-verduras-ejote",
+  "title": "Ejote",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "elote",
+  "id": "frutas-y-verduras-elote",
+  "title": "Elote",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "ensalada-cesar-mr-lucky",
+  "id": "frutas-y-verduras-ensalada-cesar-mr-lucky",
+  "title": "Ensalada César Mr. Lucky",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "ensalada-primavera-mr-lucky",
+  "id": "frutas-y-verduras-ensalada-primavera-mr-lucky",
+  "title": "Ensalada Primavera Mr. Lucky",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "epazote",
+  "id": "frutas-y-verduras-epazote",
+  "title": "Epazote",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "esparrago",
+  "id": "frutas-y-verduras-esparrago",
+  "title": "Espárrago",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "espinaca",
+  "id": "frutas-y-verduras-espinaca",
+  "title": "Espinaca",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "frambuesa",
+  "id": "frutas-y-verduras-frambuesa",
+  "title": "Frambuesa",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "fresa",
+  "id": "frutas-y-verduras-fresa",
+  "title": "Fresa",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "hierbabuena-fresca",
+  "id": "frutas-y-verduras-hierbabuena-fresca",
+  "title": "Hierbabuena Fresca",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "jengibre-fresco",
+  "id": "frutas-y-verduras-jengibre-fresco",
+  "title": "Jengibre Fresco",
+  "description": "Por 100 g"
+ },
+ {
+  "slug": "jicama",
+  "id": "frutas-y-verduras-jicama",
+  "title": "Jícama",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "jitomate-cherry",
+  "id": "frutas-y-verduras-jitomate-cherry",
+  "title": "Jitomate Cherry",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "kale-organico-1kg",
+  "id": "frutas-y-verduras-kale-organico-1kg",
+  "title": "Kale Orgánico 1kg",
+  "description": "1 kg"
+ },
+ {
+  "slug": "kiwi",
+  "id": "frutas-y-verduras-kiwi",
+  "title": "Kiwi",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "lechuga-romana",
+  "id": "frutas-y-verduras-lechuga-romana",
+  "title": "Lechuga Romana",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "limon-agrio",
+  "id": "frutas-y-verduras-limon-agrio",
+  "title": "Limón Agrio",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "maiz-rosero",
+  "id": "frutas-y-verduras-maiz-rosero",
+  "title": "Maíz Rosero",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "mango-ataulfo",
+  "id": "frutas-y-verduras-mango-ataulfo",
+  "title": "Mango Ataúlfo",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "manzana-golden",
+  "id": "frutas-y-verduras-manzana-golden",
+  "title": "Manzana Golden",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "mejorana-fresca",
+  "id": "frutas-y-verduras-mejorana-fresca",
+  "title": "Mejorana Fresca",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "melon-chino",
+  "id": "frutas-y-verduras-melon-chino",
+  "title": "Melón Chino",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "melon-honeydew",
+  "id": "frutas-y-verduras-melon-honeydew",
+  "title": "Melón Honeydew",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "menta-fresca",
+  "id": "frutas-y-verduras-menta-fresca",
+  "title": "Menta Fresca",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "naranja-valencia",
+  "id": "frutas-y-verduras-naranja-valencia",
+  "title": "Naranja Valencia",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "papa-blanca",
+  "id": "frutas-y-verduras-papa-blanca",
+  "title": "Papa Blanca",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "papaya-maradol",
+  "id": "frutas-y-verduras-papaya-maradol",
+  "title": "Papaya Maradol",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "pepino",
+  "id": "frutas-y-verduras-pepino",
+  "title": "Pepino",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "perejil",
+  "id": "frutas-y-verduras-perejil",
+  "title": "Perejil",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "platano-macho",
+  "id": "frutas-y-verduras-platano-macho",
+  "title": "Plátano Macho",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "poro",
+  "id": "frutas-y-verduras-poro",
+  "title": "Poro",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "rabano",
+  "id": "frutas-y-verduras-rabano",
+  "title": "Rábano",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "romero-fresco",
+  "id": "frutas-y-verduras-romero-fresco",
+  "title": "Romero Fresco",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "sandia",
+  "id": "frutas-y-verduras-sandia",
+  "title": "Sandía",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "te-de-limon",
+  "id": "frutas-y-verduras-te-de-limon",
+  "title": "Té de Limón",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "tomate-verde",
+  "id": "frutas-y-verduras-tomate-verde",
+  "title": "Tomate Verde",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "tomillo-fresco",
+  "id": "frutas-y-verduras-tomillo-fresco",
+  "title": "Tomillo Fresco",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "toronja",
+  "id": "frutas-y-verduras-toronja",
+  "title": "Toronja",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "tuna-fruta",
+  "id": "frutas-y-verduras-tuna-fruta",
+  "title": "Tuna (fruta)",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "uva-negra",
+  "id": "frutas-y-verduras-uva-negra",
+  "title": "Uva Negra",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "zanahoria",
+  "id": "frutas-y-verduras-zanahoria",
+  "title": "Zanahoria",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "zarzamora",
+  "id": "frutas-y-verduras-zarzamora",
+  "title": "Zarzamora",
+  "description": "Por kilo"
+ },
+ {
+  "slug": "aguacate-chunky-caja-7264kg",
+  "id": "congelados-aguacate-chunky",
+  "title": "Aguacate chunky",
+  "description": "Caja 7.264 kg (8 bolsas de 2 lb)"
+ },
+ {
+  "slug": "aros-cebolla-bolsa-907g",
+  "id": "congelados-aros-de-cebolla-empanizados-mc",
+  "title": "Aros de cebolla empanizados — MC",
+  "description": "Bolsa 907 g"
+ },
+ {
+  "slug": "deditos-papa-caja-10kg",
+  "id": "congelados-deditos-de-papa",
+  "title": "Deditos de papa",
+  "description": "Caja 10 kg"
+ },
+ {
+  "slug": "dedos-queso-bolsa-181kg",
+  "id": "congelados-dedos-de-queso",
+  "title": "Dedos de queso",
+  "description": "Bolsa 1.81 kg"
+ },
+ {
+  "slug": "papa-conquest-14-caja-1633kg",
+  "id": "congelados-papa-conquest-1-4",
+  "title": "Papa Conquest 1/4",
+  "description": "Caja 16.33 kg"
+ },
+ {
+  "slug": "papa-conquest-delivery-38-sc-caja-1361kg",
+  "id": "congelados-papa-conquest-delivery-3-8-sin-cascara",
+  "title": "Papa Conquest Delivery 3/8 sin cáscara",
+  "description": "Caja 13.61 kg"
+ },
+ {
+  "slug": "papa-conquest-delivery-teja-65-caja-1361kg",
+  "id": "congelados-papa-conquest-delivery-teja-6-5",
+  "title": "Papa Conquest Delivery teja 6/5",
+  "description": "Caja 13.61 kg"
+ },
+ {
+  "slug": "papa-curly-savory-caja-1361kg",
+  "id": "congelados-papa-curly-savory",
+  "title": "Papa curly Savory",
+  "description": "Caja 13.61 kg"
+ },
+ {
+  "slug": "papa-dulce-recta-38-caja-680kg",
+  "id": "congelados-papa-dulce-recta-3-8",
+  "title": "Papa dulce recta 3/8",
+  "description": "Caja 6.80 kg"
+ },
+ {
+  "slug": "papa-francesa-14-payette-caja-1224kg",
+  "id": "congelados-papa-francesa-1-4-payette",
+  "title": "Papa francesa 1/4 Payette",
+  "description": "Caja 12.24 kg"
+ },
+ {
+  "slug": "papa-francesa-38-payette-caja-1361kg",
+  "id": "congelados-papa-francesa-3-8-payette",
+  "title": "Papa francesa 3/8 Payette",
+  "description": "Caja 13.61 kg"
+ },
+ {
+  "slug": "papa-gajo-10-cut-65-caja-1361kg",
+  "id": "congelados-papa-gajo-10-cut-6-5",
+  "title": "Papa gajo 10 cut 6/5",
+  "description": "Caja 13.61 kg"
+ },
+ {
+  "slug": "papa-hash-brown-patty-caja-952kg",
+  "id": "congelados-papa-hash-brown-patty",
+  "title": "Papa hash brown patty",
+  "description": "Caja 9.52 kg"
+ },
+ {
+  "slug": "papa-lisa-caja",
+  "id": "congelados-papa-lisa-para-freir",
+  "title": "Papa lisa para freír",
+  "description": "Caja"
+ },
+ {
+  "slug": "papa-megacrunch-14-caja-1224kg",
+  "id": "congelados-papa-megacrunch-1-4",
+  "title": "Papa Megacrunch 1/4",
+  "description": "Caja 12.24 kg"
+ },
+ {
+  "slug": "papa-ondulada-38-payette-caja-1361kg",
+  "id": "congelados-papa-ondulada-3-8-payette",
+  "title": "Papa ondulada 3/8 Payette",
+  "description": "Caja 13.61 kg"
+ },
+ {
+  "slug": "papa-rallada-hash-brown-caja-816kg",
+  "id": "congelados-papa-rallada-hash-brown",
+  "title": "Papa rallada hash brown",
+  "description": "Caja 8.16 kg"
+ },
+ {
+  "slug": "papa-rejilla-savory-caja-1224kg",
+  "id": "congelados-papa-rejilla-savory",
+  "title": "Papa rejilla Savory",
+  "description": "Caja 12.24 kg"
+ },
+ {
+  "slug": "papa-select-38-cascara-caja-1361kg",
+  "id": "congelados-papa-select-3-8-con-cascara",
+  "title": "Papa Select 3/8 con cáscara",
+  "description": "Caja 13.61 kg"
+ },
+ {
+  "slug": "papa-select-38-sc-caja-1361kg",
+  "id": "congelados-papa-select-3-8-sin-cascara",
+  "title": "Papa Select 3/8 sin cáscara",
+  "description": "Caja 13.61 kg"
+ },
+ {
+  "slug": "papa-select-516-sc-caja-1361kg",
+  "id": "congelados-papa-select-5-16-sin-cascara",
+  "title": "Papa Select 5/16 sin cáscara",
+  "description": "Caja 13.61 kg"
+ },
+ {
+  "slug": "papa-thunder-38-sc-caja-1361kg",
+  "id": "congelados-papa-thunder-3-8-con-cascara",
+  "title": "Papa Thunder 3/8 con cáscara",
+  "description": "Caja 13.61 kg"
+ },
+ {
+  "slug": "queso-crema-krol-barra-136-kg",
+  "id": "lacteos-y-huevos-queso-crema-krol-barra-1-36-kg",
+  "title": "Queso crema Krol barra 1.36 kg",
+  "description": "Pieza — barra 1.36 kg"
+ },
+ {
+  "slug": "queso-crema-reny-picot-caja-8-kg",
+  "id": "lacteos-y-huevos-queso-crema-reny-picot-caja-8-kg",
+  "title": "Queso crema Reny Picot (caja 8 kg)",
+  "description": "Caja 8 kg"
+ },
+ {
+  "slug": "queso-crema-reny-picot-136-kg",
+  "id": "lacteos-y-huevos-queso-crema-reny-picot-1-36-kg",
+  "title": "Queso crema Reny Picot 1.36 kg",
+  "description": "Pieza 1.36 kg"
+ }
+]
