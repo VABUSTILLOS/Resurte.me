@@ -97,7 +97,7 @@ describe("buildMetaFeedCsv", () => {
     expect(lines[1]).toBe(
       "abarrotes-achiote,Achiote,Bolsa 50 g,https://resurte.me/chihuahua/producto/achiote," +
         "https://resurte.me/images/products/ai/achiote.webp,Resurte.me,6.31 MXN,in stock,new," +
-        '"{latitude: 28.63581, longitude: -106.07645}",20,km',
+        '"{latitude: 28.63581, longitude: -106.07645}",20,km,Abarrotes,abarrotes',
     )
   })
 

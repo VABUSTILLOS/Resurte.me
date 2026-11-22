@@ -36,6 +36,11 @@
 //   invisibles hoy por la misma razón (imagen rota en el feed
 //   temporal), así que no se pierde nada visible.
 // - description nunca lleva costo ni SKU del proveedor (00020).
+// - google_product_category y custom_label_0 llevan la categoría de
+//   la tienda (nombre y slug): son los campos con los que Meta arma
+//   los conjuntos/colecciones del catálogo por categoría, para que
+//   WhatsApp agrupe igual que la tienda en línea. Se agregan al
+//   final para no mover ninguna columna existente.
 //
 // Sin cookies() ni headers() — solo lecturas cacheadas (catálogo).
 
@@ -60,6 +65,8 @@ export const META_FEED_COLUMNS = [
   "availability_circle_origin",
   "availability_circle_radius",
   "availability_circle_radius_unit",
+  "google_product_category",
+  "custom_label_0",
 ] as const
 
 interface MetaFeedMapEntry {
@@ -121,6 +128,7 @@ export interface MetaFeedResult {
 
 export function buildMetaFeedCsv(products: Product[], categories: Category[]): MetaFeedResult {
   const categoryById = new Map(categories.map((c) => [c.id, c.name]))
+  const categorySlugById = new Map(categories.map((c) => [c.id, c.slug]))
   const rows: string[] = [META_FEED_COLUMNS.join(",")]
   let included = 0
   let mapped = 0
@@ -160,6 +168,8 @@ export function buildMetaFeedCsv(products: Product[], categories: Category[]): M
       CIRCLE_ORIGIN,
       String(CIRCLE_RADIUS_KM),
       "km",
+      categoryName,
+      categorySlugById.get(product.category_id) ?? slugify(categoryName),
     ]
     rows.push(fields.map(csvEscape).join(","))
     included += 1
