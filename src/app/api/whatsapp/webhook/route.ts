@@ -427,9 +427,9 @@ async function handleOrderMessage(
         void runNewOrderWorkflows(result.orderId)
       })
       const lines = [
-        "¡Pedido recibido! 🎉",
+        "¡Gracias por tu pedido! 🎉",
         "",
-        `Tu pedido *#${result.orderId}* quedó registrado en Resurte.`,
+        `Ya lo recibimos y quedó registrado en Resurte con el *#${result.orderId}*.`,
         `Total: *$${result.total.toFixed(2)} MXN*`,
       ]
       if (result.unresolved.length > 0) {
@@ -450,10 +450,10 @@ async function handleOrderMessage(
       const spei = getSpeiAccount()
       lines.push(
         "",
-        "💳 *Paga tu pedido por transferencia SPEI para poder entregártelo:*",
+        "💳 *Paga tu pedido por transferencia SPEI:*",
+        `CLABE: *${formatClabe(spei.clabe)}*`,
         `Banco: *${spei.banco}*`,
         `Beneficiario: *${spei.beneficiario}*`,
-        `CLABE: *${formatClabe(spei.clabe)}*`,
         `Concepto: *${result.orderId}* (tu número de pedido)`,
         `Monto exacto: *$${result.total.toFixed(2)} MXN*`,
         "",
