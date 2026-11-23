@@ -18,6 +18,7 @@ import { createHmac, timingSafeEqual } from "crypto"
 import { after, NextRequest, NextResponse } from "next/server"
 import { verifyWebhook, sendTextMessage } from "@/lib/whatsapp"
 import { createWhatsAppOrder, findProfileByPhone } from "@/lib/whatsapp-orders"
+import { getSpeiAccount, formatClabe } from "@/lib/spei-account"
 import { runNewOrderWorkflows } from "@/lib/workflows"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
@@ -426,9 +427,9 @@ async function handleOrderMessage(
         void runNewOrderWorkflows(result.orderId)
       })
       const lines = [
-        "¡Pedido recibido! 🎉",
+        "¡Gracias por tu pedido! 🎉",
         "",
-        `Tu pedido *#${result.orderId}* quedó registrado en Resurte.`,
+        `Ya lo recibimos y quedó registrado en Resurte con el *#${result.orderId}*.`,
         `Total: *$${result.total.toFixed(2)} MXN*`,
       ]
       if (result.unresolved.length > 0) {
@@ -442,6 +443,22 @@ async function handleOrderMessage(
             : "⚠️ Algunos productos de tu pedido no pudimos identificarlos. Si te falta algo, escríbenos el nombre y la cantidad."
         )
       }
+      // Datos SPEI: la misma fuente única que muestra el checkout web
+      // (src/lib/spei-account.ts). El cliente paga su pedido por
+      // transferencia para que se le pueda entregar; el concepto es su
+      // número de pedido, para conciliar el pago contra el pedido.
+      const spei = getSpeiAccount()
+      lines.push(
+        "",
+        "💳 *Paga tu pedido por transferencia SPEI:*",
+        `CLABE: *${formatClabe(spei.clabe)}*`,
+        `Banco: *${spei.banco}*`,
+        `Beneficiario: *${spei.beneficiario}*`,
+        `Concepto: *${result.orderId}* (tu número de pedido)`,
+        `Monto exacto: *$${result.total.toFixed(2)} MXN*`,
+        "",
+        "En cuanto recibamos tu pago, preparamos tu pedido. 🛵"
+      )
       lines.push(
         "",
         "Para entregártelo, compárteme tu *dirección completa* (calle, número, colonia, CP y alguna referencia) y el nombre de quien recibe. 📍"
