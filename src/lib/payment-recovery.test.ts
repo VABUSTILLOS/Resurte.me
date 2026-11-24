@@ -4,6 +4,7 @@ import {
   applyPaymentRecoveryFilter,
   isExcludedFromPaymentRecovery,
   isPaymentRecoverable,
+  isWhatsAppUnpaidCancellationDue,
   paymentRecoveryMethodFilter,
   PAYMENT_RECOVERY_CANCEL_HOURS,
   PAYMENT_RECOVERY_EXCLUDED_METHODS,
@@ -122,5 +123,20 @@ describe("applyPaymentRecoveryFilter", () => {
 describe("umbral de cancelación", () => {
   it("son 72 horas, y el nombre evita que se cambie a ciegas", () => {
     expect(PAYMENT_RECOVERY_CANCEL_HOURS).toBe(72)
+  })
+})
+
+describe("isWhatsAppUnpaidCancellationDue (paso final propio de WhatsApp)", () => {
+  it("con los niveles por defecto (último 48 h) y la gracia por defecto (24 h), vence a las 72 h", () => {
+    // El mismo plazo que la regla general: encender el paso propio no
+    // debe acortar ni alargar el plazo sin querer.
+    expect(isWhatsAppUnpaidCancellationDue(71, 48, 24)).toBe(false)
+    expect(isWhatsAppUnpaidCancellationDue(72, 48, 24)).toBe(true)
+    expect(isWhatsAppUnpaidCancellationDue(100, 48, 24)).toBe(true)
+  })
+
+  it("el plazo se mueve con el último nivel configurado, no es una constante", () => {
+    expect(isWhatsAppUnpaidCancellationDue(47, 24, 24)).toBe(false)
+    expect(isWhatsAppUnpaidCancellationDue(48, 24, 24)).toBe(true)
   })
 })
