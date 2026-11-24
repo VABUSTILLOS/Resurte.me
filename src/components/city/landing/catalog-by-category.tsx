@@ -33,7 +33,7 @@ export function CatalogByCategory({
               Todo lo que tu cocina necesita
             </h2>
             <p className="text-sm sm:text-base text-[#6b6b6b] mt-3 max-w-xl mx-auto leading-relaxed">
-              De la central de abastos a tu negocio. {productsCount} productos — por caja, bulto o pieza.
+              De la central de abastos a tu casa o tu negocio. {productsCount} productos — por caja, bulto o pieza.
             </p>
           </ScrollReveal>
 

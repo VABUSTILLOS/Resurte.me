@@ -106,7 +106,7 @@ export function CityPageClient({ slug, categories, preview, totalCount }: Props)
           Central de Abastos Digital en {city.name}
         </h1>
         <p className="mt-2 text-[var(--text-secondary)] max-w-2xl">
-          {totalCount} productos frescos para tu negocio. Sin membresía: pedido mínimo de {formatMxn(MIN_ORDER_MXN)} y envío gratis desde {formatMxn(FREE_SHIPPING_MXN)}. Pedidos por caja, bulto o pieza.
+          {totalCount} productos frescos para tu casa o tu negocio. Sin membresía: pedido mínimo de {formatMxn(MIN_ORDER_MXN)} y envío gratis desde {formatMxn(FREE_SHIPPING_MXN)}. Pedidos por caja, bulto o pieza.
         </p>
       </div>
 

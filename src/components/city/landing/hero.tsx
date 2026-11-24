@@ -41,7 +41,7 @@ export function HeroSection({
                 </span>
               </h1>
               <p className="mt-3 sm:mt-5 text-sm sm:text-lg text-white/75 leading-relaxed max-w-[480px]">
-                Pide los insumos de tu restaurante desde el cel. Te los entregamos el mismo día, frescos y al mejor precio. Sin madrugar, sin vueltas.
+                Surte tu casa o tu negocio desde el cel: frutas, verduras, carnes y abarrotes frescos, al mejor precio y entregados el mismo día. Sin madrugar, sin vueltas.
               </p>
               <div className="mt-4 sm:mt-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs sm:text-sm text-white/60 sm:text-white/70">
                 <span className="inline-flex items-center gap-1">

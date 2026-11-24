@@ -117,7 +117,7 @@ export default async function ZonasDeEntregaPage({ params }: Props) {
           </h1>
           <p className="text-base sm:text-lg text-[#5C6068] leading-relaxed">
             {active
-              ? `Entregamos insumos por mayoreo el mismo día en toda la ciudad de ${city.name}. No hay colonias excluidas dentro del municipio: si tu negocio está en ${city.name} capital, tienes cobertura.`
+              ? `Entregamos por mayoreo el mismo día en toda la ciudad de ${city.name}. No hay colonias excluidas dentro del municipio: si tu casa o tu negocio está en ${city.name} capital, tienes cobertura.`
               : `Todavía no entregamos en ${city.name}, ${city.state}. Hoy operamos en ${BUSINESS_LOCATION_LABEL}.`}
           </p>
         </div>

@@ -11,7 +11,7 @@ export function HowItWorks() {
               Así de fácil
             </p>
             <h2 className="text-2xl sm:text-3xl font-bold text-[#242529] tracking-tight text-balance">
-              Abastece tu negocio en 3 pasos
+              Súrtete en 3 pasos
             </h2>
             <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-1.5 sm:mt-3 max-w-xl mx-auto leading-relaxed">
               Sin membresías: pedido mínimo de {formatMxn(MIN_ORDER_MXN)} y envío gratis desde {formatMxn(FREE_SHIPPING_MXN)}. Solo los ingredientes que necesitas, cuando los necesitas.
@@ -31,7 +31,7 @@ export function HowItWorks() {
               },
               {
                 icon: Truck,
-                title: "Recibe en tu negocio",
+                title: "Recíbelo donde lo necesites",
                 desc: `Entrega el mismo día en Chihuahua. Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}; debajo del mínimo, ${formatMxn(DELIVERY_FEE_FLAT)}. Frescura garantizada.`,
               },
             ].map((step, i) => (

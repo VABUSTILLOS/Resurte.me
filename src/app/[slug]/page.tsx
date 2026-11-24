@@ -62,7 +62,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? `Resurte.me en ${city.name} — Central de Abastos Digital`
     : `Próximamente en ${city.name} — Resurte.me`
   const description = active
-    ? `Central de abastos en línea para tu negocio en ${city.name}, ${city.state}. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`
+    ? `Central de abastos en línea para tu casa o tu negocio en ${city.name}, ${city.state}. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`
     : `Muy pronto en ${city.name}, ${city.state}. Por ahora Resurte.me opera solo en Chihuahua, Chihuahua, con entrega el mismo día.`
 
   return {

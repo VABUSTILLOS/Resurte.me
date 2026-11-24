@@ -646,7 +646,7 @@ export function getCollectionContent(slug: string): CollectionContent {
       },
       {
         title: "Precio institucional",
-        description: `Compra por volumen con pedido mínimo de ${formatMxn(MIN_ORDER_MXN)}. Nuestros precios están diseñados para el negocio que crece, no para el consumidor final.`,
+        description: `Compra por volumen con pedido mínimo de ${formatMxn(MIN_ORDER_MXN)}. Precios de mayoreo para todos: surte la despensa de tu casa o la cocina de tu negocio.`,
         icon: "📦",
       },
       {

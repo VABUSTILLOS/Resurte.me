@@ -143,7 +143,7 @@ export function CollectionSlider({ collections, citySlug }: CollectionSliderProp
           >
             {collections.map((collection, idx) => {
               const icon = COLLECTION_ICONS[collection.slug] || "📦"
-              const tagline = COLLECTION_TAGLINES[collection.slug] || "Insumos al mayoreo para tu negocio"
+              const tagline = COLLECTION_TAGLINES[collection.slug] || "Insumos al mayoreo para tu casa o tu negocio"
               const cover = getCollectionCover(collection.slug) ?? collection.image_url
 
               return (
