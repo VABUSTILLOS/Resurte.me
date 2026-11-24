@@ -98,6 +98,33 @@ export function paymentRecoveryMethodFilter(): string {
 }
 
 /**
+ * El paso final PROPIO de los pedidos de WhatsApp (Ola 1 de
+ * equiparación con Take App): un pedido de WhatsApp elegido para
+ * pagarse por adelantado que sigue sin pagar una vez vencido el
+ * ÚLTIMO nivel de recordatorio más la gracia configurada se cancela
+ * con su propio aviso ("se canceló por falta de pago").
+ *
+ * La regla la enciende `WHATSAPP_UNPAID_CANCEL_ENABLED`
+ * (whatsapp-order-config.ts), que nace apagada: hoy esos pedidos ya
+ * caen en la regla general de arriba (72 h), así que el paso propio
+ * solo cambia el gobierno del plazo y el texto del aviso cuando
+ * Victor decida encenderlo.
+ *
+ * @param hoursSinceCreation Horas desde que nació el pedido.
+ * @param lastReminderLevelHours El nivel más alto de recordatorio
+ *   configurado (p. ej. 48 con los niveles por defecto 1/24/48).
+ * @param graceHours Gracia tras ese nivel
+ *   (`WHATSAPP_UNPAID_CANCEL_GRACE_HOURS`).
+ */
+export function isWhatsAppUnpaidCancellationDue(
+  hoursSinceCreation: number,
+  lastReminderLevelHours: number,
+  graceHours: number
+): boolean {
+  return hoursSinceCreation >= lastReminderLevelHours + graceHours
+}
+
+/**
  * Aplica a una consulta de `orders` exactamente la elegibilidad de la
  * recuperación de pagos.
  *

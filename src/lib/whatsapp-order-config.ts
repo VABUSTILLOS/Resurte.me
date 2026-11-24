@@ -74,3 +74,49 @@ export const WHATSAPP_ADDRESS_CAPTURE_WINDOW_HOURS = 48
  *   que sí se entrega fuera de ventana.
  */
 export const WHATSAPP_BACK_IN_STOCK_TEMPLATE: string | null = null
+
+/**
+ * Ventana (días) en la que una imagen que llega por WhatsApp se puede
+ * ligar como comprobante de pago a un pedido pendiente de pago.
+ *
+ * Más amplia que la de la dirección (48 h) a propósito: el cliente
+ * puede pedir hoy y transferir tres días después, y un pedido contra
+ * entrega que decide pagar por transferencia sigue "pendiente de
+ * pago" mientras no se entrega. Fuera de la ventana la foto se
+ * persiste en la bitácora como cualquier imagen, sin ligarse sola:
+ * adivinar el pedido de una foto vieja es peor que no ligarla.
+ */
+export const WHATSAPP_PROOF_LINK_WINDOW_DAYS = 7
+
+/**
+ * Paso final PROPIO de los pedidos de WhatsApp: cancelar por falta de
+ * pago cuando, tras el ÚLTIMO nivel de recordatorio configurado, el
+ * pedido sigue sin pagar pasadas `WHATSAPP_UNPAID_CANCEL_GRACE_HOURS`.
+ *
+ * Nace DESACTIVADO a propósito. Hoy esos pedidos ya se cancelan: el
+ * barrido general de recuperación (src/lib/payment-recovery.ts) los
+ * cancela a las 72 h con el aviso genérico de cancelación, así que
+ * desactivado no se pierde ninguna cancelación. Activarlo (ponerlo en
+ * true) hace tres cosas distintas: el plazo de los pedidos de
+ * WhatsApp pasa a gobernarse por (último nivel + gracia) en vez de
+ * las 72 h generales, el aviso al cliente dice el motivo ("se canceló
+ * por falta de pago; si lo necesitas, vuelve a pedirlo") y el staff
+ * recibe aviso propio. Se enciende cuando Victor vea un ciclo real
+ * completo con la regla general y decida que quiere la suya.
+ *
+ * Solo alcanza a pedidos que el cliente eligió pagar por adelantado
+ * (SPEI): un contra entrega NUNCA entra, porque su "pendiente de
+ * pago" es su estado normal (la misma regla de payment-recovery.ts).
+ */
+export const WHATSAPP_UNPAID_CANCEL_ENABLED = false
+
+/**
+ * Gracia (horas) tras el último nivel de recordatorio antes de que el
+ * paso final propio cancele el pedido de WhatsApp sin pagar.
+ *
+ * Con los niveles por defecto (1, 24, 48 h) y esta gracia, el plazo
+ * resultante es 72 h: el mismo que hoy aplica la regla general, para
+ * que encender el paso propio no cambie el plazo sin querer — solo el
+ * aviso y el gobierno de la regla.
+ */
+export const WHATSAPP_UNPAID_CANCEL_GRACE_HOURS = 24

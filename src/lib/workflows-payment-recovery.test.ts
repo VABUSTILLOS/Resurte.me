@@ -9,6 +9,10 @@ vi.mock("@/lib/whatsapp", () => ({
 vi.mock("@/lib/order-emails", () => ({
   sendOrderConfirmationEmail: vi.fn(),
   sendOrderStatusEmail: vi.fn(),
+  buildTrackingUrl: vi.fn(
+    (city: string, id: number, token: string) =>
+      `https://resurte.me/${city}/pedido/${id}/seguimiento?token=${token}`
+  ),
 }))
 vi.mock("@/lib/order-cancellation", () => ({ applyOrderCancellationEffects: vi.fn() }))
 vi.mock("@/lib/whatsapp-automations-engine", () => ({

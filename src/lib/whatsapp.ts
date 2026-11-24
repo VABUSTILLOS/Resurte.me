@@ -653,11 +653,49 @@ export async function sendTextMessage(
   return res.json()
 }
 
+export interface DownloadedWhatsAppMedia {
+  data: Buffer
+  mimeType: string
+  /** Tamaño real descargado, en bytes. */
+  size: number
+}
+
+/**
+ * Descarga el binario de un media_id entrante (foto que mandó el cliente).
+ *
+ * La Cloud API lo hace en dos pasos: GET /{media_id} devuelve una URL
+ * temporal firmada y GET a esa URL —también con el token— devuelve el
+ * binario. La URL caduca en minutos: se usa en el momento, jamás se
+ * persiste (lo que se guarda es el archivo en Storage propio).
+ */
+export async function downloadWhatsAppMedia(
+  mediaId: string,
+  config?: WhatsAppConfig
+): Promise<DownloadedWhatsAppMedia> {
+  const cfg = config || getConfig()
+
+  const metaRes = await waFetch(`/${mediaId}`, {}, cfg)
+  const meta = (await metaRes.json()) as {
+    url?: string
+    mime_type?: string
+  }
+  if (!meta.url) {
+    throw new Error(`WhatsApp media ${mediaId}: la respuesta no trae URL de descarga`)
+  }
+
+  const binRes = await waFetch(meta.url, {}, cfg)
+  const data = Buffer.from(await binRes.arrayBuffer())
+  return {
+    data,
+    mimeType: meta.mime_type || binRes.headers.get("content-type") || "application/octet-stream",
+    size: data.length,
+  }
+}
+
 /**
  * Send a broadcast: same template to multiple recipients.
  * WhatsApp rate limiting: ~250 messages/second for business accounts.
- */
-export async function sendBroadcast(
+ */export async function sendBroadcast(
   params: BroadcastParams,
   config?: WhatsAppConfig
 ): Promise<{ sent: number; failed: number; errors: string[] }> {
