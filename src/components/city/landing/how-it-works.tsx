@@ -1,5 +1,6 @@
 import { Search, Store, Truck } from "lucide-react"
-import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
+import { FREE_SHIPPING_MXN, MIN_ORDER_MXN, formatMxn } from "@/lib/commercial-facts"
+import { DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 
 export function HowItWorks() {
   return (
@@ -13,7 +14,7 @@ export function HowItWorks() {
               Abastece tu negocio en 3 pasos
             </h2>
             <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-1.5 sm:mt-3 max-w-xl mx-auto leading-relaxed">
-              Sin membresías, sin mínimo de compra. Solo los ingredientes que necesitas, cuando los necesitas.
+              Sin membresías: pedido mínimo de {formatMxn(MIN_ORDER_MXN)} y envío gratis desde {formatMxn(FREE_SHIPPING_MXN)}. Solo los ingredientes que necesitas, cuando los necesitas.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-8">
@@ -26,12 +27,12 @@ export function HowItWorks() {
               {
                 icon: Store,
                 title: "Arma tu pedido",
-                desc: "Agrega lo que necesitas al carrito. Sin mínimo de compra. Facturación electrónica incluida.",
+                desc: "Agrega lo que necesitas al carrito. Pedido mínimo de {formatMxn(MIN_ORDER_MXN)}. Facturación electrónica incluida.",
               },
               {
                 icon: Truck,
                 title: "Recibe en tu negocio",
-                desc: "Entrega el mismo día. Frescura garantizada. Listo para tu operación del día.",
+                desc: `Entrega el mismo día en Chihuahua. Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}; debajo del mínimo, ${formatMxn(DELIVERY_FEE_FLAT)}. Frescura garantizada.`,
               },
             ].map((step, i) => (
               <div

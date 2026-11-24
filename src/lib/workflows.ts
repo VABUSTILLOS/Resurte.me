@@ -14,11 +14,16 @@
  * Architecture:
  *  - Direct triggers: called from API routes when order events happen
  *  - CRON triggers: Vercel Cron calls checkAndSendPaymentReminders()
- *  - All messages use sendTextMessage() for now (template-free for dev)
- *    Production should use sendTemplate() with Meta-approved templates
+ *  - Las notificaciones PROACTIVAS al cliente (confirmación de pedido,
+ *    actualización de estado y recordatorio de pago) se envían con
+ *    sendTemplate() y las plantillas aprobadas por Meta de abajo: el
+ *    texto libre solo se entrega dentro de la ventana de servicio de
+ *    24 h que abre el cliente, y estos avisos no pueden depender de
+ *    ella. El aviso a staff y las confirmaciones de pago/entrega
+ *    siguen en texto libre.
  */
 
-import { sendTextMessage } from "@/lib/whatsapp"
+import { sendTemplate, sendTextMessage } from "@/lib/whatsapp"
 import { createServiceClient } from "@/lib/supabase/service"
 import { sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/order-emails"
 import type { OrderStatus, PaymentStatus } from "@/types"
@@ -182,22 +187,32 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
 // Message Builders
 // ============================================================
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: "Pendiente",
-  confirmed: "Confirmado",
-  preparing: "Preparando",
-  out_for_delivery: "En camino",
-  delivered: "Entregado",
-  cancelled: "Cancelado",
+// ============================================================
+// Plantillas de Meta (es_MX) para avisos proactivos al cliente
+// ============================================================
+// Creadas y sometidas a aprobación en Meta el 2026-11-24. Variables
+// del cuerpo, en orden:
+//  - confirmacion_pedido_resurte: 1=nombre, 2=número de pedido, 3=total
+//  - actualizacion_pedido_resurte: 1=nombre, 2=número de pedido, 3=novedad
+//  - recordatorio_pago_resurte: 1=nombre, 2=número de pedido, 3=total
+
+const TEMPLATE_ORDER_CONFIRMATION = "confirmacion_pedido_resurte"
+const TEMPLATE_ORDER_STATUS_UPDATE = "actualizacion_pedido_resurte"
+const TEMPLATE_PAYMENT_REMINDER = "recordatorio_pago_resurte"
+
+/** La "novedad" ({{3}}) de la plantilla de actualización, por estado. */
+const STATUS_NOVELTY: Record<string, string> = {
+  pending: "está pendiente de confirmación",
+  confirmed: "fue confirmado y ya lo estamos preparando",
+  preparing: "está en preparación",
+  out_for_delivery: "va en camino",
+  delivered: "fue entregado",
+  cancelled: "fue cancelado",
 }
 
-const STATUS_EMOJI: Record<string, string> = {
-  pending: "⏳",
-  confirmed: "✅",
-  preparing: "👨‍🍳",
-  out_for_delivery: "🛵",
-  delivered: "📦",
-  cancelled: "❌",
+/** Total como lo muestran los demás mensajes al cliente: "$609.00 MXN". */
+function formatTemplateTotal(total: number): string {
+  return `$${total.toFixed(2)} MXN`
 }
 
 function buildOrderItemsText(items?: { name: string; quantity: number }[]): string {
@@ -221,67 +236,6 @@ function buildNewOrderStaffMessage(order: OrderWithDetails): string {
     items ? `\n*Productos:*\n${items}` : "",
     ``,
     `_Confirma o cancela el pedido desde el panel de administración._`,
-  ].filter(Boolean).join("\n")
-}
-
-function buildNewOrderCustomerMessage(order: OrderWithDetails): string {
-  const items = buildOrderItemsText(order.items)
-
-  return [
-    `👋 ¡Hola ${order.customer_name}!`,
-    ``,
-    `Gracias por tu compra en *Resurte.me*.`,
-    ``,
-    `📋 *Pedido #${order.id}*`,
-    items ? `\n${items}\n` : "",
-    `💰 Total: $${order.total.toFixed(2)} MXN`,
-    `💳 Pago: ${order.payment_status === "paid" ? "Pagado ✅" : "Pendiente ⏳"}`,
-    order.scheduled_for ? `🕐 Entrega estimada: ${new Date(order.scheduled_for).toLocaleString("es-MX")}` : "",
-    ``,
-    `Te notificaremos cuando tu pedido esté listo.`,
-    `Si tienes dudas, responde a este mensaje.`,
-  ].filter(Boolean).join("\n")
-}
-
-function buildStatusUpdateMessage(order: OrderWithDetails): string {
-  const emoji = STATUS_EMOJI[order.status] || "📋"
-  const label = STATUS_LABELS[order.status] || order.status
-
-  const messages: Record<string, string> = {
-    confirmed: `✅ Tu pedido #${order.id} ha sido *confirmado* y lo estamos preparando.`,
-    preparing: `👨‍🍳 Tu pedido #${order.id} está siendo *preparado*.`,
-    out_for_delivery: `🛵 ¡Tu pedido #${order.id} va *en camino*! Llega pronto.`,
-    delivered: `📦 Tu pedido #${order.id} ha sido *entregado*. ¡Buen provecho!`,
-    cancelled: `❌ Tu pedido #${order.id} ha sido *cancelado*. Si fue un error, contáctanos.`,
-    pending: `⏳ Tu pedido #${order.id} está *pendiente* de confirmación.`,
-  }
-
-  const specificMessage = messages[order.status]
-  const baseMessage = `${emoji} Actualización de tu pedido #${order.id} en *Resurte.me*.\n\nEstado: *${label}*`
-
-  return specificMessage || baseMessage
-}
-
-function buildPaymentReminderMessage(order: OrderWithDetails, hoursAgo: number): string {
-  const paymentMethod = order.payment_method === "spei" ? "SPEI" :
-    order.payment_method === "oxxo" ? "OXXO" :
-    order.payment_method === "mercado_pago" ? "Mercado Pago" :
-    order.payment_method.toUpperCase()
-
-  const urgencia = hoursAgo >= 48 ? "⚠️ ÚLTIMO AVISO" : hoursAgo >= 24 ? "⏰ Recordatorio importante" : "💡 Recordatorio"
-
-  return [
-    `${urgencia}`,
-    ``,
-    `Hola ${order.customer_name},`,
-    ``,
-    `El pago de tu pedido #${order.id} por *$${order.total.toFixed(2)} MXN* en Resurte.me sigue pendiente.`,
-    ``,
-    `Método de pago: *${paymentMethod}*`,
-    ``,
-    `Por favor completa tu pago para que procesemos tu pedido.`,
-    ``,
-    hoursAgo >= 48 ? `_Si no se recibe el pago, el pedido será cancelado en las próximas horas._` : "",
   ].filter(Boolean).join("\n")
 }
 
@@ -371,14 +325,29 @@ export async function notifyStaffNewOrder(orderId: number): Promise<WorkflowLog[
 
 /**
  * Workflow 2: Confirm order to customer.
+ * Proactivo (el cliente puede no tener conversación abierta): va por
+ * plantilla aprobada, no por texto libre.
  */
 export async function confirmOrderToCustomer(orderId: number): Promise<WorkflowLog | null> {
   const order = await getOrderDetails(orderId)
   if (!order || !order.customer_phone) return null
 
   try {
-    const message = buildNewOrderCustomerMessage(order)
-    const res = await sendTextMessage({ to: order.customer_phone, text: message })
+    const res = await sendTemplate({
+      to: order.customer_phone,
+      templateName: TEMPLATE_ORDER_CONFIRMATION,
+      languageCode: "es_MX",
+      components: [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: order.customer_name || "Cliente" },
+            { type: "text", text: String(order.id) },
+            { type: "text", text: formatTemplateTotal(order.total) },
+          ],
+        },
+      ],
+    })
     const messageId = res.messages?.[0]?.id || null
 
     await logWorkflow("new_order_customer", orderId, order.customer_phone, messageId, "sent")
@@ -406,6 +375,7 @@ export async function confirmOrderToCustomer(orderId: number): Promise<WorkflowL
 
 /**
  * Workflow 3: Notify customer when order status changes.
+ * Proactivo: va por plantilla aprobada, no por texto libre.
  */
 export async function notifyCustomerStatusUpdate(orderId: number, newStatus: OrderStatus): Promise<WorkflowLog | null> {
   const order = await getOrderDetails(orderId)
@@ -415,8 +385,21 @@ export async function notifyCustomerStatusUpdate(orderId: number, newStatus: Ord
   order.status = newStatus
 
   try {
-    const message = buildStatusUpdateMessage(order)
-    const res = await sendTextMessage({ to: order.customer_phone, text: message })
+    const res = await sendTemplate({
+      to: order.customer_phone,
+      templateName: TEMPLATE_ORDER_STATUS_UPDATE,
+      languageCode: "es_MX",
+      components: [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: order.customer_name || "Cliente" },
+            { type: "text", text: String(order.id) },
+            { type: "text", text: STATUS_NOVELTY[newStatus] || `cambió a ${newStatus}` },
+          ],
+        },
+      ],
+    })
     const messageId = res.messages?.[0]?.id || null
 
     await logWorkflow("status_update", orderId, order.customer_phone, messageId, "sent")
@@ -444,6 +427,7 @@ export async function notifyCustomerStatusUpdate(orderId: number, newStatus: Ord
 
 /**
  * Workflow 4: Send payment reminder to customer.
+ * Proactivo (corre por CRON, sin conversación abierta): plantilla.
  */
 export async function sendPaymentReminder(orderId: number): Promise<WorkflowLog | null> {
   const order = await getOrderDetails(orderId)
@@ -452,14 +436,22 @@ export async function sendPaymentReminder(orderId: number): Promise<WorkflowLog 
   // Only send reminders for pending payments
   if (order.payment_status !== "pending") return null
 
-  // Calculate hours since order was created
-  const created = new Date(order.created_at)
-  const now = new Date()
-  const hoursAgo = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60))
-
   try {
-    const message = buildPaymentReminderMessage(order, hoursAgo)
-    const res = await sendTextMessage({ to: order.customer_phone, text: message })
+    const res = await sendTemplate({
+      to: order.customer_phone,
+      templateName: TEMPLATE_PAYMENT_REMINDER,
+      languageCode: "es_MX",
+      components: [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: order.customer_name || "Cliente" },
+            { type: "text", text: String(order.id) },
+            { type: "text", text: formatTemplateTotal(order.total) },
+          ],
+        },
+      ],
+    })
     const messageId = res.messages?.[0]?.id || null
 
     await logWorkflow("payment_reminder", orderId, order.customer_phone, messageId, "sent")

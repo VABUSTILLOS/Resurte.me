@@ -1,7 +1,7 @@
 // ============================================================
 // Decisiones de producto: pedidos que llegan por WhatsApp
 // ============================================================
-// Las tres decisiones de abajo gobiernan cómo se convierte un
+// Las decisiones de abajo gobiernan cómo se convierte un
 // mensaje de pedido del catálogo de WhatsApp (type "order") en un
 // pedido de la tienda. Viven juntas y parametrizadas a propósito:
 // son decisiones de Victor (confirmadas el 2026-11-20), y cambiarlas
@@ -43,3 +43,18 @@ export const WHATSAPP_ORDER_MINIMUM_MXN = MIN_ORDER_MXN
  * rige en la tienda.
  */
 export const WHATSAPP_ORDER_REJECT_BELOW_MINIMUM = true
+
+/**
+ * Ventana (horas) en la que un mensaje de texto libre del cliente se
+ * interpreta como la dirección del pedido de WhatsApp que la espera.
+ *
+ * Tras crear el pedido, la confirmación le pide la dirección por el
+ * mismo chat. Si dentro de esta ventana llega UN solo pedido de ese
+ * teléfono esperando dirección (address_id null, no cancelado ni
+ * entregado), el texto se guarda como su dirección en vez de caer al
+ * menú genérico. Fuera de la ventana, o con cero/varios pedidos en
+ * espera, el texto sigue el routing normal (palabras clave y menú):
+ * capturar a ciegas ligaría direcciones a pedidos viejos o al pedido
+ * equivocado.
+ */
+export const WHATSAPP_ADDRESS_CAPTURE_WINDOW_HOURS = 48

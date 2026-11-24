@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
+import { FREE_SHIPPING_MXN, MIN_ORDER_MXN, formatMxn } from "@/lib/commercial-facts"
 import { useCity } from "@/contexts/city-context"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { ArrowRight, MapPin, Search } from "lucide-react"
@@ -105,7 +106,7 @@ export function CityPageClient({ slug, categories, preview, totalCount }: Props)
           Central de Abastos Digital en {city.name}
         </h1>
         <p className="mt-2 text-[var(--text-secondary)] max-w-2xl">
-          {totalCount} productos frescos para tu negocio. Sin membresía, sin mínimo de compra. Pedidos por caja, bulto o pieza.
+          {totalCount} productos frescos para tu negocio. Sin membresía: pedido mínimo de {formatMxn(MIN_ORDER_MXN)} y envío gratis desde {formatMxn(FREE_SHIPPING_MXN)}. Pedidos por caja, bulto o pieza.
         </p>
       </div>
 

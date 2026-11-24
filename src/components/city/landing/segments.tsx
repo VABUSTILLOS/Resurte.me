@@ -1,3 +1,5 @@
+import { MIN_ORDER_MXN, formatMxn } from "@/lib/commercial-facts"
+
 export function CustomerSegments() {
   return (
       <section className="bg-white py-12 sm:py-20">
@@ -10,7 +12,7 @@ export function CustomerSegments() {
               ¿Para quién es?
             </h2>
             <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-3 max-w-xl mx-auto leading-relaxed">
-              Si tu negocio sirve comida, Resurte es tu proveedor. Sin mínimo, sin membresía, sin complicaciones.
+              Si tu negocio sirve comida, Resurte es tu proveedor. Sin membresía, sin complicaciones: pedido mínimo de {formatMxn(MIN_ORDER_MXN)}.
             </p>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -18,7 +20,7 @@ export function CustomerSegments() {
               {
                 icon: "🍽️",
                 title: "Restaurantes",
-                desc: "Frutas, verduras, carnes y abarrotes para tu cocina. Por mayoreo, sin mínimo.",
+                desc: "Frutas, verduras, carnes y abarrotes para tu cocina. Por mayoreo, con entrega el mismo día.",
               },
               {
                 icon: "🏨",

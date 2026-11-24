@@ -1,4 +1,4 @@
-import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
+import { FREE_SHIPPING_MXN, MIN_ORDER_MXN, formatMxn } from "@/lib/commercial-facts"
 
 export function PricingBanner() {
   return (
@@ -11,7 +11,7 @@ export function PricingBanner() {
               </div>
               <div>
                 <h3 className="text-lg font-bold">Precios de mayoreo, directo a tu negocio</h3>
-                <p className="text-white/90 text-sm">Sin membresías, sin mínimo de compra. Facturación electrónica incluida.</p>
+                <p className="text-white/90 text-sm">Sin membresías: pedido mínimo de {formatMxn(MIN_ORDER_MXN)}. Facturación electrónica incluida.</p>
               </div>
             </div>
             <div className="flex flex-wrap gap-4 text-sm font-medium">

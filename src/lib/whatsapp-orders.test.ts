@@ -6,7 +6,11 @@ vi.mock("@/lib/catalog-cache", () => ({
 }))
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
 
-import { createWhatsAppOrder } from "@/lib/whatsapp-orders"
+import {
+  captureWhatsAppOrderAddress,
+  createWhatsAppOrder,
+  parseWhatsAppAddressText,
+} from "@/lib/whatsapp-orders"
 import { getCachedCategories, getCachedVisibleProducts } from "@/lib/catalog-cache"
 import type { createServiceClient } from "@/lib/supabase/service"
 import type { Category, Product } from "@/types"
@@ -80,7 +84,7 @@ function mockSupabase(queues: Record<string, Row[]>, rpcResult: Row = { data: { 
     from: vi.fn((table: string) => {
       const result: Row = queues[table]?.shift() ?? { data: null, error: null }
       const b: Record<string, unknown> = {}
-      for (const m of ["select", "eq", "ilike", "in", "is", "not", "order", "limit"]) {
+      for (const m of ["select", "eq", "ilike", "in", "is", "not", "order", "limit", "gte", "neq"]) {
         b[m] = vi.fn(() => b)
       }
       b.insert = vi.fn((payload: unknown) => {
@@ -312,5 +316,109 @@ describe("createWhatsAppOrder", () => {
     expect(result.kind).toBe("created")
     const orderInsert = calls.find((c) => c.table === "orders" && c.op === "insert")
     expect(orderInsert?.payload).toMatchObject({ city_id: 42 })
+  })
+})
+
+describe("parseWhatsAppAddressText", () => {
+  it("extrae calle, número, colonia y CP de una dirección típica", () => {
+    const parsed = parseWhatsAppAddressText(
+      "Calle Roble 123, Col. Centro, CP 31000, casa blanca de portón negro"
+    )
+    expect(parsed.street).toBe("Calle Roble")
+    expect(parsed.number).toBe("123")
+    expect(parsed.neighborhood).toBe("Centro")
+    expect(parsed.zip_code).toBe("31000")
+    // El texto íntegro siempre sobrevive en references.
+    expect(parsed.references).toContain("casa blanca de portón negro")
+    expect(parsed.references).toContain("CP 31000")
+  })
+
+  it("sin CP ni número no inventa datos: CP vacío y número S/N", () => {
+    const parsed = parseWhatsAppAddressText("Av. Universidad, Col. Santo Niño")
+    expect(parsed.street).toBe("Av. Universidad")
+    expect(parsed.number).toBe("S/N")
+    expect(parsed.neighborhood).toBe("Santo Niño")
+    expect(parsed.zip_code).toBe("")
+  })
+})
+
+describe("captureWhatsAppOrderAddress", () => {
+  const ADDRESS_TEXT = "Calle Roble 123, Col. Centro, CP 31000, casa blanca"
+
+  function captureQueues(awaiting: unknown[]): Record<string, Row[]> {
+    return {
+      profiles: [{ data: [{ id: "user-1", full_name: "Ana", phone: "6141047021" }], error: null }],
+      orders: [
+        { data: awaiting, error: null }, // pedidos en espera de dirección
+        { data: [{ id: 555 }], error: null }, // update que liga la dirección
+      ],
+      cities: [{ data: { name: "Chihuahua", state: "Chihuahua" }, error: null }],
+      addresses: [{ data: { id: 42 }, error: null }],
+    }
+  }
+
+  it("con UN pedido en espera, guarda la dirección y la liga al pedido", async () => {
+    const { client, calls } = mockSupabase(
+      captureQueues([
+        { id: 555, total: 609, city_id: 7, user_id: "user-1", customer_phone: FROM },
+      ])
+    )
+
+    const result = await captureWhatsAppOrderAddress(client, { from: FROM, text: ADDRESS_TEXT })
+
+    expect(result).toEqual({
+      kind: "captured",
+      orderId: 555,
+      total: 609,
+      addressText: ADDRESS_TEXT,
+    })
+
+    const addrInsert = calls.find((c) => c.table === "addresses" && c.op === "insert")
+    expect(addrInsert?.payload).toMatchObject({
+      user_id: "user-1",
+      label: "WhatsApp",
+      street: "Calle Roble",
+      number: "123",
+      neighborhood: "Centro",
+      city: "Chihuahua",
+      state: "Chihuahua",
+      zip_code: "31000",
+      references: ADDRESS_TEXT,
+    })
+
+    const link = calls.find((c) => c.table === "orders" && c.op === "update")
+    expect(link?.payload).toEqual({ address_id: 42 })
+  })
+
+  it("matchea por el perfil cuando el pedido no trae customer_phone", async () => {
+    const { client } = mockSupabase(
+      captureQueues([{ id: 556, total: 700, city_id: 7, user_id: "user-1", customer_phone: null }])
+    )
+
+    const result = await captureWhatsAppOrderAddress(client, { from: FROM, text: ADDRESS_TEXT })
+    expect(result.kind).toBe("captured")
+  })
+
+  it("con DOS pedidos en espera no captura: el destino sería ambiguo", async () => {
+    const { client, calls } = mockSupabase(
+      captureQueues([
+        { id: 555, total: 609, city_id: 7, user_id: "user-1", customer_phone: FROM },
+        { id: 556, total: 700, city_id: 7, user_id: "user-1", customer_phone: FROM },
+      ])
+    )
+
+    const result = await captureWhatsAppOrderAddress(client, { from: FROM, text: ADDRESS_TEXT })
+
+    expect(result).toEqual({ kind: "none" })
+    expect(calls.some((c) => c.table === "addresses" && c.op === "insert")).toBe(false)
+  })
+
+  it("sin pedidos en espera devuelve none y no escribe nada", async () => {
+    const { client, calls } = mockSupabase(captureQueues([]))
+
+    const result = await captureWhatsAppOrderAddress(client, { from: FROM, text: ADDRESS_TEXT })
+
+    expect(result).toEqual({ kind: "none" })
+    expect(calls.some((c) => c.op === "insert")).toBe(false)
   })
 })
