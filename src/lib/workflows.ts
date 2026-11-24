@@ -25,15 +25,24 @@
 
 import { sendTemplate, sendTextMessage } from "@/lib/whatsapp"
 import { createServiceClient } from "@/lib/supabase/service"
-import { sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/order-emails"
+import {
+  buildTrackingUrl,
+  sendOrderConfirmationEmail,
+  sendOrderStatusEmail,
+} from "@/lib/order-emails"
 import type { OrderStatus, PaymentStatus } from "@/types"
 import { logger } from "@/lib/logger"
 import { applyOrderCancellationEffects } from "@/lib/order-cancellation"
 import {
   applyPaymentRecoveryFilter,
   isPaymentRecoverable,
+  isWhatsAppUnpaidCancellationDue,
   PAYMENT_RECOVERY_CANCEL_HOURS,
 } from "@/lib/payment-recovery"
+import {
+  WHATSAPP_UNPAID_CANCEL_ENABLED,
+  WHATSAPP_UNPAID_CANCEL_GRACE_HOURS,
+} from "@/lib/whatsapp-order-config"
 import type { WorkflowType } from "@/lib/workflow-types"
 import { WHATSAPP_NUMBER } from "@/lib/business"
 
@@ -72,6 +81,10 @@ interface OrderWithDetails {
   customer_phone?: string
   staff_phones?: string[]
   items?: { name: string; quantity: number }[]
+  /** Token de la liga pública del pedido (recordatorio con link). */
+  restore_token?: string | null
+  /** Slug de la ciudad del pedido, para armar la liga pública. */
+  city_slug?: string | null
 }
 
 /** Raw shape of order joined with profile from Supabase */
@@ -88,6 +101,8 @@ interface RawOrderRow {
   source: string
   created_at: string
   customer_phone: string | null
+  restore_token?: string | null
+  city?: { slug: string } | null
   profile: { full_name: string; phone: string | null }
 }
 
@@ -135,7 +150,8 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
     .from("orders")
     .select(`
       *,
-      profile:profiles!orders_user_id_fkey(full_name, phone)
+      profile:profiles!orders_user_id_fkey(full_name, phone),
+      city:cities(slug)
     `)
     .eq("id", orderId)
     .single()
@@ -175,6 +191,8 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
     created_at: rawOrder.created_at,
     customer_name: rawOrder.profile?.full_name || "Cliente",
     customer_phone: rawOrder.customer_phone ?? rawOrder.profile?.phone ?? undefined,
+    restore_token: rawOrder.restore_token ?? null,
+    city_slug: rawOrder.city?.slug ?? null,
     staff_phones: staffPhones,
     items: rawItems.map((item) => ({
       name: item.product?.name || "Producto",
@@ -426,6 +444,81 @@ export async function notifyCustomerStatusUpdate(orderId: number, newStatus: Ord
 }
 
 /**
+ * Aviso de la cancelación por falta de pago PROPIA de WhatsApp (el
+ * paso final de whatsapp-order-config.ts): misma plantilla de
+ * actualización que cualquier cambio de estado, pero la novedad dice
+ * el motivo y cómo volver a pedir; el staff recibe el aviso en texto
+ * libre, como los demás avisos internos. Se registra bajo
+ * "status_update" porque eso es lo que es: un cambio de estado con
+ * texto propio.
+ */
+export async function notifyWhatsAppUnpaidCancellation(
+  orderId: number
+): Promise<WorkflowLog | null> {
+  const order = await getOrderDetails(orderId)
+  if (!order || !order.customer_phone) return null
+
+  try {
+    const res = await sendTemplate({
+      to: order.customer_phone,
+      templateName: TEMPLATE_ORDER_STATUS_UPDATE,
+      languageCode: "es_MX",
+      components: [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: order.customer_name || "Cliente" },
+            { type: "text", text: String(order.id) },
+            {
+              type: "text",
+              text: "se canceló por falta de pago. Si lo necesitas, vuelve a pedirlo desde el catálogo",
+            },
+          ],
+        },
+      ],
+    })
+    const messageId = res.messages?.[0]?.id || null
+
+    await logWorkflow("status_update", orderId, order.customer_phone, messageId, "sent")
+
+    for (const phone of order.staff_phones ?? []) {
+      try {
+        await sendTextMessage({
+          to: phone,
+          text:
+            `🚫 *Pedido #${order.id} cancelado por falta de pago* (regla de WhatsApp)\n\n` +
+            `*Cliente:* ${order.customer_name}\n` +
+            `*Total:* $${order.total.toFixed(2)} MXN\n\n` +
+            `El stock reservado ya se liberó.`,
+        })
+        await logWorkflow("status_update", orderId, phone, null, "sent")
+      } catch (staffErr) {
+        logger.error(`[Workflow] Aviso a staff de cancelación sin pago falló:`, staffErr)
+      }
+    }
+
+    return {
+      workflow_type: "status_update",
+      order_id: orderId,
+      recipient: order.customer_phone,
+      message_id: messageId,
+      status: "sent",
+    }
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : "Unknown error"
+    logger.error(`[Workflow] Failed to notify WhatsApp unpaid cancellation:`, errorMsg)
+    await logWorkflow("status_update", orderId, order.customer_phone || "unknown", null, "failed", errorMsg)
+    return {
+      workflow_type: "status_update",
+      order_id: orderId,
+      recipient: order.customer_phone || "unknown",
+      status: "failed",
+      error: errorMsg,
+    }
+  }
+}
+
+/**
  * Workflow 4: Send payment reminder to customer.
  * Proactivo (corre por CRON, sin conversación abierta): plantilla.
  */
@@ -455,6 +548,30 @@ export async function sendPaymentReminder(orderId: number): Promise<WorkflowLog 
     const messageId = res.messages?.[0]?.id || null
 
     await logWorkflow("payment_reminder", orderId, order.customer_phone, messageId, "sent")
+
+    // La "liga de pago" del recordatorio: la plantilla no admite
+    // URLs variables, así que la liga pública del pedido va en un
+    // texto libre enseguida. Esa página muestra el estado del pago
+    // (y el bloque SPEI cuando el método lo es). El texto libre solo
+    // se entrega dentro de la ventana de servicio de 24 h; el
+    // recordatorio corre por cron y normalmente va fuera de ella, así
+    // que un fallo aquí se registra y se ignora: la plantilla —el
+    // aviso que sí llega siempre— ya se envió.
+    if (order.restore_token && order.city_slug) {
+      try {
+        const url = buildTrackingUrl(order.city_slug, order.id, order.restore_token)
+        await sendTextMessage({
+          to: order.customer_phone,
+          text: `👉 Revisa tu pedido #${order.id} y cómo pagarlo aquí:\n${url}`,
+        })
+      } catch (linkErr) {
+        logger.warn(
+          `[Workflow] Liga del pedido ${orderId} no entregada (ventana de 24 h cerrada, probablemente): ${
+            linkErr instanceof Error ? linkErr.message : String(linkErr)
+          }`
+        )
+      }
+    }
 
     return {
       workflow_type: "payment_reminder",
@@ -566,6 +683,8 @@ interface PendingPaymentOrder {
   /** Decide si el pedido entra en la recuperación (ver `payment-recovery.ts`). */
   payment_status: string | null
   payment_method: string | null
+  /** El paso final propio de cancelación solo alcanza a pedidos de WhatsApp. */
+  source?: string | null
   coupon_code?: string | null
 }
 
@@ -612,7 +731,7 @@ export async function checkAndSendPaymentReminders(): Promise<{
   const fullPending = await applyPaymentRecoveryFilter(
     supabase
       .from("orders")
-      .select("id, created_at, status, payment_status, coupon_code, payment_method")
+      .select("id, created_at, status, payment_status, coupon_code, payment_method, source")
       .eq("payment_status", "pending")
       .neq("status", "cancelled")
   ).limit(500)
@@ -621,7 +740,7 @@ export async function checkAndSendPaymentReminders(): Promise<{
     const retry = await applyPaymentRecoveryFilter(
       supabase
         .from("orders")
-        .select("id, created_at, status, payment_status, payment_method")
+        .select("id, created_at, status, payment_status, payment_method, source")
         .eq("payment_status", "pending")
         .neq("status", "cancelled")
     ).limit(500)
@@ -649,8 +768,26 @@ export async function checkAndSendPaymentReminders(): Promise<{
     const created = new Date(order.created_at)
     const hoursSinceCreation = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60))
 
+    // Paso final propio de WhatsApp (whatsapp-order-config.ts): si
+    // está encendido, los pedidos de WhatsApp se gobiernan por su
+    // regla —último nivel de recordatorio + gracia— y NO por la
+    // general; nace apagado y entonces todo sigue como siempre.
+    const waOwnRule = WHATSAPP_UNPAID_CANCEL_ENABLED && order.source === "whatsapp"
+    const lastReminderLevel =
+      reminderLevels.length > 0
+        ? Math.max(...reminderLevels)
+        : PAYMENT_RECOVERY_CANCEL_HOURS - WHATSAPP_UNPAID_CANCEL_GRACE_HOURS
+    const waCancelDue =
+      waOwnRule &&
+      isWhatsAppUnpaidCancellationDue(
+        hoursSinceCreation,
+        lastReminderLevel,
+        WHATSAPP_UNPAID_CANCEL_GRACE_HOURS
+      )
+    const genericCancelDue = !waOwnRule && hoursSinceCreation >= PAYMENT_RECOVERY_CANCEL_HOURS
+
     // Check if we should cancel very old unpaid orders (>72 hours)
-    if (hoursSinceCreation >= PAYMENT_RECOVERY_CANCEL_HOURS) {
+    if (waCancelDue || genericCancelDue) {
       try {
         // El estado se escribe condicionalmente sobre el que se leyó: si dos
         // ejecuciones del cron se solapan, solo una gana y la cascada no se
@@ -676,8 +813,14 @@ export async function checkAndSendPaymentReminders(): Promise<{
           couponCode: order.coupon_code,
         })
 
-        // Notify customer about cancellation
-        await notifyCustomerStatusUpdate(order.id, "cancelled")
+        // Notify customer about cancellation: con la regla propia el
+        // aviso dice el motivo ("por falta de pago"); con la general,
+        // el aviso de cancelación de siempre.
+        if (waCancelDue) {
+          await notifyWhatsAppUnpaidCancellation(order.id)
+        } else {
+          await notifyCustomerStatusUpdate(order.id, "cancelled")
+        }
         cancelled++
       } catch (err) {
         errors.push(`Failed to cancel order ${order.id}: ${err instanceof Error ? err.message : "Unknown"}`)

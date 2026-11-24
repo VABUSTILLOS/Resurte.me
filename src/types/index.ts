@@ -356,8 +356,22 @@ export interface OrderWithCashback {
   cashback_tier: CashbackTier | null
   week_of_month: number | null
   month_year: string | null
-  /** Ruta del comprobante de pago SPEI/OXXO en el bucket payment-proofs. */
+  /**
+   * Ruta del comprobante de pago que el cliente manda por WhatsApp
+   * (bucket privado `entregas`, prefijo `marketplace-pagos/`; ver
+   * src/lib/payment-proof.ts). Columna real desde 00228; la escriben
+   * el flujo de WhatsApp y la confirma el staff en el panel. Guardar
+   * el comprobante NO marca el pedido como pagado.
+   */
   payment_proof_path?: string | null
+  /** Cuándo llegó el comprobante de pago (00228). */
+  payment_proof_at?: string | null
+  /**
+   * Paso de la conversación post-pedido de WhatsApp (00228):
+   * 'payment' | 'schedule' | null. Solo lo lee/escribe el flujo de
+   * WhatsApp (src/lib/whatsapp-order-flow.ts).
+   */
+  wa_flow_step?: string | null
   created_at: string
 }
 

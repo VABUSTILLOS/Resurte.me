@@ -22,6 +22,16 @@ import {
   createWhatsAppOrder,
   findProfileByPhone,
 } from "@/lib/whatsapp-orders"
+import {
+  buildWhatsAppPaymentQuestion,
+  buildWhatsAppScheduleQuestion,
+  handleWhatsAppFlowReply,
+  startWhatsAppPaymentStep,
+} from "@/lib/whatsapp-order-flow"
+import {
+  handleWhatsAppProofClarification,
+  handleWhatsAppProofImage,
+} from "@/lib/whatsapp-payment-proof"
 import { getSpeiAccount, formatClabe } from "@/lib/spei-account"
 import { runNewOrderWorkflows } from "@/lib/workflows"
 import { createServiceClient } from "@/lib/supabase/service"
@@ -134,6 +144,13 @@ interface WhatsAppTextPayload {
   body?: string
 }
 
+/** Imagen entrante: el comprobante de pago llega así (type "image"). */
+interface WhatsAppImagePayload {
+  id?: string
+  mime_type?: string
+  caption?: string
+}
+
 /** Pedido del catálogo tal como lo manda Meta en un mensaje type "order". */
 interface WhatsAppOrderPayload {
   catalog_id?: string
@@ -156,6 +173,7 @@ interface WhatsAppMessage {
   text?: WhatsAppTextPayload
   interactive?: unknown
   order?: WhatsAppOrderPayload
+  image?: WhatsAppImagePayload
 }
 
 interface WhatsAppValue {
@@ -318,6 +336,14 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
     content = JSON.stringify(message.interactive)
   } else if (messageType === "order" && message.order) {
     content = JSON.stringify(message.order)
+  } else if (messageType === "image" && message.image) {
+    // La imagen se persiste con su media_id: es la referencia que el
+    // flujo de comprobantes necesita para descargarla de Meta.
+    content = JSON.stringify({
+      media_id: message.image.id ?? null,
+      mime_type: message.image.mime_type ?? null,
+      caption: message.image.caption ?? null,
+    })
   }
 
   const supabase = await createServiceClient()
@@ -370,6 +396,16 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
     return
   }
 
+  // Imagen entrante: si el teléfono tiene un pedido pendiente de
+  // pago, es su comprobante y se liga a ese pedido
+  // (src/lib/whatsapp-payment-proof.ts). Sin candidatos no se
+  // responde nada: una foto que no es comprobante de nada
+  // identificable no merece un mensaje de error al cliente.
+  if (messageType === "image" && message.image?.id) {
+    await handleProofImageMessage(supabase, { from, mediaId: message.image.id })
+    return
+  }
+
   // Routing NLP por keywords — solo mensajes de texto reciben respuesta
   // (los replies de templates/interactive requieren el ID del botón).
   if (messageType === "text" && content) {
@@ -390,19 +426,47 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
       return
     }
 
+    // Flujo post-pedido (pago y horario): si el teléfono tiene un
+    // pedido a mitad de la conversación corta, este texto es su
+    // respuesta. Va DESPUÉS de las palabras clave —si el cliente
+    // escribe "catálogo" manda el comando, no la conversación— y
+    // ANTES de la captura de dirección: un pedido en flujo ya tiene
+    // dirección, así que la captura no lo encontraría de todos modos.
+    const flow = await handleWhatsAppFlowReply(supabase, { from, text: content })
+    if (flow.kind !== "none") {
+      await replyToFlowResult(from, flow)
+      return
+    }
+
+    // Aclaración de comprobante: la respuesta numerada a "¿a cuál
+    // pedido corresponde tu comprobante?". Solo actúa con un número
+    // pelado y una aclaración abierta; si no, el texto sigue.
+    const proofReply = await handleWhatsAppProofClarification(supabase, { from, text: content })
+    if (proofReply.kind !== "none") {
+      await replyToProofResult(from, proofReply)
+      return
+    }
+
     // Captura de dirección: si el teléfono tiene UN pedido reciente
     // esperando dirección, este texto libre ES la dirección (la
     // confirmación del pedido se la acaba de pedir). Va DESPUÉS de
     // las palabras clave: si el texto trae una, manda su flujo.
     const capture = await captureWhatsAppOrderAddress(supabase, { from, text: content })
     if (capture.kind === "captured") {
+      // Con la dirección, el pedido pasa a la conversación corta de
+      // pago y horario (si la migración 00228 ya se aplicó; si no,
+      // startWhatsAppPaymentStep devuelve false y la respuesta es la
+      // de siempre, sin preguntas).
+      const flowStarted = await startWhatsAppPaymentStep(supabase, capture.orderId)
       await sendTextMessage({
         to: from,
         text:
           "✅ *¡Dirección registrada!*\n\n" +
           `Pedido *#${capture.orderId}* — Total: *$${capture.total.toFixed(2)} MXN*\n` +
           `📍 ${capture.addressText}\n\n` +
-          "Con esto tu pedido queda completo. Te avisaremos cuando vaya en camino. 🛵",
+          (flowStarted
+            ? buildWhatsAppPaymentQuestion()
+            : "Con esto tu pedido queda completo. Te avisaremos cuando vaya en camino. 🛵"),
       }).catch((err) => logger.error("WhatsApp webhook: address confirmation reply failed:", err))
       return
     }
@@ -415,6 +479,143 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
         "🛍️ *Catálogo* — escríbeme \"catálogo\" y te envío el link.\n" +
         "❓ *Ayuda* — escríbeme \"ayuda\" para hablar con soporte.",
     }).catch((err) => logger.error("WhatsApp webhook: fallback reply failed:", err))
+  }
+}
+
+type FlowReplyResult = Awaited<ReturnType<typeof handleWhatsAppFlowReply>>
+type ProofResult =
+  | Awaited<ReturnType<typeof handleWhatsAppProofImage>>
+  | Awaited<ReturnType<typeof handleWhatsAppProofClarification>>
+
+/** Responde al cliente según el resultado del flujo pago/horario. */
+async function replyToFlowResult(from: string, flow: FlowReplyResult) {
+  const reply = (text: string) =>
+    sendTextMessage({ to: from, text }).catch((err) =>
+      logger.error("WhatsApp webhook: flow reply failed:", err)
+    )
+
+  switch (flow.kind) {
+    case "payment_chosen": {
+      if (flow.method === "spei") {
+        const spei = getSpeiAccount()
+        await reply(
+          "💳 *Pago por transferencia SPEI*\n\n" +
+            `CLABE: *${formatClabe(spei.clabe)}*\n` +
+            `Banco: ${spei.banco}\n` +
+            `Beneficiario: ${spei.beneficiario}\n` +
+            `Concepto: *${flow.orderId}*\n` +
+            `Monto exacto: *$${flow.total.toFixed(2)} MXN*\n\n` +
+            "Tu pedido se atiende primero en cuanto caiga tu pago. 🚀 " +
+            "Cuando transfieras, mándanos la foto de tu comprobante por aquí y lo adjuntamos a tu pedido. 🧾\n\n" +
+            buildWhatsAppScheduleQuestion(flow.scheduleOptions)
+        )
+      } else {
+        await reply(
+          "💵 *Pago en efectivo contra entrega.* Pagas al recibir tu pedido.\n\n" +
+            buildWhatsAppScheduleQuestion(flow.scheduleOptions)
+        )
+      }
+      return
+    }
+    case "schedule_chosen": {
+      await reply(
+        "🎉 *¡Listo! Tu pedido quedó completo:*\n\n" +
+          `🧾 Pedido *#${flow.orderId}* — Total: *$${flow.total.toFixed(2)} MXN*\n` +
+          `💳 Pago: ${flow.method === "spei" ? "Transferencia SPEI" : "Efectivo contra entrega"}\n` +
+          `🗓️ Entrega: *${flow.dayLabel}* (${flow.windowLabel})\n\n` +
+          "Te avisaremos cuando vaya en camino. 🛵"
+      )
+      return
+    }
+    case "card_unavailable": {
+      await reply(
+        "Por WhatsApp todavía no cobramos con tarjeta 🙏\n" +
+          "Puedes pagar por *transferencia SPEI* o en *efectivo contra entrega*.\n\n" +
+          buildWhatsAppPaymentQuestion()
+      )
+      return
+    }
+    case "reprompt": {
+      await reply(
+        flow.step === "payment"
+          ? "No te entendí 🙈\n\n" + buildWhatsAppPaymentQuestion()
+          : "No te entendí 🙈\n\n" + buildWhatsAppScheduleQuestion(flow.scheduleOptions)
+      )
+      return
+    }
+    case "none":
+      return
+  }
+}
+
+/** Responde al cliente según el resultado del ligado de comprobante. */
+async function replyToProofResult(from: string, result: ProofResult) {
+  const reply = (text: string) =>
+    sendTextMessage({ to: from, text }).catch((err) =>
+      logger.error("WhatsApp webhook: proof reply failed:", err)
+    )
+
+  switch (result.kind) {
+    case "attached":
+    case "stored_unlinked": {
+      await reply(
+        "🧾 *¡Comprobante recibido!*\n\n" +
+          `Quedó adjunto a tu pedido *#${result.orderId}* (Total: *$${result.total.toFixed(2)} MXN*).\n` +
+          "En cuanto confirmemos tu pago te avisamos por aquí. ¡Gracias! 🙌"
+      )
+      return
+    }
+    case "clarify": {
+      const lines = result.candidates.map(
+        (c, i) => `${i + 1}️⃣ Pedido *#${c.id}* — $${c.total.toFixed(2)} MXN`
+      )
+      await reply(
+        "Recibí tu comprobante 🧾 pero tienes varios pedidos pendientes de pago.\n\n" +
+          "*¿A cuál pedido corresponde?*\n" +
+          lines.join("\n") +
+          "\n\nRespóndeme con el número."
+      )
+      return
+    }
+    case "invalid_file": {
+      await reply(`⚠️ ${result.error}\n\nMándanos la foto de tu comprobante otra vez, por favor.`)
+      return
+    }
+    case "invalid_choice": {
+      await reply(
+        "Ese número no está en la lista 🙈 Respóndeme con el número del pedido al que corresponde tu comprobante."
+      )
+      return
+    }
+    case "order_not_pending": {
+      await reply(
+        "Ese pedido ya no está pendiente de pago, así que no le adjuntamos el comprobante. " +
+          "Si fue un error, escríbenos y lo revisamos. 🙏"
+      )
+      return
+    }
+    case "error": {
+      await reply(
+        "Recibí tu foto pero no pude adjuntarla a tu pedido 😕 Ya quedó registrada y la revisamos a mano. ¡Gracias!"
+      )
+      return
+    }
+    case "none":
+      return
+  }
+}
+
+/**
+ * Imagen entrante como posible comprobante de pago: delega en
+ * src/lib/whatsapp-payment-proof.ts y responde según el resultado.
+ */
+async function handleProofImageMessage(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  args: { from: string; mediaId: string }
+) {
+  const result = await handleWhatsAppProofImage(supabase, args)
+  if (result.kind !== "none") {
+    await replyToProofResult(args.from, result)
   }
 }
 
