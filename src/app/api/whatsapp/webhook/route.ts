@@ -17,7 +17,11 @@
 import { createHmac, timingSafeEqual } from "crypto"
 import { after, NextRequest, NextResponse } from "next/server"
 import { verifyWebhook, sendTextMessage } from "@/lib/whatsapp"
-import { createWhatsAppOrder, findProfileByPhone } from "@/lib/whatsapp-orders"
+import {
+  captureWhatsAppOrderAddress,
+  createWhatsAppOrder,
+  findProfileByPhone,
+} from "@/lib/whatsapp-orders"
 import { getSpeiAccount, formatClabe } from "@/lib/spei-account"
 import { runNewOrderWorkflows } from "@/lib/workflows"
 import { createServiceClient } from "@/lib/supabase/service"
@@ -383,6 +387,23 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
 
     if (text.includes("ayuda") || text.includes("soporte") || text.includes("contacto")) {
       await sendSupportInfo(from)
+      return
+    }
+
+    // Captura de dirección: si el teléfono tiene UN pedido reciente
+    // esperando dirección, este texto libre ES la dirección (la
+    // confirmación del pedido se la acaba de pedir). Va DESPUÉS de
+    // las palabras clave: si el texto trae una, manda su flujo.
+    const capture = await captureWhatsAppOrderAddress(supabase, { from, text: content })
+    if (capture.kind === "captured") {
+      await sendTextMessage({
+        to: from,
+        text:
+          "✅ *¡Dirección registrada!*\n\n" +
+          `Pedido *#${capture.orderId}* — Total: *$${capture.total.toFixed(2)} MXN*\n` +
+          `📍 ${capture.addressText}\n\n` +
+          "Con esto tu pedido queda completo. Te avisaremos cuando vaya en camino. 🛵",
+      }).catch((err) => logger.error("WhatsApp webhook: address confirmation reply failed:", err))
       return
     }
 

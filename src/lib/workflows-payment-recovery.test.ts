@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }))
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
-vi.mock("@/lib/whatsapp", () => ({ sendTextMessage: vi.fn(async () => ({ messages: [{ id: "wamid.test" }] })) }))
+vi.mock("@/lib/whatsapp", () => ({
+  sendTextMessage: vi.fn(async () => ({ messages: [{ id: "wamid.test" }] })),
+  sendTemplate: vi.fn(async () => ({ messages: [{ id: "wamid.test" }] })),
+}))
 vi.mock("@/lib/order-emails", () => ({
   sendOrderConfirmationEmail: vi.fn(),
   sendOrderStatusEmail: vi.fn(),
@@ -21,7 +24,7 @@ vi.mock("@/lib/whatsapp-automations-engine", () => ({
 import { checkAndSendPaymentReminders } from "./workflows"
 import { createServiceClient } from "@/lib/supabase/service"
 import { applyOrderCancellationEffects } from "@/lib/order-cancellation"
-import { sendTextMessage } from "@/lib/whatsapp"
+import { sendTemplate, sendTextMessage } from "@/lib/whatsapp"
 import { paymentRecoveryMethodFilter } from "@/lib/payment-recovery"
 
 interface Spec {
@@ -151,6 +154,7 @@ describe("checkAndSendPaymentReminders — contra entrega no es un impago", () =
     const result = await checkAndSendPaymentReminders()
 
     expect(sendTextMessage).not.toHaveBeenCalled()
+    expect(sendTemplate).not.toHaveBeenCalled()
     expect(result.reminded).toBe(0)
   })
 

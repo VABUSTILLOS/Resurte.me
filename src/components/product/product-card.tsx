@@ -212,7 +212,7 @@ export const ProductCard = memo(function ProductCard({
             )}
             {/* Scanning-friendly tagline — last sentence of description as a use-case hint */}
             <p className="text-[11px] text-[var(--text-secondary)] mb-0.5 line-clamp-1 italic">
-              {tagline ?? "Abasto directo, sin mínimo de compra"}
+              {tagline ?? "Abasto directo, entrega el mismo día"}
             </p>
             <h3 className="text-[13px] sm:text-sm text-[#1a1a1a] font-medium line-clamp-2 leading-tight group-hover:text-[#0E7A0E] transition-colors duration-200">
               {product.name}

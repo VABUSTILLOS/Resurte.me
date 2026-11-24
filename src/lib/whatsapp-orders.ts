@@ -20,7 +20,8 @@
 // Lo que un pedido de WhatsApp NO trae (dirección, horario, método
 // elegido) se acuerda después por chat: nace con address_id null,
 // scheduled_for null y el método de pago por defecto de
-// src/lib/whatsapp-order-config.ts.
+// src/lib/whatsapp-order-config.ts. La dirección SÍ se captura del
+// chat: ver captureWhatsAppOrderAddress más abajo.
 //
 // Idempotencia: Meta reintenta los webhooks. Antes de crear se
 // busca el wamid en `whatsapp_messages` con `order_id` ya ligado;
@@ -34,10 +35,12 @@ import { missingColumnName } from "@/lib/admin/order-selects"
 import { callStockRpc, describeStockConflicts, type StockConflict } from "@/lib/order-stock"
 import type { createServiceClient } from "@/lib/supabase/service"
 import {
+  WHATSAPP_ADDRESS_CAPTURE_WINDOW_HOURS,
   WHATSAPP_ORDER_MINIMUM_MXN,
   WHATSAPP_ORDER_PAYMENT_METHOD,
   WHATSAPP_ORDER_REJECT_BELOW_MINIMUM,
 } from "@/lib/whatsapp-order-config"
+import { insertAddressResilient } from "@/lib/orders-address"
 import {
   buildRetailerIdIndex,
   resolveOrderItems,
@@ -363,6 +366,195 @@ export async function createWhatsAppOrder(
   })
 
   return { kind: "created", orderId, subtotal, deliveryFee, total, unresolved }
+}
+
+// ============================================================
+// Captura de la dirección desde el chat
+// ============================================================
+// La confirmación del pedido le pide al cliente su dirección por el
+// mismo WhatsApp. Cuando llega un texto libre y el teléfono tiene
+// exactamente UN pedido de WhatsApp reciente esperando dirección,
+// este módulo lo guarda como la dirección de ese pedido:
+//
+// - Se crea la fila en `addresses` con el mismo helper retrocompatible
+//   del checkout (`insertAddressResilient`): user_id del perfil si el
+//   teléfono mapea a uno; si no, dirección de invitado (user_id null).
+// - El parseo a campos (calle/número/colonia/CP) es best-effort: el
+//   texto llega libre. El texto ÍNTEGRO del cliente se conserva en
+//   `references`, que es lo que lee quien despacha, para que ningún
+//   dato se pierda si el parseo no acierta.
+// - El UPDATE del pedido es condicional (`address_id IS NULL`): si
+//   dos mensajes llegan a la vez, solo el primero liga la dirección.
+
+export interface ParsedWhatsAppAddress {
+  street: string
+  number: string
+  neighborhood: string
+  zip_code: string
+  /** Texto íntegro que escribió el cliente. */
+  references: string
+}
+
+/**
+ * Parseo best-effort de una dirección escrita libre por WhatsApp
+ * ("Calle Roble 123, Col. Centro, CP 31000, casa blanca").
+ * Puro y sin I/O: lo que no se puede deducir queda vacío o "S/N",
+ * y el texto completo siempre sobrevive en `references`.
+ */
+export function parseWhatsAppAddressText(raw: string): ParsedWhatsAppAddress {
+  const text = raw.replace(/\s+/g, " ").trim()
+
+  // CP: primer grupo de 5 dígitos (con prefijo "CP" si viene).
+  let zip_code = ""
+  let working = text
+  const cpMatch = working.match(/(?:\bC\.?\s?P\.?\s*)?(\d{5})\b/)
+  if (cpMatch) {
+    zip_code = cpMatch[1] ?? ""
+    working = working.replace(cpMatch[0], " ").replace(/\s+/g, " ").trim()
+  }
+
+  const segments = working
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const streetPart = segments[0] ?? working
+  const neighborhood = (segments[1] ?? "").replace(/^col\.?\s*/i, "").trim()
+
+  // Número: token final de la calle ("Av. Universidad 1234", "Calle 5 #230").
+  let street = streetPart
+  let number = "S/N"
+  const numMatch = streetPart.match(/^(.*?)[\s#]+(\d+[A-Za-z]?)$/)
+  if (numMatch && numMatch[1]?.trim() && numMatch[2]) {
+    street = numMatch[1].trim()
+    number = numMatch[2]
+  }
+
+  return {
+    street: street || text,
+    number,
+    neighborhood,
+    zip_code,
+    references: text,
+  }
+}
+
+export type CaptureWhatsAppAddressResult =
+  | { kind: "captured"; orderId: number; total: number; addressText: string }
+  | { kind: "none" }
+  | { kind: "error"; detail: string }
+
+interface AwaitingAddressOrder {
+  id: number
+  total: number
+  city_id: number
+  user_id: string | null
+  customer_phone: string | null
+}
+
+/**
+ * Si el teléfono tiene exactamente un pedido de WhatsApp reciente
+ * esperando dirección, guarda `text` como su dirección y devuelve el
+ * resumen para confirmar al cliente. En cualquier otro caso devuelve
+ * "none" y el llamador sigue su routing normal (palabras clave/menú):
+ * la captura nunca secuestra un mensaje que no es inequívoco.
+ */
+export async function captureWhatsAppOrderAddress(
+  supabase: ServiceClient,
+  input: { from: string; text: string }
+): Promise<CaptureWhatsAppAddressResult> {
+  const text = input.text.replace(/\s+/g, " ").trim()
+  if (!text) return { kind: "none" }
+
+  const last10 = input.from.replace(/\D/g, "").slice(-10)
+  if (last10.length < 10) return { kind: "none" }
+
+  const { profile } = await findProfileByPhone(supabase, input.from)
+
+  const since = new Date(
+    Date.now() - WHATSAPP_ADDRESS_CAPTURE_WINDOW_HOURS * 60 * 60 * 1000
+  ).toISOString()
+  const { data: rows, error: queryError } = await supabase
+    .from("orders")
+    .select("id, total, city_id, user_id, customer_phone")
+    .eq("source", "whatsapp")
+    .is("address_id", null)
+    .not("status", "in", "(cancelled,delivered)")
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(10)
+
+  if (queryError) {
+    logger.error("WhatsApp address capture: awaiting-orders query failed:", queryError)
+    return { kind: "error", detail: "awaiting_query_failed" }
+  }
+
+  const matches = ((rows ?? []) as AwaitingAddressOrder[]).filter((o) => {
+    if (o.customer_phone && o.customer_phone.replace(/\D/g, "").slice(-10) === last10) {
+      return true
+    }
+    return profile !== null && o.user_id === profile.id
+  })
+  if (matches.length !== 1) return { kind: "none" }
+
+  const order = matches[0]
+  if (!order) return { kind: "none" }
+
+  // Ciudad/estado legibles para la fila de `addresses`: los del
+  // city_id del propio pedido (la tienda opera hoy solo en Chihuahua).
+  let cityName = "Chihuahua"
+  let cityState = "Chihuahua"
+  const { data: cityRow } = await supabase
+    .from("cities")
+    .select("name, state")
+    .eq("id", order.city_id)
+    .maybeSingle()
+  if (cityRow) {
+    const c = cityRow as { name: string; state: string }
+    cityName = c.name
+    cityState = c.state
+  }
+
+  const parsed = parseWhatsAppAddressText(text)
+  const { data: addr, error: addrError } = await insertAddressResilient(supabase, {
+    user_id: order.user_id ?? profile?.id ?? null,
+    guest_token: null,
+    label: "WhatsApp",
+    street: parsed.street,
+    number: parsed.number,
+    neighborhood: parsed.neighborhood,
+    city: cityName,
+    state: cityState,
+    zip_code: parsed.zip_code,
+    references: parsed.references,
+    city_id: order.city_id,
+  })
+  if (addrError || !addr) {
+    logger.error("WhatsApp address capture: address insert failed:", addrError)
+    return { kind: "error", detail: "address_insert_failed" }
+  }
+
+  const { data: updated, error: updateError } = await supabase
+    .from("orders")
+    .update({ address_id: addr.id })
+    .eq("id", order.id)
+    .is("address_id", null)
+    .select("id")
+  if (updateError) {
+    logger.error("WhatsApp address capture: order link failed:", updateError)
+    return { kind: "error", detail: "order_link_failed" }
+  }
+  if (!updated || updated.length === 0) {
+    // Otro mensaje ganó la carrera y ya ligó una dirección.
+    return { kind: "none" }
+  }
+
+  logger.info("whatsapp.order.address_captured", { orderId: order.id, addressId: addr.id })
+  return {
+    kind: "captured",
+    orderId: order.id,
+    total: Number(order.total),
+    addressText: text,
+  }
 }
 
 /**

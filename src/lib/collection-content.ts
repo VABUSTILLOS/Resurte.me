@@ -6,6 +6,8 @@
  * para dueños de restaurante que buscan insumos de calidad institucional.
  */
 
+import { MIN_ORDER_MXN, formatMxn } from "./commercial-facts"
+
 export interface CollectionStory {
   /** Título decorativo tipo "Nuestra Herencia" */
   title: string
@@ -644,7 +646,7 @@ export function getCollectionContent(slug: string): CollectionContent {
       },
       {
         title: "Precio institucional",
-        description: "Compra por volumen sin mínimo de compra. Nuestros precios están diseñados para el negocio que crece, no para el consumidor final.",
+        description: `Compra por volumen con pedido mínimo de ${formatMxn(MIN_ORDER_MXN)}. Nuestros precios están diseñados para el negocio que crece, no para el consumidor final.`,
         icon: "📦",
       },
       {
