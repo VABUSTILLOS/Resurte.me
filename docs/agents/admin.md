@@ -132,6 +132,21 @@
   deriva (cantidad vs umbral, en create/update/modal/panel); un estado
   manual solo sobrevive con la cantidad vacía. `restock.ts` calcula la
   cantidad sugerida (cobertura de 30 días) — el panel solo la muestra.
+- Ola 2 — cantidad mín/máx y avisos de stock: `min_order_qty`/
+  `max_order_qty` (00229) son columnas opcionales como el umbral: el
+  conjunto vive en `PRODUCT_OPTIONAL_SCHEMA_COLUMNS`
+  (`product-patch.ts`) y create/update/bulk quitan del payload las que
+  falten y reintentan. Los avisos viven en
+  `src/lib/stock-notifications.ts`: alerta de stock bajo al staff por
+  WhatsApp UNA vez por cruce (estado en `low_stock_alert_state`,
+  00230; se rearme al superar el umbral) y «avísame cuando haya»
+  (tabla `stock_notifications`) al volver el stock a positivo. Los
+  enganches son: reserva de stock en `POST /api/orders` y en
+  `whatsapp-orders`, PATCH/bulk/ajuste de stock del panel, y la
+  devolución de stock al cancelar (vía
+  `processOrderRestockNotifications`); el cron diario corre el
+  barrido `stock-notifications-sweep` como red de seguridad. Todo es
+  best-effort: un fallo de aviso nunca rompe la venta.
 - Productos ronda 7 — degradación en ESCRITURA: `create`/`update` también
   degradan si falta una columna de la ronda. Ojo: una columna ausente da DOS
   errores distintos y `isMissingColumnError` (`sale-window.ts`) cubre ambos —

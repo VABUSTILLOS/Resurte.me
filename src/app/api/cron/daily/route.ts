@@ -143,6 +143,19 @@ export async function GET(req: NextRequest) {
         return purgeTrashProducts(supabase)
       },
     ],
+    // Ola 2 — barrido de avisos de inventario (00230): red de
+    // seguridad para cambios de stock que no pasaron por los puntos
+    // de enganche (alertas de inventario bajo sin duplicar y avisos
+    // «ya hay de nuevo» pendientes de reintento).
+    [
+      "stock-notifications-sweep",
+      async () => {
+        const { sweepStockNotifications } = await import("@/lib/stock-notifications")
+        const { createServiceClient } = await import("@/lib/supabase/service")
+        const supabase = await createServiceClient()
+        return sweepStockNotifications(supabase)
+      },
+    ],
   ]
 
   // Secuencial e independiente: un job que falla no detiene a los demás.

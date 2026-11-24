@@ -35,7 +35,7 @@ import {
  * cliente. No se dispara en cobros ajenos: sin marca no hace nada.
  */
 export function StripeReturnHandler() {
-  const { cart, coupon, subtotal, itemCount, clearCart } = useCart()
+  const { cart, coupon, subtotal, itemCount, clearCart, automaticDiscount } = useCart()
   const { selectedBumps, setSelectedBumps } = useSelectedBumps()
   const { city } = useCity()
   const router = useRouter()
@@ -66,7 +66,8 @@ export function StripeReturnHandler() {
       coupon,
       itemCount,
       countBumpUnits(selectedBumps),
-      DELIVERY_FEE_FLAT
+      DELIVERY_FEE_FLAT,
+      automaticDiscount
     )
     try {
       window.sessionStorage.setItem(
@@ -110,6 +111,7 @@ export function StripeReturnHandler() {
     coupon,
     subtotal,
     itemCount,
+    automaticDiscount,
     selectedBumps,
     clearCart,
     setSelectedBumps,

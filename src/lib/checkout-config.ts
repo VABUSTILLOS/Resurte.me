@@ -158,6 +158,8 @@ export interface CheckoutTotals {
   bumpsSubtotal: number
   effectiveSubtotal: number
   discountAmount: number
+  /** Descuentos automáticos sin código (coupon-rules.ts), sobre los artículos del carrito. */
+  automaticDiscountAmount: number
   payableSubtotal: number
   allItemsCount: number
   deliveryFee: number
@@ -174,6 +176,10 @@ export interface CheckoutTotals {
  * con el recalculado por POST /api/orders:
  * - El descuento de cupón se aplica sobre `subtotal + bumpsSubtotal` (igual que
  *   el servidor en realSubtotal).
+ * - El descuento automático (sin código) lo cotiza el servidor
+ *   (`POST /api/discounts/automatic`) SOLO sobre los artículos del carrito
+ *   —los bumps tienen su propia mecánica promocional y no participan— y
+ *   el servidor lo recalcula igual al crear el pedido.
  * - El envío usa validDeliveryFee (gratis desde el umbral, contando bumps, o
  *   regalado por un cupón `free_shipping`).
  */
@@ -183,11 +189,13 @@ export function calcCheckoutTotals(
   coupon: CouponLike | null,
   itemCount: number,
   bumpCount: number,
-  deliveryFeeInput: number = DELIVERY_FEE_FLAT
+  deliveryFeeInput: number = DELIVERY_FEE_FLAT,
+  automaticDiscountAmount: number = 0
 ): CheckoutTotals {
   const effectiveSubtotal = subtotal + bumpsSubtotal
   const discountAmount = calcCouponDiscount(effectiveSubtotal, coupon)
-  const payableSubtotal = effectiveSubtotal - discountAmount
+  const automaticDiscount = Math.max(0, Math.min(automaticDiscountAmount, effectiveSubtotal - discountAmount))
+  const payableSubtotal = effectiveSubtotal - discountAmount - automaticDiscount
   const allItemsCount = itemCount + bumpCount
   const freeShippingApplied = isFreeShippingCoupon(coupon)
   const deliveryFee = validDeliveryFee(allItemsCount, payableSubtotal, deliveryFeeInput, freeShippingApplied)
@@ -195,6 +203,7 @@ export function calcCheckoutTotals(
     bumpsSubtotal,
     effectiveSubtotal,
     discountAmount,
+    automaticDiscountAmount: automaticDiscount,
     payableSubtotal,
     allItemsCount,
     deliveryFee,

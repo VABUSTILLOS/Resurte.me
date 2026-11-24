@@ -243,11 +243,18 @@ export async function PATCH(
     // dos copias de esta lógica divergen y una de las dos deja de devolver
     // recursos sin que nadie se entere.
     if (status === "cancelled") {
-      await applyOrderCancellationEffects(supabase, {
+      const effects = await applyOrderCancellationEffects(supabase, {
         orderId,
         oldStatus,
         couponCode: currentOrder.coupon_code,
       })
+      // Si la cancelación devolvió stock, los productos pudieron
+      // volver a estar disponibles para suscriptores de «avísame
+      // cuando haya» (00230, best-effort).
+      if (effects.stockReleased) {
+        const { processOrderRestockNotifications } = await import("@/lib/stock-notifications")
+        await processOrderRestockNotifications(supabase, orderId)
+      }
     }
 
     // Asignación de repartidor: el bloque de arriba solo cubre estado y pago.

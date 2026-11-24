@@ -21,6 +21,8 @@ export interface ProductFormInput {
   cost: string
   stockQuantity: string
   lowStockThreshold: string
+  minOrderQty: string
+  maxOrderQty: string
   sku: string
   barcode: string
   saleStartsAt: string
@@ -38,6 +40,8 @@ export interface ProductFormValidation {
   cost: number | null
   stockQuantity: number | null
   lowStockThreshold: number | null
+  minOrderQty: number | null
+  maxOrderQty: number | null
 }
 
 /** Clave de error → `id` del control que recibe el foco al reintentar. */
@@ -49,6 +53,8 @@ export const PRODUCT_FIELD_INPUT_IDS: Record<string, string> = {
   cost: "pf-cost",
   stockQuantity: "pf-qty",
   lowStockThreshold: "pf-threshold",
+  minOrderQty: "pf-min-qty",
+  maxOrderQty: "pf-max-qty",
   stockStatus: "pf-stock",
   sku: "pf-sku",
   barcode: "pf-barcode",
@@ -71,6 +77,8 @@ const SERVER_FIELD_TO_FORM_KEY: Record<string, string> = {
   cost: "cost",
   stock_quantity: "stockQuantity",
   low_stock_threshold: "lowStockThreshold",
+  min_order_qty: "minOrderQty",
+  max_order_qty: "maxOrderQty",
   stock_status: "stockStatus",
   sku: "sku",
   barcode: "barcode",
@@ -94,12 +102,29 @@ function parseInteger(raw: string): number | null {
   return raw.trim() === "" ? null : parseInt(raw, 10)
 }
 
+/**
+ * Entero estricto para los límites por pedido (00229): «2.5» NO se
+ * trunca a 2 como hace parseInt — un límite a medias sería una
+ * regla distinta de la que el admin escribió. Vacío → null;
+ * cualquier otra cosa no entera → NaN (inválido).
+ */
+function parseStrictInteger(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (trimmed === "") return null
+  return /^-?\d+$/.test(trimmed) ? Number(trimmed) : NaN
+}
+
 function isInvalidNumber(value: number | null): boolean {
   return value !== null && (!Number.isFinite(value) || value < 0)
 }
 
 function isInvalidInteger(value: number | null): boolean {
   return value !== null && (!Number.isInteger(value) || value < 0)
+}
+
+/** Entero ≥ 1 o vacío: la regla de min_order_qty / max_order_qty (00229). */
+function isInvalidPositiveInteger(value: number | null): boolean {
+  return value !== null && (!Number.isInteger(value) || value < 1)
 }
 
 export function validateProductForm(input: ProductFormInput): ProductFormValidation {
@@ -122,6 +147,26 @@ export function validateProductForm(input: ProductFormInput): ProductFormValidat
   const lowStockThreshold = parseInteger(input.lowStockThreshold)
   if (isInvalidInteger(lowStockThreshold)) {
     errors.lowStockThreshold = "Umbral de stock bajo inválido"
+  }
+
+  const minOrderQty = parseStrictInteger(input.minOrderQty)
+  if (isInvalidPositiveInteger(minOrderQty)) {
+    errors.minOrderQty = "Cantidad mínima inválida (entero ≥ 1 o vacío)"
+  }
+
+  const maxOrderQty = parseStrictInteger(input.maxOrderQty)
+  if (isInvalidPositiveInteger(maxOrderQty)) {
+    errors.maxOrderQty = "Cantidad máxima inválida (entero ≥ 1 o vacío)"
+  }
+
+  if (
+    !errors.minOrderQty &&
+    !errors.maxOrderQty &&
+    minOrderQty !== null &&
+    maxOrderQty !== null &&
+    minOrderQty > maxOrderQty
+  ) {
+    errors.minOrderQty = "La cantidad mínima no puede superar a la máxima"
   }
 
   const skuCheck = validateSku(input.sku)
@@ -148,5 +193,7 @@ export function validateProductForm(input: ProductFormInput): ProductFormValidat
     cost,
     stockQuantity,
     lowStockThreshold,
+    minOrderQty,
+    maxOrderQty,
   }
 }

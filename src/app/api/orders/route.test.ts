@@ -578,3 +578,176 @@ describe("/api/orders inventario (migración 00143)", () => {
     expect(res.status).toBe(200)
   })
 })
+
+/** Productos cuyo read de límites (00229) devuelve min/max configurados. */
+function productsWithLimits(min: number | null, max: number | null) {
+  const main = {
+    data: [{ id: 1, price: 100, sale_price: null, stock_status: "in_stock", stock_quantity: 50 }],
+    error: null,
+  }
+  const limits = { data: [{ id: 1, min_order_qty: min, max_order_qty: max }], error: null }
+  const b = tableBuilder(main)
+  let current: typeof main | typeof limits = main
+  b.select = vi.fn((cols: unknown) => {
+    current = typeof cols === "string" && cols.includes("min_order_qty") ? limits : main
+    return b
+  }) as unknown as ReturnType<typeof vi.fn>
+  b.then = ((resolve: (v: unknown) => void) =>
+    resolve(current)) as unknown as ReturnType<typeof vi.fn>
+  return b
+}
+
+describe("/api/orders cantidad mínima/máxima por producto (migración 00229)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("rechaza 400 cuando la cantidad queda bajo el mínimo del producto", async () => {
+    const from = mockFlow({ products: productsWithLimits(5, null) })
+
+    const res = await POST(
+      orderReq({
+        ...validBody,
+        subtotal: 200,
+        total: 200,
+        items: [{ product_id: 1, quantity: 2, unit_price: 100, name: "Arroz 1 kg" }],
+      })
+    )
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.code).toBe("quantity_limit")
+    expect(body.error).toContain("Arroz 1 kg")
+    expect(body.error).toContain("mínimo por pedido es 5")
+    expect(body.violations).toHaveLength(1)
+    // El rechazo ocurre antes de crear el pedido.
+    expect(from).not.toHaveBeenCalledWith("orders")
+  })
+
+  it("rechaza 400 cuando la cantidad supera el máximo del producto", async () => {
+    mockFlow({ products: productsWithLimits(null, 3) })
+
+    const res = await POST(
+      orderReq({
+        ...validBody,
+        subtotal: 400,
+        total: 400,
+        items: [{ product_id: 1, quantity: 4, unit_price: 100, name: "Arroz 1 kg" }],
+      })
+    )
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.code).toBe("quantity_limit")
+    expect(body.error).toContain("máximo por pedido es 3")
+  })
+
+  it("acepta una cantidad exactamente en el mínimo", async () => {
+    mockFlow({ products: productsWithLimits(5, null) })
+
+    const res = await POST(
+      orderReq({
+        ...validBody,
+        subtotal: 500,
+        total: 500,
+        items: [{ product_id: 1, quantity: 5, unit_price: 100, name: "Arroz 1 kg" }],
+      })
+    )
+
+    expect(res.status).toBe(200)
+  })
+
+  it("sin la migración (la lectura de límites no trae columnas) vende como antes", async () => {
+    // El builder estándar devuelve las filas de precios para cualquier
+    // select: sin min_order_qty/max_order_qty no hay límites que forzar.
+    mockFlow()
+
+    const res = await POST(orderReq(validBody))
+
+    expect(res.status).toBe(200)
+  })
+})
+
+describe("/api/orders descuentos automáticos (migración 00231)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const bundleRule = {
+    id: "rule-1",
+    name: "Paquete: 2 piezas -$30",
+    rule_type: "bundle",
+    is_active: true,
+    config: {
+      items: [{ product_id: 1, qty: 2 }],
+      discount_type: "fixed_amount",
+      discount_value: 30,
+    },
+  }
+
+  it("aplica el descuento automático recalculado en servidor y lo persiste", async () => {
+    const orders = tableBuilder({
+      data: { id: 7, cashback_credits: 0, cashback_tier: null, total: 295, restore_token: "tok" },
+      error: null,
+    })
+    mockFlow({
+      orders,
+      automatic_discount_rules: tableBuilder({ data: [bundleRule], error: null }),
+    })
+
+    // 2 × $100 = $200 − $30 automático = $170 + envío $125 = $295.
+    const res = await POST(
+      orderReq({
+        ...validBody,
+        subtotal: 200,
+        delivery_fee: 125,
+        total: 295,
+        items: [{ product_id: 1, quantity: 2, unit_price: 100, name: "Arroz 1 kg" }],
+      })
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.total).toBe(295)
+    expect(body.automaticDiscount.amount).toBe(30)
+    expect(body.automaticDiscount.applied).toHaveLength(1)
+    expect(orders.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ discount: 30, subtotal: 200, delivery_fee: 125, total: 295 })
+    )
+  })
+
+  it("rechaza el pedido si el cliente NO incluyó el descuento automático en su total", async () => {
+    // El servidor otorga el descuento siempre que la regla aplica: un
+    // total «sin descuento» no coincide con el recalculado y se rechaza
+    // (nunca se confía en el total del cliente).
+    mockFlow({
+      automatic_discount_rules: tableBuilder({ data: [bundleRule], error: null }),
+    })
+
+    const res = await POST(
+      orderReq({
+        ...validBody,
+        subtotal: 200,
+        delivery_fee: 125,
+        total: 325,
+        items: [{ product_id: 1, quantity: 2, unit_price: 100, name: "Arroz 1 kg" }],
+      })
+    )
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toContain("total no coincide")
+  })
+
+  it("sin reglas activas el total es el de siempre", async () => {
+    mockFlow({
+      automatic_discount_rules: tableBuilder({ data: [], error: null }),
+    })
+
+    const res = await POST(orderReq(validBody))
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.automaticDiscount.amount).toBe(0)
+  })
+})

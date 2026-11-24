@@ -15,7 +15,7 @@ import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { WHATSAPP_HREF } from "@/lib/business"
 
 export default function CartPage() {
-  const { cart, itemCount, subtotal, coupon, removeItem, updateQuantity, clearCart, addItem, isLoaded } = useCart()
+  const { cart, itemCount, subtotal, coupon, automaticDiscount, automaticApplied, removeItem, updateQuantity, clearCart, addItem, isLoaded } = useCart()
   const { city } = useCity()
   const [confirmClear, setConfirmClear] = useState(false)
   const [restoreStatus, setRestoreStatus] = useState<"idle" | "loading" | "done" | "error">("idle")
@@ -31,7 +31,8 @@ export default function CartPage() {
     coupon,
     itemCount,
     countBumpUnits(selectedBumps),
-    DELIVERY_FEE_FLAT
+    DELIVERY_FEE_FLAT,
+    automaticDiscount
   )
   const deliveryFee = totals.deliveryFee
   const bumpsTotal = totals.total
@@ -388,6 +389,15 @@ export default function CartPage() {
             <div className="flex justify-between text-[#0E7A0E]">
               <span>Descuento {coupon ? `(${coupon.code})` : ""}</span>
               <span className="tabular-nums">-${totals.discountAmount.toFixed(2)}</span>
+            </div>
+          )}
+          {totals.automaticDiscountAmount > 0 && (
+            <div className="flex justify-between text-[#0E7A0E]">
+              <span>
+                Descuentos automáticos
+                {automaticApplied.length > 0 ? ` (${automaticApplied.map((a) => a.name).join(", ")})` : ""}
+              </span>
+              <span className="tabular-nums">-${totals.automaticDiscountAmount.toFixed(2)}</span>
             </div>
           )}
           {itemCount > 0 && (

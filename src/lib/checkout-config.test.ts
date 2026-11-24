@@ -241,5 +241,34 @@ describe("checkout-config", () => {
       expect(t.discountAmount).toBe(25.03)
       expect(t.payableSubtotal).toBeCloseTo(225.3, 2)
     })
+
+    it("descuento automático: por defecto es 0 y no altera los totales", () => {
+      const t = calcCheckoutTotals(420, 0, null, 3, 0)
+      expect(t.automaticDiscountAmount).toBe(0)
+      expect(t.payableSubtotal).toBe(420)
+      expect(t.total).toBe(545)
+    })
+
+    it("descuento automático: se resta del pagable junto al cupón", () => {
+      // $500 efectivo, cupón 10% = $50, automático $30 → pagable $420.
+      const t = calcCheckoutTotals(500, 0, pctCoupon, 4, 0, DELIVERY_FEE_FLAT, 30)
+      expect(t.discountAmount).toBe(50)
+      expect(t.automaticDiscountAmount).toBe(30)
+      expect(t.payableSubtotal).toBe(420)
+      expect(t.deliveryFee).toBe(125)
+      expect(t.total).toBe(545)
+    })
+
+    it("descuento automático: puede empujar el pagable bajo el umbral de envío gratis", () => {
+      const t = calcCheckoutTotals(FREE_SHIPPING_THRESHOLD, 0, null, 4, 0, DELIVERY_FEE_FLAT, 10)
+      expect(t.payableSubtotal).toBe(FREE_SHIPPING_THRESHOLD - 10)
+      expect(t.deliveryFee).toBe(125)
+    })
+
+    it("descuento automático: nunca deja el pagable en negativo", () => {
+      const t = calcCheckoutTotals(100, 0, null, 1, 0, DELIVERY_FEE_FLAT, 500)
+      expect(t.automaticDiscountAmount).toBe(100)
+      expect(t.payableSubtotal).toBe(0)
+    })
   })
 })

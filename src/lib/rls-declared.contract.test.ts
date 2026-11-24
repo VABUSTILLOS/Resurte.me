@@ -120,7 +120,7 @@ const FUENTES = MIGRATION_FILES.map((f) => sinComentarios(readFileSync(join(MIGR
 const MEDICION = medir(FUENTES)
 
 /**
- * Las 25 tablas con RLS encendida y ninguna política, con el archivo que
+ * Las 29 tablas con RLS encendida y ninguna política, con el archivo que
  * demuestra cómo se accede a cada una. Todas se leen y escriben con
  * `createServiceClient()`; `rate_limits` lo hace a través de la RPC
  * `consume_rate_limit`, cuyo `EXECUTE` quedó restringido a `service_role` en
@@ -129,6 +129,8 @@ const MEDICION = medir(FUENTES)
  * entrada).
  */
 const MODELO_DE_ACCESO: Record<string, string> = {
+  automatic_discount_rules:
+    "createServiceClient() desde src/lib/automatic-discounts.ts (la leen /api/orders, /api/discounts/automatic y el CRUD de /api/admin/automatic-discounts)",
   bump_affinity: "createServiceClient() desde src/app/api/admin/bump-affinity/route.ts",
   bump_rules: "createServiceClient() desde src/app/api/admin/bump-rules/route.ts",
   commission_adjustments:
@@ -153,6 +155,8 @@ const MODELO_DE_ACCESO: Record<string, string> = {
   foodos_payouts: "createServiceClient() desde src/app/api/admin/foodos/payouts/route.ts",
   geo_panel_checks: "createServiceClient() desde src/app/admin/seo-ia/actions.ts",
   leads: "createServiceClient() desde src/app/admin/actions.ts",
+  low_stock_alert_state:
+    "createServiceClient() desde src/lib/stock-notifications.ts (estado de la alerta de stock bajo al staff, 00230)",
   order_upsells: "createServiceClient() desde src/app/api/admin/funnel/route.ts",
   product_suppliers: "createServiceClient() desde src/app/api/admin/suppliers/route.ts",
   // El archivo va nombrado porque es la única entrada del registro que no
@@ -162,6 +166,8 @@ const MODELO_DE_ACCESO: Record<string, string> = {
   // EXECUTE). Ver `docs/OPS.md` §13.
   rate_limits:
     "RPC consume_rate_limit (EXECUTE sólo a service_role desde 00165) desde src/lib/rate-limit.ts, con el cliente de servicio",
+  stock_notifications:
+    "createServiceClient() desde src/lib/stock-notifications.ts y src/app/api/stock-notifications/route.ts (suscripciones «avísame cuando haya», 00230)",
   suppliers: "createServiceClient() desde src/app/api/admin/suppliers/route.ts",
   whatsapp_automation_sends: "createServiceClient() desde src/app/admin/actions.ts",
   whatsapp_catalog_categories: "createServiceClient() desde src/app/admin/actions.ts",
@@ -229,7 +235,7 @@ describe("perímetro — RLS sin políticas", () => {
     // Conteo fijo a propósito: es un tripwire, no un dato. Al añadir una tabla
     // con RLS y sin políticas hay que venir aquí y actualizarlo, que es lo que
     // obliga a mirar si de verdad está declarada en el registro.
-    expect(DECLARADAS).toHaveLength(26)
+    expect(DECLARADAS).toHaveLength(29)
   })
 
   it("ninguna entrada está vacía y todas nombran dónde vive el acceso", () => {

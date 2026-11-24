@@ -5,8 +5,14 @@
  */
 
 import {
+  AUTOMATIC_RULE_TYPES,
   COUPON_DISCOUNT_TYPES,
   FREE_SHIPPING_TYPE,
+  parseBundleRuleConfig,
+  parseBuyXGetYRuleConfig,
+  type AutomaticRuleType,
+  type BundleRuleConfig,
+  type BuyXGetYRuleConfig,
   type CouponDiscountType,
 } from "./coupon-rules"
 
@@ -298,4 +304,104 @@ export function suggestDuplicateCode(code: string, existing: string[]): string {
     if (!taken.has(candidate)) return candidate
   }
   return `${upper.slice(0, 28)}-C${Date.now() % 100}`
+}
+
+// ============================================================
+// Descuentos automáticos sin código (migración 00231)
+// ============================================================
+// La forma del `config` la validan los parsers de coupon-rules.ts
+// (la misma fuente que usa el motor al evaluar): lo que el panel
+// guarda es exactamente lo que el motor sabe leer.
+
+export interface AutomaticDiscountRuleInput {
+  name: string
+  rule_type: AutomaticRuleType
+  is_active: boolean
+  config: BundleRuleConfig | BuyXGetYRuleConfig
+}
+
+const BUNDLE_CONFIG_ERROR =
+  "config de paquete inválido: items [{product_id, qty}] sin repetir, discount_type percentage|fixed_amount y discount_value > 0 (≤ 100 si es porcentaje)"
+const BXGY_CONFIG_ERROR =
+  "config compra-X-llévate-Y inválido: buy_product_id, buy_qty, get_product_id, get_qty enteros > 0 y discount_pct entre 1 y 100"
+
+export function validateAutomaticDiscountRuleInput(
+  body: Record<string, unknown>
+): { ok: true; value: AutomaticDiscountRuleInput } | { ok: false; error: string } {
+  const name = typeof body.name === "string" ? body.name.trim() : ""
+  if (!name) return { ok: false, error: "name es obligatorio" }
+  if (name.length > 80) return { ok: false, error: "name admite hasta 80 caracteres" }
+
+  const ruleType = body.rule_type
+  if (typeof ruleType !== "string" || !AUTOMATIC_RULE_TYPES.includes(ruleType as never)) {
+    return { ok: false, error: `rule_type debe ser ${AUTOMATIC_RULE_TYPES.join(", ")}` }
+  }
+
+  if (ruleType === "bundle") {
+    const config = parseBundleRuleConfig(body.config)
+    if (!config) return { ok: false, error: BUNDLE_CONFIG_ERROR }
+    return {
+      ok: true,
+      value: {
+        name,
+        rule_type: "bundle",
+        is_active: body.is_active === undefined ? true : Boolean(body.is_active),
+        config,
+      },
+    }
+  }
+
+  const config = parseBuyXGetYRuleConfig(body.config)
+  if (!config) return { ok: false, error: BXGY_CONFIG_ERROR }
+  return {
+    ok: true,
+    value: {
+      name,
+      rule_type: "buy_x_get_y",
+      is_active: body.is_active === undefined ? true : Boolean(body.is_active),
+      config,
+    },
+  }
+}
+
+export interface AutomaticDiscountRulePatch {
+  name?: string
+  is_active?: boolean
+  config?: BundleRuleConfig | BuyXGetYRuleConfig
+}
+
+/**
+ * Actualización parcial de una regla automática. El `config` se
+ * valida contra el tipo de la regla EXISTENTE (el tipo no se
+ * cambia con PATCH: para cambiar de tipo se crea otra regla).
+ */
+export function validateAutomaticDiscountRulePatch(
+  body: Record<string, unknown>,
+  ruleType: string
+): { ok: true; value: AutomaticDiscountRulePatch } | { ok: false; error: string } {
+  const patch: AutomaticDiscountRulePatch = {}
+  if ("name" in body) {
+    const name = typeof body.name === "string" ? body.name.trim() : ""
+    if (!name) return { ok: false, error: "name es obligatorio" }
+    if (name.length > 80) return { ok: false, error: "name admite hasta 80 caracteres" }
+    patch.name = name
+  }
+  if ("is_active" in body) patch.is_active = Boolean(body.is_active)
+  if ("config" in body) {
+    if (ruleType === "bundle") {
+      const config = parseBundleRuleConfig(body.config)
+      if (!config) return { ok: false, error: BUNDLE_CONFIG_ERROR }
+      patch.config = config
+    } else if (ruleType === "buy_x_get_y") {
+      const config = parseBuyXGetYRuleConfig(body.config)
+      if (!config) return { ok: false, error: BXGY_CONFIG_ERROR }
+      patch.config = config
+    } else {
+      return { ok: false, error: `rule_type desconocido: ${ruleType}` }
+    }
+  }
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: "Sin campos para actualizar" }
+  }
+  return { ok: true, value: patch }
 }

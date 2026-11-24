@@ -5,6 +5,8 @@ import {
   validateCouponPatch,
   validateAffinityPairInput,
   validateAffinityPairPatch,
+  validateAutomaticDiscountRuleInput,
+  validateAutomaticDiscountRulePatch,
   suggestDuplicateCode,
 } from "./admin-marketing-validation"
 
@@ -261,5 +263,67 @@ describe("validateAffinityPairPatch", () => {
     expect(validateAffinityPairPatch({}).ok).toBe(false)
     expect(validateAffinityPairPatch({ kind: "nope" }).ok).toBe(false)
     expect(validateAffinityPairPatch({ weight: -3 }).ok).toBe(false)
+  })
+})
+
+describe("validateAutomaticDiscountRuleInput", () => {
+  it("acepta un paquete válido y normaliza el config", () => {
+    const res = validateAutomaticDiscountRuleInput({
+      name: "Paquete parrillero",
+      rule_type: "bundle",
+      config: {
+        items: [{ product_id: 1, qty: 1 }],
+        discount_type: "percentage",
+        discount_value: 10,
+      },
+    })
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      expect(res.value.is_active).toBe(true)
+      expect(res.value.rule_type).toBe("bundle")
+    }
+  })
+
+  it("acepta compra-X-llévate-Y válido", () => {
+    const res = validateAutomaticDiscountRuleInput({
+      name: "3x2 en salsas",
+      rule_type: "buy_x_get_y",
+      is_active: false,
+      config: { buy_product_id: 5, buy_qty: 2, get_product_id: 5, get_qty: 1, discount_pct: 100 },
+    })
+    expect(res.ok).toBe(true)
+    if (res.ok) expect(res.value.is_active).toBe(false)
+  })
+
+  it("rechaza nombre vacío, tipo desconocido y configs inválidos", () => {
+    expect(validateAutomaticDiscountRuleInput({ name: "", rule_type: "bundle", config: {} }).ok).toBe(false)
+    expect(validateAutomaticDiscountRuleInput({ name: "X", rule_type: "otro", config: {} }).ok).toBe(false)
+    expect(
+      validateAutomaticDiscountRuleInput({
+        name: "X",
+        rule_type: "bundle",
+        config: { items: [], discount_type: "percentage", discount_value: 10 },
+      }).ok
+    ).toBe(false)
+    expect(
+      validateAutomaticDiscountRuleInput({
+        name: "X",
+        rule_type: "buy_x_get_y",
+        config: { buy_product_id: 1, buy_qty: 2, get_product_id: 2, get_qty: 1, discount_pct: 0 },
+      }).ok
+    ).toBe(false)
+  })
+})
+
+describe("validateAutomaticDiscountRulePatch", () => {
+  it("valida el config contra el tipo existente y acepta on/off", () => {
+    const ok = validateAutomaticDiscountRulePatch({ is_active: false }, "bundle")
+    expect(ok.ok).toBe(true)
+    const bad = validateAutomaticDiscountRulePatch(
+      { config: { items: [{ product_id: 1, qty: 0 }], discount_type: "percentage", discount_value: 10 } },
+      "bundle"
+    )
+    expect(bad.ok).toBe(false)
+    expect(validateAutomaticDiscountRulePatch({}, "bundle").ok).toBe(false)
   })
 })

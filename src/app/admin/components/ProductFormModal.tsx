@@ -51,6 +51,8 @@ export interface ProductFormProduct {
   cost: number | null
   stock_quantity: number | null
   low_stock_threshold: number | null
+  min_order_qty: number | null
+  max_order_qty: number | null
   sku: string | null
   barcode: string | null
   tags: string[] | null
@@ -148,6 +150,8 @@ interface FormSnapshot {
   barcode: string
   tags: string[]
   lowStockThreshold: string
+  minOrderQty: string
+  maxOrderQty: string
   seoTitle: string
   seoDescription: string
   relatedIds: number[]
@@ -262,6 +266,12 @@ export function ProductFormModal({
   const [tagDraft, setTagDraft] = useState("")
   const [lowStockThreshold, setLowStockThreshold] = useState(
     product?.low_stock_threshold != null ? String(product.low_stock_threshold) : ""
+  )
+  const [minOrderQty, setMinOrderQty] = useState(
+    product?.min_order_qty != null ? String(product.min_order_qty) : ""
+  )
+  const [maxOrderQty, setMaxOrderQty] = useState(
+    product?.max_order_qty != null ? String(product.max_order_qty) : ""
   )
   const [seoTitle, setSeoTitle] = useState(product?.seo_title ?? "")
   const [seoDescription, setSeoDescription] = useState(product?.seo_description ?? "")
@@ -711,6 +721,8 @@ export function ProductFormModal({
     barcode,
     tags,
     lowStockThreshold,
+    minOrderQty,
+    maxOrderQty,
     seoTitle,
     seoDescription,
     relatedIds,
@@ -761,6 +773,8 @@ export function ProductFormModal({
       cost,
       stockQuantity,
       lowStockThreshold,
+      minOrderQty,
+      maxOrderQty,
       sku,
       barcode,
       saleStartsAt,
@@ -779,6 +793,8 @@ export function ProductFormModal({
       cost: check.cost,
       stock_quantity: check.stockQuantity,
       low_stock_threshold: check.lowStockThreshold,
+      min_order_qty: check.minOrderQty,
+      max_order_qty: check.maxOrderQty,
       // Misma regla que la vista previa del select: con unidades capturadas el
       // estado se deriva del umbral; sin unidades manda la selección manual.
       stock_status: resolveSubmittedStockStatus(
@@ -2005,6 +2021,60 @@ export function ProductFormModal({
                 <FieldError id="pf-err-lowStockThreshold" message={fieldErrors.lowStockThreshold} />
                 <p id="pf-threshold-hint" className="mt-1 text-[10px] text-gray-600">
                   Vacío = predeterminado ({DEFAULT_LOW_STOCK_THRESHOLD}).
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label
+                  className="block text-xs font-semibold text-gray-600 mb-1"
+                  htmlFor="pf-min-qty"
+                >
+                  Cantidad mínima por pedido
+                </label>
+                <input
+                  id="pf-min-qty"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={minOrderQty}
+                  onChange={(e) => {
+                    setMinOrderQty(e.target.value)
+                    clearFieldError("minOrderQty")
+                  }}
+                  placeholder="Sin mínimo"
+                  className={fieldCls("minOrderQty")}
+                  {...fieldA11y("minOrderQty", "pf-min-qty-hint")}
+                />
+                <FieldError id="pf-err-minOrderQty" message={fieldErrors.minOrderQty} />
+                <p id="pf-min-qty-hint" className="mt-1 text-[10px] text-gray-600">
+                  Vacío = sin mínimo. Se fuerza en la web y en pedidos de WhatsApp.
+                </p>
+              </div>
+              <div>
+                <label
+                  className="block text-xs font-semibold text-gray-600 mb-1"
+                  htmlFor="pf-max-qty"
+                >
+                  Cantidad máxima por pedido
+                </label>
+                <input
+                  id="pf-max-qty"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={maxOrderQty}
+                  onChange={(e) => {
+                    setMaxOrderQty(e.target.value)
+                    clearFieldError("maxOrderQty")
+                  }}
+                  placeholder="Sin máximo"
+                  className={fieldCls("maxOrderQty")}
+                  {...fieldA11y("maxOrderQty", "pf-max-qty-hint")}
+                />
+                <FieldError id="pf-err-maxOrderQty" message={fieldErrors.maxOrderQty} />
+                <p id="pf-max-qty-hint" className="mt-1 text-[10px] text-gray-600">
+                  Vacío = sin máximo por pedido.
                 </p>
               </div>
             </div>

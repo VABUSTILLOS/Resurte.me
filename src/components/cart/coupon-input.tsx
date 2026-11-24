@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useCart } from "@/contexts/cart-context"
-import { calcCheckoutTotals, countBumpUnits } from "@/lib/checkout-config"
+import { calcCheckoutTotals, countBumpUnits, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import type { AppliedCoupon } from "@/types"
 import { Tag, X, Loader2, Check } from "lucide-react"
@@ -14,7 +14,7 @@ import { Tag, X, Loader2, Check } from "lucide-react"
  * crear la orden en /api/orders.
  */
 export function CouponInput() {
-  const { subtotal, itemCount, coupon, applyCoupon, removeCoupon } = useCart()
+  const { subtotal, itemCount, coupon, automaticDiscount, applyCoupon, removeCoupon } = useCart()
   const { selectedBumps } = useSelectedBumps()
   const [code, setCode] = useState("")
   const [loading, setLoading] = useState(false)
@@ -26,8 +26,17 @@ export function CouponInput() {
     [selectedBumps]
   )
   const totals = useMemo(
-    () => calcCheckoutTotals(subtotal, bumpsSubtotal, coupon, itemCount, countBumpUnits(selectedBumps)),
-    [subtotal, bumpsSubtotal, coupon, itemCount, selectedBumps]
+    () =>
+      calcCheckoutTotals(
+        subtotal,
+        bumpsSubtotal,
+        coupon,
+        itemCount,
+        countBumpUnits(selectedBumps),
+        DELIVERY_FEE_FLAT,
+        automaticDiscount
+      ),
+    [subtotal, bumpsSubtotal, coupon, itemCount, selectedBumps, automaticDiscount]
   )
 
   // Revalida el cupón persistido (localStorage) al montar o si cambia el

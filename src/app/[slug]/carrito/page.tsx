@@ -23,7 +23,7 @@ import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 
 export default function CartPage() {
-  const { cart, itemCount, subtotal, coupon, updateQuantity, removeItem, clearCart, isLoaded } = useCart()
+  const { cart, itemCount, subtotal, coupon, automaticDiscount, automaticApplied, updateQuantity, removeItem, clearCart, isLoaded } = useCart()
   const { city } = useCity()
   const router = useRouter()
   // Order bumps (cross-sell estilo ThriveCart). Estado compartido con el drawer
@@ -40,7 +40,8 @@ export default function CartPage() {
     coupon,
     itemCount,
     countBumpUnits(selectedBumps),
-    DELIVERY_FEE_FLAT
+    DELIVERY_FEE_FLAT,
+    automaticDiscount
   )
   const { deliveryFee } = totals
   const bumpsTotal = totals.total
@@ -249,6 +250,17 @@ export default function CartPage() {
                     Descuento
                   </span>
                   <span className="font-semibold text-green-600">-${totals.discountAmount.toFixed(2)}</span>
+                </div>
+              )}
+
+              {totals.automaticDiscountAmount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-green-600 flex items-center gap-1">
+                    <Tag className="w-3.5 h-3.5" />
+                    Descuentos automáticos
+                    {automaticApplied.length > 0 ? ` (${automaticApplied.map((a) => a.name).join(", ")})` : ""}
+                  </span>
+                  <span className="font-semibold text-green-600">-${totals.automaticDiscountAmount.toFixed(2)}</span>
                 </div>
               )}
 

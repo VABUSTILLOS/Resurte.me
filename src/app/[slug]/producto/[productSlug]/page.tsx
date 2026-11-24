@@ -15,6 +15,8 @@ import { RecentlyViewed } from "@/components/product/recently-viewed"
 import { getBreadcrumbSchema, getProductSchema } from "@/lib/structured-data"
 import { buildRelatedProducts } from "@/lib/related-products"
 import { comparePresentations } from "@/lib/unit-price"
+import { fetchQuantityLimits } from "@/lib/product-quantity-limits"
+import { createServiceClient } from "@/lib/supabase/service"
 
 // ISR: se revalida cada 5 min (alineado con catalog-cache). La primera
 // visita a cada producto renderiza y cachea; el resto sale del CDN.
@@ -141,6 +143,23 @@ export default async function ProductPage({ params }: Props) {
   // tipo de marcado que Google penaliza.
   const reviewStats = (await getProductReviewIndex()).get(product.id)
 
+  // Cantidad mínima/máxima por pedido (00229): columnas PRIVADAS
+  // (solo service_role). La ficha las lee con el cliente de servicio
+  // en servidor para mostrar el mínimo y para que el botón «Avísame
+  // cuando haya» no dependa de ellas; si la migración aún no se
+  // aplica, la lectura degrada a sin límites y la ficha se pinta
+  // igual que antes.
+  let minOrderQty: number | null = null
+  let maxOrderQty: number | null = null
+  try {
+    const limits = await fetchQuantityLimits(await createServiceClient(), [product.id])
+    const row = limits.get(product.id)
+    minOrderQty = row?.min_order_qty ?? null
+    maxOrderQty = row?.max_order_qty ?? null
+  } catch {
+    // Sin límites visibles: la ficha no muestra el mínimo.
+  }
+
   const url = `https://resurte.me/${slug}/producto/${productSlug}`
   const jsonLd = [
     getProductSchema(
@@ -175,6 +194,8 @@ export default async function ProductPage({ params }: Props) {
         citySlug={slug}
         cityName={city.name}
         reviewStats={reviewStats}
+        minOrderQty={minOrderQty}
+        maxOrderQty={maxOrderQty}
       />
       {/* Rail de vistos recientemente (cliente, localStorage) */}
       <RecentlyViewed

@@ -42,6 +42,13 @@ import {
 } from "@/lib/whatsapp-order-config"
 import { insertAddressResilient } from "@/lib/orders-address"
 import {
+  describeQuantityViolation,
+  fetchQuantityLimits,
+  validateQuantityLimits,
+  type QuantityLimitViolation,
+} from "@/lib/product-quantity-limits"
+import { processStockNotifications } from "@/lib/stock-notifications"
+import {
   buildRetailerIdIndex,
   resolveOrderItems,
   resolveRetailerId,
@@ -83,6 +90,12 @@ export type CreateWhatsAppOrderResult =
     }
   | { kind: "no_resolvable_items"; unresolved: UnresolvedOrderItem[] }
   | { kind: "insufficient_stock"; detail: string; unresolved: UnresolvedOrderItem[] }
+  | {
+      kind: "quantity_violation"
+      detail: string
+      violations: QuantityLimitViolation[]
+      unresolved: UnresolvedOrderItem[]
+    }
   | { kind: "error"; detail: string }
 
 const round2 = (n: number) => Math.round(n * 100) / 100
@@ -223,6 +236,27 @@ export async function createWhatsAppOrder(
     }
   }
 
+  // ── Cantidad mínima/máxima por producto (migración 00229) ────
+  // Mismo criterio que el mínimo global de abajo y que el checkout
+  // web (regla única en product-quantity-limits.ts): si una línea
+  // viola el mínimo/máximo de su producto, el pedido NO se crea y
+  // el webhook le dice al cliente el límite exacto para que corrija
+  // su pedido en el catálogo. No se ajusta la cantidad en silencio:
+  // cambiar lo pedido sin avisar vendería algo distinto de lo que
+  // el cliente eligió. Sin la migración, no hay límites que forzar.
+  const quantityLimits = await fetchQuantityLimits(
+    supabase,
+    resolved.lines.map((l) => l.product_id)
+  )
+  if (quantityLimits.size > 0) {
+    const violations = validateQuantityLimits(resolved.lines, quantityLimits)
+    if (violations.length > 0) {
+      const detail = violations.map(describeQuantityViolation).join("; ")
+      logger.info("whatsapp.order.quantity_violation", { from, waMessageId, detail })
+      return { kind: "quantity_violation", detail, violations, unresolved }
+    }
+  }
+
   // ── Totales (fuente única: las mismas reglas del checkout) ────
   const subtotal = round2(resolved.subtotal)
   const deliveryFee = validDeliveryFee(resolved.lines.length, subtotal, DELIVERY_FEE_FLAT)
@@ -337,6 +371,14 @@ export async function createWhatsAppOrder(
     logger.warn("WhatsApp order: existencia insuficiente; pedido revertido", { orderId, detail })
     return { kind: "insufficient_stock", detail, unresolved }
   }
+
+  // ── Avisos de inventario (migración 00230, best-effort) ──────
+  // La reserva pudo dejar productos bajo su umbral: se avisa al
+  // staff una vez por cruce. Nunca lanza ni bloquea el pedido.
+  await processStockNotifications(
+    supabase,
+    resolved.lines.map((l) => l.product_id)
+  )
 
   // ── Ligar el mensaje de WhatsApp con su pedido (bitácora) ─────
   if (waMessageId) {

@@ -14,6 +14,22 @@
   sobre bumps) se hace en ambos lados el mismo día. El `bumpCount` que recibe es
   **unidades**, no líneas: se calcula con `countBumpUnits(selectedBumps)` para
   que un bump con cantidad 3 cuente como 3 artículos.
+- **Descuentos automáticos sin código** (00231, tabla
+  `automatic_discount_rules`): reglas `bundle` (paquete) y
+  `buy_x_get_y` (compra X, llévate Y) administradas en
+  `/admin/marketing`. El motor puro es `evaluateAutomaticDiscounts`
+  en `src/lib/coupon-rules.ts` (la misma casa que las reglas de
+  cupón). El carrito los cotiza con `POST /api/discounts/automatic`
+  (solo pinta) y `POST /api/orders` los **recalcula** con precios de
+  la BD: nunca se confía en la cotización del cliente. Se evalúan
+  solo sobre los artículos estándar —los order bumps quedan fuera,
+  tienen su propia mecánica— y **no** aplican a pedidos de WhatsApp
+  (ese canal tampoco acepta cupones con código). Se apilan con el
+  cupón: el descuento total (cupón + automático) se topa al subtotal
+  y `orders.discount` guarda ese total; `orders.coupon_code` solo se
+  llena con cupón. `calcCheckoutTotals` recibe el monto automático
+  como séptimo argumento y lo resta junto al cupón antes de decidir
+  el envío gratis.
 - **El conteo que se muestra es catálogo + bumps**: todas las superficies usan
   `countOrderUnits(itemCount, selectedBumps)` (= `itemCount + countBumpUnits`)
   para el número de productos que ven el header (insignia y `aria-label`),

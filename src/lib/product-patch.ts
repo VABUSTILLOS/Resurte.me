@@ -23,6 +23,8 @@ export const PRODUCT_AUDIT_FIELDS = [
   "stock_status",
   "stock_quantity",
   "low_stock_threshold",
+  "min_order_qty",
+  "max_order_qty",
   "is_visible",
   "show_in_whatsapp",
   "name",
@@ -68,6 +70,8 @@ export const PRODUCT_UPDATE_FIELDS = [
   "sale_starts_at",
   "sale_ends_at",
   "low_stock_threshold",
+  "min_order_qty",
+  "max_order_qty",
   "related_product_ids",
 ] as const
 
@@ -83,6 +87,20 @@ export type PatchValidation =
 const MAX_RELATED = 12
 /** Máximo de etiquetas por producto. */
 const MAX_TAGS = 20
+
+/**
+ * Columnas de producto que llegaron por migración posterior al
+ * esquema base y pueden NO existir en un despliegue dado
+ * (low_stock_threshold → 00108; min/max por pedido → 00229). Las
+ * rutas de escritura las quitan del payload y reintentan cuando
+ * PostgREST rechaza por columna ausente, en vez de perder la
+ * edición entera.
+ */
+export const PRODUCT_OPTIONAL_SCHEMA_COLUMNS = [
+  "low_stock_threshold",
+  "min_order_qty",
+  "max_order_qty",
+] as const
 
 /**
  * Valida y normaliza un patch de producto. Es puramente funcional: no toca la
@@ -205,6 +223,29 @@ export function validateProductPatch(
     const v = updates.low_stock_threshold
     if (v !== null && (typeof v !== "number" || !Number.isInteger(v) || v < 0)) {
       return { ok: false, error: "low_stock_threshold debe ser un entero ≥ 0 o null", field: "low_stock_threshold" }
+    }
+  }
+  // Cantidad mínima/máxima por pedido (migración 00229): entero ≥ 1 o
+  // null (sin límite). Si el patch trae ambos, el mínimo no puede
+  // superar al máximo; con uno solo, la BD lo contrasta con el otro
+  // valor vigente vía el CHECK de la migración.
+  for (const field of ["min_order_qty", "max_order_qty"] as const) {
+    if (field in updates) {
+      const v = updates[field]
+      if (v !== null && (typeof v !== "number" || !Number.isInteger(v) || v < 1)) {
+        return { ok: false, error: `${field} debe ser un entero ≥ 1 o null`, field }
+      }
+    }
+  }
+  if (
+    typeof updates.min_order_qty === "number" &&
+    typeof updates.max_order_qty === "number" &&
+    updates.min_order_qty > updates.max_order_qty
+  ) {
+    return {
+      ok: false,
+      error: "min_order_qty no puede ser mayor que max_order_qty",
+      field: "min_order_qty",
     }
   }
   // Productos relacionados (migración 00109): ids enteros, sin el propio.

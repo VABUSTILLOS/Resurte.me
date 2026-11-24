@@ -164,11 +164,18 @@ export async function POST(
     }
 
     // Devolver inventario y liberar el cupón: la misma cascada que el admin.
-    await applyOrderCancellationEffects(supabase, {
+    const effects = await applyOrderCancellationEffects(supabase, {
       orderId,
       oldStatus,
       couponCode: order.coupon_code,
     })
+
+    // Si la cancelación devolvió stock, avisar a suscriptores de
+    // «avísame cuando haya» de esos productos (00230, best-effort).
+    if (effects.stockReleased) {
+      const { processOrderRestockNotifications } = await import("@/lib/stock-notifications")
+      await processOrderRestockNotifications(supabase, orderId)
+    }
 
     try {
       await onOrderStatusChange(orderId, oldStatus, "cancelled")

@@ -717,6 +717,15 @@ async function handleOrderMessage(
       }).catch((err) => logger.error("WhatsApp webhook: stock reply failed:", err))
       break
     }
+    case "quantity_violation": {
+      await sendTextMessage({
+        to: from,
+        text:
+          `Tu pedido tiene cantidades fuera del rango permitido por producto: ${result.detail}.\n\n` +
+          "Ajusta las cantidades en el catálogo y vuelve a enviar tu pedido, por favor. 🙏",
+      }).catch((err) => logger.error("WhatsApp webhook: quantity-violation reply failed:", err))
+      break
+    }
     case "duplicate": {
       // Reintento de Meta: el pedido ya existe y ya se respondió.
       logger.info("whatsapp.order.duplicate_ignored", { messageId, orderId: result.orderId })
