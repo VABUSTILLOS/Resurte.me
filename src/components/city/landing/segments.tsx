@@ -12,7 +12,7 @@ export function CustomerSegments() {
               ¿Para quién es?
             </h2>
             <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-3 max-w-xl mx-auto leading-relaxed">
-              Si tu negocio sirve comida, Resurte es tu proveedor. Sin membresía, sin complicaciones: pedido mínimo de {formatMxn(MIN_ORDER_MXN)}.
+              Si cocinas para tu familia o tu negocio sirve comida, Resurte es tu proveedor. Sin membresía, sin complicaciones: pedido mínimo de {formatMxn(MIN_ORDER_MXN)}.
             </p>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -36,6 +36,11 @@ export function CustomerSegments() {
                 icon: "🏢",
                 title: "Oficinas y comedores",
                 desc: "Insumos para cocina industrial. Facturación electrónica, línea de crédito disponible.",
+              },
+              {
+                icon: "🏠",
+                title: "Casas y familias",
+                desc: "El súper de tu casa a precio de mayoreo: la despensa de la semana, la carne para la asada y frutas y verduras frescas, entregado el mismo día.",
               },
             ].map((seg) => (
               <div

@@ -376,13 +376,13 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
             <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-[#e0dbd2]">
               <AccordionItem title="Descripción" defaultOpen={descriptionOpen}>
                 <p className="text-sm text-[#6b6b6b] leading-relaxed whitespace-pre-line">
-                  {product.description || "Producto seleccionado directamente en la Central de Abastos. Frescura garantizada para que tu negocio sirva siempre lo mejor. Origen verificado, manejo sanitario certificado."}
+                  {product.description || "Producto seleccionado directamente en la Central de Abastos. Frescura garantizada para tu casa o tu negocio. Origen verificado, manejo sanitario certificado."}
                 </p>
               </AccordionItem>
 
               <AccordionItem title="Calidad y Origen" defaultOpen={qualityOpen}>
                 <p className="text-sm text-[#6b6b6b] leading-relaxed">
-                  <strong>Calidad garantizada para tu negocio.</strong> Todos nuestros productos provienen directamente de distribuidores autorizados en la Central de Abastos. Cada lote pasa por control de frescura, temperatura y manejo sanitario antes de salir a ruta. Si algo no llega en condiciones óptimas, te lo reponemos sin costo.
+                  <strong>Calidad garantizada para tu casa o tu negocio.</strong> Todos nuestros productos provienen directamente de distribuidores autorizados en la Central de Abastos. Cada lote pasa por control de frescura, temperatura y manejo sanitario antes de salir a ruta. Si algo no llega en condiciones óptimas, te lo reponemos sin costo.
                 </p>
               </AccordionItem>
 

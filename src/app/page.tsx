@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Resurte.me — Central de Abastos Digital en Chihuahua",
     description:
-      `Frutas, verduras, carnes y abarrotes por mayoreo para tu negocio en Chihuahua. Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`,
+      `Frutas, verduras, carnes y abarrotes por mayoreo para tu casa o tu negocio en Chihuahua. Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`,
     url: "https://resurte.me",
     siteName: "Resurte.me",
     locale: "es_MX",

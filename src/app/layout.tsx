@@ -58,7 +58,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Resurte.me — Central de Abastos Digital",
   description:
-    `Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde ${freeShippingFrom}.`,
+    `Central de abastos en línea para tu casa o tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde ${freeShippingFrom}.`,
   keywords: [
     "central de abastos",
     "mayoreo",
@@ -80,7 +80,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Resurte.me — Central de Abastos Digital",
     description:
-      `Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde ${freeShippingFrom}.`,
+      `Central de abastos en línea para tu casa o tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde ${freeShippingFrom}.`,
     url: "https://resurte.me",
     siteName: "Resurte.me",
     locale: "es_MX",
@@ -98,7 +98,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Resurte.me — Central de Abastos Digital",
     description:
-      `Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Envío gratis desde ${freeShippingFrom}.`,
+      `Central de abastos en línea para tu casa o tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Envío gratis desde ${freeShippingFrom}.`,
     images: ["https://resurte.me/opengraph-image"],
   },
   // Sin bloque `icons`: los favicons salen de las convenciones de archivo de
