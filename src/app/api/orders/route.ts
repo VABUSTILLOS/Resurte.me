@@ -21,6 +21,7 @@ import {
   validateQuantityLimits,
 } from "@/lib/product-quantity-limits"
 import { processStockNotifications } from "@/lib/stock-notifications"
+import { fetchOrderVariantData, type OrderVariantRow } from "@/lib/product-variants"
 import { resolveBumpPricing } from "@/lib/order-bumps"
 import { insertAddressResilient } from "@/lib/orders-address"
 import { missingColumnName } from "@/lib/admin/order-selects"
@@ -35,6 +36,8 @@ const orderItemSchema = z.object({
   unit_price: z.number().nonnegative(),
   name: z.string(),
   item_type: z.enum(["standard", "bump"]).optional(),
+  /** Presentación elegida (00232); solo en artículos estándar. */
+  variant_id: z.number().int().positive().optional(),
 })
 
 const createOrderSchema = z.object({
@@ -91,6 +94,8 @@ interface OrderItemInput {
   name: string
   /** 'standard' (carrito) o 'bump' (order bump del drawer, con descuento). */
   item_type?: "standard" | "bump"
+  /** Presentación elegida (00232); el servidor la revalida contra la BD. */
+  variant_id?: number
 }
 
 interface CreateOrderBody {
@@ -266,6 +271,60 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── Presentaciones (migración 00232) ──
+    // Una línea estándar puede traer `variant_id`: la presentación
+    // se revalida contra la BD (existe, es de ese producto y sigue
+    // activa) y su precio/existencia mandan sobre los del producto.
+    // Un producto CON presentaciones no se vende sin elegir una:
+    // ni como línea estándar suelta ni como artículo especial.
+    // Sin la migración, fetchOrderVariantData degrada a «sin
+    // variantes» y el checkout se comporta como antes — salvo que
+    // una línea que SÍ nombra una variante se rechaza, porque no
+    // hay forma de validarla.
+    const variantData = await fetchOrderVariantData(supabase, {
+      variantIds: items
+        .filter((i) => i.item_type !== "bump" && i.variant_id)
+        .map((i) => i.variant_id as number),
+      productIds,
+    })
+    const variantOf = (item: OrderItemInput): OrderVariantRow | null =>
+      item.variant_id ? (variantData.byId.get(item.variant_id) ?? null) : null
+
+    for (const item of items) {
+      if (item.item_type === "bump") {
+        if (item.variant_id) {
+          return NextResponse.json(
+            { error: "Un artículo especial no lleva presentación" },
+            { status: 400 }
+          )
+        }
+        continue
+      }
+      if (item.variant_id) {
+        if (!variantData.tableAvailable) {
+          return NextResponse.json(
+            { error: `La presentación de ${item.name} ya no está disponible` },
+            { status: 400 }
+          )
+        }
+        const variant = variantOf(item)
+        if (!variant || variant.product_id !== item.product_id || !variant.is_active) {
+          return NextResponse.json(
+            { error: `La presentación de ${item.name} ya no está disponible` },
+            { status: 400 }
+          )
+        }
+      } else if (variantData.productIdsWithVariants.has(item.product_id)) {
+        return NextResponse.json(
+          {
+            error: `«${item.name}» se vende por presentación: elige una en su página antes de pedir`,
+            code: "variant_required",
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     // Cantidades: enteras, entre 1 y 99 por item (mismo rango que upsells).
     // Sin esta validación, cantidades negativas producían subtotales
     // negativos/items corruptos, y cantidades absurdas pasaban intactas.
@@ -280,10 +339,11 @@ export async function POST(request: NextRequest) {
       item.quantity = qty
     }
 
-    // Items agotados
+    // Items agotados (la presentación manda sobre el producto)
     for (const item of items) {
-      const db = getDbProduct(item.product_id)
-      if (db.stock_status === "out_of_stock") {
+      const variant = item.item_type === "bump" ? null : variantOf(item)
+      const stockStatus = variant ? variant.stock_status : getDbProduct(item.product_id).stock_status
+      if (stockStatus === "out_of_stock") {
         return NextResponse.json(
           { error: `El producto ${item.name ?? item.product_id} está agotado` },
           { status: 400 }
@@ -304,12 +364,39 @@ export async function POST(request: NextRequest) {
         (requestedByProduct.get(item.product_id) ?? 0) + item.quantity
       )
     }
+    // La existencia se revisa donde vive: las líneas con
+    // presentación contra la variante (00232) y las demás contra
+    // el producto. `requestedByProduct` (todo sumado) se conserva
+    // para el límite mín/máx, que es POR PRODUCTO.
+    const requestedPlainByProduct = new Map<number, number>()
+    const requestedByVariant = new Map<number, number>()
+    for (const item of items) {
+      if (item.item_type !== "bump" && item.variant_id) {
+        requestedByVariant.set(
+          item.variant_id,
+          (requestedByVariant.get(item.variant_id) ?? 0) + item.quantity
+        )
+      } else {
+        requestedPlainByProduct.set(
+          item.product_id,
+          (requestedPlainByProduct.get(item.product_id) ?? 0) + item.quantity
+        )
+      }
+    }
     const shortages: string[] = []
-    for (const [productId, requested] of requestedByProduct) {
+    for (const [productId, requested] of requestedPlainByProduct) {
       const db = getDbProduct(productId)
       if (db.stock_quantity !== null && db.stock_quantity < requested) {
         const name = items.find((i) => i.product_id === productId)?.name ?? `Producto ${productId}`
         shortages.push(`${name} (pediste ${requested}, hay ${db.stock_quantity})`)
+      }
+    }
+    for (const [variantId, requested] of requestedByVariant) {
+      const variant = variantData.byId.get(variantId)
+      if (variant && variant.stock_quantity !== null && variant.stock_quantity < requested) {
+        const name =
+          items.find((i) => i.variant_id === variantId)?.name ?? `Presentación ${variantId}`
+        shortages.push(`${name} (pediste ${requested}, hay ${variant.stock_quantity})`)
       }
     }
     if (shortages.length > 0) {
@@ -353,6 +440,16 @@ export async function POST(request: NextRequest) {
     const bumpItems = items.filter((i) => i.item_type === "bump")
     const bumpPriceByProduct = new Map<number, number>()
     if (bumpItems.length > 0) {
+      // Un producto con presentaciones no se ofrece como artículo
+      // especial (00232): el bump no sabe cuál presentación dar.
+      for (const item of bumpItems) {
+        if (variantData.productIdsWithVariants.has(item.product_id)) {
+          return NextResponse.json(
+            { error: `El artículo especial ${item.product_id} no está disponible` },
+            { status: 400 }
+          )
+        }
+      }
       const bumpProductIds = [...new Set(bumpItems.map((i) => i.product_id))]
       const { data: bumpRules, error: bumpErr } = await supabase
         .from("bump_rules")
@@ -395,16 +492,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Recalcular subtotal con precios reales (sale_price gana si existe;
-    // el bump usa el mismo precio de catálogo, sin descuento propio)
-    const realSubtotal = items.reduce((sum, item) => {
+    // Precio unitario real de una línea, desde la BD: el bump usa
+    // el precio de catálogo validado contra sus reglas; la línea
+    // con presentación, el de LA VARIANTE (00232); el resto, el del
+    // producto (sale_price gana si existe). Lo usan el subtotal,
+    // los descuentos automáticos y el insert de ítems: una sola
+    // definición para que las tres cifras no puedan divergir.
+    const unitPriceOf = (item: OrderItemInput): number => {
       const db = getDbProduct(item.product_id)
-      const unitPrice =
-        item.item_type === "bump"
-          ? (bumpPriceByProduct.get(item.product_id) ?? db.sale_price ?? db.price)
-          : (db.sale_price ?? db.price)
-      return sum + unitPrice * item.quantity
-    }, 0)
+      if (item.item_type === "bump") {
+        return bumpPriceByProduct.get(item.product_id) ?? db.sale_price ?? db.price
+      }
+      const variant = variantOf(item)
+      if (variant) return variant.sale_price ?? variant.price
+      return db.sale_price ?? db.price
+    }
+
+    // Recalcular subtotal con precios reales
+    const realSubtotal = items.reduce(
+      (sum, item) => sum + unitPriceOf(item) * item.quantity,
+      0
+    )
 
     const subtotalDiff = Math.abs(realSubtotal - (subtotal ?? 0))
     if (subtotalDiff > 0.01) {
@@ -486,14 +594,14 @@ export async function POST(request: NextRequest) {
     const autoRules = await fetchActiveAutomaticDiscountRules(supabase)
     const autoLines: AutomaticDiscountLine[] = items
       .filter((i) => i.item_type !== "bump")
-      .map((i) => {
-        const db = getDbProduct(i.product_id)
-        return {
-          product_id: i.product_id,
-          quantity: i.quantity,
-          unit_price: db.sale_price ?? db.price,
-        }
-      })
+      .map((i) => ({
+        product_id: i.product_id,
+        quantity: i.quantity,
+        // Con presentación, el precio de la variante (00232): el
+        // motor agrupa por producto, así que las presentaciones de
+        // un mismo producto suman para la regla como en la tienda.
+        unit_price: unitPriceOf(i),
+      }))
     const autoQuote = evaluateAutomaticDiscounts(autoRules, autoLines)
     // Mismo tope que calcCheckoutTotals del cliente: cupón +
     // automático nunca descuentan más que el subtotal.
@@ -796,17 +904,22 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Create order items (unit_price real de la BD, no el del cliente)
+    // La presentación comprada viaja en la línea (00232), con su
+    // nombre en foto. Las claves solo se agregan si alguna línea
+    // trae variante: sin variantes el insert es idéntico al de
+    // antes de la migración, así un esquema sin aplicar no lo tumba.
+    const anyVariantLine = items.some((i) => i.item_type !== "bump" && i.variant_id)
     const orderItems = items.map((item) => {
-      const db = getDbProduct(item.product_id)
+      const variant = item.item_type === "bump" ? null : variantOf(item)
       return {
         order_id: order.id,
         product_id: item.product_id,
         quantity: item.quantity,
-        unit_price:
-          item.item_type === "bump"
-            ? (bumpPriceByProduct.get(item.product_id) ?? db.sale_price ?? db.price)
-            : (db.sale_price ?? db.price),
+        unit_price: unitPriceOf(item),
         item_type: item.item_type === "bump" ? "bump" : "standard",
+        ...(anyVariantLine
+          ? { variant_id: variant?.id ?? null, variant_label: variant?.name ?? null }
+          : {}),
       }
     })
 

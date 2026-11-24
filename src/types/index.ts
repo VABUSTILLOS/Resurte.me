@@ -107,6 +107,15 @@ export interface Product {
   /** Relacionados explícitos elegidos en el panel (migración 00109). */
   related_product_ids?: number[] | null
   stock_status: 'in_stock' | 'low_stock' | 'out_of_stock'
+  /**
+   * Presentaciones (00232): lo calcula la capa de datos, NO es una
+   * columna de `products`. `has_variants` = el producto tiene al
+   * menos una variante activa y se vende eligiendo presentación;
+   * `variant_min_price` = el menor precio efectivo entre ellas
+   * (para el «desde $…» de la tarjeta).
+   */
+  has_variants?: boolean
+  variant_min_price?: number | null
   show_in_whatsapp: boolean
   whatsapp_product_id: string | null
   unit?: string
@@ -114,6 +123,30 @@ export interface Product {
   is_visible?: boolean
   seo_title?: string | null
   seo_description?: string | null
+}
+
+/**
+ * Presentación (variante) de un producto — migración 00232.
+ * Cada variante tiene su propio precio, oferta, existencia y SKU;
+ * el producto padre agrupa las presentaciones en una sola ficha.
+ * `slug` es estable dentro del producto: de él cuelga el
+ * retailer_id del feed de Meta, así que nunca se regenera.
+ */
+export interface ProductVariant {
+  id: number
+  product_id: number
+  name: string
+  slug: string
+  sku: string | null
+  price: number
+  sale_price: number | null
+  /** NULL = sin control de inventario (como en `products`). */
+  stock_quantity: number | null
+  stock_status: 'in_stock' | 'low_stock' | 'out_of_stock'
+  is_active: boolean
+  position: number
+  created_at?: string
+  updated_at?: string
 }
 
 export interface CollectionRecipe {
@@ -197,6 +230,9 @@ export interface OrderItem {
   product_id: number
   quantity: number
   unit_price: number
+  /** Presentación comprada (00232); ausente en pedidos anteriores. */
+  variant_id?: number | null
+  variant_label?: string | null
 }
 
 // --- WhatsApp Types ---
@@ -275,6 +311,14 @@ export interface CartItem {
   sale_price: number | null
   quantity: number
   stock_status: 'in_stock' | 'low_stock' | 'out_of_stock'
+  /**
+   * Presentación elegida (00232). La identidad de la línea del
+   * carrito es (product_id, variant_id): dos presentaciones del
+   * mismo producto son dos líneas. Ausente/null = sin presentación.
+   */
+  variant_id?: number | null
+  /** Nombre de la presentación, para pintar la línea. */
+  variant_name?: string | null
 }
 
 export interface Cart {

@@ -203,7 +203,7 @@ export function CartDrawer() {
           ) : (
             <ul className="divide-y divide-[#E8E9EB]">
               {cart.items.map((item) => (
-                <li key={item.product_id} className="py-4 group">
+                <li key={`${item.product_id}-${item.variant_id ?? 0}`} className="py-4 group">
                   <div className="flex gap-3">
                     {/* Product image placeholder */}
                     <div className="w-16 h-16 rounded-[10px] bg-[#F7F5F0] flex items-center justify-center shrink-0 relative overflow-hidden">
@@ -228,14 +228,16 @@ export function CartDrawer() {
                           {item.name}
                         </h4>
                         <button
-                          onClick={() => removeItem(item.product_id)}
+                          onClick={() => removeItem(item.product_id, item.variant_id)}
                           aria-label={`Eliminar ${item.name} del carrito`}
                           className="p-2.5 sm:p-1 rounded-md hover:bg-red-50 transition-all touch-target"
                         >
                           <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-red-400" />
                         </button>
                       </div>
-                      <p className="text-[13px] text-[var(--text-secondary)]">{item.brand}</p>
+                      <p className="text-[13px] text-[var(--text-secondary)]">
+                        {item.variant_name ? `Presentación: ${item.variant_name}` : item.brand}
+                      </p>
 
                       {item.stock_status === "low_stock" && (
                         <span className="text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
@@ -266,7 +268,7 @@ export function CartDrawer() {
                         <div className="flex items-center gap-0.5 border border-[#E8E9EB] rounded-[10px]">
                           <button
                             onClick={() =>
-                              updateQuantity(item.product_id, item.quantity - 1)
+                              updateQuantity(item.product_id, item.quantity - 1, item.variant_id)
                             }
                             aria-label={`Reducir cantidad de ${item.name}`}
                             className="p-2.5 sm:p-1.5 rounded-md hover:bg-[#F7F5F0] transition-colors touch-target"
@@ -278,7 +280,7 @@ export function CartDrawer() {
                           </span>
                           <button
                             onClick={() =>
-                              updateQuantity(item.product_id, item.quantity + 1)
+                              updateQuantity(item.product_id, item.quantity + 1, item.variant_id)
                             }
                             aria-label={`Aumentar cantidad de ${item.name}`}
                             className="p-2.5 sm:p-1.5 rounded-md hover:bg-[#F7F5F0] transition-colors touch-target"

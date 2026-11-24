@@ -751,3 +751,112 @@ describe("/api/orders descuentos automáticos (migración 00231)", () => {
     expect(body.automaticDiscount.amount).toBe(0)
   })
 })
+
+describe("/api/orders presentaciones (00232)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const variantRow = {
+    id: 50,
+    product_id: 1,
+    name: "Bolsa 5 kg",
+    price: 80,
+    sale_price: null,
+    stock_status: "in_stock",
+    stock_quantity: 5,
+    is_active: true,
+  }
+
+  it("cobra el precio de la variante y la guarda en la línea", async () => {
+    const orderItems = tableBuilder({ data: null, error: null })
+    mockFlow({
+      product_variants: tableBuilder({ data: [variantRow], error: null }),
+      order_items: orderItems,
+    })
+
+    const res = await POST(
+      orderReq({
+        ...validBody,
+        subtotal: 80,
+        total: 80,
+        items: [
+          {
+            product_id: 1,
+            quantity: 1,
+            unit_price: 100,
+            name: "Producto (Bolsa 5 kg)",
+            variant_id: 50,
+          },
+        ],
+      })
+    )
+
+    expect(res.status).toBe(200)
+    const inserted = orderItems.insert.mock.calls[0]?.[0] as Array<Record<string, unknown>>
+    expect(inserted[0]).toMatchObject({
+      product_id: 1,
+      unit_price: 80,
+      variant_id: 50,
+      variant_label: "Bolsa 5 kg",
+    })
+  })
+
+  it("un producto con presentaciones no se vende sin elegir una", async () => {
+    mockFlow({
+      product_variants: tableBuilder({ data: [variantRow], error: null }),
+    })
+
+    const res = await POST(orderReq(validBody))
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.code).toBe("variant_required")
+  })
+
+  it("una variante de otro producto se rechaza", async () => {
+    mockFlow({
+      product_variants: tableBuilder({
+        data: [{ ...variantRow, product_id: 2 }],
+        error: null,
+      }),
+    })
+
+    const res = await POST(
+      orderReq({
+        ...validBody,
+        items: [
+          { product_id: 1, quantity: 1, unit_price: 100, name: "Producto", variant_id: 50 },
+        ],
+      })
+    )
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toContain("ya no está disponible")
+  })
+
+  it("la existencia que manda es la de la variante, no la del producto", async () => {
+    mockFlow({
+      product_variants: tableBuilder({
+        data: [{ ...variantRow, stock_quantity: 1 }],
+        error: null,
+      }),
+    })
+
+    const res = await POST(
+      orderReq({
+        ...validBody,
+        subtotal: 160,
+        total: 160,
+        items: [
+          { product_id: 1, quantity: 2, unit_price: 80, name: "Producto (Bolsa 5 kg)", variant_id: 50 },
+        ],
+      })
+    )
+
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.code).toBe("insufficient_stock")
+  })
+})

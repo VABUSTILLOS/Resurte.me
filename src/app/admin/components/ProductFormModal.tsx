@@ -22,6 +22,7 @@ import {
   resolveSubmittedStockStatus,
 } from "@/lib/stock"
 import { conflictFromResponse } from "@/lib/product-conflict"
+import { ProductVariantsEditor } from "@/app/admin/components/ProductVariantsEditor"
 import {
   adoptTheirs,
   describeWriteConflict,
@@ -133,6 +134,7 @@ const FORM_SECTIONS = [
   { id: "pf-sec-inventario", label: "Inventario" },
   { id: "pf-sec-seo", label: "SEO" },
   { id: "pf-sec-publicacion", label: "Publicación" },
+  { id: "pf-sec-presentaciones", label: "Presentaciones" },
 ] as const
 
 /** Campos que cuentan para la guarda de "cambios sin guardar". */
@@ -2221,6 +2223,24 @@ export function ProductFormModal({
                 className={`${inputCls} resize-y`}
               />
             </div>
+          </fieldset>
+
+          {/* Presentaciones (00232): editor independiente del guardado
+              del producto — cada presentación se guarda al momento
+              con su propia llamada. En alta aún no hay producto al
+              que colgarlas. */}
+          <fieldset id="pf-sec-presentaciones" className="scroll-mt-2 space-y-4 border-0 p-0">
+            <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-600">
+              Presentaciones
+            </legend>
+            {isEdit ? (
+              <ProductVariantsEditor productId={product.id} />
+            ) : (
+              <p className="text-sm text-gray-500">
+                Guarda el producto primero para agregar presentaciones (bolsa 1 kg, bolsa
+                5 kg, tamaños, sabores…).
+              </p>
+            )}
           </fieldset>
           </div>
         </div>

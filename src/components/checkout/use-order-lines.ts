@@ -2,13 +2,15 @@
 
 import { useCallback, useState } from "react"
 import type { CartItem } from "@/types"
-import { useCart } from "@/contexts/cart-context"
+import { isSameCartLine, useCart } from "@/contexts/cart-context"
 import { resolveQuantityChange } from "@/lib/order-lines"
 
 /** Línea del pedido que espera confirmación para eliminarse. */
 export interface PendingRemoval {
   kind: "item" | "bump"
   id: number
+  /** Presentación de la línea (00232); solo aplica a kind "item". */
+  variantId?: number | null
   name: string
 }
 
@@ -40,42 +42,52 @@ export function useOrderLines({ bumps, onSetBumpQuantity, onRemoveBump }: UseOrd
   const items = [...cart.items, ...emptied]
 
   const updateItemQuantity = useCallback(
-    (productId: number, quantity: number) => {
+    (productId: number, quantity: number, variantId?: number | null) => {
+      // La identidad de la línea es (producto, presentación) — 00232:
+      // dos presentaciones del mismo producto se editan por separado.
+      const key = { product_id: productId, variant_id: variantId ?? null }
       const action = resolveQuantityChange(
-        cart.items.some((i) => i.product_id === productId),
+        cart.items.some((i) => isSameCartLine(i, key)),
         quantity
       )
 
       switch (action.type) {
         case "set":
-          updateQuantity(productId, action.quantity)
+          updateQuantity(productId, action.quantity, variantId)
           return
 
         case "empty": {
-          const line = cart.items.find((i) => i.product_id === productId)
+          const line = cart.items.find((i) => isSameCartLine(i, key))
           if (line) {
             setEmptied((prev) =>
-              prev.some((i) => i.product_id === productId)
+              prev.some((i) => isSameCartLine(i, key))
                 ? prev
                 : [...prev, { ...line, quantity: 0 }]
             )
           }
-          updateQuantity(productId, 0)
+          updateQuantity(productId, 0, variantId)
           return
         }
 
         case "restore": {
-          const line = emptied.find((i) => i.product_id === productId)
-          setEmptied((prev) => prev.filter((i) => i.product_id !== productId))
+          const line = emptied.find((i) => isSameCartLine(i, key))
+          setEmptied((prev) => prev.filter((i) => !isSameCartLine(i, key)))
           if (line) addItem({ ...line, quantity: action.quantity })
           return
         }
 
         case "confirm-remove": {
           const line =
-            emptied.find((i) => i.product_id === productId) ??
-            cart.items.find((i) => i.product_id === productId)
-          if (line) setPendingRemoval({ kind: "item", id: productId, name: line.name })
+            emptied.find((i) => isSameCartLine(i, key)) ??
+            cart.items.find((i) => isSameCartLine(i, key))
+          if (line) {
+            setPendingRemoval({
+              kind: "item",
+              id: productId,
+              variantId: variantId ?? null,
+              name: line.variant_name ? `${line.name} (${line.variant_name})` : line.name,
+            })
+          }
           return
         }
       }
@@ -101,8 +113,13 @@ export function useOrderLines({ bumps, onSetBumpQuantity, onRemoveBump }: UseOrd
     const pending = pendingRemoval
     if (!pending) return
     if (pending.kind === "item") {
-      setEmptied((prev) => prev.filter((i) => i.product_id !== pending.id))
-      removeItem(pending.id)
+      setEmptied((prev) =>
+        prev.filter(
+          (i) =>
+            !isSameCartLine(i, { product_id: pending.id, variant_id: pending.variantId ?? null })
+        )
+      )
+      removeItem(pending.id, pending.variantId)
     } else {
       onRemoveBump(pending.id)
     }

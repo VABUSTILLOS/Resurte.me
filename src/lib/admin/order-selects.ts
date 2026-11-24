@@ -29,7 +29,10 @@
  * `missingOptionalOrderColumn`). El esquema de referencia las define en
  * `supabase/migrations/` (driver_id en 00076, coupon_code en 00114,
  * delivery_proof_path en 00154, refunded_amount_cents en 00187, priority en
- * 00220).
+ * 00220). `variant_label` es la excepción: no es columna de `orders` sino
+ * del embed de `order_items` del ticket imprimible (00232), y entra en la
+ * misma lista para que el ticket se imprima sin la presentación mientras
+ * la migración no se aplica.
  */
 
 /** FK que desambigua el embed `orders → profiles` (cliente, no vendedor). */
@@ -51,6 +54,7 @@ export const ADMIN_ORDER_OPTIONAL_COLUMNS = [
   "delivery_proof_path",
   "refunded_amount_cents",
   "priority",
+  "variant_label",
 ] as const
 
 export type AdminOrderOptionalColumn = (typeof ADMIN_ORDER_OPTIONAL_COLUMNS)[number]
@@ -72,6 +76,8 @@ export type AdminOrdersSelectOptions = {
   refunded?: boolean
   /** Incluir `priority` (omitir cuando la columna no existe en el esquema). */
   priority?: boolean
+  /** Incluir `variant_label` en el embed de `order_items` (solo ticket, 00232). */
+  variantLabel?: boolean
 }
 
 /**
@@ -120,6 +126,7 @@ export function buildAdminOrdersSelect({
 export function buildAdminOrderPrintSelect({
   coupon = true,
   priority = true,
+  variantLabel = true,
 }: AdminOrdersSelectOptions = {}): string {
   return [
     "id",
@@ -138,7 +145,9 @@ export function buildAdminOrderPrintSelect({
     `profiles!${ORDERS_PROFILE_FK}(full_name)`,
     `addresses(${ORDERS_ADDRESS_COLUMNS})`,
     "delivery_drivers(name)",
-    "order_items(quantity, unit_price, products(name))",
+    variantLabel
+      ? "order_items(quantity, unit_price, variant_label, products(name))"
+      : "order_items(quantity, unit_price, products(name))",
   ].join(", ")
 }
 
@@ -235,6 +244,8 @@ export interface AdminOrderPrintRow {
     | {
         quantity: number
         unit_price: number | string
+        /** Presentación comprada (00232); ausente sin la migración. */
+        variant_label?: string | null
         products: { name: string } | { name: string }[] | null
       }[]
     | null

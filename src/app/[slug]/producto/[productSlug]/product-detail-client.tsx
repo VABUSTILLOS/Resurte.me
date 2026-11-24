@@ -12,7 +12,7 @@ import { AccordionItem } from "@/components/ui/accordion-item"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { StoreBreadcrumb } from "@/components/ui/store-breadcrumb"
 import Link from "next/link"
-import type { Category, Product } from "@/types"
+import type { Category, Product, ProductVariant } from "@/types"
 import type { PresentationCandidate } from "@/lib/unit-price"
 import { formatUnitPrice, unitPrice } from "@/lib/unit-price"
 import { getCategoryIcon } from "@/lib/utils"
@@ -37,9 +37,15 @@ interface ProductDetailClientProps {
   minOrderQty?: number | null
   /** Cantidad máxima por pedido (00229); null/ausente = sin máximo. */
   maxOrderQty?: number | null
+  /**
+   * Presentaciones del producto (00232), solo activas y en orden de
+   * exhibición. Vacío/ausente = producto sin presentaciones: la
+   * ficha se comporta exactamente como antes.
+   */
+  variants?: ProductVariant[]
 }
 
-export function ProductDetailClient({ product, category, relatedProducts, presentations = [], citySlug, cityName, reviewStats, minOrderQty, maxOrderQty }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, category, relatedProducts, presentations = [], citySlug, cityName, reviewStats, minOrderQty, maxOrderQty, variants = [] }: ProductDetailClientProps) {
   const { addItem } = useCart()
   const { toast } = useToast()
   const [added, setAdded] = useState(false)
@@ -48,17 +54,40 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
   const [quantity, setQuantity] = useState(minQty)
   const [selectedImage, setSelectedImage] = useState(0)
 
+  // Presentaciones (00232): la selección manda sobre precio,
+  // descuento y disponibilidad de TODA la ficha. Por defecto, la
+  // primera presentación con existencia. Las agotadas se muestran
+  // pero no se pueden elegir; si TODAS están agotadas, la ficha
+  // entera queda en «Agotado» (el padre ya viene agregado así) y
+  // aparece el «Avísame cuando haya» del producto.
+  // La cantidad mín/máx (00229) sigue siendo POR PRODUCTO: aplica
+  // igual a cualquier presentación.
+  const hasVariants = variants.length > 0
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null)
+  const selectedVariant: ProductVariant | null = hasVariants
+    ? (variants.find((v) => v.id === selectedVariantId) ??
+      variants.find((v) => v.stock_status !== "out_of_stock") ??
+      variants[0] ??
+      null)
+    : null
+
   const allImages = product.images?.length ? product.images : [product.image_url]
 
-  const displayPrice = product.sale_price ?? product.price ?? 0
+  const displayPrice = selectedVariant
+    ? (selectedVariant.sale_price ?? selectedVariant.price)
+    : (product.sale_price ?? product.price ?? 0)
   const perUnit = unitPrice(displayPrice, product.unit)
-  const originalPrice = product.price ?? 0
-  const hasDiscount = !!product.sale_price && product.sale_price < (product.price ?? 0)
-  const discountPercent = product.sale_price != null && hasDiscount
-    ? Math.round((1 - product.sale_price / originalPrice) * 100)
+  const originalPrice = selectedVariant ? selectedVariant.price : (product.price ?? 0)
+  const hasDiscount = displayPrice < originalPrice
+  const discountPercent = hasDiscount && originalPrice > 0
+    ? Math.round((1 - displayPrice / originalPrice) * 100)
     : 0
-  const outOfStock = product.stock_status === "out_of_stock"
-  const lowStock = product.stock_status === "low_stock"
+  const outOfStock = selectedVariant
+    ? selectedVariant.stock_status === "out_of_stock"
+    : product.stock_status === "out_of_stock"
+  const lowStock = selectedVariant
+    ? selectedVariant.stock_status === "low_stock"
+    : product.stock_status === "low_stock"
 
   // Track product view on page load
   useEffect(() => {
@@ -88,26 +117,52 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
   }, [])
 
   const handleAdd = () => {
-    for (let i = 0; i < quantity; i++) {
+    if (selectedVariant) {
+      // La línea nace ligada a la presentación (00232): su precio y
+      // su existencia son los de la variante, y el servidor los
+      // vuelve a validar contra la BD al crear el pedido.
       addItem({
         product_id: product.id,
         name: product.name,
         slug: product.slug,
         image_url: product.image_url,
         brand: product.brand,
-        price: originalPrice,
-        sale_price: product.sale_price ?? null,
-        quantity: 1,
-        stock_status: (product.stock_status ?? "in_stock") as "in_stock" | "low_stock" | "out_of_stock",
+        price: selectedVariant.price,
+        sale_price: selectedVariant.sale_price ?? null,
+        quantity,
+        stock_status: selectedVariant.stock_status,
+        variant_id: selectedVariant.id,
+        variant_name: selectedVariant.name,
       })
+      AnalyticsEvents.addToCart({
+        id: product.id,
+        name: `${product.name} (${selectedVariant.name})`,
+        price: displayPrice,
+        quantity,
+      })
+      toast(`${product.name} (${selectedVariant.name}) agregado al carrito`)
+    } else {
+      for (let i = 0; i < quantity; i++) {
+        addItem({
+          product_id: product.id,
+          name: product.name,
+          slug: product.slug,
+          image_url: product.image_url,
+          brand: product.brand,
+          price: originalPrice,
+          sale_price: product.sale_price ?? null,
+          quantity: 1,
+          stock_status: (product.stock_status ?? "in_stock") as "in_stock" | "low_stock" | "out_of_stock",
+        })
+      }
+      AnalyticsEvents.addToCart({
+        id: product.id,
+        name: product.name,
+        price: displayPrice,
+        quantity,
+      })
+      toast(`${product.name} agregado al carrito`)
     }
-    AnalyticsEvents.addToCart({
-      id: product.id,
-      name: product.name,
-      price: displayPrice,
-      quantity,
-    })
-    toast(`${product.name} agregado al carrito`)
     setAdded(true)
     setQuantity(minQty)
     setTimeout(() => setAdded(false), 1500)
@@ -238,6 +293,48 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
               </p>
             )}
 
+            {/* Selector de presentación (00232): al cambiarla cambian
+                el precio, el descuento y la disponibilidad de abajo.
+                Las agotadas se ven pero no se pueden elegir. */}
+            {hasVariants && selectedVariant && (
+              <div className="mt-5">
+                <p id="presentacion-label" className="text-sm font-medium text-[#1a1a1a] mb-2">
+                  Presentación
+                </p>
+                <div role="radiogroup" aria-labelledby="presentacion-label" className="flex flex-wrap gap-2">
+                  {variants.map((v) => {
+                    const vPrice = v.sale_price ?? v.price
+                    const vOut = v.stock_status === "out_of_stock"
+                    const isSelected = v.id === selectedVariant.id
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        disabled={vOut}
+                        onClick={() => setSelectedVariantId(v.id)}
+                        className={`touch-target flex flex-col items-start gap-0.5 px-3.5 py-2 rounded-xl border-2 text-left transition-all ${
+                          isSelected
+                            ? "border-[#0E7A0E] bg-[#e8f5e9]"
+                            : "border-[#ede8df] bg-white hover:border-[#0E7A0E]/50"
+                        } ${vOut ? "opacity-55 cursor-not-allowed" : ""}`}
+                      >
+                        <span className="text-sm font-semibold text-[#1a1a1a]">{v.name}</span>
+                        <span className="text-[13px] text-[#6b6b6b]">
+                          ${vPrice.toFixed(2)}
+                          {vOut && <span className="ml-1.5 font-medium text-[#9a3412]">· Agotado</span>}
+                          {!vOut && v.stock_status === "low_stock" && (
+                            <span className="ml-1.5 font-medium text-amber-700">· Pocas unidades</span>
+                          )}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Price */}
             <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-[#ede8df]">
               <div className="flex items-baseline gap-3">
@@ -272,8 +369,10 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
             </div>
 
             {/* Comparador de presentaciones (C13): solo aparece cuando el
-                catálogo tiene la misma mercancía en otro tamaño comparable. */}
-            {perUnit && presentations.length > 0 && (
+                catálogo tiene la misma mercancía en otro tamaño comparable.
+                Con presentaciones reales (00232) el selector de arriba lo
+                sustituye: comparar contra otros productos sería ruido. */}
+            {perUnit && presentations.length > 0 && !hasVariants && (
               <section
                 aria-labelledby="comparar-presentaciones"
                 className="mt-4 rounded-xl border border-[#ede8df] bg-[#faf8f4] p-3"
@@ -384,7 +483,9 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
 
               <OrderByWhatsAppButton
                 phoneNumber={WHATSAPP_NUMBER}
-                productName={product.name}
+                productName={
+                  selectedVariant ? `${product.name} (${selectedVariant.name})` : product.name
+                }
                 productPrice={displayPrice}
                 quantity={quantity}
                 className="flex-1 h-12 flex items-center justify-center gap-2 text-sm font-semibold rounded-xl border-2 border-[#25D366] text-[#0F7A3D] hover:bg-[#0F7A3D] hover:text-white transition-all duration-200"

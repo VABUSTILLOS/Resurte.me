@@ -22,6 +22,8 @@ import { logger } from "@/lib/logger"
 /** Conflicto de existencia de un producto del pedido. */
 export interface StockConflict {
   product_id: number
+  /** Presentación en conflicto (00232); ausente = el producto mismo. */
+  variant_id?: number
   /** Suma de cantidades del pedido para ese producto. */
   requested: number
   /** Existencia disponible al momento de reservar. */

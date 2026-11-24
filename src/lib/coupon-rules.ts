@@ -205,7 +205,14 @@ export function evaluateAutomaticDiscounts(
   let subtotal = 0
   for (const line of lines) {
     qtyByProduct.set(line.product_id, (qtyByProduct.get(line.product_id) ?? 0) + line.quantity)
-    priceByProduct.set(line.product_id, line.unit_price)
+    // Un producto puede llegar en varias líneas con precios
+    // distintos (sus presentaciones, 00232): la regla se valúa con
+    // el MENOR, para nunca descontar de más. Sin presentaciones hay
+    // un solo precio por producto y esto no cambia nada.
+    const known = priceByProduct.get(line.product_id)
+    if (known === undefined || line.unit_price < known) {
+      priceByProduct.set(line.product_id, line.unit_price)
+    }
     subtotal += line.unit_price * line.quantity
   }
 

@@ -112,10 +112,17 @@ describe("buildAdminOrdersSelect", () => {
 describe("buildAdminOrderPrintSelect", () => {
   it("trae los items, el repartidor y el cupón", () => {
     const select = buildAdminOrderPrintSelect()
-    expect(select).toContain("order_items(quantity, unit_price, products(name))")
+    expect(select).toContain("order_items(quantity, unit_price, variant_label, products(name))")
     expect(select).toContain("delivery_drivers(name)")
     expect(select).toContain("coupon_code")
     expect(select).toContain("scheduled_for")
+  })
+
+  it("omite variant_label sin perder el resto del ticket (reintento por 42703, 00232)", () => {
+    const select = buildAdminOrderPrintSelect({ variantLabel: false })
+    expect(select).not.toContain("variant_label")
+    expect(select).toContain("order_items(quantity, unit_price, products(name))")
+    expect(select).toContain("delivery_drivers(name)")
   })
 
   it("omite coupon_code sin perder el resto del ticket", () => {

@@ -47,7 +47,7 @@ export function ReorderSection({ products }: Props) {
 
   const productById = useMemo(() => {
     const map = new Map<number, ReorderCatalogProduct>()
-    for (const p of products) map.set(p.id, p)
+    for (const p of products) map.set(p.id, { ...p, has_variants: p.has_variants === true })
     return map
   }, [products])
 

@@ -9,6 +9,29 @@
   `src/lib/ingredient-affinity.ts`, `src/lib/upsell-offers.ts`
 
 ## Invariantes
+- **Líneas con presentación (00232)**: la identidad de una línea del
+  carrito es `(product_id, variant_id)` — `isSameCartLine` en
+  `cart-context` es la única comparación válida; dos presentaciones
+  del mismo producto son dos líneas y se editan por separado en
+  drawer, `/cart`, `/{ciudad}/carrito`, `OrderItemsList` y
+  `ReviewStep`. El payload de `POST /api/orders` lleva `variant_id`
+  y el nombre compuesto `Producto (Presentación)`; el servidor
+  valida que la variante exista, sea de ese producto y esté activa,
+  cobra SU precio (`unitPriceOf` es la única definición: subtotal,
+  descuentos automáticos e insert la comparten) y valida existencia
+  contra SU stock; la reserva la mueve la RPC v2 de 00232, que
+  también re-deriva el estado del padre. Un producto con
+  presentaciones sin `variant_id` se rechaza con 400
+  `variant_required`, y un bump de un producto con presentaciones no
+  se ofrece ni se acepta (el bump no sabe qué presentación dar). Los
+  descuentos automáticos agrupan por producto (las presentaciones
+  suman para la regla) y valúan cada producto a su MENOR precio de
+  línea. `order_items` guarda `variant_id` + `variant_label` (foto
+  del nombre); las claves solo se insertan si alguna línea trae
+  variante, para que un esquema sin la migración no tumbe el insert.
+  «Repetir pedido» NO re-agrega productos que hoy tienen
+  presentaciones: se cuentan como no disponibles y el cliente elige
+  la presentación en la ficha.
 - **Fuente única de totales**: `calcCheckoutTotals` (cliente) y su espejo en
   `POST /api/orders` (servidor). Cualquier cambio de regla (envío gratis, cupón
   sobre bumps) se hace en ambos lados el mismo día. El `bumpCount` que recibe es

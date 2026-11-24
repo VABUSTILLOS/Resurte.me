@@ -16,6 +16,8 @@ import { getBreadcrumbSchema, getProductSchema } from "@/lib/structured-data"
 import { buildRelatedProducts } from "@/lib/related-products"
 import { comparePresentations } from "@/lib/unit-price"
 import { fetchQuantityLimits } from "@/lib/product-quantity-limits"
+import { fetchProductVariants } from "@/lib/product-variants"
+import type { ProductVariant } from "@/types"
 import { createServiceClient } from "@/lib/supabase/service"
 
 // ISR: se revalida cada 5 min (alineado con catalog-cache). La primera
@@ -151,11 +153,17 @@ export default async function ProductPage({ params }: Props) {
   // igual que antes.
   let minOrderQty: number | null = null
   let maxOrderQty: number | null = null
+  // Presentaciones (00232): solo activas. Si la migración aún no se
+  // aplica, la lectura degrada a [] y la ficha vende el producto
+  // base como siempre.
+  let productVariants: ProductVariant[] = []
   try {
-    const limits = await fetchQuantityLimits(await createServiceClient(), [product.id])
+    const service = await createServiceClient()
+    const limits = await fetchQuantityLimits(service, [product.id])
     const row = limits.get(product.id)
     minOrderQty = row?.min_order_qty ?? null
     maxOrderQty = row?.max_order_qty ?? null
+    productVariants = await fetchProductVariants(service, product.id)
   } catch {
     // Sin límites visibles: la ficha no muestra el mínimo.
   }
@@ -196,6 +204,7 @@ export default async function ProductPage({ params }: Props) {
         reviewStats={reviewStats}
         minOrderQty={minOrderQty}
         maxOrderQty={maxOrderQty}
+        variants={productVariants}
       />
       {/* Rail de vistos recientemente (cliente, localStorage) */}
       <RecentlyViewed

@@ -15,7 +15,7 @@ interface OrderItemsListProps {
    * sobre una línea en 0) pide confirmación para eliminarla en lugar de
    * escribir la cantidad: ver `resolveQuantityChange` en `@/lib/order-lines`.
    */
-  onUpdateItemQuantity: (productId: number, quantity: number) => void
+  onUpdateItemQuantity: (productId: number, quantity: number, variantId?: number | null) => void
   /** Cambia la cantidad de un artículo especial (misma regla que arriba). */
   onUpdateBumpQuantity: (ruleId: number, quantity: number) => void
   /** Resumen final de confirmación: misma lista, sin steppers. */
@@ -122,20 +122,25 @@ export function OrderItemsList({
       {items.map((item) => {
         const unitPrice = item.sale_price ?? item.price
         return (
-          <li key={`item-${item.product_id}`} className="py-3 flex items-center gap-3">
+          <li
+            key={`item-${item.product_id}-${item.variant_id ?? 0}`}
+            className="py-3 flex items-center gap-3"
+          >
             <Thumb src={item.image_url} alt={item.name} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-[#242529] truncate">
                 {item.quantity}× {item.name}
               </p>
-              <p className="text-xs text-[var(--text-secondary)]">{item.brand}</p>
+              <p className="text-xs text-[var(--text-secondary)]">
+                {item.variant_name ? `Presentación: ${item.variant_name}` : item.brand}
+              </p>
               <div className="mt-2 flex items-center justify-between gap-2">
                 {!readOnly && (
                   <QuantityStepper
                     quantity={item.quantity}
-                    label={item.name}
-                    onChange={(q) => onUpdateItemQuantity(item.product_id, q)}
-                    onRequestRemove={() => onUpdateItemQuantity(item.product_id, -1)}
+                    label={item.variant_name ? `${item.name} (${item.variant_name})` : item.name}
+                    onChange={(q) => onUpdateItemQuantity(item.product_id, q, item.variant_id)}
+                    onRequestRemove={() => onUpdateItemQuantity(item.product_id, -1, item.variant_id)}
                   />
                 )}
                 {item.quantity === 0 ? (

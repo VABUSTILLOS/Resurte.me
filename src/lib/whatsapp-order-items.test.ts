@@ -4,8 +4,9 @@ import {
   resolveOrderItems,
   resolveRetailerId,
   type OrderDbProduct,
+  type OrderDbVariant,
 } from "@/lib/whatsapp-order-items"
-import type { Category, Product } from "@/types"
+import type { Category, Product, ProductVariant } from "@/types"
 
 /**
  * Resolución retailer_id (Meta) → producto de la tienda.
@@ -104,7 +105,7 @@ describe("resolveOrderItems", () => {
     )
     expect(result.unresolved).toEqual([])
     expect(result.lines).toEqual([
-      { product_id: 101, name: "Cúrcuma", quantity: 2, unit_price: 203 },
+      { product_id: 101, name: "Cúrcuma", quantity: 2, unit_price: 203, variant_id: null, variant_name: null },
     ])
     expect(result.subtotal).toBe(406)
   })
@@ -189,5 +190,103 @@ describe("resolveOrderItems", () => {
     expect(result.unresolved).toEqual([
       { retailer_id: "abarrotes-salsa-nueva", name: "Salsa Nueva", reason: "missing_in_db" },
     ])
+  })
+})
+
+describe("presentaciones (00232)", () => {
+  const BOLSA_5KG: ProductVariant = {
+    id: 501,
+    product_id: 102,
+    name: "Bolsa 5 kg",
+    slug: "bolsa-5-kg",
+    sku: null,
+    price: 540,
+    sale_price: null,
+    stock_quantity: 10,
+    stock_status: "in_stock",
+    is_active: true,
+    position: 0,
+  }
+  const BOLSA_1KG: ProductVariant = {
+    ...BOLSA_5KG,
+    id: 502,
+    name: "Bolsa 1 kg",
+    slug: "bolsa-1-kg",
+    price: 118,
+    stock_quantity: 0,
+    stock_status: "out_of_stock",
+    position: 1,
+  }
+  const INDEX_V = buildRetailerIdIndex(PRODUCTS, CATEGORIES, [BOLSA_5KG, BOLSA_1KG])
+  const DB_VARIANTS = new Map<number, OrderDbVariant>([
+    [501, { id: 501, product_id: 102, name: "Bolsa 5 kg", price: 540, sale_price: 499, stock_status: "in_stock", stock_quantity: 10, is_active: true }],
+    [502, { id: 502, product_id: 102, name: "Bolsa 1 kg", price: 118, sale_price: null, stock_status: "out_of_stock", stock_quantity: 0, is_active: true }],
+  ])
+  const ALA_FEED_ID = "carnes-aves-y-pescados-ala-1-2-iqf-pilgrim-s"
+
+  it("el retailer_id de la variante cuelga del id FIJO del producto, no de su nombre", () => {
+    const result = resolveOrderItems(
+      [{ product_retailer_id: `${ALA_FEED_ID}--bolsa-5-kg`, quantity: 2, item_price: 1 }],
+      INDEX_V,
+      DB,
+      DB_VARIANTS
+    )
+    expect(result.unresolved).toEqual([])
+    expect(result.lines).toEqual([
+      {
+        product_id: 102,
+        name: "Ala 1-2 IQF Pilgrim's (caja 12 kg)",
+        quantity: 2,
+        // Precio de la variante en BD (su oferta), no el del producto ni el de Meta.
+        unit_price: 499,
+        variant_id: 501,
+        variant_name: "Bolsa 5 kg",
+      },
+    ])
+    expect(result.subtotal).toBe(998)
+  })
+
+  it("dos variantes del mismo producto son dos líneas; la agotada no resuelve", () => {
+    const result = resolveOrderItems(
+      [
+        { product_retailer_id: `${ALA_FEED_ID}--bolsa-5-kg`, quantity: 1 },
+        { product_retailer_id: `${ALA_FEED_ID}--bolsa-1-kg`, quantity: 1 },
+      ],
+      INDEX_V,
+      DB,
+      DB_VARIANTS
+    )
+    expect(result.lines).toHaveLength(1)
+    expect(result.lines[0]?.variant_id).toBe(501)
+    expect(result.unresolved).toEqual([
+      {
+        retailer_id: `${ALA_FEED_ID}--bolsa-1-kg`,
+        name: "Ala 1-2 IQF Pilgrim's (caja 12 kg) — Bolsa 1 kg",
+        reason: "out_of_stock",
+      },
+    ])
+  })
+
+  it("el artículo base de un producto con variantes exige elegir presentación", () => {
+    const result = resolveOrderItems(
+      [{ product_retailer_id: ALA_FEED_ID, quantity: 1 }],
+      INDEX_V,
+      DB,
+      DB_VARIANTS
+    )
+    expect(result.lines).toEqual([])
+    expect(result.unresolved).toEqual([
+      { retailer_id: ALA_FEED_ID, name: "Ala 1-2 IQF Pilgrim's (caja 12 kg)", reason: "variant_required" },
+    ])
+  })
+
+  it("sin variantes en el índice, el mismo producto resuelve como siempre", () => {
+    const result = resolveOrderItems(
+      [{ product_retailer_id: ALA_FEED_ID, quantity: 1 }],
+      INDEX,
+      DB
+    )
+    expect(result.lines).toHaveLength(1)
+    expect(result.lines[0]?.variant_id).toBeNull()
   })
 })

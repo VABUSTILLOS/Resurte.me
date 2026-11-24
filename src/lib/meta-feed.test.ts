@@ -6,7 +6,7 @@ import {
   metaFeedMapEntry,
   toAbsoluteImageUrl,
 } from "@/lib/meta-feed"
-import type { Category, Product } from "@/types"
+import type { Category, Product, ProductVariant } from "@/types"
 
 function product(overrides: Partial<Product>): Product {
   return {
@@ -97,8 +97,53 @@ describe("buildMetaFeedCsv", () => {
     expect(lines[1]).toBe(
       "abarrotes-achiote,Achiote,Bolsa 50 g,https://resurte.me/chihuahua/producto/achiote," +
         "https://resurte.me/images/products/ai/achiote.webp,Resurte.me,6.31 MXN,in stock,new," +
-        '"{latitude: 28.63581, longitude: -106.07645}",20,km,Abarrotes,abarrotes',
+        '"{latitude: 28.63581, longitude: -106.07645}",20,km,Abarrotes,abarrotes,',
     )
+  })
+
+  it("con presentaciones: una fila por variante agrupada y la base agotada (00232)", () => {
+    const variant = (overrides: Partial<ProductVariant>): ProductVariant => ({
+      id: 10,
+      product_id: 1,
+      name: "Bolsa 5 kg",
+      slug: "bolsa-5-kg",
+      sku: null,
+      price: 290,
+      sale_price: null,
+      stock_quantity: 4,
+      stock_status: "in_stock",
+      is_active: true,
+      position: 0,
+      ...overrides,
+    })
+    const { csv, included, variantRows } = buildMetaFeedCsv(
+      [product({})],
+      [category({})],
+      [
+        variant({}),
+        variant({ id: 11, name: "Bolsa 1 kg", slug: "bolsa-1-kg", price: 68, sale_price: 60, position: 1 }),
+        variant({ id: 12, name: "Oculta", slug: "oculta", is_active: false, position: 2 }),
+      ],
+    )
+    const lines = csv.trim().split("\n")
+    expect(included).toBe(1)
+    expect(variantRows).toBe(2)
+    // La base conserva su id fijo y sale agotada: no se vende sin elegir.
+    expect(lines[1]).toContain("abarrotes-achiote,Achiote,")
+    expect(lines[1]).toContain("out of stock")
+    // Las variantes cuelgan del id del producto (item_group_id al final).
+    expect(lines[2]).toContain("abarrotes-achiote--bolsa-5-kg,Achiote — Bolsa 5 kg,")
+    expect(lines[2]).toContain("290.00 MXN")
+    expect(lines[2]?.endsWith(",abarrotes-achiote")).toBe(true)
+    expect(lines[3]).toContain("abarrotes-achiote--bolsa-1-kg,Achiote — Bolsa 1 kg,")
+    expect(lines[3]).toContain("60.00 MXN")
+    expect(csv).not.toContain("oculta")
+  })
+
+  it("sin variantes el feed no emite filas extra ni agrupa (00232)", () => {
+    const { csv, variantRows } = buildMetaFeedCsv([product({})], [category({})])
+    expect(variantRows).toBe(0)
+    expect(csv.trim().split("\n")).toHaveLength(2)
   })
 
   it("usa el precio de oferta vigente y marca agotados", () => {

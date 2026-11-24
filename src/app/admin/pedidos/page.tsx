@@ -1110,6 +1110,7 @@ function AdminOrdersContent() {
                     <li key={item.id} className="flex items-center justify-between px-3 py-2">
                       <span className="text-sm text-gray-700">
                         {item.quantity}× {item.product_name ?? `Producto #${item.product_id}`}
+                        {item.variant_label ? ` (${item.variant_label})` : ""}
                       </span>
                       <span className="text-sm font-medium text-gray-900">
                         ${(item.unit_price * item.quantity).toFixed(2)}

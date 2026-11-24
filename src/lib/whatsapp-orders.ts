@@ -28,7 +28,11 @@
 // al crear se liga la fila. Un reintento devuelve "duplicate" y no
 // crea un segundo pedido ni reserva stock dos veces.
 
-import { getCachedCategories, getCachedVisibleProducts } from "@/lib/catalog-cache"
+import {
+  getCachedActiveVariants,
+  getCachedCategories,
+  getCachedVisibleProducts,
+} from "@/lib/catalog-cache"
 import { DELIVERY_FEE_FLAT, validDeliveryFee } from "@/lib/checkout-config"
 import { logger } from "@/lib/logger"
 import { missingColumnName } from "@/lib/admin/order-selects"
@@ -48,12 +52,15 @@ import {
   type QuantityLimitViolation,
 } from "@/lib/product-quantity-limits"
 import { processStockNotifications } from "@/lib/stock-notifications"
+import { fetchOrderVariantData } from "@/lib/product-variants"
 import {
   buildRetailerIdIndex,
   resolveOrderItems,
   resolveRetailerId,
+  resolveRetailerVariant,
   type MetaOrderProductItem,
   type OrderDbProduct,
+  type OrderDbVariant,
   type UnresolvedOrderItem,
 } from "@/lib/whatsapp-order-items"
 
@@ -175,16 +182,24 @@ export async function createWhatsAppOrder(
   }
 
   // ── Resolución retailer_id → producto ─────────────────────────
-  const [products, categories] = await Promise.all([
+  const [products, categories, variants] = await Promise.all([
     getCachedVisibleProducts(),
     getCachedCategories(),
+    getCachedActiveVariants(),
   ])
-  const index = buildRetailerIdIndex(products, categories)
+  const index = buildRetailerIdIndex(products, categories, variants)
 
   const candidateIds = new Set<number>()
+  const candidateVariantIds = new Set<number>()
   for (const item of productItems) {
-    const product = resolveRetailerId(index, String(item.product_retailer_id ?? ""))
+    const retailerId = String(item.product_retailer_id ?? "")
+    const product = resolveRetailerId(index, retailerId)
     if (product) candidateIds.add(product.id)
+    const variantHit = resolveRetailerVariant(index, retailerId)
+    if (variantHit) {
+      candidateIds.add(variantHit.product.id)
+      candidateVariantIds.add(variantHit.variant.id)
+    }
   }
 
   // Precios y existencia FRESCOS de la BD (espejo de POST /api/orders:
@@ -205,7 +220,19 @@ export async function createWhatsAppOrder(
     }
   }
 
-  const resolved = resolveOrderItems(productItems, index, dbProducts)
+  // Precios y existencia FRESCOS de las presentaciones (00232):
+  // la variante se cobra y se aparta por su propia fila, no por la
+  // del producto padre. Sin la migración, el mapa queda vacío y
+  // ninguna línea de variante resuelve (el índice tampoco las trae).
+  const variantData = await fetchOrderVariantData(supabase, {
+    variantIds: [...candidateVariantIds],
+    productIds: [],
+  })
+  const dbVariants = new Map<number, OrderDbVariant>(
+    [...variantData.byId.entries()].map(([id, row]) => [id, { ...row }])
+  )
+
+  const resolved = resolveOrderItems(productItems, index, dbProducts, dbVariants)
   const unresolved = resolved.unresolved
 
   if (resolved.lines.length === 0) {
@@ -218,12 +245,17 @@ export async function createWhatsAppOrder(
   // y borrar el pedido cuando el faltante ya se ve en la lectura.
   const earlyConflicts: StockConflict[] = []
   for (const line of resolved.lines) {
-    const db = dbProducts.get(line.product_id)
-    if (db && db.stock_quantity !== null && db.stock_quantity < line.quantity) {
+    // La existencia de una presentación es la de la variante
+    // (00232); la de la línea sin presentación, la del producto.
+    const available =
+      line.variant_id !== null
+        ? (dbVariants.get(line.variant_id)?.stock_quantity ?? null)
+        : (dbProducts.get(line.product_id)?.stock_quantity ?? null)
+    if (available !== null && available < line.quantity) {
       earlyConflicts.push({
         product_id: line.product_id,
         requested: line.quantity,
-        available: db.stock_quantity,
+        available,
       })
     }
   }
@@ -249,7 +281,16 @@ export async function createWhatsAppOrder(
     resolved.lines.map((l) => l.product_id)
   )
   if (quantityLimits.size > 0) {
-    const violations = validateQuantityLimits(resolved.lines, quantityLimits)
+    // El límite es POR PRODUCTO (00229): las presentaciones del
+    // mismo producto suman antes de validar, igual que el checkout
+    // web agrupa por producto.
+    const aggregated = new Map<number, { product_id: number; name: string; quantity: number }>()
+    for (const line of resolved.lines) {
+      const current = aggregated.get(line.product_id)
+      if (current) current.quantity += line.quantity
+      else aggregated.set(line.product_id, { product_id: line.product_id, name: line.name, quantity: line.quantity })
+    }
+    const violations = validateQuantityLimits([...aggregated.values()], quantityLimits)
     if (violations.length > 0) {
       const detail = violations.map(describeQuantityViolation).join("; ")
       logger.info("whatsapp.order.quantity_violation", { from, waMessageId, detail })
@@ -348,12 +389,20 @@ export async function createWhatsAppOrder(
   const orderId = (order as { id: number }).id
 
   // ── Ítems (unit_price real de la BD, nunca el de Meta) ────────
+  // La presentación comprada viaja en la línea (00232). Las claves
+  // solo se agregan si alguna línea trae variante: sin variantes el
+  // insert es idéntico al de antes de la migración 00232, así un
+  // esquema sin aplicar no tumba el pedido.
+  const anyVariant = resolved.lines.some((l) => l.variant_id !== null)
   const orderItems = resolved.lines.map((line) => ({
     order_id: orderId,
     product_id: line.product_id,
     quantity: line.quantity,
     unit_price: line.unit_price,
     item_type: "standard",
+    ...(anyVariant
+      ? { variant_id: line.variant_id, variant_label: line.variant_name }
+      : {}),
   }))
   const { error: itemsError } = await supabase.from("order_items").insert(orderItems)
   if (itemsError) {
