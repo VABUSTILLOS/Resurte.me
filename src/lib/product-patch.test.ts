@@ -31,6 +31,10 @@ describe("validateProductPatch — campo culpable", () => {
     ["tags", { tags: Array.from({ length: 21 }, (_, i) => `t${i}`) }],
     ["low_stock_threshold", { low_stock_threshold: 1.5 }],
     ["low_stock_threshold", { low_stock_threshold: -1 }],
+    ["min_order_qty", { min_order_qty: 0 }],
+    ["min_order_qty", { min_order_qty: 1.5 }],
+    ["max_order_qty", { max_order_qty: -2 }],
+    ["min_order_qty", { min_order_qty: 10, max_order_qty: 5 }],
     ["related_product_ids", { related_product_ids: "7" }],
     ["related_product_ids", { related_product_ids: ["a"] }],
     ["related_product_ids", { related_product_ids: Array.from({ length: 14 }, (_, i) => i + 1) }],
@@ -54,5 +58,16 @@ describe("validateProductPatch — campo culpable", () => {
   it("un patch válido no lleva campo culpable", () => {
     const result = validate({ name: "Agua 600 ml", price: 12.5, sku: "AGUA-600" })
     expect(result.ok).toBe(true)
+  })
+
+  it("acepta min/max válidos y null (sin límite)", () => {
+    const withBoth = validate({ min_order_qty: 5, max_order_qty: 20 })
+    expect(withBoth.ok).toBe(true)
+    if (withBoth.ok) {
+      expect(withBoth.updates.min_order_qty).toBe(5)
+      expect(withBoth.updates.max_order_qty).toBe(20)
+    }
+    const cleared = validate({ min_order_qty: null, max_order_qty: null })
+    expect(cleared.ok).toBe(true)
   })
 })

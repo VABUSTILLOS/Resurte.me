@@ -8,7 +8,19 @@ import type { Coupon } from "@/types"
 import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { validDeliveryFee } from "@/lib/checkout-config"
-import { isFreeShippingCoupon, validateCouponEligibility } from "@/lib/coupon-rules"
+import {
+  evaluateAutomaticDiscounts,
+  isFreeShippingCoupon,
+  validateCouponEligibility,
+  type AutomaticDiscountLine,
+} from "@/lib/coupon-rules"
+import { fetchActiveAutomaticDiscountRules } from "@/lib/automatic-discounts"
+import {
+  describeQuantityViolation,
+  fetchQuantityLimits,
+  validateQuantityLimits,
+} from "@/lib/product-quantity-limits"
+import { processStockNotifications } from "@/lib/stock-notifications"
 import { resolveBumpPricing } from "@/lib/order-bumps"
 import { insertAddressResilient } from "@/lib/orders-address"
 import { missingColumnName } from "@/lib/admin/order-selects"
@@ -307,6 +319,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // ── Cantidad mínima/máxima por producto (migración 00229) ──
+    // Límites por producto que el panel configura; se fuerzan aquí
+    // igual que en WhatsApp (regla única en product-quantity-limits).
+    // Se valida la cantidad AGRUPADA por producto (carrito + bumps
+    // del mismo producto suman). Sin la migración, fetchQuantityLimits
+    // degrada a «sin límites» y el checkout sigue como antes.
+    const quantityLimits = await fetchQuantityLimits(supabase, [...requestedByProduct.keys()])
+    if (quantityLimits.size > 0) {
+      const limitLines = [...requestedByProduct.entries()].map(([productId, quantity]) => ({
+        product_id: productId,
+        name: items.find((i) => i.product_id === productId)?.name ?? `Producto ${productId}`,
+        quantity,
+      }))
+      const violations = validateQuantityLimits(limitLines, quantityLimits)
+      if (violations.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Cantidad fuera de rango: ${violations.map(describeQuantityViolation).join("; ")}`,
+            code: "quantity_limit",
+            violations,
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     // ── Precios de order bumps (server-side, nunca del cliente) ──
     // Los items tipo "bump" se validan contra bump_rules activos y se cobran al
     // precio de catálogo: los artículos especiales NO llevan descuento propio.
@@ -437,12 +475,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── Descuentos automáticos sin código (migración 00231) ──
+    // Paquetes y compra-X-llévate-Y definidos en el panel. Se
+    // RECALCULAN aquí con el motor compartido (coupon-rules.ts)
+    // contra precios de la BD — el total que manda el cliente ya
+    // los trae cotizados vía POST /api/discounts/automatic, pero
+    // nunca se confía en él: si no coinciden, el match de totales
+    // de abajo rechaza el pedido. Solo participan los artículos
+    // estándar: los bumps tienen su propia mecánica promocional.
+    const autoRules = await fetchActiveAutomaticDiscountRules(supabase)
+    const autoLines: AutomaticDiscountLine[] = items
+      .filter((i) => i.item_type !== "bump")
+      .map((i) => {
+        const db = getDbProduct(i.product_id)
+        return {
+          product_id: i.product_id,
+          quantity: i.quantity,
+          unit_price: db.sale_price ?? db.price,
+        }
+      })
+    const autoQuote = evaluateAutomaticDiscounts(autoRules, autoLines)
+    // Mismo tope que calcCheckoutTotals del cliente: cupón +
+    // automático nunca descuentan más que el subtotal.
+    const automaticDiscountAmount = Math.min(
+      autoQuote.discountAmount,
+      Math.max(0, realSubtotal - discountAmount)
+    )
+
     // Delivery fee: 0 si hay envío gratis (subtotal con descuento >= umbral, o
     // cupón `free_shipping`) o no hay items; si no, solo 0 (recoger) o 125 MXN
     // (envío), whitelist.
     const computedDeliveryFee = validDeliveryFee(
       items.length,
-      realSubtotal - discountAmount,
+      realSubtotal - discountAmount - automaticDiscountAmount,
       delivery_fee,
       isFreeShippingCoupon(coupon)
     )
@@ -450,7 +515,7 @@ export async function POST(request: NextRequest) {
     // El checkout envía total = subtotal - descuento + envío. Se exige que
     // coincida con el monto recalculado server-side (el descuento solo se
     // otorga si el cupón fue validado arriba).
-    const realTotal = Math.max(0, realSubtotal - discountAmount + computedDeliveryFee)
+    const realTotal = Math.max(0, realSubtotal - discountAmount - automaticDiscountAmount + computedDeliveryFee)
     const totalDiff = Math.abs(realTotal - (total ?? 0))
     if (totalDiff > 0.01) {
       logger.error("Total mismatch", { client: total, server: realTotal, diff: totalDiff })
@@ -656,8 +721,14 @@ export async function POST(request: NextRequest) {
       customer_email: email?.trim() || null,
     }
     if (coupon) {
-      insertOrder.discount = discountAmount
       insertOrder.coupon_code = coupon.code
+    }
+    // `discount` guarda el descuento TOTAL aplicado (cupón con
+    // código + descuentos automáticos): es la cifra que el cliente
+    // efectivamente no pagó y la que el panel muestra en el pedido.
+    const totalDiscountAmount = discountAmount + automaticDiscountAmount
+    if (coupon || totalDiscountAmount > 0) {
+      insertOrder.discount = totalDiscountAmount
     }
     if (storeId !== null) {
       insertOrder.store_id = storeId
@@ -796,11 +867,25 @@ export async function POST(request: NextRequest) {
       void runNewOrderWorkflows(order.id)
     })
 
+    // 7. Avisos de inventario (migración 00230): la reserva pudo
+    //    dejar productos bajo su umbral. Best-effort tras responder;
+    //    processStockNotifications nunca lanza y degrada si las
+    //    tablas aún no existen.
+    after(() => {
+      void processStockNotifications(supabase, [...requestedByProduct.keys()])
+    })
+
     return NextResponse.json({
       orderId: order.id,
       cashbackCredits: order.cashback_credits ?? 0,
       cashbackTier: order.cashback_tier ?? undefined,
       total: realTotal,
+      // Descuento automático aplicado por el servidor (0 si ninguna
+      // regla del panel aplicó): el checkout lo muestra en el resumen.
+      automaticDiscount: {
+        amount: automaticDiscountAmount,
+        applied: autoQuote.applied,
+      },
       // Cupón personal de recompra emitido con esta orden (null si anónimo).
       repurchaseCoupon,
       // Token de seguimiento público (restore_token de la migración 00063):

@@ -13,7 +13,7 @@ import { SUPPLIER_FILTER_NONE } from "@/lib/admin-supplier-panel"
 import { NextResponse, type NextRequest } from "next/server"
 
 const COLS =
-  "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,created_at,sku,barcode,tags,sale_starts_at,sale_ends_at,low_stock_threshold,related_product_ids,updated_at,deleted_at"
+  "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,created_at,sku,barcode,tags,sale_starts_at,sale_ends_at,low_stock_threshold,min_order_qty,max_order_qty,related_product_ids,updated_at,deleted_at"
 
 /** Set de la ronda 6 (00096-00105) sin las columnas de la ronda 7
  *  (00106-00109): permite degradar solo esas funciones si aún no se

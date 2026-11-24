@@ -14,6 +14,8 @@ interface ReviewStepProps {
   itemCount: number
   subtotal: number
   discount: number
+  /** Descuentos automáticos sin código ya incluidos en `total`. */
+  automaticDiscount?: number
   deliveryFee: number
   total: number
   /** Order bumps ya seleccionados (mecánica ThriveCart). Se listan como
@@ -39,6 +41,7 @@ export function ReviewStep({
   itemCount,
   subtotal,
   discount,
+  automaticDiscount = 0,
   deliveryFee,
   total,
   bumpItems,
@@ -192,6 +195,12 @@ export function ReviewStep({
           <div className="flex justify-between text-sm">
             <span className="text-green-600">Descuento</span>
             <span className="text-green-600">-${discount.toFixed(2)}</span>
+          </div>
+        )}
+        {automaticDiscount > 0 && (
+          <div className="flex justify-between text-sm">
+            <span className="text-green-600">Descuentos automáticos</span>
+            <span className="text-green-600">-${automaticDiscount.toFixed(2)}</span>
           </div>
         )}
         <div className="flex justify-between text-sm">

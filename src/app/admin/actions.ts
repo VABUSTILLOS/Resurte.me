@@ -1199,6 +1199,12 @@ export async function adjustProductStock(
     throw new Error("Error al actualizar el stock")
   }
 
+  // Avisos de inventario (00230, best-effort): un reabasto puede
+  // rearmar la alerta de inventario bajo y disparar los «avísame
+  // cuando haya» pendientes; una baja manual puede cruzar el umbral.
+  const { processStockNotifications } = await import("@/lib/stock-notifications")
+  await processStockNotifications(supabase, [productId])
+
   const { error: logError } = await supabase.from("stock_adjustments").insert({
     product_id: productId,
     previous_status: product.stock_status,

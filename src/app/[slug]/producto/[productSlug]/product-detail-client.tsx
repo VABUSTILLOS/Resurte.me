@@ -21,6 +21,7 @@ import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 import { ProductReviews } from "@/components/product/product-reviews"
 import type { ProductReviewStats } from "@/lib/product-reviews"
 import { WHATSAPP_NUMBER } from "@/lib/business"
+import { BackInStockForm } from "@/components/product/back-in-stock-form"
 
 interface ProductDetailClientProps {
   product: Product
@@ -32,13 +33,19 @@ interface ProductDetailClientProps {
   cityName: string
   /** Reseñas agregadas del producto. `undefined` = no tiene ninguna. */
   reviewStats?: ProductReviewStats
+  /** Cantidad mínima por pedido (00229); null/ausente = sin mínimo. */
+  minOrderQty?: number | null
+  /** Cantidad máxima por pedido (00229); null/ausente = sin máximo. */
+  maxOrderQty?: number | null
 }
 
-export function ProductDetailClient({ product, category, relatedProducts, presentations = [], citySlug, cityName, reviewStats }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, category, relatedProducts, presentations = [], citySlug, cityName, reviewStats, minOrderQty, maxOrderQty }: ProductDetailClientProps) {
   const { addItem } = useCart()
   const { toast } = useToast()
   const [added, setAdded] = useState(false)
-  const [quantity, setQuantity] = useState(1)
+  const minQty = minOrderQty ?? 1
+  const maxQty = maxOrderQty ?? null
+  const [quantity, setQuantity] = useState(minQty)
   const [selectedImage, setSelectedImage] = useState(0)
 
   const allImages = product.images?.length ? product.images : [product.image_url]
@@ -102,7 +109,7 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
     })
     toast(`${product.name} agregado al carrito`)
     setAdded(true)
-    setQuantity(1)
+    setQuantity(minQty)
     setTimeout(() => setAdded(false), 1500)
   }
 
@@ -220,6 +227,17 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
               </p>
             )}
 
+            {/* Cantidad mínima/máxima por pedido (00229) */}
+            {minOrderQty != null && !outOfStock && (
+              <p className="mt-3 text-sm text-[#6b6b6b] flex items-center gap-1.5">
+                <Package className="w-4 h-4" />
+                Pedido mínimo: {minOrderQty} {minOrderQty === 1 ? "pieza" : "piezas"}
+                {maxOrderQty != null && (
+                  <span>· Máximo por pedido: {maxOrderQty}</span>
+                )}
+              </p>
+            )}
+
             {/* Price */}
             <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-[#ede8df]">
               <div className="flex items-baseline gap-3">
@@ -317,9 +335,9 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
                 <p className="text-sm font-medium text-[#1a1a1a] mb-2">Cantidad</p>
                 <div className="inline-flex items-center border border-[#ede8df] rounded-lg overflow-hidden">
                   <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    onClick={() => setQuantity(Math.max(minQty, quantity - 1))}
                     className="w-10 h-10 flex items-center justify-center text-[#6b6b6b] hover:bg-[#f0ede5] transition-colors touch-target"
-                    disabled={quantity <= 1}
+                    disabled={quantity <= minQty}
                     aria-label="Disminuir cantidad"
                   >
                     <Minus className="w-4 h-4" />
@@ -328,8 +346,9 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
                     {quantity}
                   </span>
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
+                    onClick={() => setQuantity(maxQty != null ? Math.min(maxQty, quantity + 1) : quantity + 1)}
                     className="w-10 h-10 flex items-center justify-center text-[#6b6b6b] hover:bg-[#f0ede5] transition-colors touch-target"
+                    disabled={maxQty != null && quantity >= maxQty}
                     aria-label="Aumentar cantidad"
                   >
                     <Plus className="w-4 h-4" />
@@ -371,6 +390,11 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
                 className="flex-1 h-12 flex items-center justify-center gap-2 text-sm font-semibold rounded-xl border-2 border-[#25D366] text-[#0F7A3D] hover:bg-[#0F7A3D] hover:text-white transition-all duration-200"
               />
             </div>
+
+            {/* Agotado: suscripción «avísame cuando haya» (00230) */}
+            {outOfStock && (
+              <BackInStockForm productId={product.id} productName={product.name} />
+            )}
 
             {/* Description — Erewhon-style accordion */}
             <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-[#e0dbd2]">
@@ -444,8 +468,8 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
             {/* Stepper de cantidad */}
             <div className="flex items-center border border-[#ede8df] rounded-lg overflow-hidden shrink-0">
               <button
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                disabled={quantity <= 1}
+                onClick={() => setQuantity(Math.max(minQty, quantity - 1))}
+                disabled={quantity <= minQty}
                 className="w-10 h-10 flex items-center justify-center text-[#6b6b6b] hover:bg-[#f0ede5] transition-colors touch-target"
                 aria-label="Disminuir cantidad"
               >
@@ -455,7 +479,8 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
                 {quantity}
               </span>
               <button
-                onClick={() => setQuantity(quantity + 1)}
+                onClick={() => setQuantity(maxQty != null ? Math.min(maxQty, quantity + 1) : quantity + 1)}
+                disabled={maxQty != null && quantity >= maxQty}
                 className="w-10 h-10 flex items-center justify-center text-[#6b6b6b] hover:bg-[#f0ede5] transition-colors touch-target"
                 aria-label="Aumentar cantidad"
               >

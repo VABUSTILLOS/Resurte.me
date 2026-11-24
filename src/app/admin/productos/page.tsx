@@ -157,6 +157,8 @@ interface Product {
   cost: number | null
   stock_quantity: number | null
   low_stock_threshold: number | null
+  min_order_qty: number | null
+  max_order_qty: number | null
   sku: string | null
   barcode: string | null
   tags: string[] | null

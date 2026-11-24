@@ -6,6 +6,7 @@ import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
 import { slugify } from "@/lib/foodos"
 import { validateSku, validateBarcode } from "@/lib/sku"
+import { PRODUCT_OPTIONAL_SCHEMA_COLUMNS } from "@/lib/product-patch"
 import { deriveStockStatus, isStockStatus } from "@/lib/stock"
 import { isMissingColumnError } from "@/lib/sale-window"
 import { NextResponse } from "next/server"
@@ -111,6 +112,29 @@ export async function POST(request: Request) {
         ? body.low_stock_threshold
         : null
 
+    // Cantidad mínima/máxima por pedido (migración 00229): entero ≥ 1
+    // o ausente (sin límite). Un valor inválido se trata como «sin
+    // límite» en vez de rechazar la creación, mismo criterio blando
+    // que el umbral de arriba; el modal ya valida en el cliente.
+    const minOrderQty =
+      typeof body.min_order_qty === "number" &&
+      Number.isInteger(body.min_order_qty) &&
+      body.min_order_qty >= 1
+        ? body.min_order_qty
+        : null
+    const maxOrderQty =
+      typeof body.max_order_qty === "number" &&
+      Number.isInteger(body.max_order_qty) &&
+      body.max_order_qty >= 1
+        ? body.max_order_qty
+        : null
+    if (minOrderQty !== null && maxOrderQty !== null && minOrderQty > maxOrderQty) {
+      return NextResponse.json(
+        { error: "min_order_qty no puede ser mayor que max_order_qty", field: "min_order_qty" },
+        { status: 400 }
+      )
+    }
+
     const stockStatus = isStockStatus(body.stock_status) ? body.stock_status : "in_stock"
     const categoryId =
       typeof body.category_id === "number" && Number.isInteger(body.category_id)
@@ -211,6 +235,8 @@ export async function POST(request: Request) {
       sale_starts_at: schedule.sale_starts_at,
       sale_ends_at: schedule.sale_ends_at,
       low_stock_threshold: lowStockThreshold,
+      min_order_qty: minOrderQty,
+      max_order_qty: maxOrderQty,
       related_product_ids: relatedIds,
       stock_status: derivedStock,
       stock_quantity: stockQuantity,
@@ -231,17 +257,28 @@ export async function POST(request: Request) {
     const SELECT_COLS_BASE =
       "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,sku,barcode,tags,sale_starts_at,sale_ends_at,related_product_ids,created_at"
 
-    let inserted = await supabase.from("products").insert(payload).select(SELECT_COLS).single()
+    let payloadToInsert: Record<string, unknown> = { ...payload }
+    let inserted = await supabase.from("products").insert(payloadToInsert).select(SELECT_COLS).single()
 
-    if (inserted.error && isMissingColumnError(inserted.error)) {
-      // Migración 00108 pendiente: el umbral por producto aún no existe y
-      // PostgREST rechaza el INSERT completo. Se reintenta sin la columna
-      // (mismo patrón que list/payments/order-bumps); `stock_status` ya viene
-      // derivado contra el umbral efectivo, así que la tienda no cambia.
-      const { low_stock_threshold: _omit, ...base } = payload
+    // Migración de columnas opcionales pendiente (00108 → umbral;
+    // 00229 → min/max por pedido): PostgREST rechaza el INSERT
+    // completo por una sola columna inexistente. Se reintenta sin
+    // las opcionales presentes (mismo patrón que update/list); el
+    // `stock_status` ya viene derivado contra el umbral efectivo,
+    // así que la tienda no cambia.
+    for (
+      let attempt = 0;
+      attempt < 3 && inserted.error && isMissingColumnError(inserted.error);
+      attempt++
+    ) {
+      const present = PRODUCT_OPTIONAL_SCHEMA_COLUMNS.filter((c) => c in payloadToInsert)
+      if (present.length === 0) break
+      const next: Record<string, unknown> = { ...payloadToInsert }
+      for (const col of present) delete next[col]
+      payloadToInsert = next
       inserted = (await supabase
         .from("products")
-        .insert(base)
+        .insert(payloadToInsert)
         .select(SELECT_COLS_BASE)
         .single()) as unknown as typeof inserted
     }

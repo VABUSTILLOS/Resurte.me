@@ -66,7 +66,7 @@ type DrawerStep = "review" | "address" | "schedule" | "bumps" | "payment" | "off
  * siempre tiene la alternativa de pagar en la página completa.
  */
 export function CheckoutDrawer() {
-  const { cart, itemCount, subtotal, clearCart, coupon } = useCart()
+  const { cart, itemCount, subtotal, clearCart, coupon, automaticDiscount } = useCart()
   const { city } = useCity()
   const router = useRouter()
 
@@ -114,7 +114,8 @@ export function CheckoutDrawer() {
     coupon,
     itemCount,
     bumpUnits,
-    DELIVERY_FEE_FLAT
+    DELIVERY_FEE_FLAT,
+    automaticDiscount
   )
   const { discountAmount, payableSubtotal, deliveryFee } = totals
   const total = totals.total
@@ -543,6 +544,12 @@ export function CheckoutDrawer() {
                   <div className="flex justify-between text-green-700">
                     <span>Descuento ({coupon?.code ?? "cupón"})</span>
                     <span className="font-semibold">-${discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                {totals.automaticDiscountAmount > 0 && (
+                  <div className="flex justify-between text-green-700">
+                    <span>Descuentos automáticos</span>
+                    <span className="font-semibold">-${totals.automaticDiscountAmount.toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between">

@@ -9,6 +9,8 @@ const VALID: ProductFormInput = {
   cost: "8",
   stockQuantity: "24",
   lowStockThreshold: "5",
+  minOrderQty: "",
+  maxOrderQty: "",
   sku: "AGUA-600",
   barcode: "7501234567890",
   saleStartsAt: "",
@@ -119,6 +121,8 @@ describe("validateProductForm", () => {
       cost: "-1",
       stockQuantity: "-1",
       lowStockThreshold: "-1",
+      minOrderQty: "-1",
+      maxOrderQty: "-1",
       sku: "-x",
       barcode: "1",
       saleStartsAt: "2026-03-10T10:00",
@@ -131,6 +135,8 @@ describe("validateProductForm", () => {
       "cost",
       "stockQuantity",
       "lowStockThreshold",
+      "minOrderQty",
+      "maxOrderQty",
       "sku",
       "barcode",
       "saleWindow",
@@ -146,6 +152,8 @@ describe("validateProductForm", () => {
       cost: "-1",
       stockQuantity: "-1",
       lowStockThreshold: "-1",
+      minOrderQty: "-1",
+      maxOrderQty: "-1",
       sku: "-x",
       barcode: "1",
       saleStartsAt: "2026-03-10T10:00",
@@ -154,6 +162,34 @@ describe("validateProductForm", () => {
     for (const key of Object.keys(result.errors)) {
       expect(PRODUCT_FIELD_INPUT_IDS[key]).toBeTruthy()
     }
+  })
+})
+
+describe("validateProductForm — cantidades mínima/máxima (00229)", () => {
+  it("vacías = sin límite (null) y sin error", () => {
+    const result = validateProductForm(VALID)
+    expect(result.minOrderQty).toBeNull()
+    expect(result.maxOrderQty).toBeNull()
+    expect(result.errors.minOrderQty).toBeUndefined()
+    expect(result.errors.maxOrderQty).toBeUndefined()
+  })
+
+  it("parsea enteros válidos", () => {
+    const result = validateProductForm(withInput({ minOrderQty: "5", maxOrderQty: "20" }))
+    expect(result.minOrderQty).toBe(5)
+    expect(result.maxOrderQty).toBe(20)
+    expect(result.errors.minOrderQty).toBeUndefined()
+  })
+
+  it("rechaza 0, negativos y no enteros", () => {
+    expect(validateProductForm(withInput({ minOrderQty: "0" })).errors.minOrderQty).toBeTruthy()
+    expect(validateProductForm(withInput({ maxOrderQty: "-1" })).errors.maxOrderQty).toBeTruthy()
+    expect(validateProductForm(withInput({ minOrderQty: "2.5" })).errors.minOrderQty).toBeTruthy()
+  })
+
+  it("rechaza mínimo mayor que máximo", () => {
+    const result = validateProductForm(withInput({ minOrderQty: "10", maxOrderQty: "5" }))
+    expect(result.errors.minOrderQty).toBeTruthy()
   })
 })
 
@@ -201,6 +237,8 @@ describe("formKeyForServerField", () => {
       "cost",
       "stock_quantity",
       "low_stock_threshold",
+      "min_order_qty",
+      "max_order_qty",
       "sku",
       "barcode",
     ]

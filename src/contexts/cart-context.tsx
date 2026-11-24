@@ -13,6 +13,7 @@ import {
 } from "react"
 import type { Cart, CartItem, AppliedCoupon } from "@/types"
 import { calcCouponDiscount } from "@/lib/checkout-config"
+import type { AppliedAutomaticDiscount } from "@/lib/coupon-rules"
 import { createClient } from "@/lib/supabase/client"
 import { mergeCarts, type ServerCartSnapshot } from "@/lib/cart-sync"
 import { clearCartSyncEntry, handleCartPushFailure } from "@/lib/cart-sync-queue"
@@ -56,6 +57,13 @@ interface CartContextValue extends Omit<CartState, "clearedAt"> {
   itemCount: number
   subtotal: number
   discount: number
+  /**
+   * Descuento automático sin código cotizado por el servidor
+   * (POST /api/discounts/automatic): monto y reglas aplicadas.
+   * Es una cotización para pintar; POST /api/orders lo recalcula.
+   */
+  automaticDiscount: number
+  automaticApplied: AppliedAutomaticDiscount[]
   total: (deliveryFee?: number) => number
 }
 
@@ -64,6 +72,7 @@ interface CartContextValue extends Omit<CartState, "clearedAt"> {
 // ============================================================
 
 const EMPTY_CART: Cart = { items: [] }
+const NO_AUTOMATIC_APPLIED: AppliedAutomaticDiscount[] = []
 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
@@ -474,6 +483,67 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const itemCount = state.cart.items.reduce((sum, i) => sum + i.quantity, 0)
 
+  // ── Cotización de descuentos automáticos sin código ──
+  // El servidor cotiza (POST /api/discounts/automatic) cada vez que
+  // cambia el contenido del carrito, con debounce: las reglas viven
+  // en la BD del panel y el cliente no puede conocerlas. La cifra
+  // solo PINTA el descuento en el carrito; al crear el pedido el
+  // servidor la recalcula y el total debe coincidir.
+  const [autoQuote, setAutoQuote] = useState<{
+    signature: string
+    amount: number
+    applied: AppliedAutomaticDiscount[]
+  }>({ signature: "", amount: 0, applied: [] })
+  const quoteSeqRef = useRef(0)
+  const itemsSignature = state.cart.items
+    .map((i) => `${i.product_id}x${i.quantity}`)
+    .join("|")
+
+  useEffect(() => {
+    const items = state.cart.items
+    if (items.length === 0) return
+    const seq = ++quoteSeqRef.current
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch("/api/discounts/automatic", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+            }),
+          })
+          if (!res.ok) return
+          const data = (await res.json()) as {
+            discount_amount?: number
+            applied?: AppliedAutomaticDiscount[]
+          }
+          // Una respuesta vieja no pisa una cotización más nueva.
+          if (quoteSeqRef.current !== seq) return
+          setAutoQuote({
+            signature: items.map((i) => `${i.product_id}x${i.quantity}`).join("|"),
+            amount: typeof data.discount_amount === "number" ? data.discount_amount : 0,
+            applied: Array.isArray(data.applied) ? data.applied : [],
+          })
+        } catch {
+          // Sin red o sin endpoint: el carrito sigue sin el descuento
+          // automático (el servidor tampoco lo aplicaría sin reglas).
+        }
+      })()
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [state.cart.items])
+
+  // La cotización solo vale para el contenido exacto que la produjo:
+  // si el carrito cambió (o se vació), lo expuesto vuelve a 0 hasta
+  // que llegue la cotización nueva, sin setState en el efecto.
+  const quoteIsCurrent = autoQuote.signature === itemsSignature && itemsSignature !== ""
+  const automaticDiscount = quoteIsCurrent ? autoQuote.amount : 0
+  const automaticApplied = useMemo(
+    () => (quoteIsCurrent ? autoQuote.applied : NO_AUTOMATIC_APPLIED),
+    [quoteIsCurrent, autoQuote.applied]
+  )
+
   // Fuente única para el offset de elementos flotantes del fondo: marca el
   // body cuando el MobileCartBar está visible para que WhatsApp, la pill de
   // cuenta, el StickyCatalogButton y el cookie banner suban por encima.
@@ -487,9 +557,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const total = useCallback(
     (deliveryFee = 0) => {
-      return Math.max(0, subtotal - discount + deliveryFee)
+      return Math.max(0, subtotal - discount - automaticDiscount + deliveryFee)
     },
-    [subtotal, discount]
+    [subtotal, discount, automaticDiscount]
   )
 
   return (
@@ -506,8 +576,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         itemCount,
         subtotal,
         discount,
+        automaticDiscount,
+        automaticApplied,
         total,
-      }), [state, addItem, addOrderItems, removeItem, updateQuantity, clearCart, applyCoupon, removeCoupon, itemCount, subtotal, discount, total])}
+      }), [state, addItem, addOrderItems, removeItem, updateQuantity, clearCart, applyCoupon, removeCoupon, itemCount, subtotal, discount, automaticDiscount, automaticApplied, total])}
     >
       {children}
     </CartContext.Provider>

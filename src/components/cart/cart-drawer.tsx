@@ -32,7 +32,7 @@ const SWIPE_CLOSE_THRESHOLD = 80
 
 export function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false)
-  const { cart, itemCount, subtotal, coupon, removeItem, updateQuantity, clearCart } = useCart()
+  const { cart, itemCount, subtotal, coupon, automaticDiscount, automaticApplied, removeItem, updateQuantity, clearCart } = useCart()
   const { city } = useCity()
   // Order bumps seleccionados en el cross-sell del carrito; el CheckoutDrawer
   // los lee del mismo store compartido (useSelectedBumps), así que la selección
@@ -73,7 +73,8 @@ export function CartDrawer() {
     coupon,
     itemCount,
     countBumpUnits(selectedBumps),
-    DELIVERY_FEE_FLAT
+    DELIVERY_FEE_FLAT,
+    automaticDiscount
   )
   const { deliveryFee, payableSubtotal } = totals
   const drawerTotal = totals.total
@@ -365,6 +366,16 @@ export function CartDrawer() {
               </div>
             )}
 
+            {totals.automaticDiscountAmount > 0 && (
+              <div className="flex items-center justify-between text-sm text-green-700">
+                <span>
+                  Descuentos automáticos
+                  {automaticApplied.length > 0 ? ` (${automaticApplied.map((a) => a.name).join(", ")})` : ""}
+                </span>
+                <span className="font-semibold">-${totals.automaticDiscountAmount.toFixed(2)}</span>
+              </div>
+            )}
+
             {/* Delivery fee (dinámico: gratis desde FREE_SHIPPING_THRESHOLD, igual que el checkout) */}
             <div className="flex items-center justify-between text-[13px] text-[var(--text-secondary)]">
               <span className="flex items-center gap-1.5">
@@ -436,7 +447,7 @@ export function CartDrawer() {
  * Works on both mobile and desktop.
  */
 export function MobileCartBar() {
-  const { cart, itemCount, subtotal, coupon } = useCart()
+  const { cart, itemCount, subtotal, coupon, automaticDiscount } = useCart()
   const { selectedBumps } = useSelectedBumps()
   const [mounted] = useState(true)
   const { city } = useCity()
@@ -468,7 +479,8 @@ export function MobileCartBar() {
     coupon,
     itemCount,
     countBumpUnits(selectedBumps),
-    DELIVERY_FEE_FLAT
+    DELIVERY_FEE_FLAT,
+    automaticDiscount
   )
   const barTotal = totals.total
   const fsBar = freeShippingProgress(totals.payableSubtotal, totals.freeShippingApplied)

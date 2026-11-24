@@ -109,7 +109,11 @@
   tocar **dos** sitios que el contrato compara entre sí:
   `PUBLIC_PRODUCT_COLUMNS` en `src/lib/product-columns.ts` y el `GRANT SELECT (…)`
   de `00192_products_column_privileges.sql`. `cost`, `admin_note`,
-  `low_stock_threshold`, `deleted_at` y `publish_at`/`unpublish_at` son
+  `low_stock_threshold`, `min_order_qty`/`max_order_qty` (00229:
+  cantidad mínima/máxima por pedido, forzadas en servidor en web y
+  WhatsApp por `src/lib/product-quantity-limits.ts`; la ficha las lee
+  en servidor con `service_role`), `deleted_at` y
+  `publish_at`/`unpublish_at` son
   privadas: solo las lee `service_role`. Guardia:
   `npx vitest run src/lib/product-columns.contract.test.ts`.
 

@@ -317,6 +317,47 @@ describe("createWhatsAppOrder", () => {
     const orderInsert = calls.find((c) => c.table === "orders" && c.op === "insert")
     expect(orderInsert?.payload).toMatchObject({ city_id: 42 })
   })
+
+  it("viola el mínimo por producto (00229): NO crea el pedido y detalla el límite", async () => {
+    const queues = happyQueues()
+    // La segunda lectura de `products` es la de límites (fetchQuantityLimits).
+    queues.products = [
+      { data: [DB_CURCUMA], error: null },
+      { data: [{ id: 101, min_order_qty: 5, max_order_qty: null }], error: null },
+    ]
+    const { client, calls } = mockSupabase(queues)
+
+    const result = await createWhatsAppOrder(client, {
+      from: FROM,
+      waMessageId: "wamid.8",
+      productItems: THREE_CURCUMA, // 3 < mínimo 5
+    })
+
+    expect(result.kind).toBe("quantity_violation")
+    if (result.kind === "quantity_violation") {
+      expect(result.detail).toContain("Cúrcuma")
+      expect(result.detail).toContain("mínimo por pedido es 5")
+      expect(result.violations).toHaveLength(1)
+    }
+    expect(calls.some((c) => c.table === "orders" && c.op === "insert")).toBe(false)
+  })
+
+  it("respeta el máximo por producto (00229) y crea si la cantidad cabe", async () => {
+    const queues = happyQueues()
+    queues.products = [
+      { data: [DB_CURCUMA], error: null },
+      { data: [{ id: 101, min_order_qty: 2, max_order_qty: 10 }], error: null },
+    ]
+    const { client } = mockSupabase(queues)
+
+    const result = await createWhatsAppOrder(client, {
+      from: FROM,
+      waMessageId: "wamid.9",
+      productItems: THREE_CURCUMA, // 3 ∈ [2, 10]
+    })
+
+    expect(result.kind).toBe("created")
+  })
 })
 
 describe("parseWhatsAppAddressText", () => {

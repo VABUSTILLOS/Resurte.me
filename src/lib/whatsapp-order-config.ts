@@ -58,3 +58,19 @@ export const WHATSAPP_ORDER_REJECT_BELOW_MINIMUM = true
  * equivocado.
  */
 export const WHATSAPP_ADDRESS_CAPTURE_WINDOW_HOURS = 48
+
+/**
+ * Plantilla de WhatsApp para el aviso «ya hay de nuevo» (back in
+ * stock, src/lib/stock-notifications.ts).
+ *
+ * - null (hoy) → el aviso sale como texto libre por la API. Texto
+ *   libre solo se entrega dentro de la ventana de 24 h de Meta:
+ *   un suscriptor que nunca ha escrito al negocio (o escribió hace
+ *   más de 24 h) NO lo recibe, y la suscripción queda pendiente
+ *   para reintentarlo en el siguiente barrido.
+ * - Cuando exista una plantilla genérica aprobada en la WABA
+ *   (p. ej. "aviso_disponibilidad_resurte" con {{1}} = nombre del
+ *   producto), se pone su nombre aquí y el aviso pasa a plantilla,
+ *   que sí se entrega fuera de ventana.
+ */
+export const WHATSAPP_BACK_IN_STOCK_TEMPLATE: string | null = null

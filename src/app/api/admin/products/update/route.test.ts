@@ -7,11 +7,13 @@ vi.mock("@/lib/catalog-cache", () => ({ revalidateCatalogCache: vi.fn() }))
 vi.mock("@/lib/catalog", () => ({ resetCatalogCache: vi.fn() }))
 vi.mock("@/lib/audit-log", () => ({ logAdminAction: vi.fn() }))
 vi.mock("@/lib/whatsapp-sync-queue", () => ({ enqueueProductsForWaSync: vi.fn() }))
+vi.mock("@/lib/stock-notifications", () => ({ processStockNotifications: vi.fn() }))
 
 import { PATCH } from "./route"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { logAdminAction } from "@/lib/audit-log"
+import { processStockNotifications } from "@/lib/stock-notifications"
 
 /** Lectura: Postgres rechaza el SELECT de una columna inexistente. */
 const READ_MISSING_COLUMN = {
@@ -258,5 +260,42 @@ describe("/api/admin/products/update", () => {
     const res = await PATCH(patchRequest({ productId: 1, price: 30 }))
     expect(res.status).toBe(404)
     expect((await res.json()).error).toContain("ya no existe")
+  })
+
+  // ---------- Ola 2: límites por pedido (00229) y avisos de stock (00230) ----------
+
+  it("acepta y escribe min/max por pedido cuando la migración 00229 está aplicada", async () => {
+    asAdmin()
+    const { writePayloads } = serviceWith({
+      reads: [{ data: { ...CURRENT_ROW, min_order_qty: null, max_order_qty: null }, error: null }],
+      writes: [{ error: null }],
+    })
+    const res = await PATCH(patchRequest({ productId: 1, min_order_qty: 5, max_order_qty: 20 }))
+    expect(res.status).toBe(200)
+    expect(writePayloads[0]).toMatchObject({ min_order_qty: 5, max_order_qty: 20 })
+  })
+
+  it("400 si min_order_qty supera a max_order_qty", async () => {
+    asAdmin()
+    serviceWith({ reads: [{ data: CURRENT_ROW, error: null }], writes: [{ error: null }] })
+    const res = await PATCH(patchRequest({ productId: 1, min_order_qty: 10, max_order_qty: 5 }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).field).toBe("min_order_qty")
+  })
+
+  it("procesa avisos de stock solo cuando la edición toca stock_quantity", async () => {
+    asAdmin()
+    serviceWith({
+      reads: [{ data: CURRENT_ROW, error: null }],
+      writes: [{ error: null }],
+    })
+    const res = await PATCH(patchRequest({ productId: 1, stock_quantity: 0 }))
+    expect(res.status).toBe(200)
+    expect(processStockNotifications).toHaveBeenCalledWith(expect.anything(), [1])
+
+    vi.mocked(processStockNotifications).mockClear()
+    const res2 = await PATCH(patchRequest({ productId: 1, price: 30 }))
+    expect(res2.status).toBe(200)
+    expect(processStockNotifications).not.toHaveBeenCalled()
   })
 })

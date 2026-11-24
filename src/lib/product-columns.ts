@@ -49,6 +49,7 @@
  * | `low_stock_threshold` | Umbral operativo de reposición; solo lo lee el admin. |
  * | `deleted_at` | Papelera (`src/lib/trash.ts`, que corre con `service_role`). |
  * | `publish_at` / `unpublish_at` | Programación editorial; solo la lee el cron de publicación. |
+ * | `min_order_qty` / `max_order_qty` | Límites de compra por pedido (00229); los fuerzan en servidor POST /api/orders y WhatsApp, que leen con `service_role`. |
  *
  * Los consumidores de esas seis columnas usan `createServiceClient()`
  * (`service_role`), que **no** pasa por estos privilegios.
@@ -100,4 +101,6 @@ export const PRIVATE_PRODUCT_COLUMNS = [
   "deleted_at",
   "publish_at",
   "unpublish_at",
+  "min_order_qty",
+  "max_order_qty",
 ] as const

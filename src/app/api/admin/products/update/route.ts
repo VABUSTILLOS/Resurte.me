@@ -4,7 +4,7 @@ import { readJsonBody } from "@/lib/api-body"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
-import { PRODUCT_AUDIT_FIELDS, validateProductPatch } from "@/lib/product-patch"
+import { PRODUCT_AUDIT_FIELDS, PRODUCT_OPTIONAL_SCHEMA_COLUMNS, validateProductPatch } from "@/lib/product-patch"
 import { conflictPayload, isStaleWrite, type ConflictCurrent } from "@/lib/product-conflict"
 import { deriveStockStatus } from "@/lib/stock"
 import { isMissingColumnError } from "@/lib/sale-window"
@@ -66,18 +66,20 @@ export async function PATCH(request: Request) {
     // Fila actual: hace falta para derivar el stock con el umbral vigente y
     // para registrar el diff antes/después en la bitácora (Fase 15).
     const AUDIT_COLS = [...PRODUCT_AUDIT_FIELDS, "deleted_at", "updated_at"]
-    let thresholdReadable = true
+    const unreadableOptional = new Set<string>()
     let currentRes = await supabase
       .from("products")
       .select(AUDIT_COLS.join(", "))
       .eq("id", productId)
       .maybeSingle()
     if (currentRes.error && isMissingColumnError(currentRes.error)) {
-      // Migración 00108 pendiente: se relee sin el umbral para no perder el
-      // diff antes/después de la bitácora (el umbral queda fuera del diff,
-      // porque leerlo como `null` inventaría un cambio inexistente).
-      thresholdReadable = false
-      const base = AUDIT_COLS.filter((c) => c !== "low_stock_threshold")
+      // Alguna migración de columnas opcionales sigue pendiente
+      // (00108 → low_stock_threshold; 00229 → min/max por pedido): se
+      // relee sin TODAS las opcionales para no perder el diff
+      // antes/después de la bitácora (quedan fuera del diff, porque
+      // leerlas como `null` inventaría un cambio inexistente).
+      for (const col of PRODUCT_OPTIONAL_SCHEMA_COLUMNS) unreadableOptional.add(col)
+      const base = AUDIT_COLS.filter((c) => !unreadableOptional.has(c))
       currentRes = (await supabase
         .from("products")
         .select(base.join(", "))
@@ -144,26 +146,30 @@ export async function PATCH(request: Request) {
     // precondición compara. Se escribe aquí además del trigger de la
     // migración 00119 para que funcione aunque no esté aplicada.
     const nowIso = new Date().toISOString()
-    const writePayload = { ...updates, updated_at: nowIso }
+    let writePayload: Record<string, unknown> = { ...updates, updated_at: nowIso }
 
     // `.select("id")` para distinguir "actualizado" de "ya no existe": sin él
     // PostgREST responde sin error aunque no haya tocado ninguna fila.
-    let { data: written, error } = await supabase
-      .from("products")
-      .update(writePayload)
-      .eq("id", productId)
-      .select("id")
+    const doWrite = (payload: Record<string, unknown>) =>
+      supabase.from("products").update(payload).eq("id", productId).select("id")
+    let { data: written, error } = await doWrite(writePayload)
 
-    if (error && isMissingColumnError(error) && "low_stock_threshold" in updates) {
-      // Migración 00108 pendiente: PostgREST rechaza el PATCH entero por una
-      // sola columna inexistente. Se reintenta sin el umbral para que el
-      // resto de la edición sí se guarde (mismo patrón que las lecturas).
-      const { low_stock_threshold: _omit, ...rest } = writePayload
-      ;({ data: written, error } = await supabase
-        .from("products")
-        .update(rest)
-        .eq("id", productId)
-        .select("id"))
+    // Migración de columnas opcionales pendiente (00108/00229):
+    // PostgREST rechaza el PATCH entero por una sola columna
+    // inexistente. Se reintenta sin las opcionales presentes en el
+    // payload para que el resto de la edición sí se guarde (mismo
+    // patrón que las lecturas).
+    for (
+      let attempt = 0;
+      attempt < 3 && error && isMissingColumnError(error);
+      attempt++
+    ) {
+      const present = PRODUCT_OPTIONAL_SCHEMA_COLUMNS.filter((c) => c in writePayload)
+      if (present.length === 0) break
+      const next: Record<string, unknown> = { ...writePayload }
+      for (const col of present) delete next[col]
+      writePayload = next
+      ;({ data: written, error } = await doWrite(writePayload))
     }
 
     if (error) {
@@ -185,7 +191,7 @@ export async function PATCH(request: Request) {
     const after: Record<string, unknown> = {}
     for (const field of PRODUCT_AUDIT_FIELDS) {
       if (!(field in updates)) continue
-      if (field === "low_stock_threshold" && !thresholdReadable) continue
+      if (unreadableOptional.has(field)) continue
       const prev = (current as Record<string, unknown> | null)?.[field] ?? null
       const next = (updates as Record<string, unknown>)[field] ?? null
       if (JSON.stringify(prev) !== JSON.stringify(next)) {
@@ -205,6 +211,14 @@ export async function PATCH(request: Request) {
     // WA5 — encolar sync incremental del catálogo WhatsApp (best-effort).
     const { enqueueProductsForWaSync } = await import("@/lib/whatsapp-sync-queue")
     await enqueueProductsForWaSync(supabase, [productId], "product_update")
+
+    // Avisos de inventario (00230, best-effort): si la edición tocó
+    // la existencia, el producto pudo cruzar su umbral o volver a
+    // tener stock para los suscriptores de «avísame cuando haya».
+    if ("stock_quantity" in updates) {
+      const { processStockNotifications } = await import("@/lib/stock-notifications")
+      await processStockNotifications(supabase, [Number(productId)])
+    }
 
     return NextResponse.json({ success: true, productId, updated_at: nowIso, ...updates })
   } catch (error) {

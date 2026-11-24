@@ -49,7 +49,7 @@ import {
 // ============================================================
 
 export default function CheckoutPage() {
-  const { cart, itemCount, subtotal, clearCart, coupon, isLoaded } = useCart()
+  const { cart, itemCount, subtotal, clearCart, coupon, automaticDiscount, isLoaded } = useCart()
   const { city } = useCity()
   const router = useRouter()
 
@@ -120,7 +120,8 @@ export default function CheckoutPage() {
     coupon,
     itemCount,
     bumpUnits,
-    DELIVERY_FEE_FLAT
+    DELIVERY_FEE_FLAT,
+    automaticDiscount
   )
   const { effectiveSubtotal, discountAmount, allItemsCount, deliveryFee } = totals
   const total = totals.total
@@ -463,6 +464,7 @@ export default function CheckoutPage() {
             itemCount={allItemsCount}
             subtotal={effectiveSubtotal}
             discount={discountAmount}
+            automaticDiscount={totals.automaticDiscountAmount}
             deliveryFee={deliveryFee}
             total={total}
             bumpItems={selectedBumps.map((b) => ({

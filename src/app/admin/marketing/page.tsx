@@ -7,6 +7,7 @@ import { Copy, Megaphone, Pencil, Percent, Plus, Power, TicketPercent, Trash2, X
 import { suggestDuplicateCode } from "@/lib/admin-marketing-validation"
 import { BUMP_MIN_PRICE_MXN } from "@/lib/checkout-config"
 import BumpAffinitySection, { type AffinityPair } from "@/components/admin/bump-affinity-section"
+import { AutomaticDiscountRules } from "./AutomaticDiscountRules"
 
 interface BumpRule {
   id: number
@@ -696,6 +697,9 @@ function MarketingContent() {
           )}
         </ul>
       </section>
+
+      {/* ── Descuentos automáticos sin código (00231) ────────── */}
+      <AutomaticDiscountRules />
     </div>
   )
 }

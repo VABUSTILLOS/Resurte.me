@@ -39,7 +39,7 @@ import {
   rejectedBulkFields,
   type BulkFailure,
 } from "@/lib/product-bulk"
-import { validateProductPatch, type ProductPatch } from "@/lib/product-patch"
+import { PRODUCT_OPTIONAL_SCHEMA_COLUMNS, validateProductPatch, type ProductPatch } from "@/lib/product-patch"
 import { parseExpectedMap, staleIds, STALE_WRITE_REASON } from "@/lib/product-conflict"
 import { deriveStockStatus } from "@/lib/stock"
 import { isMissingColumnError } from "@/lib/sale-window"
@@ -222,12 +222,23 @@ export async function POST(request: Request) {
 
     for (const { patch, ids: groupIds } of groupByPatch(ids, patchById).values()) {
       for (const idsChunk of chunkList(groupIds, BULK_CHUNK)) {
-        let res = await supabase.from("products").update(patch).in("id", idsChunk).select("id")
-        if (res.error && isMissingColumnError(res.error) && "low_stock_threshold" in patch) {
-          // Migración 00108 pendiente: PostgREST rechaza el UPDATE entero por
-          // una sola columna inexistente (mismo patrón que update/route.ts).
-          const { low_stock_threshold: _omit, ...rest } = patch
-          res = await supabase.from("products").update(rest).in("id", idsChunk).select("id")
+        let patchToWrite: Record<string, unknown> = patch
+        let res = await supabase.from("products").update(patchToWrite).in("id", idsChunk).select("id")
+        // Migración de columnas opcionales pendiente (00108 → umbral;
+        // 00229 → min/max por pedido): PostgREST rechaza el UPDATE
+        // entero por una sola columna inexistente. Se reintenta sin
+        // las opcionales presentes (mismo patrón que update/route.ts).
+        for (
+          let attempt = 0;
+          attempt < 3 && res.error && isMissingColumnError(res.error);
+          attempt++
+        ) {
+          const present = PRODUCT_OPTIONAL_SCHEMA_COLUMNS.filter((c) => c in patchToWrite)
+          if (present.length === 0) break
+          const next: Record<string, unknown> = { ...patchToWrite }
+          for (const col of present) delete next[col]
+          patchToWrite = next
+          res = await supabase.from("products").update(patchToWrite).in("id", idsChunk).select("id")
         }
         if (res.error) {
           for (const id of idsChunk) failed.push({ id, reason: res.error.message })
@@ -277,6 +288,14 @@ export async function POST(request: Request) {
       // WA5 — un solo encolado incremental del catálogo WhatsApp.
       const { enqueueProductsForWaSync } = await import("@/lib/whatsapp-sync-queue")
       await enqueueProductsForWaSync(supabase, updated, "product_bulk_update")
+
+      // Avisos de inventario (00230, best-effort): si algún parche
+      // tocó la existencia, los productos actualizados pudieron
+      // cruzar su umbral o volver a tener stock.
+      if ([...patchById.values()].some((p) => "stock_quantity" in p)) {
+        const { processStockNotifications } = await import("@/lib/stock-notifications")
+        await processStockNotifications(supabase, updated)
+      }
     }
 
     return NextResponse.json({ updated, failed, stale })
