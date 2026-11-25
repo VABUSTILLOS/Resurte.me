@@ -516,6 +516,44 @@
   el seguimiento: el `restore_token` del pedido o la sesión cuyo `id` es
   `orders.user_id`. Como la ruta escribe, su tope es más estrecho que el del
   seguimiento (10/60 s contra 30/60 s).
+- **El link de pago de Stripe y los pagos parciales viven en dos módulos**
+  (Ola 4): `src/lib/stripe-payment-link.ts` genera una **Checkout Session
+  hospedada por Stripe** por pedido —nunca un Payment Link de catálogo,
+  porque el monto es el saldo vivo del pedido— y `src/lib/order-payments.ts`
+  es el **libro de pagos** (`order_payments`, migración 00233): la única
+  fuente del saldo (`computePaymentBalance`: total − abonos `recorded`; un
+  pedido con `payment_status = 'paid'` por una vía previa se lee cubierto
+  aunque el libro esté vacío, para no romper pedidos viejos).
+  Invariantes: **el monto sale SIEMPRE de la base** (total − libro), nunca
+  del cliente —la ruta pública `POST /api/orders/[id]/payment-link` ni
+  siquiera acepta un monto, y la del admin valida `0 < monto ≤ saldo`—;
+  la sesión lleva `metadata.order_id` + `metadata.order_payment_link = "1"`
+  en la sesión y en el PaymentIntent, y el webhook deriva esos PI a
+  `handleOrderPaymentLinkSucceeded` **antes** de la regla legada de
+  `amount_mismatch` (un anticipo no es un error de monto); la idempotencia
+  es el **índice único parcial sobre `stripe_payment_intent_id`** (la doble
+  entrega `payment_intent.succeeded` + `checkout.session.completed` abona
+  una sola vez). **Un abono parcial NO marca pagado, NO confirma y NO
+  libera el pedido**: solo cuando el libro cubre el total,
+  `recordOrderPayment` pasa `payment_status` a `paid` y el estado
+  `pending → confirmed` (nunca retrocede un estado posterior), y el handler
+  dispara los mismos avisos del pago web. El pedido parcial **sigue en
+  `pending`**, así que el recordatorio de pago sigue saliendo y la
+  cancelación automática conserva su ventana (su interruptor
+  `WHATSAPP_UNPAID_CANCEL_ENABLED` no se toca). El SPEI confirmado a mano
+  cuenta como abono: el «Confirmar pago» de la ruta de estado escribe la
+  fila del saldo restante, y el panel registra abonos de cualquier método
+  (`POST /api/admin/orders/[id]/payments`, con anulación que revierte
+  `paid → pending` si el libro deja de cubrir). Todo degrada sin la
+  migración: sin la tabla, el link por el **total** sigue marcando pagado
+  por la vía legada, un anticipo queda solo en el log para conciliar a
+  mano, y el panel declara el libro inactivo en vez de romperse. El link
+  vigente se persiste en `orders.payment_link_*` y se reutiliza solo si es
+  por el mismo monto y tiene menos de 23 h; `checkout.session.expired` lo
+  limpia. Superficies: botón «Pagar con tarjeta» en la página pública de
+  seguimiento, mensaje extra en el recordatorio de WhatsApp (tras la liga
+  de seguimiento) y la sección «Pagos y link de pago» del detalle del
+  pedido en el admin.
 
 ## Verificación
 `npm test` (payments, checkout-config, coupon-rules, order-bumps,
@@ -538,6 +576,15 @@ src/lib/order-cancellation.contract.test.ts "src/app/api/orders/[id]/cancel/rout
 mano, cancelar un pedido `pending` sin cobro desde `/mis-pedidos/[orderId]`
 (sesión) y desde `/pedido/[orderId]?t=` (invitado), comprobando que el inventario
 vuelve y que el cupón se libera.
+
+Para el link de pago y los abonos (Ola 4): `npx vitest run
+src/lib/order-payments.test.ts src/lib/stripe-payment-link.test.ts
+src/lib/stripe-link-webhook.test.ts
+"src/app/api/admin/orders/[id]/payments/route.test.ts"
+"src/app/api/orders/[id]/payment-link/route.test.ts"` y, a mano, generar el
+link de un pedido de prueba desde el detalle del admin, pagar un anticipo con
+una tarjeta de prueba y comprobar que el libro lo registra sin marcar pagado,
+pagar el resto y comprobar que el pedido pasa a pagado y confirmado.
 
 FoodOS tiene su propio par de puertas y su propia máquina de estados, así que su
 verificación va aparte: `npx vitest run src/lib/foodos-order-status.test.ts

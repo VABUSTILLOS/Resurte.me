@@ -30,6 +30,7 @@ import {
   sendOrderConfirmationEmail,
   sendOrderStatusEmail,
 } from "@/lib/order-emails"
+import { getOrCreateOrderPaymentLink } from "@/lib/stripe-payment-link"
 import type { OrderStatus, PaymentStatus } from "@/types"
 import { logger } from "@/lib/logger"
 import { applyOrderCancellationEffects } from "@/lib/order-cancellation"
@@ -571,6 +572,37 @@ export async function sendPaymentReminder(orderId: number): Promise<WorkflowLog 
           }`
         )
       }
+    }
+
+    // Link de pago con tarjeta (Ola 4): la página hospedada de
+    // Stripe por el SALDO del pedido (si ya abonó algo, el link es
+    // por lo que falta). Mismo régimen que la liga de seguimiento:
+    // texto libre tras la plantilla, best-effort fuera de la
+    // ventana de 24 h. Sin llave de Stripe el generador se corta
+    // antes de tocar la base y el recordatorio queda como antes.
+    try {
+      const supabase = await createServiceClient()
+      const link = await getOrCreateOrderPaymentLink(supabase, {
+        id: order.id,
+        total: order.total,
+        payment_status: order.payment_status,
+        status: order.status,
+        customer_email: null,
+        restore_token: order.restore_token ?? null,
+        city_slug: order.city_slug ?? null,
+      })
+      await sendTextMessage({
+        to: order.customer_phone,
+        text:
+          `💳 Paga tu pedido #${order.id} con tarjeta en este link seguro de Stripe ` +
+          `(por $${link.amount.toFixed(2)} MXN):\n${link.url}`,
+      })
+    } catch (payLinkErr) {
+      logger.warn(
+        `[Workflow] Link de pago del pedido ${orderId} no entregado: ${
+          payLinkErr instanceof Error ? payLinkErr.message : String(payLinkErr)
+        }`
+      )
     }
 
     return {

@@ -6,6 +6,8 @@
 export const AUDIT_ACTIONS = [
   "order_status",
   "order_payment",
+  "order_payment_link",
+  "order_payment_void",
   "order_payment_revert",
   "order_cancelled_by_customer",
   "order_driver_assigned",
@@ -99,6 +101,8 @@ export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   order_status: "Estado de pedido",
   order_payment: "Confirmación de pago",
+  order_payment_link: "Link de pago generado",
+  order_payment_void: "Pago anulado del libro",
   order_payment_revert: "Reversión de confirmación de pago",
   order_cancelled_by_customer: "Cancelación por el cliente",
   order_driver_assigned: "Repartidor asignado",

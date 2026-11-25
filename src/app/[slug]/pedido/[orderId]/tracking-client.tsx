@@ -67,6 +67,9 @@ interface TrackedOrder {
   discount: number
   delivery_fee: number
   total: number
+  /** Libro de pagos (Ola 4): null cuando el servidor no lo pudo leer. */
+  paid_amount: number | null
+  balance: number | null
   scheduled_for: string | null
   created_at: string
   city: { slug: string; name: string } | null
@@ -90,6 +93,8 @@ export function TrackingClient() {
   const [confirmingCancel, setConfirmingCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
+  const [payingLink, setPayingLink] = useState(false)
+  const [payLinkError, setPayLinkError] = useState<string | null>(null)
 
   // El comprobante se pide aparte del tracking: la ruta de track expone a
   // propósito cero datos del pedido más allá del estado, y el comprobante vive
@@ -194,6 +199,35 @@ export function TrackingClient() {
       product_name: item.name,
       product_image: item.image_url,
     }))
+
+  // Link de pago con tarjeta (Ola 4): el servidor genera la página
+  // hospedada de Stripe por el saldo exacto del pedido y aquí solo
+  // se navega a ella. El monto nunca sale de esta página.
+  const handlePayWithCard = async () => {
+    if (!token) return
+    setPayingLink(true)
+    setPayLinkError(null)
+    try {
+      const res = await fetch(`/api/orders/${orderId}/payment-link`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ t: token }),
+      })
+      const data = (await res.json().catch(() => null)) as {
+        error?: string
+        url?: string
+      } | null
+      if (!res.ok || !data?.url) {
+        setPayLinkError(data?.error ?? "No pudimos generar el link de pago. Intenta de nuevo.")
+        return
+      }
+      window.location.assign(data.url)
+    } catch {
+      setPayLinkError("No pudimos generar el link de pago. Revisa tu conexión e intenta de nuevo.")
+    } finally {
+      setPayingLink(false)
+    }
+  }
 
   const handleCancel = async () => {
     if (!token) return
@@ -375,6 +409,45 @@ export function TrackingClient() {
           )}
         </div>
       )}
+
+      {/* Pago con tarjeta (Ola 4): mientras el pedido tenga saldo,
+          el cliente puede pagarlo en la página segura de Stripe sin
+          esperar a la entrega ni a transferir. Si ya abonó algo, la
+          tarjeta dice cuánto falta: el link siempre es por el saldo. */}
+      {order.status !== "cancelled" &&
+        (order.payment_status === "pending" || order.payment_status === "processing") && (
+          <div className="bg-white rounded-xl border border-brand-200 p-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {order.balance != null && order.paid_amount != null && order.paid_amount > 0
+                    ? `Ya abonaste $${order.paid_amount.toFixed(2)} · te faltan $${order.balance.toFixed(2)}`
+                    : `Pago pendiente · $${order.total.toFixed(2)}`}
+                </p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  Págalo ahora con tarjeta en la página segura de Stripe, o como elegiste al
+                  pedirlo.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handlePayWithCard}
+                disabled={payingLink}
+                className="min-h-[44px] shrink-0 inline-flex items-center justify-center gap-2 px-4 py-3 bg-brand-600 text-white text-sm font-bold rounded-xl hover:bg-brand-700 transition-colors disabled:opacity-60"
+              >
+                <CreditCard className="w-4 h-4" />
+                {payingLink
+                  ? "Generando link…"
+                  : `Pagar con tarjeta${order.balance != null ? ` · $${order.balance.toFixed(2)}` : ""}`}
+              </button>
+            </div>
+            {payLinkError && (
+              <p role="alert" className="text-xs text-red-700 mt-2">
+                {payLinkError}
+              </p>
+            )}
+          </div>
+        )}
 
       {/* Items */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">

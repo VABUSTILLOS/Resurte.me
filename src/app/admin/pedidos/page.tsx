@@ -59,6 +59,7 @@ import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import { orderCustomerLabel } from "@/lib/admin/order-selects"
 import { ProofSection } from "./proof-section"
 import { RefundSection } from "./refund-section"
+import { PaymentsSection } from "./payments-section"
 
 function formatAdminAddress(a: NonNullable<AdminOrder["address"]>): string {
   const parts = [
@@ -1215,6 +1216,13 @@ function AdminOrdersContent() {
                 orderId={selectedOrder.id}
                 paymentStatus={selectedOrder.payment_status}
                 refundedAmountCents={selectedOrder.refunded_amount_cents ?? null}
+                onChanged={refresh}
+              />
+
+              {/* Pagos parciales y link de pago de Stripe (Ola 4, 00233) */}
+              <PaymentsSection
+                orderId={selectedOrder.id}
+                status={selectedOrder.status}
                 onChanged={refresh}
               />
 

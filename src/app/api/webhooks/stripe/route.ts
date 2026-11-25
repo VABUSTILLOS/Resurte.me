@@ -4,6 +4,7 @@ import { headers } from "next/headers"
 import { createServiceClient } from "@/lib/supabase/service"
 import {
   handlePaymentIntentSucceeded,
+  handleOrderPaymentLinkSucceeded,
   handlePaymentIntentRefunded,
   handlePaymentIntentFailed,
   handlePaymentIntentCanceled,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/stripe-webhook-handlers"
 import { logger } from "@/lib/logger"
 import { handleConnectAccountUpdated } from "@/lib/stripe-connect"
+import { clearPersistedOrderPaymentLink } from "@/lib/stripe-payment-link"
 /**
  * POST /api/webhooks/stripe
  *
@@ -100,6 +102,57 @@ export async function POST(request: NextRequest) {
           supabase,
           event.data.object as { id: string }
         )
+        break
+      }
+
+      // Link de pago por pedido (Ola 4): la Checkout Session trae la
+      // misma metadata que su PaymentIntent. El registro lo hace el
+      // mismo handler que procesa payment_intent.succeeded y el
+      // libro deduplica por PaymentIntent, así que recibir los dos
+      // eventos de la misma compra no abona dos veces. Solo se
+      // procesa con la sesión ya pagada: una sesión completada con
+      // método asíncrono aún no acreditado la cierra su propio
+      // payment_intent.succeeded posterior.
+      case "checkout.session.completed": {
+        const session = event.data.object as {
+          id: string
+          payment_status?: string
+          payment_intent?: string | null
+          amount_total?: number | null
+          customer?: string | null
+          customer_details?: { email?: string | null } | null
+          metadata?: Record<string, string>
+        }
+        if (
+          session.metadata?.order_payment_link === "1" &&
+          session.payment_status === "paid" &&
+          typeof session.payment_intent === "string"
+        ) {
+          const supabase = await createServiceClient()
+          await handleOrderPaymentLinkSucceeded(supabase, {
+            id: session.payment_intent,
+            amount_received: session.amount_total ?? 0,
+            metadata: { ...(session.metadata ?? {}), checkout_session_id: session.id },
+            payment_method: null,
+            customer: typeof session.customer === "string" ? session.customer : null,
+            receipt_email: session.customer_details?.email ?? null,
+          })
+        }
+        break
+      }
+
+      // La sesión del link caducó sin pagarse: el link persistido en
+      // el pedido ya no sirve y se limpia para que el panel no lo
+      // ofrezca como vigente (best-effort).
+      case "checkout.session.expired": {
+        const session = event.data.object as {
+          id: string
+          metadata?: Record<string, string>
+        }
+        if (session.metadata?.order_payment_link === "1") {
+          const supabase = await createServiceClient()
+          await clearPersistedOrderPaymentLink(supabase, session.id)
+        }
         break
       }
 
