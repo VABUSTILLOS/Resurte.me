@@ -896,7 +896,18 @@
   pasar por el modelo— ante reclamos, pagos disputados o
   petición explícita (`detectHumanHandoff`). Toda respuesta del
   bot se registra en `whatsapp_messages` como `bot:<kind>`
-  (`bot:ai` = IA); las de una persona van como `text`.
+  (`bot:ai` = IA); las de una persona van como `text`. Las
+  respuestas de la IA pueden ir acompañadas de la foto de los
+  productos que citó: el modelo cierra con una línea interna
+  `PRODUCTOS: <refs>` (las referencias `[ref: slug]` del
+  contexto), el servidor la retira del texto y la valida contra
+  el contexto inyectado en ESA llamada (fuera de contexto =
+  descartada), y el webhook manda primero el texto y después
+  hasta 3 fotos (`sendImageMessage`, URL directa vía
+  `toAbsoluteImageUrl` — jamás /_next/image), cada una con pie
+  «<nombre> — $<precio>» y registro `bot:ai-image` (autor «ia»
+  en la bandeja). Best-effort: si una foto falla, el texto ya
+  salió y nada se rompe.
 - Bandeja de la tienda (`/admin/whatsapp/bandeja` +
   `/api/whatsapp/inbox`): proyecta `whatsapp_messages` agrupada
   por `phoneKey`, sin segundo almacén. El envío revalida la

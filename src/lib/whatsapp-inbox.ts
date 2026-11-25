@@ -12,9 +12,11 @@
 //   direcciones; la conversación se agrupa por phoneKey
 //   (últimos 10 dígitos).
 // - El autor de un saliente se deduce de `message_type`:
-//   `bot:ai` → asistente con IA, `bot:*` → bot de reglas,
-//   `template:*` / `workflow:*` / `automation:*` → automático,
-//   el resto (`text`) → una persona del equipo.
+//   `bot:ai` → asistente con IA, `bot:ai-image` → foto de
+//   producto que acompaña su respuesta (autor también la IA),
+//   `bot:*` → bot de reglas, `template:*` / `workflow:*` /
+//   `automation:*` → automático, el resto (`text`) → una
+//   persona del equipo.
 //
 // Dos candados de servidor, no de interfaz (heredados del CRM):
 // - La ventana de 24 h se revalida al enviar: fuera de ella
@@ -63,7 +65,7 @@ export function classifyMessageAuthor(
 ): WaMessageAuthor {
   if (message.direction === "inbound") return "cliente"
   const type = message.message_type ?? ""
-  if (type === "bot:ai" || type === "bot:handoff") return "ia"
+  if (type === "bot:ai" || type === "bot:handoff" || type === "bot:ai-image") return "ia"
   if (type.startsWith("bot:")) return "bot"
   if (
     type.startsWith("template:") ||
@@ -91,6 +93,9 @@ export function messageDisplayText(message: InboxMessage): string {
     return content || "Mensaje del cliente"
   }
 
+  if (type === "bot:ai-image") {
+    return content ? `🖼️ Foto de producto: ${content}` : "🖼️ Foto de producto"
+  }
   if (type.startsWith("template:")) return `📋 Plantilla: ${type.slice("template:".length)}`
   if (type.startsWith("workflow:")) {
     const key = type.slice("workflow:".length) as WorkflowType

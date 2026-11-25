@@ -16,7 +16,7 @@
 
 import { createHmac, timingSafeEqual } from "crypto"
 import { after, NextRequest, NextResponse } from "next/server"
-import { verifyWebhook, sendTextMessage } from "@/lib/whatsapp"
+import { verifyWebhook, sendImageMessage, sendTextMessage } from "@/lib/whatsapp"
 import {
   captureWhatsAppOrderAddress,
   createWhatsAppOrder,
@@ -32,7 +32,11 @@ import {
   handleWhatsAppProofClarification,
   handleWhatsAppProofImage,
 } from "@/lib/whatsapp-payment-proof"
-import { answerWhatsAppWithAi } from "@/lib/whatsapp-ai-assistant"
+import {
+  answerWhatsAppWithAi,
+  buildAiProductImageCaption,
+  type AiProductImage,
+} from "@/lib/whatsapp-ai-assistant"
 import { getBotPaused } from "@/lib/whatsapp-conversation-controls"
 import { getSpeiAccount, formatClabe } from "@/lib/spei-account"
 import { runNewOrderWorkflows } from "@/lib/workflows"
@@ -51,7 +55,9 @@ type ServiceClient = Awaited<ReturnType<typeof createServiceClient>>
 // lo que escribió una persona. El registro es best-effort: si
 // falla, el cliente igual recibió su respuesta. Antes de la Ola 6
 // estas respuestas NO se registraban; el comportamiento visible
-// para el cliente no cambia.
+// para el cliente no cambia. Las fotos que acompañan una
+// respuesta de la IA salen por sendBotImageReply y se registran
+// como `bot:ai-image` (el contenido guardado es el pie de foto).
 
 type BotReplyKind =
   | "keyword"
@@ -86,6 +92,41 @@ async function sendBotReply(
     }
   } catch (err) {
     logger.error("WhatsApp webhook: falló el envío de la respuesta del bot:", err)
+  }
+}
+
+/**
+ * Foto de producto que acompaña una respuesta de la IA. Es un
+ * acompañamiento best-effort: el texto ya salió por sendBotReply
+ * y si la foto falla (API, URL caída) solo queda el error en el
+ * log — nada se rompe ni se reintenta. Se registra en
+ * whatsapp_messages como `bot:ai-image` con el pie de foto como
+ * contenido, para que la bandeja lea la conversación completa.
+ */
+async function sendBotImageReply(
+  supabase: ServiceClient,
+  args: { to: string; product: AiProductImage }
+): Promise<void> {
+  const caption = buildAiProductImageCaption(args.product)
+  try {
+    const result = (await sendImageMessage({
+      to: args.to,
+      imageUrl: args.product.imageUrl,
+      caption,
+    })) as { messages?: Array<{ id?: string }> } | null
+    try {
+      await supabase.from("whatsapp_messages").insert({
+        from_number: args.to,
+        message_type: "bot:ai-image",
+        content: caption,
+        direction: "outbound",
+        message_id: result?.messages?.[0]?.id ?? null,
+      })
+    } catch (err) {
+      logger.error("WhatsApp webhook: no se pudo registrar la foto del asistente:", err)
+    }
+  } catch (err) {
+    logger.error("WhatsApp webhook: falló el envío de la foto del asistente:", err)
   }
 }
 
@@ -549,6 +590,14 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
         text: ai.text,
         kind: ai.kind === "ai" ? "ai" : "handoff",
       })
+      // Después del texto, las fotos de los productos que la IA
+      // mencionó (validadas contra el contexto, tope 3, en orden
+      // de mención). Best-effort: sendBotImageReply nunca lanza.
+      if (ai.kind === "ai") {
+        for (const product of ai.products) {
+          await sendBotImageReply(supabase, { to: from, product })
+        }
+      }
       return
     }
 

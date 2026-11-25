@@ -64,6 +64,13 @@ export interface SendTextParams {
   preview_url?: boolean
 }
 
+export interface SendImageParams {
+  to: string
+  /** URL pública y directa de la imagen (la descarga WhatsApp). */
+  imageUrl: string
+  caption?: string
+}
+
 export interface BroadcastParams {
   recipients: string[]
   templateName: string
@@ -644,6 +651,39 @@ export async function sendTextMessage(
         text: {
           body: params.text,
           preview_url: params.preview_url ?? false,
+        },
+      }),
+    },
+    cfg
+  )
+
+  return res.json()
+}
+
+/**
+ * Send an image message via WhatsApp, from a public URL.
+ * La URL debe ser directa y pública (WhatsApp la descarga de su
+ * lado): la del feed de Meta sirve tal cual; una de /_next/image
+ * NO (devuelve 400 fuera del sitio).
+ */
+export async function sendImageMessage(
+  params: SendImageParams,
+  config?: WhatsAppConfig
+): Promise<{ messaging_product: string; messages: { id: string }[] }> {
+  const cfg = config || getConfig()
+
+  const res = await waFetch(
+    `/${cfg.phoneNumberId}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: params.to,
+        type: "image",
+        image: {
+          link: params.imageUrl,
+          ...(params.caption ? { caption: params.caption } : {}),
         },
       }),
     },
