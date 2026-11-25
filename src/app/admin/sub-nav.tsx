@@ -26,7 +26,10 @@ const ADMIN_NAV_GROUPS = [
   },
   {
     label: "WhatsApp",
-    items: [{ href: "/admin/whatsapp", label: "WhatsApp", exact: true }],
+    items: [
+      { href: "/admin/whatsapp", label: "WhatsApp", exact: true },
+      { href: "/admin/whatsapp/bandeja", label: "Bandeja", exact: false },
+    ],
   },
   {
     label: "Operación",

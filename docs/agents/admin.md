@@ -860,6 +860,40 @@
   (normalizado por `normalizeMxPhoneForWaMe`); la difusión respeta
   `marketing_consent`, tope de 200 y dedupe por día en
   `whatsapp_automation_sends`.
+- Atención al cliente (Ola 6): el asistente con IA del webhook
+  (`whatsapp-ai-assistant.ts`) es el ÚLTIMO paso conversacional:
+  palabras clave → flujo post-pedido → comprobante → dirección →
+  IA → menú. Solo actúa con `WHATSAPP_AI_ASSISTANT_ENABLED=true`
+  y proveedor de IA configurado; ante apagado, falta de llave o
+  fallo devuelve «none» y el webhook cae al menú histórico. La IA
+  NUNCA toca pedidos ni dinero: solo afirma precios/existencias
+  del contexto inyectado (catálogo cacheado + políticas de
+  `commercial-facts` + último pedido) y deriva a humano —sin
+  pasar por el modelo— ante reclamos, pagos disputados o
+  petición explícita (`detectHumanHandoff`). Toda respuesta del
+  bot se registra en `whatsapp_messages` como `bot:<kind>`
+  (`bot:ai` = IA); las de una persona van como `text`.
+- Bandeja de la tienda (`/admin/whatsapp/bandeja` +
+  `/api/whatsapp/inbox`): proyecta `whatsapp_messages` agrupada
+  por `phoneKey`, sin segundo almacén. El envío revalida la
+  ventana de 24 h EN EL SERVIDOR: fuera de ella solo sale una
+  plantilla con status `approved`. La pausa del bot por
+  conversación (`whatsapp_conversation_controls`, 00235) apaga
+  SOLO lo conversacional (palabras clave, IA, menú); lo
+  transaccional (pedidos del catálogo, flujo, comprobantes,
+  dirección) nunca se pausa. Sin la 00235 no hay pausa y todo
+  sigue como antes. Los envíos y la pausa dejan fila en
+  `admin_audit_log` con `{ template, characters }`, jamás el
+  cuerpo del mensaje.
+- Flujos por condición (Ola 6): un tipo más del motor,
+  `conditional_flows`, con las reglas en el `config.rules` de su
+  fila (CRUD en la página de Automatizaciones). Condiciones:
+  `first_order`, `order_count_gte`, `order_total_gte`,
+  `active_recurrence`. Dedupe por (regla, pedido) en
+  `whatsapp_automation_sends`; respeta `marketing_consent`;
+  nace apagado y sin reglas. Requiere la 00235 (valor del ENUM
+  `automation_type`); sin ella no se puede guardar la fila y el
+  motor usa el default inactivo.
 
 - Productos — contraste (la superficie que axe no puede ver): `e2e/a11y.spec.ts`
   recorre **solo rutas públicas**, así que `/admin/productos` (que exige sesión)

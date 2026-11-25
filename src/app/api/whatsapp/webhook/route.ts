@@ -32,10 +32,62 @@ import {
   handleWhatsAppProofClarification,
   handleWhatsAppProofImage,
 } from "@/lib/whatsapp-payment-proof"
+import { answerWhatsAppWithAi } from "@/lib/whatsapp-ai-assistant"
+import { getBotPaused } from "@/lib/whatsapp-conversation-controls"
 import { getSpeiAccount, formatClabe } from "@/lib/spei-account"
 import { runNewOrderWorkflows } from "@/lib/workflows"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
+
+type ServiceClient = Awaited<ReturnType<typeof createServiceClient>>
+
+// ============================================================
+// Respuestas del bot con registro (Ola 6)
+// ============================================================
+// Toda respuesta automática de este webhook sale por aquí: envía
+// con la capa de siempre (sendTextMessage) y registra el saliente
+// en whatsapp_messages como `bot:<kind>`, para que la bandeja del
+// panel distinga qué respondió el bot (y qué la IA: kind "ai") de
+// lo que escribió una persona. El registro es best-effort: si
+// falla, el cliente igual recibió su respuesta. Antes de la Ola 6
+// estas respuestas NO se registraban; el comportamiento visible
+// para el cliente no cambia.
+
+type BotReplyKind =
+  | "keyword"
+  | "order"
+  | "flow"
+  | "proof"
+  | "address"
+  | "ai"
+  | "handoff"
+  | "menu"
+
+async function sendBotReply(
+  supabase: ServiceClient,
+  args: { to: string; text: string; kind: BotReplyKind; previewUrl?: boolean }
+): Promise<void> {
+  try {
+    const result = (await sendTextMessage({
+      to: args.to,
+      text: args.text,
+      preview_url: args.previewUrl,
+    })) as { messages?: Array<{ id?: string }> } | null
+    try {
+      await supabase.from("whatsapp_messages").insert({
+        from_number: args.to,
+        message_type: `bot:${args.kind}`,
+        content: args.text,
+        direction: "outbound",
+        message_id: result?.messages?.[0]?.id ?? null,
+      })
+    } catch (err) {
+      logger.error("WhatsApp webhook: no se pudo registrar la respuesta del bot:", err)
+    }
+  } catch (err) {
+    logger.error("WhatsApp webhook: falló el envío de la respuesta del bot:", err)
+  }
+}
 
 // ============================================================
 // GET — Webhook Verification
@@ -411,18 +463,26 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
   if (messageType === "text" && content) {
     const text = content.toLowerCase()
 
-    if (text.includes("pedido") || text.includes("orden") || text.includes("mi pedido")) {
-      await handleOrderLookup(from)
+    // Pausa por conversación (Ola 6): si el equipo está atendiendo
+    // este chat desde la bandeja, el bot no responde lo
+    // CONVERSACIONAL (palabras clave, asistente con IA, menú) para
+    // no pisar al humano. Lo transaccional de abajo (flujo
+    // post-pedido, aclaración de comprobante, captura de dirección)
+    // corre igual, con o sin pausa: pausarlo rompería pedidos.
+    const botPaused = await getBotPaused(supabase, from)
+
+    if (!botPaused && (text.includes("pedido") || text.includes("orden") || text.includes("mi pedido"))) {
+      await handleOrderLookup(supabase, from)
       return
     }
 
-    if (text.includes("catálogo") || text.includes("catalogo") || text.includes("productos") || text.includes("menú") || text.includes("menu")) {
-      await sendCatalogLink(from)
+    if (!botPaused && (text.includes("catálogo") || text.includes("catalogo") || text.includes("productos") || text.includes("menú") || text.includes("menu"))) {
+      await sendCatalogLink(supabase, from)
       return
     }
 
-    if (text.includes("ayuda") || text.includes("soporte") || text.includes("contacto")) {
-      await sendSupportInfo(from)
+    if (!botPaused && (text.includes("ayuda") || text.includes("soporte") || text.includes("contacto"))) {
+      await sendSupportInfo(supabase, from)
       return
     }
 
@@ -434,7 +494,7 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
     // dirección, así que la captura no lo encontraría de todos modos.
     const flow = await handleWhatsAppFlowReply(supabase, { from, text: content })
     if (flow.kind !== "none") {
-      await replyToFlowResult(from, flow)
+      await replyToFlowResult(supabase, from, flow)
       return
     }
 
@@ -443,7 +503,7 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
     // pelado y una aclaración abierta; si no, el texto sigue.
     const proofReply = await handleWhatsAppProofClarification(supabase, { from, text: content })
     if (proofReply.kind !== "none") {
-      await replyToProofResult(from, proofReply)
+      await replyToProofResult(supabase, from, proofReply)
       return
     }
 
@@ -458,8 +518,9 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
       // startWhatsAppPaymentStep devuelve false y la respuesta es la
       // de siempre, sin preguntas).
       const flowStarted = await startWhatsAppPaymentStep(supabase, capture.orderId)
-      await sendTextMessage({
+      await sendBotReply(supabase, {
         to: from,
+        kind: "address",
         text:
           "✅ *¡Dirección registrada!*\n\n" +
           `Pedido *#${capture.orderId}* — Total: *$${capture.total.toFixed(2)} MXN*\n` +
@@ -467,18 +528,39 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
           (flowStarted
             ? buildWhatsAppPaymentQuestion()
             : "Con esto tu pedido queda completo. Te avisaremos cuando vaya en camino. 🛵"),
-      }).catch((err) => logger.error("WhatsApp webhook: address confirmation reply failed:", err))
+      })
+      return
+    }
+
+    // Con la pausa encendida aquí termina el turno: el equipo está
+    // atendiendo este chat y el bot no dice nada más.
+    if (botPaused) return
+
+    // Asistente con IA (Ola 6): el texto libre que no cayó en
+    // ninguna palabra clave ni en un paso del flujo lo puede
+    // responder la IA con el contexto de la tienda. Con el
+    // interruptor apagado, sin llave de IA o ante cualquier
+    // fallo, answerWhatsAppWithAi devuelve "none" y se cae al
+    // menú de siempre: el comportamiento histórico.
+    const ai = await answerWhatsAppWithAi(supabase, { from, text: content })
+    if (ai.kind === "ai" || ai.kind === "handoff") {
+      await sendBotReply(supabase, {
+        to: from,
+        text: ai.text,
+        kind: ai.kind === "ai" ? "ai" : "handoff",
+      })
       return
     }
 
     // Fallback de bienvenida: orienta al usuario a los comandos disponibles.
-    await sendTextMessage({
+    await sendBotReply(supabase, {
       to: from,
+      kind: "menu",
       text: "¡Hola! 👋 Puedo ayudarte con:\n\n" +
         "📦 *Tu pedido* — escríbeme \"mi pedido\" para ver el estado.\n" +
         "🛍️ *Catálogo* — escríbeme \"catálogo\" y te envío el link.\n" +
         "❓ *Ayuda* — escríbeme \"ayuda\" para hablar con soporte.",
-    }).catch((err) => logger.error("WhatsApp webhook: fallback reply failed:", err))
+    })
   }
 }
 
@@ -488,11 +570,8 @@ type ProofResult =
   | Awaited<ReturnType<typeof handleWhatsAppProofClarification>>
 
 /** Responde al cliente según el resultado del flujo pago/horario. */
-async function replyToFlowResult(from: string, flow: FlowReplyResult) {
-  const reply = (text: string) =>
-    sendTextMessage({ to: from, text }).catch((err) =>
-      logger.error("WhatsApp webhook: flow reply failed:", err)
-    )
+async function replyToFlowResult(supabase: ServiceClient, from: string, flow: FlowReplyResult) {
+  const reply = (text: string) => sendBotReply(supabase, { to: from, text, kind: "flow" })
 
   switch (flow.kind) {
     case "payment_chosen": {
@@ -549,11 +628,8 @@ async function replyToFlowResult(from: string, flow: FlowReplyResult) {
 }
 
 /** Responde al cliente según el resultado del ligado de comprobante. */
-async function replyToProofResult(from: string, result: ProofResult) {
-  const reply = (text: string) =>
-    sendTextMessage({ to: from, text }).catch((err) =>
-      logger.error("WhatsApp webhook: proof reply failed:", err)
-    )
+async function replyToProofResult(supabase: ServiceClient, from: string, result: ProofResult) {
+  const reply = (text: string) => sendBotReply(supabase, { to: from, text, kind: "proof" })
 
   switch (result.kind) {
     case "attached":
@@ -615,7 +691,7 @@ async function handleProofImageMessage(
 ) {
   const result = await handleWhatsAppProofImage(supabase, args)
   if (result.kind !== "none") {
-    await replyToProofResult(args.from, result)
+    await replyToProofResult(supabase, args.from, result)
   }
 }
 
@@ -685,45 +761,47 @@ async function handleOrderMessage(
         "",
         "Para entregártelo, compárteme tu *dirección completa* (calle, número, colonia, CP y alguna referencia) y el nombre de quien recibe. 📍"
       )
-      await sendTextMessage({ to: from, text: lines.join("\n") }).catch((err) =>
-        logger.error("WhatsApp webhook: order confirmation reply failed:", err)
-      )
+      await sendBotReply(supabase, { to: from, text: lines.join("\n"), kind: "order" })
       break
     }
     case "below_minimum": {
-      await sendTextMessage({
+      await sendBotReply(supabase, {
         to: from,
+        kind: "order",
         text:
           `Tu pedido suma *$${result.subtotal.toFixed(2)} MXN* y el mínimo de compra es de *$${result.minimum.toFixed(2)} MXN*: te faltan *$${result.missingAmount.toFixed(2)} MXN*. 🙏\n\n` +
           "Agrega más productos desde el catálogo y vuelve a enviar tu pedido. 🛍️",
-      }).catch((err) => logger.error("WhatsApp webhook: below-minimum reply failed:", err))
+      })
       break
     }
     case "no_resolvable_items": {
-      await sendTextMessage({
+      await sendBotReply(supabase, {
         to: from,
+        kind: "order",
         text:
           "No pude identificar los productos de tu pedido. 😕\n\n" +
           "Escríbeme tu pedido como texto (producto y cantidad) y lo registramos por aquí mismo.",
-      }).catch((err) => logger.error("WhatsApp webhook: no-items reply failed:", err))
+      })
       break
     }
     case "insufficient_stock": {
-      await sendTextMessage({
+      await sendBotReply(supabase, {
         to: from,
+        kind: "order",
         text:
           `Algunos productos de tu pedido ya no tienen existencia suficiente: ${result.detail}.\n\n` +
           "Ajusta las cantidades en el catálogo y vuelve a enviar tu pedido, por favor. 🙏",
-      }).catch((err) => logger.error("WhatsApp webhook: stock reply failed:", err))
+      })
       break
     }
     case "quantity_violation": {
-      await sendTextMessage({
+      await sendBotReply(supabase, {
         to: from,
+        kind: "order",
         text:
           `Tu pedido tiene cantidades fuera del rango permitido por producto: ${result.detail}.\n\n` +
           "Ajusta las cantidades en el catálogo y vuelve a enviar tu pedido, por favor. 🙏",
-      }).catch((err) => logger.error("WhatsApp webhook: quantity-violation reply failed:", err))
+      })
       break
     }
     case "duplicate": {
@@ -739,21 +817,20 @@ async function handleOrderMessage(
 }
 
 /** Busca el perfil por teléfono (últimos 10 dígitos) y responde con el estado del último pedido. */
-async function handleOrderLookup(from: string) {
+async function handleOrderLookup(supabase: ServiceClient, from: string) {
   // Meta envía el número en formato internacional sin '+': 5215512345678.
   // profiles.phone puede estar como "+52 1 55..." o "5512345678": comparar
   // por los últimos 10 dígitos cubre ambos formatos de forma fiable.
   const digits = from.replace(/\D/g, "")
   const last10 = digits.slice(-10)
   if (last10.length < 10) {
-    await sendTextMessage({
+    await sendBotReply(supabase, {
       to: from,
+      kind: "order",
       text: "No pude identificar tu número para buscar tu pedido. Escríbenos a soporte por favor.",
-    }).catch(() => {})
+    })
     return
   }
-
-  const supabase = await createServiceClient()
 
   // 1) Encontrar el perfil cuyo teléfono termina en los mismos 10 dígitos
   // (helper compartido con la creación de pedidos: whatsapp-orders.ts).
@@ -765,10 +842,11 @@ async function handleOrderLookup(from: string) {
   }
 
   if (!profile) {
-    await sendTextMessage({
+    await sendBotReply(supabase, {
       to: from,
+      kind: "order",
       text: "No encontramos un pedido asociado a este número. Si acabas de hacer tu primer pedido, ¡gracias! 🎉\n\n¿Quieres ver el *catálogo*? Escríbeme \"catálogo\".",
-    }).catch(() => {})
+    })
     return
   }
 
@@ -793,10 +871,11 @@ async function handleOrderLookup(from: string) {
 
   const order = orders?.[0]
   if (!order) {
-    await sendTextMessage({
+    await sendBotReply(supabase, {
       to: from,
+      kind: "order",
       text: "Aún no tienes pedidos registrados en Resurte. Cuando hagas tu primer pedido te avisamos aquí mismo. 📲",
-    }).catch(() => {})
+    })
     return
   }
 
@@ -811,33 +890,37 @@ async function handleOrderLookup(from: string) {
   const city = (order.city as { name?: string } | null)?.name || "tu ciudad"
   const total = Number(order.total).toFixed(2)
 
-  await sendTextMessage({
+  await sendBotReply(supabase, {
     to: from,
+    kind: "order",
     text: `Hola ${profile.full_name || ""} 👋\n\nTu pedido *#${order.id}* (${city}) está: *${statusLabel[order.status as string] || order.status}*\n\nTotal: $${total} MXN\n\n¿Necesitas algo más? Escríbeme \"ayuda\" o \"catálogo\".`,
-  }).catch((err) => logger.error("WhatsApp webhook: order status reply failed:", err))
+  })
 }
 
-async function sendCatalogLink(from: string) {
+async function sendCatalogLink(supabase: ServiceClient, from: string) {
   const siteUrl =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
     "https://resurte.me"
-  await sendTextMessage({
+  await sendBotReply(supabase, {
     to: from,
+    kind: "keyword",
     text: "¡Claro! Aquí tienes nuestro catálogo: 🛍️",
-    preview_url: true,
-  }).catch(() => {})
-  await sendTextMessage({
+    previewUrl: true,
+  })
+  await sendBotReply(supabase, {
     to: from,
+    kind: "keyword",
     text: `${siteUrl}/comer`,
-    preview_url: true,
-  }).catch((err) => logger.error("WhatsApp webhook: catalog link reply failed:", err))
+    previewUrl: true,
+  })
 }
 
-async function sendSupportInfo(from: string) {
-  await sendTextMessage({
+async function sendSupportInfo(supabase: ServiceClient, from: string) {
+  await sendBotReply(supabase, {
     to: from,
+    kind: "keyword",
     text: "¿Necesitas ayuda? 🙋\n\n📞 Escríbenos a *hola@resurte.me* o responde con tu duda y un agente te atenderá en horario de 9:00 a 21:00.\n\nTambién puedes consultar el estado de tu pedido escribiendo \"mi pedido\".",
-  }).catch((err) => logger.error("WhatsApp webhook: support reply failed:", err))
+  })
 }
 
 async function handleMessageStatus(status: WhatsAppStatus, _value: WhatsAppValue) {
