@@ -75,7 +75,7 @@ interface OrderWithDetails {
   subtotal: number
   delivery_fee: number
   scheduled_for: string | null
-  source: "web" | "whatsapp"
+  source: "web" | "whatsapp" | "recurring"
   created_at: string
   // Joined fields
   customer_name?: string
@@ -188,7 +188,7 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
     subtotal: rawOrder.subtotal,
     delivery_fee: rawOrder.delivery_fee,
     scheduled_for: rawOrder.scheduled_for,
-    source: rawOrder.source as "web" | "whatsapp",
+    source: rawOrder.source as "web" | "whatsapp" | "recurring",
     created_at: rawOrder.created_at,
     customer_name: rawOrder.profile?.full_name || "Cliente",
     customer_phone: rawOrder.customer_phone ?? rawOrder.profile?.phone ?? undefined,

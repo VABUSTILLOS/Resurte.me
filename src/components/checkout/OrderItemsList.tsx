@@ -3,6 +3,7 @@
 import Image from "next/image"
 import { Minus, Plus, ShoppingBag } from "lucide-react"
 import type { CartItem } from "@/types"
+import { cartItemUnitPrice } from "@/lib/cart-prices"
 import type { SelectedBump } from "@/components/checkout/BumpCards"
 
 interface OrderItemsListProps {
@@ -120,7 +121,7 @@ export function OrderItemsList({
   return (
     <ul className="divide-y divide-[#E8E9EB]">
       {items.map((item) => {
-        const unitPrice = item.sale_price ?? item.price
+        const unitPrice = cartItemUnitPrice(item)
         return (
           <li
             key={`item-${item.product_id}-${item.variant_id ?? 0}`}

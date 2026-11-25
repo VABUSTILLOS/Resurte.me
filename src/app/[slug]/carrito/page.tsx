@@ -18,6 +18,7 @@ import Link from "next/link"
 import { CouponInput } from "@/components/cart/coupon-input"
 import { ShoppingLists } from "@/components/cart/shopping-lists"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
+import { cartItemUnitPrice } from "@/lib/cart-prices"
 import { calcCheckoutTotals, DELIVERY_FEE_FLAT, countBumpUnits, countOrderUnits } from "@/lib/checkout-config"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
@@ -174,7 +175,19 @@ export default function CartPage() {
 
                 <div className="flex items-center justify-between mt-2">
                   <div>
-                    {item.sale_price ? (
+                    {item.customer_price != null && !item.variant_id ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-bold text-emerald-700">
+                          ${item.customer_price.toFixed(2)}
+                        </span>
+                        <span className="text-sm text-gray-400 line-through">
+                          ${(item.sale_price ?? item.price).toFixed(2)}
+                        </span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5">
+                          Tu precio
+                        </span>
+                      </div>
+                    ) : item.sale_price ? (
                       <div className="flex items-center gap-2">
                         <span className="text-lg font-bold text-brand-600">
                           ${item.sale_price.toFixed(2)}
@@ -189,7 +202,7 @@ export default function CartPage() {
                       </span>
                     )}
                     <p className="text-[11px] text-gray-400">
-                      Subtotal: ${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}
+                      Subtotal: ${(cartItemUnitPrice(item) * item.quantity).toFixed(2)}
                     </p>
                   </div>
 

@@ -10,6 +10,7 @@ import {
   calcCheckoutTotals,
   countBumpUnits,
 } from "@/lib/checkout-config"
+import { cartItemUnitPrice } from "@/lib/cart-prices"
 import { clearCheckoutStep } from "@/lib/checkout-resume"
 import { withoutQueryParams } from "@/lib/url-params"
 import {
@@ -85,7 +86,7 @@ export function StripeReturnHandler() {
               id: String(i.product_id),
               name: i.name,
               quantity: i.quantity,
-              price: i.sale_price ?? i.price,
+              price: cartItemUnitPrice(i),
             })),
             ...selectedBumps.map((b) => ({
               id: String(b.productId),

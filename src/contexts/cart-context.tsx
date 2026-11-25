@@ -12,6 +12,8 @@ import {
   type ReactNode,
 } from "react"
 import type { Cart, CartItem, AppliedCoupon } from "@/types"
+import { useCustomerPrices } from "@/hooks/use-customer-prices"
+import { cartItemUnitPrice } from "@/lib/cart-prices"
 import { calcCouponDiscount } from "@/lib/checkout-config"
 import type { AppliedAutomaticDiscount } from "@/lib/coupon-rules"
 import { createClient } from "@/lib/supabase/client"
@@ -49,6 +51,7 @@ type CartAction =
   | { type: "APPLY_COUPON"; payload: AppliedCoupon }
   | { type: "REMOVE_COUPON" }
   | { type: "LOAD_CART"; payload: CartState }
+  | { type: "APPLY_CUSTOMER_PRICES"; payload: ReadonlyMap<number, number> }
 
 interface CartContextValue extends Omit<CartState, "clearedAt"> {
   addItem: (item: CartItem) => void
@@ -200,6 +203,28 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     case "LOAD_CART":
       return { ...action.payload, isLoaded: true }
 
+    case "APPLY_CUSTOMER_PRICES": {
+      // Precios especiales del cliente con sesión (00234): se fijan
+      // en las líneas SIN presentación (la presentación cobra la
+      // suya) y se quitan al cerrar sesión (mapa vacío). Sin
+      // cambios devuelve el MISMO estado: el efecto que despacha
+      // depende de `items` y no debe entrar en ciclo.
+      let changed = false
+      const items = state.cart.items.map((item) => {
+        if (item.variant_id) {
+          if (item.customer_price == null) return item
+          changed = true
+          return { ...item, customer_price: null }
+        }
+        const special = action.payload.get(item.product_id) ?? null
+        if ((item.customer_price ?? null) === special) return item
+        changed = true
+        return { ...item, customer_price: special }
+      })
+      if (!changed) return state
+      return { ...state, cart: { items } }
+    }
+
     default:
       return state
   }
@@ -300,10 +325,7 @@ function serializeCart(items: CartItem[], coupon: AppliedCoupon | null): string 
 }
 
 function calcSubtotal(items: CartItem[]): number {
-  return items.reduce((sum, item) => {
-    const price = item.sale_price ?? item.price
-    return sum + price * item.quantity
-  }, 0)
+  return items.reduce((sum, item) => sum + cartItemUnitPrice(item) * item.quantity, 0)
 }
 
 // El descuento del cupón usa la fuente única `calcCouponDiscount`
@@ -334,6 +356,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     dispatch({ type: "LOAD_CART", payload: loadFromStorage() })
   }, [])
+
+  // Precios especiales del cliente con sesión (00234): cuando el
+  // mapa llega, cambia o se vacía (cierre de sesión), se reaplica
+  // sobre las líneas actuales. El reducer no crea estado nuevo si
+  // nada cambió, así que esto no entra en ciclo con el push.
+  const customerPrices = useCustomerPrices()
+  useEffect(() => {
+    dispatch({ type: "APPLY_CUSTOMER_PRICES", payload: customerPrices })
+  }, [customerPrices, state.cart.items])
 
   // Persist to localStorage on changes
   useEffect(() => {

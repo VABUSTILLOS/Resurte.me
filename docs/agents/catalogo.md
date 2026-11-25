@@ -8,6 +8,14 @@
 - `src/app/catalogo/**`
 
 ## Invariantes
+- Precio especial por cliente (Ola 5, 00234): `customer_product_prices`
+  es un precio fijo por (cliente, producto) que SOLO se pinta con la
+  sesión de ese cliente (`useCustomerPrice` en tarjeta y ficha, con
+  distintivo «Tu precio») y solo sin presentaciones. **Nunca entra al
+  feed de Meta ni a ninguna superficie pública o prerenderizada**: el
+  catálogo público (y el de WhatsApp) tiene un solo precio, y la
+  landing por ciudad sigue estática — el especial llega por
+  `/api/customer-prices` ya con sesión, jamás por `catalog-cache`.
 - `ProductCard` está envuelta en `React.memo` y usa `content-visibility: auto` — no
   quitar; el catálogo renderiza cientos de cards. Vive en el **envoltorio interno**
   (imagen + ficha), no en `.product-card`: `content-visibility: auto` implica

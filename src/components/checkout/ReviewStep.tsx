@@ -2,6 +2,7 @@
 
 import { MapPin, Clock, ArrowLeft, ArrowRight } from "lucide-react"
 import type { City, CartItem } from "@/types"
+import { cartItemUnitPrice } from "@/lib/cart-prices"
 import { QuantityStepper } from "@/components/checkout/OrderItemsList"
 import { CouponInput } from "@/components/cart/coupon-input"
 import { getNextDays, type AddressForm, type ScheduleForm } from "./checkout-shared"
@@ -132,7 +133,7 @@ export function ReviewStep({
                       En 0
                     </span>
                   ) : (
-                    `$${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}`
+                    `$${(cartItemUnitPrice(item) * item.quantity).toFixed(2)}`
                   )}
                 </span>
               </div>

@@ -554,6 +554,35 @@
   seguimiento, mensaje extra en el recordatorio de WhatsApp (tras la liga
   de seguimiento) y la sección «Pagos y link de pago» del detalle del
   pedido en el admin.
+- **El precio especial por cliente y los pedidos recurrentes** (Ola 5,
+  migración 00234) comparten una regla: **el precio especial es un dato
+  de la BD** (`customer_product_prices`, precio fijo por cliente y
+  producto), nunca del payload. `POST /api/orders` lo lee con la sesión
+  del pedido vía `fetchCustomerPrices` y lo aplica SOLO a la línea
+  estándar sin presentación dentro de `unitPriceOf` (el bump cobra el
+  suyo y la presentación la suya), así que el match de subtotal sigue
+  siendo la puerta: un cliente que pinte un precio que no tiene, o
+  cuyo especial se quitó, recibe el mismatch de siempre. Los
+  descuentos automáticos valoran esas líneas al precio especial (es
+  su precio real en el pedido). La web lo pinta solo con la sesión de
+  ese cliente (`GET /api/customer-prices` → `CartItem.customer_price`
+  vía `cartItemUnitPrice`, la única definición de precio de línea del
+  carrito): invitados y demás clientes ven el público. **En WhatsApp
+  NO aplica**: el catálogo de Meta publica un solo precio. El pedido
+  recurrente (`src/lib/recurring-orders.ts`, `orders.source =
+  'recurring'`) SÍ lo respeta porque nace en el servidor ya ligado al
+  cliente: el barrido `recurring-orders` del cron diario genera el
+  pedido real con precios de la BD de ese momento, existencia y
+  mín/máx validados y el **mínimo de $500 forzado** —si no llega, no
+  se crea, se avisa al staff por WhatsApp y la plantilla registra
+  `last_result` y avanza al siguiente ciclo (nunca se ajusta en
+  silencio ni reintenta a diario)—. Nada se cobra solo: el pedido
+  nace `pending` con el método habitual de la plantilla (por eso
+  `card` no es método válido de plantilla) y se paga por los canales
+  de siempre; al crearse corre `runNewOrderWorkflows` (aviso al staff
+  y confirmación al cliente con la plantilla de siempre). Sin la
+  migración todo degrada: no hay especiales ni recurrencias y la
+  tienda vende como siempre.
 
 ## Verificación
 `npm test` (payments, checkout-config, coupon-rules, order-bumps,
@@ -576,6 +605,16 @@ src/lib/order-cancellation.contract.test.ts "src/app/api/orders/[id]/cancel/rout
 mano, cancelar un pedido `pending` sin cobro desde `/mis-pedidos/[orderId]`
 (sesión) y desde `/pedido/[orderId]?t=` (invitado), comprobando que el inventario
 vuelve y que el cupón se libera.
+
+Para precios especiales y recurrentes (Ola 5): `npx vitest run
+src/lib/recurring-orders.test.ts src/lib/customer-prices.test.ts
+src/lib/cart-prices.test.ts` y, a mano, asignar un especial en
+`/admin/recurrentes`, entrar con la sesión de ese cliente y comprobar
+que ficha, carrito y checkout cobran el especial (y que con otra
+sesión se cobra el público); crear una recurrencia semanal para hoy
+y comprobar que el cron genera el pedido con la confirmación de
+WhatsApp de siempre, y que una plantilla bajo el mínimo no genera
+pedido y sí aviso al staff.
 
 Para el link de pago y los abonos (Ola 4): `npx vitest run
 src/lib/order-payments.test.ts src/lib/stripe-payment-link.test.ts

@@ -156,6 +156,25 @@ export async function GET(req: NextRequest) {
         return sweepStockNotifications(supabase)
       },
     ],
+    [
+      // Pedidos recurrentes (00234): genera el pedido real de
+      // cada plantilla activa cuya fecha llegó, con precios de
+      // la BD de ese momento. Sin la migración no hace nada.
+      "recurring-orders",
+      async () => {
+        const { runDueRecurringOrders } = await import("@/lib/recurring-orders")
+        const { dayKeyOf, DEFAULT_TIMEZONE } = await import("@/lib/local-date")
+        const { createServiceClient } = await import("@/lib/supabase/service")
+        const supabase = await createServiceClient()
+        const summary = await runDueRecurringOrders(supabase, dayKeyOf(DEFAULT_TIMEZONE))
+        return {
+          available: summary.available,
+          processed: summary.processed,
+          created: summary.created,
+          skipped: summary.skipped,
+        }
+      },
+    ],
   ]
 
   // Secuencial e independiente: un job que falla no detiene a los demás.

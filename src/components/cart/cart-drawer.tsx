@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { AnalyticsEvents } from "@/lib/analytics"
+import { cartItemUnitPrice } from "@/lib/cart-prices"
 import { haptic } from "@/lib/haptics"
 import { CHECKOUT_DRAWER_EVENT } from "@/components/checkout/CheckoutDrawer"
 import { BumpCards } from "@/components/checkout/BumpCards"
@@ -502,7 +503,7 @@ export function MobileCartBar() {
       cart.items.map((i) => ({
         item_id: String(i.product_id),
         item_name: i.name,
-        price: i.sale_price ?? i.price,
+        price: cartItemUnitPrice(i),
         quantity: i.quantity,
       }))
     )

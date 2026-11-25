@@ -55,6 +55,7 @@ const ADMIN_NAV_GROUPS = [
     items: [
       { href: "/admin/usuarios", label: "Usuarios", exact: false },
       { href: "/admin/recompensas", label: "Recompensas", exact: false },
+      { href: "/admin/recurrentes", label: "Recurrentes y precios", exact: false },
       { href: "/admin/restaurantes", label: "Restaurantes", exact: false },
       // C.2 — dinero de FoodOS en custodia de la plataforma. Va junto a
       // Restaurantes porque es la misma audiencia, pero es una obligación de
