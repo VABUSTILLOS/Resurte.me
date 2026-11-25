@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import {
+  getCachedActiveVariants,
   getCachedCategories,
   getCachedVisibleProducts,
 } from "@/lib/catalog-cache"
@@ -23,13 +24,14 @@ const CACHE_CONTROL =
   "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
 
 export async function GET() {
-  const [products, categories] = await Promise.all([
+  const [products, categories, variants] = await Promise.all([
     getCachedVisibleProducts(),
     getCachedCategories(),
+    getCachedActiveVariants(),
   ])
 
-  const { csv, included, mapped, unmapped, skippedNoImage, skippedNoCategory } =
-    buildMetaFeedCsv(products, categories)
+  const { csv, included, mapped, unmapped, skippedNoImage, skippedNoCategory, variantRows } =
+    buildMetaFeedCsv(products, categories, variants)
 
   return new NextResponse(csv, {
     headers: {
@@ -40,6 +42,7 @@ export async function GET() {
       "X-Meta-Feed-Unmapped": String(unmapped),
       "X-Meta-Feed-Skipped-No-Image": String(skippedNoImage),
       "X-Meta-Feed-Skipped-No-Category": String(skippedNoCategory),
+      "X-Meta-Feed-Variants": String(variantRows),
     },
   })
 }

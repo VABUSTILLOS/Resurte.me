@@ -54,6 +54,13 @@ export interface ReorderCatalogProduct {
   sale_price: number | null
   stock_status: ReorderStockStatus
   brand: string | null
+  /**
+   * El producto hoy se vende por presentaciones (00232). La
+   * partida histórica no dice cuál se compró (o el cliente debe
+   * volver a elegirla), así que no se re-agrega: se cuenta como
+   * saltada y el cliente la elige en la ficha.
+   */
+  has_variants?: boolean
 }
 
 export interface ReorderPlan {
@@ -105,6 +112,12 @@ export function resolveReorderItem(
       stock_status: "in_stock",
     }
   }
+
+  // Con presentaciones (00232) la línea base ya no se vende: el
+  // servidor la rechazaría pidiendo elegir presentación y tumbaría
+  // el pedido entero. Se descarta como «ya no disponible» y el
+  // cliente la vuelve a elegir en la ficha.
+  if (current.has_variants) return null
 
   return {
     product_id: item.product_id,

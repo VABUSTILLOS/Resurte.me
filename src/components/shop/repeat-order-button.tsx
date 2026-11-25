@@ -60,6 +60,23 @@ export function RepeatOrderButton({ orderId, items, prominent = false, className
       catalog = new Map(
         ((data ?? []) as ReorderCatalogProduct[]).map((p) => [p.id, p]),
       )
+      // Presentaciones (00232): un producto que hoy se vende por
+      // presentación no se re-agrega como línea base (el servidor
+      // la rechazaría). La política pública de product_variants
+      // expone las activas; si la tabla aún no existe, se sigue
+      // como antes.
+      try {
+        const { data: variantRows } = await supabase
+          .from("product_variants")
+          .select("product_id")
+          .in("product_id", items.map((i) => i.product_id))
+        for (const row of (variantRows ?? []) as { product_id: number }[]) {
+          const entry = catalog.get(row.product_id)
+          if (entry) entry.has_variants = true
+        }
+      } catch {
+        // Sin tabla de variantes: nada que marcar.
+      }
     } catch {
       // Catálogo caído: `null` hace que el plan use el snapshot histórico. El
       // servidor sigue validando precios al confirmar el pedido.

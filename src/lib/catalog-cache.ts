@@ -1,7 +1,8 @@
 import { revalidateTag, unstable_cache } from "next/cache"
 import { buildProductReviewIndex, type ProductReviewStats } from "@/lib/product-reviews"
-import type { Category, City, Product, RestaurantCollection } from "@/types"
+import type { Category, City, Product, ProductVariant, RestaurantCollection } from "@/types"
 import {
+  getActiveProductVariants,
   getAvailableProductIds,
   getCategories,
   getCategoryById,
@@ -44,6 +45,15 @@ export const getCachedCategories = unstable_cache(
 export const getCachedVisibleProducts = unstable_cache(
   async (): Promise<Product[]> => getProducts(),
   ["catalog-products"],
+  { revalidate: 300, tags: ["catalog", "products"] }
+)
+
+// Presentaciones activas (00232): las consumen el feed de Meta y
+// la conversión de pedidos de WhatsApp. Sin la migración, la capa
+// de datos degrada a [] y ambas superficies venden como antes.
+export const getCachedActiveVariants = unstable_cache(
+  async (): Promise<ProductVariant[]> => getActiveProductVariants(),
+  ["catalog-variants"],
   { revalidate: 300, tags: ["catalog", "products"] }
 )
 

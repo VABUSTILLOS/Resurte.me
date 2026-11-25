@@ -60,6 +60,7 @@ export default async function PrintOrderPage({
       buildAdminOrderPrintSelect({
         coupon: !dropped.has("coupon_code"),
         priority: !dropped.has("priority"),
+        variantLabel: !dropped.has("variant_label"),
       })
     ))
   }
@@ -124,7 +125,10 @@ export default async function PrintOrderPage({
               const product = unwrap(item.products)
               return (
                 <tr key={i} className="align-top">
-                  <td className="py-1 pr-2">{item.quantity}× {product?.name ?? "Producto"}</td>
+                  <td className="py-1 pr-2">
+                    {item.quantity}× {product?.name ?? "Producto"}
+                    {item.variant_label ? ` (${item.variant_label})` : ""}
+                  </td>
                   <td className="py-1 text-right whitespace-nowrap">
                     ${(Number(item.unit_price) * item.quantity).toFixed(2)}
                   </td>

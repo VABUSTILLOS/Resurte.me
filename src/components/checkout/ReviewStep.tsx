@@ -24,7 +24,7 @@ interface ReviewStepProps {
    *  Retrocompatible: si no se pasan, el paso renderiza igual que antes. */
   bumpItems?: { ruleId: number; product_id: number; name: string; quantity: number; unitPrice: number }[]
   /** Cambia la cantidad de un artículo del catálogo (0 = línea vacía; negativo = confirmar eliminación). */
-  onUpdateItemQuantity: (productId: number, quantity: number) => void
+  onUpdateItemQuantity: (productId: number, quantity: number, variantId?: number | null) => void
   /** Cambia la cantidad de un artículo especial (misma regla que arriba). */
   onUpdateBumpQuantity: (ruleId: number, quantity: number) => void
   onEditAddress: () => void
@@ -118,10 +118,13 @@ export function ReviewStep({
         </h3>
         <ul className="space-y-2">
           {cartItems.map((item) => (
-            <li key={item.product_id} className="text-sm">
+            <li key={`${item.product_id}-${item.variant_id ?? 0}`} className="text-sm">
               <div className="flex justify-between items-center gap-2">
                 <span className="text-gray-600 truncate mr-4">
                   {item.quantity}× {item.name}
+                  {item.variant_name && (
+                    <span className="text-gray-400"> · {item.variant_name}</span>
+                  )}
                 </span>
                 <span className="font-medium text-gray-900 shrink-0">
                   {item.quantity === 0 ? (
@@ -136,9 +139,9 @@ export function ReviewStep({
               <div className="mt-2">
                 <QuantityStepper
                   quantity={item.quantity}
-                  label={item.name}
-                  onChange={(q) => onUpdateItemQuantity(item.product_id, q)}
-                  onRequestRemove={() => onUpdateItemQuantity(item.product_id, -1)}
+                  label={item.variant_name ? `${item.name} (${item.variant_name})` : item.name}
+                  onChange={(q) => onUpdateItemQuantity(item.product_id, q, item.variant_id)}
+                  onRequestRemove={() => onUpdateItemQuantity(item.product_id, -1, item.variant_id)}
                 />
               </div>
             </li>

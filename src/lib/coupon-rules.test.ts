@@ -126,6 +126,20 @@ describe("coupon-rules", () => {
       ])
     })
 
+    it("presentaciones del mismo producto: suman cantidad y se valúan al menor precio (00232)", () => {
+      // El producto 1 llega en dos líneas (dos presentaciones):
+      // 1×$200 + 1×$120. El paquete pide 1 de 1 y 2 de 2: la
+      // cantidad del producto 1 suma (2 ≥ 1) y su valor en el
+      // paquete se valúa al menor precio ($120), no al último.
+      const quote = evaluateAutomaticDiscounts([bundlePct], [
+        { product_id: 1, quantity: 1, unit_price: 200 },
+        { product_id: 1, quantity: 1, unit_price: 120 },
+        { product_id: 2, quantity: 2, unit_price: 50 },
+      ])
+      // Paquete: 1×$120 + 2×$50 = $220 → 10% = $22.
+      expect(quote.discountAmount).toBe(22)
+    })
+
     it("bundle: no aplica si falta un producto o cantidad", () => {
       const quote = evaluateAutomaticDiscounts([bundlePct], [
         { product_id: 1, quantity: 1, unit_price: 200 },

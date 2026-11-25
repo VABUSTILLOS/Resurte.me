@@ -138,7 +138,7 @@ export default function CartPage() {
         <div className="lg:col-span-2 space-y-4">
           {cart.items.map((item) => (
             <div
-              key={item.product_id}
+              key={`${item.product_id}-${item.variant_id ?? 0}`}
               className="flex gap-4 p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors"
             >
               <div className="w-20 h-20 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
@@ -153,10 +153,12 @@ export default function CartPage() {
                 <div className="flex justify-between gap-2">
                   <div>
                     <h3 className="font-semibold text-gray-900">{item.name}</h3>
-                    <p className="text-xs text-gray-400">{item.brand}</p>
+                    <p className="text-xs text-gray-400">
+                      {item.variant_name ? `Presentación: ${item.variant_name}` : item.brand}
+                    </p>
                   </div>
                   <button
-                    onClick={() => removeItem(item.product_id)}
+                    onClick={() => removeItem(item.product_id, item.variant_id)}
                     className="p-2.5 sm:p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors touch-target"
                     title="Quitar"
                   >
@@ -193,7 +195,7 @@ export default function CartPage() {
 
                   <div className="flex items-center gap-1 border border-gray-200 rounded-lg">
                     <button aria-label="Disminuir cantidad"
-                      onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
+                      onClick={() => updateQuantity(item.product_id, item.quantity - 1, item.variant_id)}
                       className="p-2 rounded-md hover:bg-gray-100 transition-colors touch-target"
                     >
                       <Minus className="w-4 h-4 text-gray-500" />
@@ -202,7 +204,7 @@ export default function CartPage() {
                       {item.quantity}
                     </span>
                     <button aria-label="Aumentar cantidad"
-                      onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
+                      onClick={() => updateQuantity(item.product_id, item.quantity + 1, item.variant_id)}
                       className="p-2 rounded-md hover:bg-gray-100 transition-colors touch-target"
                     >
                       <Plus className="w-4 h-4 text-gray-500" />

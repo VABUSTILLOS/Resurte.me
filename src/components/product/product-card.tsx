@@ -49,8 +49,15 @@ export const ProductCard = memo(function ProductCard({
   const favorited = isFavorite(product.id)
 
   const price = product.sale_price ?? product.price
-  const hasDiscount = product.sale_price && product.sale_price < product.price
-  const perUnit = unitPrice(price, product.unit)
+  // Presentaciones (00232): el producto se vende eligiendo una en
+  // su ficha. La tarjeta muestra el «desde» (menor precio de las
+  // presentaciones) y su acción lleva a la ficha: el quick-add y
+  // el stepper no saben qué presentación dar, y el servidor
+  // rechaza la línea sin presentación.
+  const hasVariants = product.has_variants === true
+  const displayPrice = hasVariants ? (product.variant_min_price ?? price) : price
+  const hasDiscount = !hasVariants && product.sale_price && product.sale_price < product.price
+  const perUnit = hasVariants ? null : unitPrice(price, product.unit)
   const discountPercent = product.sale_price && product.sale_price < product.price
     ? Math.round((1 - product.sale_price / product.price) * 100)
     : 0
@@ -60,8 +67,11 @@ export const ProductCard = memo(function ProductCard({
   // ¿El producto ya está en el carrito? Entonces mostramos stepper (− N +)
   // en lugar del botón Agregar: ajustar la cantidad de un pedido grande (30+
   // insumos) sin abrir el drawer es la interacción más repetida del usuario
-  // B2B en móvil.
-  const cartItem = cart.items.find((i) => i.product_id === product.id)
+  // B2B en móvil. Con presentaciones no hay stepper: la línea del
+  // carrito es por presentación y se ajusta en el carrito/checkout.
+  const cartItem = hasVariants
+    ? undefined
+    : cart.items.find((i) => i.product_id === product.id && (i.variant_id ?? null) === null)
 
   // Second image for hover swap effect
   const secondaryImage = product.images?.[1]
@@ -220,7 +230,7 @@ export const ProductCard = memo(function ProductCard({
 
             <div className="flex items-center gap-2 mt-1.5 sm:mt-2">
               <span className="text-sm sm:text-base font-bold text-[#1a1a1a]">
-                ${price.toFixed(2)}
+                {hasVariants ? `desde $${displayPrice.toFixed(2)}` : `$${price.toFixed(2)}`}
               </span>
               {hasDiscount && (
                 <span className="text-xs sm:text-sm text-[var(--text-secondary)] line-through">
@@ -268,10 +278,19 @@ export const ProductCard = memo(function ProductCard({
       </button>
 
       {/* Acción principal del card:
+          0) con presentaciones → "Elegir presentación" (lleva a la ficha)
           1) ya en carrito → stepper − N + (siempre visible, comunica el estado)
           2) disponible    → quick-add
           3) agotado       → "Avísame" por WhatsApp o spacer */}
-      {cartItem && !outOfStock ? (
+      {hasVariants && !outOfStock ? (
+        <Link
+          href={`/${citySlug}/producto/${product.slug}`}
+          aria-label={`Elegir presentación de ${product.name}`}
+          className="flex items-center justify-center gap-1.5 w-[calc(100%-1.75rem)] mx-auto mt-2 sm:mt-0 mb-3 sm:mb-0 sm:w-auto sm:absolute sm:-bottom-2 sm:left-1/2 sm:-translate-x-1/2 sm:z-10 px-3 py-1.5 sm:px-5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 ease-out shadow-lg touch-target active:scale-95 bg-[#0E7A0E] text-white hover:bg-[#0D720D] hover:shadow-xl whitespace-nowrap"
+        >
+          Elegir presentación
+        </Link>
+      ) : cartItem && !outOfStock ? (
         <div
           role="group"
           aria-label={`${product.name}: ${cartItem.quantity} en el carrito`}

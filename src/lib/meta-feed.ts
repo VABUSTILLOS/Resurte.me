@@ -41,12 +41,25 @@
 //   los conjuntos/colecciones del catálogo por categoría, para que
 //   WhatsApp agrupe igual que la tienda en línea. Se agregan al
 //   final para no mover ninguna columna existente.
+// - Presentaciones (00232): un producto CON variantes activas emite
+//   además una fila por variante, DESPUÉS de su fila base, con
+//   id = `<id del producto>--<slug de la variante>` (los ids fijos
+//   del mapa no se tocan ni se reutilizan: si un id de variante
+//   chocara con el de un producto, la fila de la variante se omite)
+//   y con `item_group_id` = id del producto, la columna con la que
+//   Meta agrupa variantes de un mismo artículo (se agrega al final,
+//   como las de categoría). La fila BASE de un producto con
+//   variantes sale con availability "out of stock": la presentación
+//   «sin elegir» no se vende — en WhatsApp se compra la variante,
+//   igual que la ficha web obliga a elegirla — y así el artículo
+//   viejo no queda vendible con precio/existencia del padre.
 //
 // Sin cookies() ni headers() — solo lecturas cacheadas (catálogo).
 
 import { slugify } from "@/lib/foodos"
 import metaFeedMap from "@/lib/meta-feed-map.json"
-import type { Category, Product } from "@/types"
+import { activeVariantsOf, groupVariantsByProduct, variantEffectivePrice } from "@/lib/product-variants"
+import type { Category, Product, ProductVariant } from "@/types"
 
 const BASE_URL = "https://resurte.me"
 const CIRCLE_ORIGIN = "{latitude: 28.63581, longitude: -106.07645}"
@@ -67,6 +80,7 @@ export const META_FEED_COLUMNS = [
   "availability_circle_radius_unit",
   "google_product_category",
   "custom_label_0",
+  "item_group_id",
 ] as const
 
 interface MetaFeedMapEntry {
@@ -91,6 +105,18 @@ export function metaFeedMapEntry(slug: string): MetaFeedMapEntry | undefined {
  */
 export function metaFeedIdForNew(categoryName: string, productSlug: string): string {
   return `${slugify(categoryName)}-${productSlug}`
+}
+
+/**
+ * id de una presentación en el feed: el id del producto (fijo o
+ * derivado, NUNCA recalculado desde el nombre) + `--` + el slug
+ * estable de la variante. Es la MISMA fórmula que usa el índice de
+ * resolución de pedidos de WhatsApp (whatsapp-order-items.ts): si
+ * divergieran, el catálogo vendería artículos que la tienda no
+ * sabe convertir en pedidos.
+ */
+export function metaFeedVariantId(productFeedId: string, variantSlug: string): string {
+  return `${productFeedId}--${variantSlug}`
 }
 
 /** URL de imagen directa, apta para que Meta la descargue. */
@@ -124,17 +150,26 @@ export interface MetaFeedResult {
   unmapped: number
   skippedNoImage: number
   skippedNoCategory: number
+  /** Filas de presentación emitidas (00232). */
+  variantRows: number
 }
 
-export function buildMetaFeedCsv(products: Product[], categories: Category[]): MetaFeedResult {
+export function buildMetaFeedCsv(
+  products: Product[],
+  categories: Category[],
+  variants: readonly ProductVariant[] = []
+): MetaFeedResult {
   const categoryById = new Map(categories.map((c) => [c.id, c.name]))
   const categorySlugById = new Map(categories.map((c) => [c.id, c.slug]))
+  const variantsByProduct = groupVariantsByProduct(variants)
   const rows: string[] = [META_FEED_COLUMNS.join(",")]
+  const usedIds = new Set<string>()
   let included = 0
   let mapped = 0
   let unmapped = 0
   let skippedNoImage = 0
   let skippedNoCategory = 0
+  let variantRows = 0
 
   for (const product of products) {
     const categoryName = categoryById.get(product.category_id)
@@ -154,26 +189,71 @@ export function buildMetaFeedCsv(products: Product[], categories: Category[]): M
       entry?.description ?? capitalizePresentation(product.unit, product.description)
     if (entry) mapped += 1
     else unmapped += 1
+    const productVariants = activeVariantsOf(variantsByProduct.get(product.id) ?? [], product.id)
     const effectivePrice = product.sale_price ?? product.price
+    const link = `${BASE_URL}/chihuahua/producto/${product.slug}`
+    const categorySlug = categorySlugById.get(product.category_id) ?? slugify(categoryName)
     const fields = [
       id,
       title,
       description,
-      `${BASE_URL}/chihuahua/producto/${product.slug}`,
+      link,
       imageLink,
       "Resurte.me",
       `${effectivePrice.toFixed(2)} MXN`,
-      product.stock_status === "out_of_stock" ? "out of stock" : "in stock",
+      // Con presentaciones, la fila base no se vende: se compra la
+      // variante (ver la nota de Presentaciones al inicio del archivo).
+      productVariants.length > 0 || product.stock_status === "out_of_stock"
+        ? "out of stock"
+        : "in stock",
       "new",
       CIRCLE_ORIGIN,
       String(CIRCLE_RADIUS_KM),
       "km",
       categoryName,
-      categorySlugById.get(product.category_id) ?? slugify(categoryName),
+      categorySlug,
+      "",
     ]
     rows.push(fields.map(csvEscape).join(","))
+    usedIds.add(id)
     included += 1
+
+    // Una fila por presentación, agrupadas con item_group_id = id
+    // del producto. Un id que chocara con el de un producto (o con
+    // otra variante) se omite: pisar un id fijo rompería el catálogo.
+    for (const variant of productVariants) {
+      const variantId = metaFeedVariantId(id, variant.slug)
+      if (usedIds.has(variantId)) continue
+      usedIds.add(variantId)
+      const variantFields = [
+        variantId,
+        `${title} — ${variant.name}`,
+        description,
+        link,
+        imageLink,
+        "Resurte.me",
+        `${variantEffectivePrice(variant).toFixed(2)} MXN`,
+        variant.stock_status === "out_of_stock" ? "out of stock" : "in stock",
+        "new",
+        CIRCLE_ORIGIN,
+        String(CIRCLE_RADIUS_KM),
+        "km",
+        categoryName,
+        categorySlug,
+        id,
+      ]
+      rows.push(variantFields.map(csvEscape).join(","))
+      variantRows += 1
+    }
   }
 
-  return { csv: `${rows.join("\n")}\n`, included, mapped, unmapped, skippedNoImage, skippedNoCategory }
+  return {
+    csv: `${rows.join("\n")}\n`,
+    included,
+    mapped,
+    unmapped,
+    skippedNoImage,
+    skippedNoCategory,
+    variantRows,
+  }
 }

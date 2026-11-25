@@ -158,6 +158,8 @@ interface AdminOrderItem {
   unit_price: number
   product_name: string | null
   product_image: string | null
+  /** Presentación comprada (00232); null en pedidos sin presentación. */
+  variant_label: string | null
 }
 
 export interface AdminOrder {
@@ -350,12 +352,23 @@ export async function getAdminOrders(
   const hasMore = (orders?.length ?? 0) > limit
   const pageOrders = (orders ?? []).slice(0, limit)
 
-  // Cargar items y nombres de producto para todos los pedidos
+  // Cargar items y nombres de producto para todos los pedidos.
+  // `variant_label` (00232) se pide como best-effort: si la
+  // migración aún no se aplica la consulta falla con 42703 y se
+  // reintenta sin la columna, como el resto de degradaciones.
   const orderIds = pageOrders.map((o) => o.id)
-  const { data: items } = await supabase
+  const itemsResult = await supabase
     .from("order_items")
-    .select("id, order_id, product_id, quantity, unit_price")
+    .select("id, order_id, product_id, quantity, unit_price, variant_label")
     .in("order_id", orderIds.length ? orderIds : [-1])
+  const items = itemsResult.error
+    ? (
+        await supabase
+          .from("order_items")
+          .select("id, order_id, product_id, quantity, unit_price")
+          .in("order_id", orderIds.length ? orderIds : [-1])
+      ).data
+    : itemsResult.data
 
   const productIds = Array.from(
     new Set((items ?? []).map((i) => i.product_id))
@@ -378,6 +391,8 @@ export async function getAdminOrders(
       unit_price: Number(item.unit_price),
       product_name: productMap.get(item.product_id)?.name ?? null,
       product_image: productMap.get(item.product_id)?.image_url ?? null,
+      variant_label:
+        (item as { variant_label?: string | null }).variant_label ?? null,
     })
     itemsByOrder.set(item.order_id, list)
   }

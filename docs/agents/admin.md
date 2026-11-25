@@ -7,6 +7,24 @@
 - `src/lib/admin-auth.ts`, `src/lib/admin-marketing-validation.ts`
 
 ## Invariantes
+- **Presentaciones de producto (00232)**: se editan en la sección
+  «Presentaciones» del formulario de producto
+  (`ProductVariantsEditor.tsx`), con guardado INDEPENDIENTE del
+  formulario: cada alta/edición/baja llama a
+  `/api/admin/products/variants` (permiso `productos`, auditoría
+  `product_variant_create/update/delete`) y se aplica al momento.
+  Reglas: el `slug` de la variante se crea una vez del nombre y
+  NUNCA se regenera al renombrar (de él cuelga su retailer_id en el
+  feed de Meta); con `stock_quantity` entera el `stock_status` se
+  deriva con el `low_stock_threshold` del producto padre, sin
+  cantidad manda el estado manual; tras cada escritura se re-deriva
+  el estado agregado del padre (`refreshParentStockStatus`); una
+  variante con pedidos no se elimina (409) — se desactiva. En alta
+  de producto la sección solo muestra el aviso de guardar primero.
+  Sin la migración 00232 la ruta responde 400 con el aviso y el
+  editor lo muestra tal cual. El detalle del pedido y el ticket
+  imprimible muestran la presentación desde `order_items.variant_label`
+  (lectura best-effort con reintento sin la columna).
 - Toda ruta API de admin valida con `admin-auth.ts` y el layout tiene guard
   server-side (`getUserRole`); nunca exponer datos sin gate.
 - Dashboard (PR #18): KPIs vs ayer, alertas operativas, auto-refresh pausable,
@@ -147,6 +165,15 @@
   `processOrderRestockNotifications`); el cron diario corre el
   barrido `stock-notifications-sweep` como red de seguridad. Todo es
   best-effort: un fallo de aviso nunca rompe la venta.
+- Ola 3 — presentaciones en WhatsApp (00232): cada presentación es
+  un artículo del catálogo de Meta con retailer_id
+  `<id del producto>--<slug de la variante>` (ver Catálogo). La
+  conversión (`whatsapp-order-items.ts`) resuelve ese id a la
+  variante y respeta SU precio y SU existencia; el id base de un
+  producto con presentaciones ya no resuelve y el pedido se rechaza
+  con el motivo `variant_required` (el cliente debe elegir
+  presentación en el catálogo). Los límites mín/máx (00229) se
+  validan sumando las líneas por producto, igual que en web.
 - Productos ronda 7 — degradación en ESCRITURA: `create`/`update` también
   degradan si falta una columna de la ronda. Ojo: una columna ausente da DOS
   errores distintos y `isMissingColumnError` (`sale-window.ts`) cubre ambos —

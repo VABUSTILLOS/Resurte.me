@@ -39,8 +39,12 @@ interface CartState {
 type CartAction =
   | { type: "ADD_ITEM"; payload: CartItem; at: number }
   | { type: "ADD_ITEMS"; payload: CartItem[]; at: number }
-  | { type: "REMOVE_ITEM"; payload: { product_id: number }; at: number }
-  | { type: "UPDATE_QUANTITY"; payload: { product_id: number; quantity: number }; at: number }
+  | { type: "REMOVE_ITEM"; payload: { product_id: number; variant_id?: number | null }; at: number }
+  | {
+      type: "UPDATE_QUANTITY"
+      payload: { product_id: number; quantity: number; variant_id?: number | null }
+      at: number
+    }
   | { type: "CLEAR_CART"; at: number }
   | { type: "APPLY_COUPON"; payload: AppliedCoupon }
   | { type: "REMOVE_COUPON" }
@@ -49,8 +53,9 @@ type CartAction =
 interface CartContextValue extends Omit<CartState, "clearedAt"> {
   addItem: (item: CartItem) => void
   addOrderItems: (items: CartItem[]) => void
-  removeItem: (productId: number) => void
-  updateQuantity: (productId: number, quantity: number) => void
+  /** Quita UNA línea: la identidad es (productId, variantId) — 00232. */
+  removeItem: (productId: number, variantId?: number | null) => void
+  updateQuantity: (productId: number, quantity: number, variantId?: number | null) => void
   clearCart: () => void
   applyCoupon: (coupon: AppliedCoupon) => void
   removeCoupon: () => void
@@ -74,12 +79,24 @@ interface CartContextValue extends Omit<CartState, "clearedAt"> {
 const EMPTY_CART: Cart = { items: [] }
 const NO_AUTOMATIC_APPLIED: AppliedAutomaticDiscount[] = []
 
+/**
+ * Identidad de una línea del carrito (00232): producto +
+ * presentación. Dos presentaciones del mismo producto son dos
+ * líneas; sin presentación, la línea de siempre.
+ */
+export function isSameCartLine(
+  a: { product_id: number; variant_id?: number | null },
+  b: { product_id: number; variant_id?: number | null }
+): boolean {
+  return a.product_id === b.product_id && (a.variant_id ?? null) === (b.variant_id ?? null)
+}
+
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD_ITEM": {
       const newItem = action.payload
       const items = [...state.cart.items]
-      const existing = items.findIndex((i) => i.product_id === newItem.product_id)
+      const existing = items.findIndex((i) => isSameCartLine(i, newItem))
 
       if (existing >= 0) {
         const current = items[existing]
@@ -104,7 +121,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       // Batch add (ej. "repetir pedido"): una sola actualización de estado.
       const items = [...state.cart.items]
       for (const newItem of action.payload) {
-        const existing = items.findIndex((i) => i.product_id === newItem.product_id)
+        const existing = items.findIndex((i) => isSameCartLine(i, newItem))
         if (existing >= 0) {
           const current = items[existing]
           if (!current) continue
@@ -124,9 +141,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     }
 
     case "REMOVE_ITEM": {
-      const items = state.cart.items.filter(
-        (i) => i.product_id !== action.payload.product_id
-      )
+      const items = state.cart.items.filter((i) => !isSameCartLine(i, action.payload))
       // If no items left, reset store info
       if (items.length === 0) {
         return {
@@ -141,9 +156,9 @@ function cartReducer(state: CartState, action: CartAction): CartState {
     }
 
     case "UPDATE_QUANTITY": {
-      const { product_id, quantity } = action.payload
+      const { quantity } = action.payload
       if (quantity <= 0) {
-        const items = state.cart.items.filter((i) => i.product_id !== product_id)
+        const items = state.cart.items.filter((i) => !isSameCartLine(i, action.payload))
         if (items.length === 0) {
           return {
             ...state,
@@ -159,7 +174,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         cart: {
           ...state.cart,
           items: state.cart.items.map((i) =>
-            i.product_id === product_id ? { ...i, quantity } : i
+            isSameCartLine(i, action.payload) ? { ...i, quantity } : i
           ),
         },
         clearedAt: null,
@@ -457,17 +472,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "ADD_ITEMS", payload: items, at: Date.now() })
   }, [])
 
-  const removeItem = useCallback((productId: number) => {
-    dispatch({ type: "REMOVE_ITEM", payload: { product_id: productId }, at: Date.now() })
-  }, [])
-
-  const updateQuantity = useCallback((productId: number, quantity: number) => {
+  const removeItem = useCallback((productId: number, variantId?: number | null) => {
     dispatch({
-      type: "UPDATE_QUANTITY",
-      payload: { product_id: productId, quantity },
+      type: "REMOVE_ITEM",
+      payload: { product_id: productId, variant_id: variantId ?? null },
       at: Date.now(),
     })
   }, [])
+
+  const updateQuantity = useCallback(
+    (productId: number, quantity: number, variantId?: number | null) => {
+      dispatch({
+        type: "UPDATE_QUANTITY",
+        payload: { product_id: productId, quantity, variant_id: variantId ?? null },
+        at: Date.now(),
+      })
+    },
+    []
+  )
 
   const clearCart = useCallback(() => {
     dispatch({ type: "CLEAR_CART", at: Date.now() })
@@ -496,7 +518,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }>({ signature: "", amount: 0, applied: [] })
   const quoteSeqRef = useRef(0)
   const itemsSignature = state.cart.items
-    .map((i) => `${i.product_id}x${i.quantity}`)
+    .map((i) => `${i.product_id}:${i.variant_id ?? 0}x${i.quantity}`)
     .join("|")
 
   useEffect(() => {
@@ -510,7 +532,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+              items: items.map((i) => ({
+                product_id: i.product_id,
+                quantity: i.quantity,
+                ...(i.variant_id ? { variant_id: i.variant_id } : {}),
+              })),
             }),
           })
           if (!res.ok) return

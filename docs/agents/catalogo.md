@@ -117,6 +117,41 @@
   privadas: solo las lee `service_role`. Guardia:
   `npx vitest run src/lib/product-columns.contract.test.ts`.
 
+- **Presentaciones (variantes) — 00232.** Un producto puede tener
+  presentaciones (`product_variants`: precio, oferta, existencia y SKU
+  propios) que se venden desde UNA ficha. Reglas fijas, fuente única en
+  `src/lib/product-variants.ts`:
+  - La ficha (`product-detail-client.tsx`) muestra el selector
+    «Presentación»; precio, descuento, disponibilidad, barra sticky y
+    botón de WhatsApp siguen a la presentación elegida. Las agotadas se
+    ven pero no se eligen; si todas están agotadas, la ficha entera es
+    «Agotado» y sale el «Avísame cuando haya» del producto. El
+    comparador C13 se oculta cuando hay presentaciones reales.
+  - La tarjeta (`ProductCard`) de un producto con presentaciones
+    muestra «desde $X» (menor precio) y su acción es el enlace
+    «Elegir presentación» a la ficha: sin quick-add ni stepper, porque
+    la línea del carrito exige presentación y el servidor rechaza la
+    línea base (`variant_required`).
+  - El `stock_status` del producto padre es un AGREGADO: agotado solo
+    si todas sus presentaciones activas lo están. Lo mantienen las RPC
+    de inventario (00232), `refreshParentStockStatus` (panel) y nadie
+    más debe escribirlo a mano en un producto con presentaciones.
+  - La cantidad mín/máx por pedido (00229) es POR PRODUCTO: las
+    líneas de todas las presentaciones suman para el límite.
+  - `Product.has_variants`/`variant_min_price` son calculados al leer
+    el catálogo (`markVariantInfo` en `data.ts`, variantes vía
+    `catalog-cache`), NO columnas de `products`: no entran al contrato
+    de `product-columns`.
+  - El feed de Meta emite una fila por presentación con
+    `item_group_id` = id del producto y retailer_id
+    `<id del producto>--<slug de la variante>`; el `slug` de la
+    variante se fija al crearla y NUNCA se regenera al renombrar. Los
+    ids fijos de `meta-feed-map.json` no se tocan. El producto con
+    presentaciones emite su fila base como «out of stock» (la
+    presentación sin elegir no se vende).
+  - Sin la migración 00232 todo degrada a «sin presentaciones» y la
+    tienda vende como antes.
+
 ## Verificación
 `npx vitest run src/lib/unit-price.test.ts` + `npm run build` (prerender de 20
 ciudades) + smoke de `/chihuahua`, `/chihuahua/buscar?q=aguacate`,

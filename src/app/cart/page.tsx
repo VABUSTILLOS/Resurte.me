@@ -285,7 +285,7 @@ export default function CartPage() {
 
           return (
             <div
-              key={item.product_id}
+              key={`${item.product_id}-${item.variant_id ?? 0}`}
               className="bg-white rounded-xl border border-[#e0dbd2] p-4 flex gap-4 items-center"
             >
               {/* Image */}
@@ -314,9 +314,13 @@ export default function CartPage() {
                 >
                   {item.name}
                 </Link>
-                {item.brand && (
+                {item.variant_name ? (
+                  <p className="text-xs text-[#6b6b6b] mt-0.5">
+                    Presentación: {item.variant_name}
+                  </p>
+                ) : item.brand ? (
                   <p className="text-xs text-[#B0B3B8] mt-0.5">{item.brand}</p>
-                )}
+                ) : null}
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-sm font-bold text-[#1a1a1a]">
                     ${itemPrice.toFixed(2)}
@@ -332,7 +336,7 @@ export default function CartPage() {
               {/* Quantity + Remove */}
               <div className="flex flex-col items-end gap-2 shrink-0">
                 <button
-                  onClick={() => removeItem(item.product_id)}
+                  onClick={() => removeItem(item.product_id, item.variant_id)}
                   className="text-[#B0B3B8] hover:text-[#de3534] transition-colors p-2.5 sm:p-1 touch-target"
                   aria-label={`Eliminar ${item.name}`}
                 >
@@ -340,7 +344,7 @@ export default function CartPage() {
                 </button>
                 <div className="flex items-center gap-1.5 bg-[#F7F5F0] rounded-lg p-1">
                   <button
-                    onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
+                    onClick={() => updateQuantity(item.product_id, item.quantity - 1, item.variant_id)}
                     className="w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-white hover:text-[#1a1a1a] transition-colors touch-target"
                     aria-label="Reducir cantidad"
                   >
@@ -350,7 +354,7 @@ export default function CartPage() {
                     {item.quantity}
                   </span>
                   <button
-                    onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
+                    onClick={() => updateQuantity(item.product_id, item.quantity + 1, item.variant_id)}
                     className="w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-white hover:text-[#0E7A0E] transition-colors touch-target"
                     aria-label="Aumentar cantidad"
                   >
@@ -436,7 +440,7 @@ export default function CartPage() {
               cart.items
                 .map(
                   (item, i) =>
-                    `${i + 1}. ${item.quantity}× ${item.name} — $${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}`
+                    `${i + 1}. ${item.quantity}× ${item.name}${item.variant_name ? ` (${item.variant_name})` : ""} — $${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}`
                 )
                 .join("\n") +
               `\n\n*Total: $${bumpsTotal.toFixed(2)} MXN*\n\n¿Me confirman disponibilidad y tiempo de entrega?`

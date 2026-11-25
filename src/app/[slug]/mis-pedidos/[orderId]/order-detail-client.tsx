@@ -138,6 +138,8 @@ export function OrderDetailClient() {
           product_id: item.product_id,
           quantity: item.quantity,
           unit_price: item.unit_price,
+          variant_id: item.variant_id ?? null,
+          variant_label: item.variant_label ?? null,
           product_name: item.products?.name || `Producto #${item.product_id}`,
           product_image: item.products?.image_url || "",
         }))
@@ -290,7 +292,10 @@ export function OrderDetailClient() {
         <ul className="divide-y divide-gray-100">
           {order.items.map((item) => (
             <li key={item.id} className="flex justify-between py-2 first:pt-0 last:pb-0">
-              <span className="text-sm text-gray-700">{item.quantity}× {item.product_name}</span>
+              <span className="text-sm text-gray-700">
+                {item.quantity}× {item.product_name}
+                {item.variant_label ? ` (${item.variant_label})` : ""}
+              </span>
               <span className="text-sm font-medium text-gray-900">${(item.unit_price * item.quantity).toFixed(2)}</span>
             </li>
           ))}

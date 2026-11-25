@@ -498,7 +498,14 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
                   product_id: item.product_id,
                   quantity: item.quantity,
                   unit_price: item.sale_price ?? item.price,
-                  name: item.name,
+                  // Con presentación (00232) el nombre la incluye (es
+                  // lo que lee el personal en los avisos) y viaja su
+                  // id: el servidor valida precio y existencia de ESA
+                  // variante, nunca los del producto base.
+                  name: item.variant_name
+                    ? `${item.name} (${item.variant_name})`
+                    : item.name,
+                  ...(item.variant_id ? { variant_id: item.variant_id } : {}),
                 })),
               ...selectedBumps
                 .filter((b) => b.quantity > 0)

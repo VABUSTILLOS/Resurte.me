@@ -209,6 +209,24 @@ describe("order-reorder · el plan de rehidratación", () => {
   })
 })
 
+describe("order-reorder · presentaciones (00232)", () => {
+  it("un producto que hoy se vende por presentación se salta, no se re-agrega como base", () => {
+    const plan = buildReorderPlan(
+      HISTORICO,
+      catalogo(producto({ id: 1, has_variants: true }), producto({ id: 2 })),
+    )
+
+    expect(plan.items.map((i) => i.product_id)).toEqual([2])
+    expect(plan.skipped).toBe(1)
+  })
+
+  it("con el catálogo caído (snapshot) el comportamiento no cambia", () => {
+    const plan = buildReorderPlan(HISTORICO, null)
+    expect(plan.items).toHaveLength(2)
+    expect(plan.skipped).toBe(0)
+  })
+})
+
 describe("order-reorder · lo que se le dice al cliente", () => {
   it("R14 · todo agregado: cuántos productos entraron", () => {
     const plan = buildReorderPlan(

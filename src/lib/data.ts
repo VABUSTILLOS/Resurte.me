@@ -1,6 +1,7 @@
 import { createPublicClient } from "@/lib/supabase/public"
 import { PUBLIC_PRODUCT_SELECT } from "@/lib/product-columns"
-import type { City, Category, Product, RestaurantCollection } from "@/types"
+import type { City, Category, Product, ProductVariant, RestaurantCollection } from "@/types"
+import { groupVariantsByProduct, variantEffectivePrice } from "@/lib/product-variants"
 import { logger } from "@/lib/logger"
 import { expandSearchTerms, escapeIlike } from "@/lib/search-terms"
 import { normalizeSale, withResolvedSale } from "@/lib/sale-window"
@@ -92,6 +93,55 @@ export async function getCategoryById(id: number): Promise<Category | null> {
 // PRODUCTOS
 // ============================================================
 
+/**
+ * Presentaciones activas de todo el catálogo (migración 00232).
+ * Lectura pública: la política de `product_variants` solo expone
+ * las activas. Degrada a [] si la tabla aún no existe (42P01):
+ * sin variantes, la tienda se comporta como antes.
+ */
+export async function getActiveProductVariants(): Promise<ProductVariant[]> {
+  const supabase = await tryCreateClient()
+  if (!supabase) return []
+  try {
+    const { data, error } = await supabase
+      .from("product_variants")
+      .select(
+        "id, product_id, name, slug, sku, price, sale_price, stock_quantity, stock_status, is_active, position"
+      )
+      .eq("is_active", true)
+      .order("product_id")
+    if (error) return []
+    // El orden de exhibición (position, id) se resuelve en memoria:
+    // una sola cláusula ORDER BY mantiene la consulta simple y la
+    // degradación total —cualquier fallo de esta lectura accesoria
+    // devuelve «sin variantes», nunca tumba el catálogo.
+    const rows = (data ?? []) as unknown as ProductVariant[]
+    rows.sort((a, b) => a.product_id - b.product_id || a.position - b.position || a.id - b.id)
+    return rows
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Marca en memoria los productos que se venden por presentación
+ * (`has_variants` + `variant_min_price` para el «desde $…»): no es
+ * una columna de `products`, se deriva de `product_variants`.
+ */
+async function markVariantInfo(products: Product[]): Promise<Product[]> {
+  if (products.length === 0) return products
+  const variants = await getActiveProductVariants()
+  if (variants.length === 0) return products
+  const byProduct = groupVariantsByProduct(variants)
+  for (const product of products) {
+    const list = byProduct.get(product.id)
+    if (!list || list.length === 0) continue
+    product.has_variants = true
+    product.variant_min_price = Math.min(...list.map(variantEffectivePrice))
+  }
+  return products
+}
+
 export async function getProducts(
   categoryId?: number,
   includeHidden: boolean = false
@@ -134,7 +184,7 @@ export async function getProducts(
   // la fila desde un select construido en runtime y cae a `GenericStringError`.
   // La conversión a `Product` siempre fue manual; lo que vigila que las columnas
   // pedidas sean las correctas es `product-columns.contract.test.ts`.
-  return normalizeSale(rows as unknown as Product[])
+  return markVariantInfo(normalizeSale(rows as unknown as Product[]))
 }
 
 const PAGE_SIZE = 24
@@ -187,7 +237,7 @@ export async function getProductsPaginated(
     ;({ data, count } = await fallback)
   }
 
-  const products = normalizeSale(data as unknown as Product[])
+  const products = await markVariantInfo(normalizeSale(data as unknown as Product[]))
   const total = count ?? products.length
   const hasMore = from + products.length < total
 
@@ -211,7 +261,9 @@ export async function getProductBySlug(
 
   const { data } = await query.single()
   const product = (data as unknown as Product) ?? null
-  return product ? withResolvedSale(product) : null
+  if (!product) return null
+  const [marked] = await markVariantInfo([withResolvedSale(product)])
+  return marked ?? null
 }
 
 // ============================================================
