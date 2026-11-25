@@ -135,6 +135,7 @@ const ROUTES = [
   "/admin/seo-ia",
   "/admin/sistema",
   "/admin/whatsapp",
+  "/admin/whatsapp/bandeja",
 ]
 
 const ATTEMPTS = 3

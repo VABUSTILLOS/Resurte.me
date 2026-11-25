@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import type { AutomationType } from "@/types"
 import { ManualTriggerPanel } from "./manual-trigger-panel"
+import { ConditionalFlowsPanel } from "./conditional-flows-panel"
 
 // ============================================================
 // Mock automations with UI config
@@ -223,6 +224,7 @@ export default function AdminAutomationsPage() {
       </div>
 
       <ManualTriggerPanel />
+      <ConditionalFlowsPanel />
 
       {/* Cómo funciona el motor */}
       <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-5 mb-6">

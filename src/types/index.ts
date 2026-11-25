@@ -274,6 +274,7 @@ export type AutomationType =
   | 'reactivation'
   | 'post_delivery_rating'
   | 'onboarding'
+  | 'conditional_flows'
 
 export interface WhatsAppAutomation {
   id: number

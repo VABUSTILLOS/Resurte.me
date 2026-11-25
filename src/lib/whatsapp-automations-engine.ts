@@ -13,6 +13,7 @@ import {
   type RestaurantSend,
 } from "@/lib/messaging/dedupe"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
+import { isMissingRelationError } from "@/lib/sale-window"
 
 export interface WaAutomationConfig {
   is_active: boolean
@@ -57,6 +58,18 @@ export const AUTOMATION_DEFAULTS: Record<string, WaAutomationConfig> = {
     is_active: true,
     trigger_delay_hours: 0,
     config: { discount_percent: 10, coupon_code: "BIENVENIDO10" },
+    template_id: null,
+  },
+  // Flujos por condición (Ola 6): las reglas viven en config.rules
+  // y las evalúa runConditionalFlows contra cada pedido nuevo.
+  // Nace APAGADO y sin reglas: nada se envía hasta que el panel
+  // lo encienda y agregue reglas. Requiere la migración 00235
+  // (el valor del ENUM); sin ella la fila ni siquiera se puede
+  // guardar y este default inactivo es el comportamiento.
+  conditional_flows: {
+    is_active: false,
+    trigger_delay_hours: 0,
+    config: { rules: [] },
     template_id: null,
   },
 }
@@ -553,6 +566,314 @@ async function runBirthday(
   return result
 }
 
+// ============================================================
+// Flujos automáticos por condición (Ola 6)
+// ============================================================
+// Un tipo de automatización más del motor (no un motor nuevo):
+// la fila `conditional_flows` de whatsapp_automations guarda en
+// su config un arreglo de REGLAS. El cron diario evalúa cada
+// regla contra los pedidos creados en las últimas ~26 h: si la
+// condición del cliente/pedido se cumple, sale la plantilla
+// elegida (o el texto, dentro de ventana) por el mismo
+// sendAutomationWhatsApp de siempre, con dedupe por
+// (regla, pedido): un evento jamás dispara dos veces la misma
+// regla, aunque el cron corra de nuevo.
+//
+// Condiciones disponibles (evaluables con datos que ya existen):
+// - first_order:        es el primer pedido del cliente.
+// - order_count_gte:    el cliente lleva >= threshold pedidos.
+// - order_total_gte:    el pedido suma >= threshold MXN.
+// - active_recurrence:  el cliente tiene una recurrencia activa
+//                       (Ola 5; sin la 00234, siempre falso).
+
+export type ConditionalFlowCondition =
+  | "first_order"
+  | "order_count_gte"
+  | "order_total_gte"
+  | "active_recurrence"
+
+export const CONDITIONAL_FLOW_CONDITIONS: readonly ConditionalFlowCondition[] = [
+  "first_order",
+  "order_count_gte",
+  "order_total_gte",
+  "active_recurrence",
+]
+
+export const CONDITIONAL_FLOW_CONDITION_LABEL: Record<ConditionalFlowCondition, string> = {
+  first_order: "Es su primer pedido",
+  order_count_gte: "Cliente frecuente (nº de pedidos ≥)",
+  order_total_gte: "Pedido mayor a ($ MXN ≥)",
+  active_recurrence: "Tiene una recurrencia activa (Ola 5)",
+}
+
+/** ¿La condición necesita el umbral numérico (threshold)? */
+export function conditionalFlowNeedsThreshold(
+  condition: ConditionalFlowCondition
+): boolean {
+  return condition === "order_count_gte" || condition === "order_total_gte"
+}
+
+export interface ConditionalFlowRule {
+  id: string
+  name: string
+  condition: ConditionalFlowCondition
+  /** Umbral de las condiciones *_gte; null en las demás. */
+  threshold: number | null
+  /** Plantilla aprobada a enviar; vacío = solo texto. */
+  template_name: string
+  /** Texto libre (fallback si la plantilla falla, o el mensaje si no hay plantilla). */
+  text: string
+  is_active: boolean
+}
+
+/**
+ * Lee y valida las reglas desde el config JSONB (puro). Una
+ * regla sin condición válida o sin nada que enviar (ni
+ * plantilla ni texto) se descarta: mejor una regla de menos
+ * que un envío vacío.
+ */
+export function parseConditionalFlowRules(
+  config: Record<string, unknown> | null | undefined
+): ConditionalFlowRule[] {
+  const raw = config?.rules
+  if (!Array.isArray(raw)) return []
+  const rules: ConditionalFlowRule[] = []
+  raw.forEach((item, index) => {
+    if (!item || typeof item !== "object") return
+    const r = item as Record<string, unknown>
+    const condition = r.condition as ConditionalFlowCondition
+    if (!CONDITIONAL_FLOW_CONDITIONS.includes(condition)) return
+    const templateName = typeof r.template_name === "string" ? r.template_name.trim() : ""
+    const text = typeof r.text === "string" ? r.text.trim() : ""
+    if (!templateName && !text) return
+    const thresholdRaw = Number(r.threshold)
+    rules.push({
+      id: typeof r.id === "string" && r.id ? r.id : `rule-${index + 1}`,
+      name: typeof r.name === "string" && r.name ? r.name : `Regla ${index + 1}`,
+      condition,
+      threshold:
+        conditionalFlowNeedsThreshold(condition) && Number.isFinite(thresholdRaw)
+          ? thresholdRaw
+          : null,
+      template_name: templateName,
+      text,
+      is_active: r.is_active !== false,
+    })
+  })
+  return rules
+}
+
+/** Hechos del cliente/pedido contra los que se evalúa una regla. */
+export interface ConditionalFlowFacts {
+  /** Pedidos del cliente (sin cancelados) hasta este pedido, inclusive. */
+  orderCount: number
+  /** Total de ESTE pedido. */
+  orderTotal: number
+  /** ¿Tiene una recurrencia activa en recurring_orders? */
+  hasActiveRecurrence: boolean
+}
+
+/** ¿Se cumple la condición con estos hechos? (puro) */
+export function evaluateFlowCondition(
+  rule: Pick<ConditionalFlowRule, "condition" | "threshold">,
+  facts: ConditionalFlowFacts
+): boolean {
+  switch (rule.condition) {
+    case "first_order":
+      return facts.orderCount === 1
+    case "order_count_gte":
+      return rule.threshold != null && facts.orderCount >= rule.threshold
+    case "order_total_gte":
+      return rule.threshold != null && facts.orderTotal >= rule.threshold
+    case "active_recurrence":
+      return facts.hasActiveRecurrence
+  }
+}
+
+/**
+ * Sustituye los marcadores del texto de la regla (puro):
+ * {nombre} (primer nombre), {pedido} (#id) y {total} ($ MXN).
+ */
+export function renderFlowText(
+  text: string,
+  facts: { customerName: string | null; orderId: number; orderTotal: number }
+): string {
+  const firstName = (facts.customerName ?? "").trim().split(/\s+/)[0] ?? ""
+  return text
+    .replaceAll("{nombre}", firstName)
+    .replaceAll("{pedido}", `#${facts.orderId}`)
+    .replaceAll("{total}", `$${facts.orderTotal.toFixed(2)} MXN`)
+    .replace(/\s{2,}/g, " ")
+    .trim()
+}
+
+/** Resuelve el id de una plantilla por nombre, solo si está aprobada. */
+async function resolveApprovedTemplateId(
+  supabase: SupabaseClient,
+  templateName: string
+): Promise<number | null> {
+  const { data } = await supabase
+    .from("whatsapp_templates")
+    .select("id")
+    .eq("template_name", templateName)
+    .eq("status", "approved")
+    .maybeSingle()
+  return (data?.id as number) ?? null
+}
+
+/** Usuarios con recurrencia activa (Ola 5); sin la 00234, nadie. */
+async function fetchActiveRecurrenceUserIds(
+  supabase: SupabaseClient,
+  userIds: readonly string[]
+): Promise<Set<string>> {
+  const active = new Set<string>()
+  if (userIds.length === 0) return active
+  try {
+    const { data, error } = await supabase
+      .from("recurring_orders")
+      .select("user_id")
+      .eq("status", "active")
+      .in("user_id", [...userIds])
+    if (error) {
+      if (!isMissingRelationError(error)) {
+        logger.warn("Flujos por condición: no se pudo leer recurring_orders", {
+          error: error.message,
+        })
+      }
+      return active
+    }
+    for (const row of data ?? []) {
+      if (row.user_id) active.add(row.user_id as string)
+    }
+    return active
+  } catch {
+    return active
+  }
+}
+
+async function runConditionalFlows(
+  supabase: SupabaseClient,
+  cfg: WaAutomationConfig,
+  restaurantSends: readonly RestaurantSend[] = []
+): Promise<AutomationSendResult> {
+  const result = emptyResult(true)
+  const rules = parseConditionalFlowRules(cfg.config).filter((r) => r.is_active)
+  if (rules.length === 0) return result
+
+  // Eventos: pedidos creados en las últimas ~26 h (el cron es
+  // diario; el dedupe por (regla, pedido) absorbe el traslape).
+  const since = new Date(Date.now() - 26 * 3_600_000).toISOString()
+  const { data: recentOrders, error } = await supabase
+    .from("orders")
+    .select("id, user_id, customer_phone, customer_name, total, created_at")
+    .gte("created_at", since)
+    .neq("status", "cancelled")
+    .not("customer_phone", "is", null)
+    .order("created_at", { ascending: true })
+    .limit(200)
+  if (error) {
+    result.errors.push(error.message)
+    return result
+  }
+  const orders = (recentOrders ?? []) as Array<{
+    id: number
+    user_id: string | null
+    customer_phone: string
+    customer_name: string | null
+    total: number
+    created_at: string
+  }>
+  if (orders.length === 0) return result
+
+  // Conteo de pedidos por cliente hasta cada evento: una sola
+  // lectura del historial de los usuarios involucrados.
+  const userIds = [...new Set(orders.map((o) => o.user_id).filter((u): u is string => Boolean(u)))]
+  const historyByUser = new Map<string, Array<{ id: number; created_at: string }>>()
+  if (userIds.length > 0) {
+    const { data: history } = await supabase
+      .from("orders")
+      .select("id, user_id, created_at")
+      .in("user_id", userIds)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: true })
+      .limit(5000)
+    for (const row of (history ?? []) as Array<{ id: number; user_id: string; created_at: string }>) {
+      const list = historyByUser.get(row.user_id) ?? []
+      list.push({ id: row.id, created_at: row.created_at })
+      historyByUser.set(row.user_id, list)
+    }
+  }
+
+  const [activeRecurrenceUsers, profilesRes] = await Promise.all([
+    fetchActiveRecurrenceUserIds(supabase, userIds),
+    userIds.length > 0
+      ? supabase.from("profiles").select("id, marketing_consent").in("id", userIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; marketing_consent: boolean | null }> }),
+  ])
+  const consentByUser = new Map<string, boolean>()
+  for (const p of (profilesRes.data ?? []) as Array<{ id: string; marketing_consent: boolean | null }>) {
+    consentByUser.set(p.id, p.marketing_consent !== false)
+  }
+
+  // La plantilla de cada regla se resuelve una vez por corrida.
+  const templateIdByRule = new Map<string, number | null>()
+  for (const rule of rules) {
+    templateIdByRule.set(
+      rule.id,
+      rule.template_name ? await resolveApprovedTemplateId(supabase, rule.template_name) : null
+    )
+  }
+
+  for (const order of orders) {
+    const history = order.user_id ? (historyByUser.get(order.user_id) ?? []) : []
+    const orderCount = history.filter(
+      (h) => h.created_at < order.created_at || (h.created_at === order.created_at && h.id <= order.id)
+    ).length
+    const facts: ConditionalFlowFacts = {
+      orderCount: Math.max(orderCount, order.user_id ? 1 : 0),
+      orderTotal: Number(order.total) || 0,
+      hasActiveRecurrence: order.user_id ? activeRecurrenceUsers.has(order.user_id) : false,
+    }
+    // Sin consentimiento de marketing no hay flujos promocionales
+    // (la misma guarda de reactivación y cumpleaños).
+    if (order.user_id && consentByUser.get(order.user_id) === false) continue
+
+    for (const rule of rules) {
+      if (!evaluateFlowCondition(rule, facts)) continue
+      if (rule.template_name && templateIdByRule.get(rule.id) == null) {
+        // La plantilla dejó de estar aprobada: no se manda texto
+        // libre en su lugar fuera de ventana; se anota y se salta.
+        result.skipped++
+        if (!result.errors.includes(`template_not_approved:${rule.template_name}`)) {
+          result.errors.push(`template_not_approved:${rule.template_name}`)
+        }
+        continue
+      }
+      const text =
+        renderFlowText(rule.text, {
+          customerName: order.customer_name,
+          orderId: order.id,
+          orderTotal: facts.orderTotal,
+        }) ||
+        `Hola, te escribimos de Resurte.me por tu pedido #${order.id}. ¡Gracias por surtirte con nosotros!`
+      const sendStatus = await sendAutomationWhatsApp(supabase, {
+        restaurantSends,
+        type: "conditional_flows",
+        recipient: order.customer_phone,
+        dedupeKey: `conditional_flows:${rule.id}:order:${order.id}`,
+        text,
+        userId: order.user_id,
+        orderId: order.id,
+        templateId: templateIdByRule.get(rule.id) ?? null,
+      })
+      if (sendStatus === "sent") result.sent++
+      else if (sendStatus === "skipped") result.skipped++
+      else result.failed++
+    }
+  }
+  return result
+}
+
 // ---------- Runner del cron ----------
 
 const ENGINE_JOBS: Record<
@@ -568,6 +889,7 @@ const ENGINE_JOBS: Record<
   post_delivery_rating: runPostDeliveryRating,
   onboarding: runOnboarding,
   birthday: runBirthday,
+  conditional_flows: runConditionalFlows,
 }
 
 /**

@@ -120,7 +120,7 @@ const FUENTES = MIGRATION_FILES.map((f) => sinComentarios(readFileSync(join(MIGR
 const MEDICION = medir(FUENTES)
 
 /**
- * Las 32 tablas con RLS encendida y ninguna política, con el archivo que
+ * Las 33 tablas con RLS encendida y ninguna política, con el archivo que
  * demuestra cómo se accede a cada una. Todas se leen y escriben con
  * `createServiceClient()`; `rate_limits` lo hace a través de la RPC
  * `consume_rate_limit`, cuyo `EXECUTE` quedó restringido a `service_role` en
@@ -179,6 +179,8 @@ const MODELO_DE_ACCESO: Record<string, string> = {
   whatsapp_catalog_categories: "createServiceClient() desde src/app/admin/actions.ts",
   whatsapp_catalog_items: "createServiceClient() desde src/app/admin/actions.ts",
   whatsapp_catalogs: "createServiceClient() desde src/app/admin/actions.ts",
+  whatsapp_conversation_controls:
+    "createServiceClient() desde src/lib/whatsapp-conversation-controls.ts (pausa del bot por conversación, 00235; la escribe la bandeja /api/whatsapp/inbox y el asistente de IA al derivar a humano, y la lee el webhook)",
   whatsapp_sync_items: "createServiceClient() desde src/app/admin/actions.ts",
   whatsapp_sync_queue: "createServiceClient() desde src/app/admin/actions.ts",
   whatsapp_sync_runs: "createServiceClient() desde src/app/admin/actions.ts",
@@ -241,7 +243,7 @@ describe("perímetro — RLS sin políticas", () => {
     // Conteo fijo a propósito: es un tripwire, no un dato. Al añadir una tabla
     // con RLS y sin políticas hay que venir aquí y actualizarlo, que es lo que
     // obliga a mirar si de verdad está declarada en el registro.
-    expect(DECLARADAS).toHaveLength(32)
+    expect(DECLARADAS).toHaveLength(33)
   })
 
   it("ninguna entrada está vacía y todas nombran dónde vive el acceso", () => {

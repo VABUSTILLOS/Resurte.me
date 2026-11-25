@@ -137,7 +137,18 @@ export async function GET() {
     }
   }
 
+  // Plantillas aprobadas (para los selectores del panel, p. ej. las
+  // reglas de los flujos por condición de la Ola 6).
+  const { data: approvedTemplates } = await supabase
+    .from("whatsapp_templates")
+    .select("template_name")
+    .eq("status", "approved")
+    .order("template_name")
+
   return NextResponse.json({
+    templates: ((approvedTemplates ?? []) as Array<{ template_name: string }>).map(
+      (t) => t.template_name
+    ),
     automations: automations.map((a) => ({
       ...a,
       template_name:
