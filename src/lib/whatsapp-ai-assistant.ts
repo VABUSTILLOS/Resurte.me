@@ -28,9 +28,19 @@
 // llave o si la llamada falla: en todos esos casos este módulo
 // devuelve { kind: "none" } y el webhook cae al menú de
 // siempre. Nada de aquí lanza.
+//
+// FOTOS DE PRODUCTO: el modelo cierra su respuesta con una
+// línea interna `PRODUCTOS: <refs>` (la retira este módulo,
+// jamás llega al cliente) con las referencias [ref: slug] de
+// los productos del contexto que citó. El servidor valida cada
+// referencia contra el contexto inyectado EN ESA llamada y
+// devuelve las fotos a enviar (tope 3); el webhook manda el
+// texto primero y las fotos después, como acompañamiento
+// best-effort: si una foto falla, la respuesta ya salió.
 
 import { chatCompletionRaw } from "@/lib/ai/llm"
 import { getCachedVisibleProducts } from "@/lib/catalog-cache"
+import { toAbsoluteImageUrl } from "@/lib/meta-feed"
 import {
   CREDIT_DAYS_PROSE,
   DELIVERY_COVERAGE_PROSE,
@@ -58,6 +68,9 @@ export const WHATSAPP_AI_MAX_CATALOG_PRODUCTS = 300
 
 /** Tope de caracteres del bloque de catálogo dentro del prompt. */
 export const WHATSAPP_AI_MAX_CATALOG_CHARS = 14_000
+
+/** Tope de fotos que acompañan una respuesta del asistente. */
+export const WHATSAPP_AI_MAX_PRODUCT_IMAGES = 3
 
 /** Token con el que el modelo pide derivar; jamás llega al cliente. */
 const HANDOFF_TOKEN = "DERIVAR_A_HUMANO"
@@ -168,22 +181,54 @@ export const WHATSAPP_AI_HANDOFF_MESSAGE =
 
 export type AiCatalogProduct = Pick<
   Product,
-  "name" | "price" | "sale_price" | "stock_status" | "has_variants" | "variant_min_price"
+  | "name"
+  | "slug"
+  | "image_url"
+  | "price"
+  | "sale_price"
+  | "stock_status"
+  | "has_variants"
+  | "variant_min_price"
 >
+
+/** Precio vigente del producto (oferta si la hay). */
+function effectivePriceOf(p: AiCatalogProduct): number {
+  return p.sale_price ?? p.price
+}
+
+/** Precio que acompaña la foto: en presentaciones, el «desde». */
+function displayPriceOf(p: AiCatalogProduct): number {
+  if (p.has_variants) return p.variant_min_price ?? effectivePriceOf(p)
+  return effectivePriceOf(p)
+}
+
+export interface CatalogContextBuild {
+  context: string
+  /** Productos cuyas líneas SÍ entraron al contexto (tras los topes). */
+  included: AiCatalogProduct[]
+}
 
 /**
  * Catálogo en líneas compactas para el prompt. Solo lo que la IA
- * puede afirmar: nombre, precio vigente y si está agotado. Se
+ * puede afirmar: nombre, precio vigente y si está agotado. Cada
+ * línea cierra con su referencia estable `[ref: slug]`: es el
+ * identificador que el modelo cita en su línea PRODUCTOS para
+ * que el servidor sepa qué fotos acompañan la respuesta. Se
  * corta por número de productos y por caracteres; si se cortó,
  * la nota final le dice al modelo que el catálogo sigue y que
- * lo que no vea «lo confirma el equipo».
+ * lo que no vea «lo confirma el equipo». `included` trae solo
+ * los productos que sobrevivieron al corte: la validación de
+ * referencias se hace contra ellos, no contra el catálogo entero.
  */
-export function buildCatalogContext(products: readonly AiCatalogProduct[]): string {
+export function buildCatalogContextEntries(
+  products: readonly AiCatalogProduct[]
+): CatalogContextBuild {
   const lines: string[] = []
+  const included: AiCatalogProduct[] = []
   let chars = 0
   let truncated = false
   for (const p of products.slice(0, WHATSAPP_AI_MAX_CATALOG_PRODUCTS)) {
-    const effective = p.sale_price ?? p.price
+    const effective = effectivePriceOf(p)
     let line = `- ${p.name}: ${formatMxn(effective)}`
     if (p.sale_price != null && p.sale_price < p.price) {
       line += ` (oferta, precio regular ${formatMxn(p.price)})`
@@ -192,18 +237,25 @@ export function buildCatalogContext(products: readonly AiCatalogProduct[]): stri
       line += ` — se vende por presentación, desde ${formatMxn(p.variant_min_price ?? effective)}`
     }
     if (p.stock_status === "out_of_stock") line += " — AGOTADO"
+    line += ` [ref: ${p.slug}]`
     if (chars + line.length > WHATSAPP_AI_MAX_CATALOG_CHARS) {
       truncated = true
       break
     }
     lines.push(line)
+    included.push(p)
     chars += line.length + 1
   }
   if (products.length > WHATSAPP_AI_MAX_CATALOG_PRODUCTS) truncated = true
   if (truncated) {
     lines.push("(El catálogo continúa: si el cliente pregunta por algo que no aparece aquí, di que lo confirmas con el equipo.)")
   }
-  return lines.join("\n")
+  return { context: lines.join("\n"), included }
+}
+
+/** Solo el texto del contexto (la validación usa la versión con `included`). */
+export function buildCatalogContext(products: readonly AiCatalogProduct[]): string {
+  return buildCatalogContextEntries(products).context
 }
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
@@ -254,7 +306,13 @@ export function buildWhatsAppAiSystemPrompt(): string {
     `5. Facturación: ${INVOICING} gratis a solicitud del cliente.`,
     "6. Si el cliente reclama, disputa un pago o pide hablar con una persona, responde " +
       `ÚNICAMENTE con ${HANDOFF_TOKEN} y nada más.`,
-    "7. Responde en español, breve (máximo 4 líneas), amable y directo. Sin listas largas.",
+    "7. Responde en español, breve (máximo 4 líneas, sin contar la línea PRODUCTOS), amable y directo. Sin listas largas.",
+    "8. Cierra SIEMPRE con una línea aparte que empiece con `PRODUCTOS:` y liste las referencias " +
+      "de los productos del CONTEXTO que mencionaste en tu respuesta, en el orden en que los " +
+      "mencionaste, separadas por comas y SIN los corchetes de [ref: ...]: por ejemplo " +
+      "`PRODUCTOS: papa-blanca, papa-francesa-38`. Es un registro interno para adjuntar las " +
+      "fotos de esos productos: no lo comentes ni lo expliques. Si no mencionaste ningún " +
+      "producto, escribe `PRODUCTOS: -`.",
     "",
     `Datos SPEI de la tienda (solo si el cliente pregunta cómo transferir): CLABE ${formatClabe(spei.clabe)}, ` +
       `${spei.banco}, beneficiario ${spei.beneficiario}, concepto = número de pedido.`,
@@ -293,11 +351,101 @@ export function sanitizeAiReply(text: string): string | null {
 }
 
 // ============================================================
+// Fotos de los productos mencionados
+// ============================================================
+// Contrato de salida del modelo: la respuesta cierra con una
+// línea `PRODUCTOS: ref1, ref2` (regla 8 del prompt). Este
+// módulo la retira del texto —el cliente nunca la ve— y valida
+// cada referencia contra el contexto inyectado en ESA llamada:
+// una referencia fuera del contexto se descarta en silencio.
+// Si el modelo no escribe la línea o la escribe mal, no hay
+// fotos y el texto sale como siempre.
+
+const MENTION_TRAILER_RE = /^[ \t]*PRODUCTOS[ \t]*:[ \t]*(.*)$/i
+
+/**
+ * Retira la(s) línea(s) PRODUCTOS de la respuesta cruda y
+ * devuelve las referencias citadas, en el orden en que el
+ * modelo las escribió (sin validar todavía).
+ */
+export function extractMentionTrailer(text: string): { text: string; slugs: string[] } {
+  const kept: string[] = []
+  let payload: string | null = null
+  for (const line of text.split("\n")) {
+    const match = line.match(MENTION_TRAILER_RE)
+    if (match) {
+      if (payload === null) payload = match[1] ?? ""
+      continue
+    }
+    kept.push(line)
+  }
+  if (payload === null) return { text, slugs: [] }
+  const slugs = payload
+    .split(",")
+    .map((token) =>
+      token
+        .trim()
+        .replace(/^[[\s`"']+/, "")
+        .replace(/[\]\s`"']+$/, "")
+    )
+    .filter((token) => token.length > 0 && token !== "-")
+  return { text: kept.join("\n"), slugs }
+}
+
+/** Una foto lista para enviar: producto validado + URL directa. */
+export interface AiProductImage {
+  slug: string
+  name: string
+  /** Precio vigente que va en el pie de foto (en presentaciones, el «desde»). */
+  price: number
+  /** URL directa absoluta: la misma que publica el feed de Meta. */
+  imageUrl: string
+}
+
+/**
+ * Valida las referencias citadas contra el contexto inyectado y
+ * resuelve su foto. Descarta: referencias desconocidas,
+ * duplicadas y productos sin imagen válida (su URL se resuelve
+ * con `toAbsoluteImageUrl`, la misma del feed de Meta: directa,
+ * jamás /_next/image). Tope de fotos por respuesta; un producto
+ * sin imagen se salta sin consumir un lugar del tope.
+ */
+export function resolveAiProductImages(
+  slugs: readonly string[],
+  included: readonly AiCatalogProduct[]
+): AiProductImage[] {
+  const bySlug = new Map(included.map((p) => [p.slug, p]))
+  const seen = new Set<string>()
+  const images: AiProductImage[] = []
+  for (const slug of slugs) {
+    if (images.length >= WHATSAPP_AI_MAX_PRODUCT_IMAGES) break
+    if (seen.has(slug)) continue
+    seen.add(slug)
+    const product = bySlug.get(slug)
+    if (!product) continue
+    const imageUrl = toAbsoluteImageUrl(product.image_url)
+    if (!imageUrl) continue
+    images.push({
+      slug: product.slug,
+      name: product.name,
+      price: displayPriceOf(product),
+      imageUrl,
+    })
+  }
+  return images
+}
+
+/** Pie de foto de cada imagen: «<nombre> — $<precio>». */
+export function buildAiProductImageCaption(product: AiProductImage): string {
+  return `${product.name} — ${formatMxn(product.price)}`
+}
+
+// ============================================================
 // Orquestación
 // ============================================================
 
 export type WhatsAppAiAnswer =
-  | { kind: "ai"; text: string }
+  | { kind: "ai"; text: string; products: AiProductImage[] }
   | { kind: "handoff"; text: string; reason: HandoffReason }
   | { kind: "none" }
 
@@ -371,11 +519,12 @@ export async function answerWhatsAppWithAi(
       deps.loadCatalog(),
     ])
     const lastOrder = profile ? await fetchLastOrder(supabase, profile.id) : null
+    const catalogBuild = buildCatalogContextEntries(catalog)
 
     const result = await deps.chat(
       buildWhatsAppAiSystemPrompt(),
       buildWhatsAppAiUserPrompt({
-        catalogContext: buildCatalogContext(catalog),
+        catalogContext: catalogBuild.context,
         orderContext: buildOrderContext(lastOrder),
         customerName: profile?.full_name ?? null,
         message: args.text,
@@ -390,9 +539,14 @@ export async function answerWhatsAppWithAi(
       return { kind: "handoff", text: WHATSAPP_AI_HANDOFF_MESSAGE, reason: "modelo" }
     }
 
-    const clean = sanitizeAiReply(result.text)
+    // La línea PRODUCTOS se retira ANTES de sanear: no es parte
+    // de la respuesta visible. Sus referencias se validan contra
+    // el contexto inyectado en esta llamada (`included`).
+    const { text: visibleText, slugs } = extractMentionTrailer(result.text)
+    const clean = sanitizeAiReply(visibleText)
     if (!clean) return { kind: "none" }
-    return { kind: "ai", text: clean }
+    const products = resolveAiProductImages(slugs, catalogBuild.included)
+    return { kind: "ai", text: clean, products }
   } catch (err) {
     logger.error("whatsapp.ai: falló la respuesta del asistente", {
       error: err instanceof Error ? err.message : String(err),

@@ -6,6 +6,7 @@ import {
   parseMetaPriceToMajor,
   resolveCatalogId,
   retryDelayMs,
+  sendImageMessage,
   type WhatsAppConfig,
   type WhatsAppProduct,
 } from "./whatsapp"
@@ -183,5 +184,64 @@ describe("parseMetaPriceToMajor", () => {
     expect(parseMetaPriceToMajor("")).toBeNull()
     expect(parseMetaPriceToMajor("abc")).toBeNull()
     expect(parseMetaPriceToMajor(NaN)).toBeNull()
+  })
+})
+
+describe("sendImageMessage", () => {
+  const cfg: WhatsAppConfig = {
+    accessToken: "token",
+    phoneNumberId: "phone-9",
+    wabaId: "waba",
+    catalogId: "cat-1",
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("manda type image con link y caption a /messages del número", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ messaging_product: "whatsapp", messages: [{ id: "wamid.1" }] }),
+        { status: 200 }
+      )
+    )
+    vi.stubGlobal("fetch", fetchMock)
+
+    const result = await sendImageMessage(
+      {
+        to: "5216140000000",
+        imageUrl: "https://resurte.me/images/papa-blanca.jpg",
+        caption: "Papa Blanca — $49 MXN",
+      },
+      cfg
+    )
+    expect(result.messages[0]?.id).toBe("wamid.1")
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain("/phone-9/messages")
+    const body = JSON.parse(init.body as string) as {
+      to: string
+      type: string
+      image: { link: string; caption?: string }
+    }
+    expect(body.to).toBe("5216140000000")
+    expect(body.type).toBe("image")
+    expect(body.image.link).toBe("https://resurte.me/images/papa-blanca.jpg")
+    expect(body.image.caption).toBe("Papa Blanca — $49 MXN")
+  })
+
+  it("sin caption no manda la llave caption", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ messages: [{ id: "wamid.2" }] }), { status: 200 })
+    )
+    vi.stubGlobal("fetch", fetchMock)
+
+    await sendImageMessage(
+      { to: "5216140000000", imageUrl: "https://resurte.me/images/x.jpg" },
+      cfg
+    )
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const body = JSON.parse(init.body as string) as { image: Record<string, unknown> }
+    expect(body.image).toEqual({ link: "https://resurte.me/images/x.jpg" })
   })
 })

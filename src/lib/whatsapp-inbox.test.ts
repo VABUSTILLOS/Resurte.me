@@ -24,6 +24,7 @@ describe("classifyMessageAuthor", () => {
   it("distingue IA, bot, automático y equipo en los salientes", () => {
     expect(classifyMessageAuthor(msg({ direction: "outbound", message_type: "bot:ai" }))).toBe("ia")
     expect(classifyMessageAuthor(msg({ direction: "outbound", message_type: "bot:handoff" }))).toBe("ia")
+    expect(classifyMessageAuthor(msg({ direction: "outbound", message_type: "bot:ai-image" }))).toBe("ia")
     expect(classifyMessageAuthor(msg({ direction: "outbound", message_type: "bot:menu" }))).toBe("bot")
     expect(classifyMessageAuthor(msg({ direction: "outbound", message_type: "bot:flow" }))).toBe("bot")
     expect(classifyMessageAuthor(msg({ direction: "outbound", message_type: "template:promocion_semanal_resurte" }))).toBe("automatico")
@@ -39,6 +40,21 @@ describe("messageDisplayText", () => {
     expect(
       messageDisplayText(msg({ direction: "outbound", message_type: "bot:ai", content: "Cuesta $32" }))
     ).toBe("Cuesta $32")
+  })
+
+  it("la foto del asistente se rotula con su pie de foto", () => {
+    expect(
+      messageDisplayText(
+        msg({
+          direction: "outbound",
+          message_type: "bot:ai-image",
+          content: "Papa Blanca — $49 MXN",
+        })
+      )
+    ).toBe("🖼️ Foto de producto: Papa Blanca — $49 MXN")
+    expect(
+      messageDisplayText(msg({ direction: "outbound", message_type: "bot:ai-image", content: "" }))
+    ).toBe("🖼️ Foto de producto")
   })
 
   it("los JSON se muestran como etiqueta, no crudos", () => {
