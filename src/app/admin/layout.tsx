@@ -1,10 +1,26 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { ADMIN_PATH_HEADER, adminLoginPath, resolveAdminAccess } from "@/lib/admin-auth"
 import { AdminSubNav } from "./sub-nav"
+import { AdminPwa } from "./admin-pwa"
 
 export const dynamic = "force-dynamic"
+
+/**
+ * PWA del panel (Ola 7): nombre y comportamiento al agregarlo a
+ * la pantalla de inicio en iOS. El manifest y el service worker
+ * los monta `AdminPwa` (la liga del manifest raíz es la de la
+ * tienda y hay que sustituirla solo aquí dentro).
+ */
+export const metadata: Metadata = {
+  appleWebApp: {
+    capable: true,
+    title: "Panel Resurte",
+    statusBarStyle: "default",
+  },
+}
 
 /**
  * Shell del área /admin: guard server-side + subnavegación persistente.
@@ -50,6 +66,7 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <AdminPwa />
       <AdminSubNav permissions={access.permissions} />
       {children}
     </div>

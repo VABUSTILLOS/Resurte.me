@@ -36,6 +36,7 @@ const ADMIN_NAV_GROUPS = [
     items: [
       { href: "/admin", label: "Dashboard", exact: true },
       { href: "/admin/pedidos", label: "Pedidos", exact: false },
+      { href: "/admin/entregas", label: "Entregas", exact: false },
       { href: "/admin/repartidores", label: "Repartidores", exact: false },
       { href: "/admin/comisiones", label: "Comisiones", exact: false },
     ],

@@ -122,9 +122,10 @@ const ROUTES = [
   // ellas no aparecían en ningún spec, así que el calentamiento tampoco las
   // cubría: cada una habría pagado su compilación en frío dentro del timeout
   // de su propia prueba, que es justo el flake que este archivo existe para
-  // evitar. El barrido visita las 19; estas 11 completan la lista.
+  // evitar. El barrido visita las 20; estas 12 completan la lista.
   "/admin/comisiones",
   "/admin/conversion",
+  "/admin/entregas",
   "/admin/foodos/dispersiones",
   "/admin/foodos/restaurantes",
   "/admin/operar",

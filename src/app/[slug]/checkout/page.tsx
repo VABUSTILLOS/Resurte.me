@@ -31,6 +31,10 @@ import { BumpCards } from "@/components/checkout/BumpCards"
 import { RemoveLineDialog } from "@/components/checkout/RemoveLineDialog"
 import { useOrderLines } from "@/components/checkout/use-order-lines"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
+import {
+  snapScheduleToAvailability,
+  useDeliveryAvailability,
+} from "@/hooks/use-delivery-availability"
 import { WHATSAPP_HREF } from "@/lib/business"
 import { cartItemUnitPrice } from "@/lib/cart-prices"
 import { calcCheckoutTotals, DELIVERY_FEE_FLAT, MIN_ITEM_QUANTITY, countBumpUnits } from "@/lib/checkout-config"
@@ -65,6 +69,13 @@ export default function CheckoutPage() {
     date: getNextDays()[0]?.value ?? "",
     time: DELIVERY_TIMES[2] ?? "12:00 PM — 2:00 PM",
   })
+  // Disponibilidad de franjas (Ola 7): la selección EFECTIVA es
+  // la del cliente ajustada a lo que hoy se ofrece —si el día o
+  // la franja dejaron de ofrecerse, cae a la primera opción—.
+  // Se deriva en render, sin efecto: es lo que se pinta y lo que
+  // se envía al crear el pedido.
+  const availability = useDeliveryAvailability()
+  const effectiveSchedule = snapScheduleToAvailability(availability, schedule)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
   // Teléfono de contacto: se guarda en orders.customer_phone para activar la
   // confirmación por WhatsApp al cliente.
@@ -207,7 +218,7 @@ export default function CheckoutPage() {
   } = useCheckoutOrder({
     city,
     address,
-    schedule,
+    schedule: effectiveSchedule,
     phone,
     email,
     coupon,
@@ -446,8 +457,12 @@ export default function CheckoutPage() {
       {/* ============ STEP 2: SCHEDULE ============ */}
       {step === "schedule" && (
         <ScheduleStep
-          schedule={schedule}
-          onDateChange={(value) => setSchedule((s) => ({ ...s, date: value }))}
+          schedule={effectiveSchedule}
+          days={availability}
+          times={availability.find((d) => d.value === effectiveSchedule.date)?.times}
+          onDateChange={(value) =>
+            setSchedule((s) => snapScheduleToAvailability(availability, { ...s, date: value }))
+          }
           onTimeChange={(value) => setSchedule((s) => ({ ...s, time: value }))}
           onBack={() => setStep("address")}
           onContinue={() => setStep("review")}
@@ -459,7 +474,7 @@ export default function CheckoutPage() {
         <>
           <ReviewStep
             address={address}
-            schedule={schedule}
+            schedule={effectiveSchedule}
             city={city}
             cartItems={orderLines.items}
             itemCount={allItemsCount}

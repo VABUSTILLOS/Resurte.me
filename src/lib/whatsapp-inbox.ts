@@ -57,14 +57,6 @@ export const INBOX_LIST_MESSAGE_LIMIT = 1500
 
 export type WaMessageAuthor = "cliente" | "ia" | "bot" | "automatico" | "equipo"
 
-export const WA_AUTHOR_LABEL: Record<WaMessageAuthor, string> = {
-  cliente: "Cliente",
-  ia: "Asistente IA",
-  bot: "Bot",
-  automatico: "Automático",
-  equipo: "Equipo",
-}
-
 /** ¿Quién escribió este mensaje? Se deduce de direction + message_type. */
 export function classifyMessageAuthor(
   message: Pick<InboxMessage, "direction" | "message_type">

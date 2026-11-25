@@ -22,6 +22,16 @@ import {
 } from "@/lib/product-quantity-limits"
 import { processStockNotifications } from "@/lib/stock-notifications"
 import { fetchCustomerPrices } from "@/lib/customer-prices"
+import {
+  findDeliverySlotByStart,
+  isDefaultDeliverySlotsConfig,
+  slotTakenKey,
+  slotUnavailableReason,
+} from "@/lib/delivery-slots"
+import {
+  countOrdersInSlot,
+  loadDeliverySlotsConfig,
+} from "@/lib/delivery-slots-server"
 import { fetchOrderVariantData, type OrderVariantRow } from "@/lib/product-variants"
 import { resolveBumpPricing } from "@/lib/order-bumps"
 import { insertAddressResilient } from "@/lib/orders-address"
@@ -791,6 +801,49 @@ export async function POST(request: NextRequest) {
     const scheduledFor = schedule.date
       ? new Date(`${schedule.date}T${extractTime(schedule.time)}:00-06:00`)
       : new Date()
+
+    // ── Franja de entrega (Ola 7): la validación es del servidor ──
+    // Con la configuración histórica (sin tocar en /admin/entregas)
+    // este bloque no corre: el pedido se agenda como siempre. Con
+    // configuración del panel, la franja pedida tiene que seguir
+    // tomable —ofrecida ese día, sin cortar por la hora de corte y
+    // sin llenar su capacidad— o el pedido se rechaza ANTES de
+    // reservar cupón o existencia. Una hora que no corresponde a
+    // ninguna franja conocida conserva la tolerancia histórica.
+    if (schedule.date && schedule.time) {
+      const { config: slotsConfig } = await loadDeliverySlotsConfig(supabase)
+      if (!isDefaultDeliverySlotsConfig(slotsConfig)) {
+        const slot = findDeliverySlotByStart(extractTime(schedule.time))
+        if (slot) {
+          const taken =
+            slotsConfig.capacityPerSlot !== null
+              ? new Map([
+                  [
+                    slotTakenKey(schedule.date, slot.id),
+                    await countOrdersInSlot(supabase, schedule.date, slot),
+                  ],
+                ])
+              : undefined
+          const reason = slotUnavailableReason(slotsConfig, {
+            dayKey: schedule.date,
+            slot,
+            taken,
+            applyStartedRule: true,
+          })
+          if (reason !== null) {
+            logger.info("orders.schedule_unavailable", { date: schedule.date, slot: slot.id, reason })
+            return NextResponse.json(
+              {
+                error:
+                  "Esa franja de entrega ya no está disponible. Elige otro día u otra franja, por favor.",
+                code: "schedule_unavailable",
+              },
+              { status: 400 }
+            )
+          }
+        }
+      }
+    }
 
     // ── Reservar el uso del cupón (optimistic concurrency) ──
     // Si el UPDATE condicional no afecta filas, otro pedido consumió el último

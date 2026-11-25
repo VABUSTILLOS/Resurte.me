@@ -599,13 +599,6 @@ export const CONDITIONAL_FLOW_CONDITIONS: readonly ConditionalFlowCondition[] = 
   "active_recurrence",
 ]
 
-export const CONDITIONAL_FLOW_CONDITION_LABEL: Record<ConditionalFlowCondition, string> = {
-  first_order: "Es su primer pedido",
-  order_count_gte: "Cliente frecuente (nº de pedidos ≥)",
-  order_total_gte: "Pedido mayor a ($ MXN ≥)",
-  active_recurrence: "Tiene una recurrencia activa (Ola 5)",
-}
-
 /** ¿La condición necesita el umbral numérico (threshold)? */
 export function conditionalFlowNeedsThreshold(
   condition: ConditionalFlowCondition

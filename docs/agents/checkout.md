@@ -584,6 +584,37 @@
   migración todo degrada: no hay especiales ni recurrencias y la
   tienda vende como siempre.
 
+- **Las franjas de entrega y la hora de corte viven en un solo módulo**
+  (Ola 7, migración 00236): `src/lib/delivery-slots.ts` es la fuente
+  única de las franjas (las 6 de 2 horas, 8:00–20:00) —`DELIVERY_TIMES`
+  del checkout y las ventanas del flujo de WhatsApp son proyecciones
+  suyas, no copias—. La configuración del panel (`delivery_slots_config`,
+  fila única: franjas por día de semana, `cutoffTime`, `capacityPerSlot`)
+  la leen el checkout (vía `GET /api/delivery-slots` y
+  `use-delivery-availability`, con caída a las listas estáticas si la
+  petición falla), el flujo de WhatsApp (`buildWhatsAppScheduleOptions`
+  con la config cargada por el webhook), la validación de
+  `POST /api/orders` y los pedidos recurrentes. Invariantes:
+  - **La configuración por defecto ES el comportamiento histórico**:
+    todas las franjas todos los días, sin corte y sin capacidad. Las
+    reglas de corte (hoy cortado tras la hora de corte; franja de hoy
+    ya empezada) SOLO actúan con `cutoffTime` configurado, y
+    `POST /api/orders` ni siquiera valida si la config es la default.
+  - **La validación es del servidor y va antes de reservar cupón o
+    existencia**: con config tocada, una franja no ofrecida ese día,
+    cortada o llena se rechaza con 400 `schedule_unavailable`. Una hora
+    que no mapea a ninguna franja conocida conserva la tolerancia
+    histórica (no se valida), para no romper payloads viejos.
+  - **La regla es una**: `slotUnavailableReason` decide si una franja
+    se puede tomar; la disponibilidad pública, la validación y los
+    recurrentes la consumen con sus interruptores (los recurrentes no
+    aplican «ya empezó»: su pedido lo genera el sistema y nace en la
+    primera franja válida de su día; sin ninguna, el ciclo no se genera
+    —`no_slot`— y se avisa al staff, como el mínimo de $500).
+  - `scheduled_for` no cambia de formato: día local + hora de inicio
+    de la franja con `-06:00`, lo arma `slotScheduledFor` para los
+    recurrentes y el armado histórico en web/WhatsApp.
+
 ## Verificación
 `npm test` (payments, checkout-config, coupon-rules, order-bumps,
 ingredient-affinity, checkout-bdd-regression) + `npx playwright test
@@ -624,6 +655,17 @@ src/lib/stripe-link-webhook.test.ts
 link de un pedido de prueba desde el detalle del admin, pagar un anticipo con
 una tarjeta de prueba y comprobar que el libro lo registra sin marcar pagado,
 pagar el resto y comprobar que el pedido pasa a pagado y confirmado.
+
+Para las franjas y el corte (Ola 7): `npx vitest run
+src/lib/delivery-slots.test.ts src/lib/whatsapp-order-flow.test.ts
+src/app/api/delivery-slots/route.test.ts
+src/app/api/admin/delivery-slots/route.test.ts` y, a mano, sin tocar la
+configuración comprobar que el checkout ofrece los mismos 7 días × 6
+franjas y que WhatsApp ofrece las mismas opciones de siempre; después,
+en `/admin/entregas`, cerrar un día y poner una hora de corte pasada y
+comprobar que ese día desaparece de la web, que WhatsApp ya no ofrece
+hoy y que un `POST /api/orders` directo a una franja cortada responde
+400 `schedule_unavailable`.
 
 FoodOS tiene su propio par de puertas y su propia máquina de estados, así que su
 verificación va aparte: `npx vitest run src/lib/foodos-order-status.test.ts
