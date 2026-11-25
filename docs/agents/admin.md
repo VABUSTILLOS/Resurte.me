@@ -196,6 +196,30 @@
   (`/api/recurring-orders`); editar artículos es solo del panel.
   Sin la migración, GET responde `available: false` y las
   escrituras 409: la pantalla lo declara y no rompe.
+- Ola 7 — entregas y panel instalable (00236): la sección
+  `/admin/entregas` (dominio `pedidos`, grupo *Operación*) edita la
+  configuración de franjas de `delivery_slots_config` vía
+  `/api/admin/delivery-slots` (bitácora `delivery_slots_config_update`):
+  franjas por día de semana, hora de corte opcional y capacidad
+  opcional por franja. La config por defecto es el comportamiento
+  histórico y sin la migración GET responde `available: false` y PUT
+  409 (la pantalla lo declara). Las reglas viven en
+  `src/lib/delivery-slots.ts` (ver Checkout). **El panel es una PWA
+  separada de la tienda**: manifest propio en
+  `/admin/manifest.webmanifest` (alcance `/admin`, `start_url`
+  `/admin`), service worker propio servido en `/admin/sw.js` —su
+  alcance máximo es `/admin`, así que nunca controla la tienda— con
+  estrategia network-first para las navegaciones (sin red responde
+  su página de «sin conexión», jamás una copia cacheada del panel),
+  red directa para `/api/**` y cache-first solo para estáticos con
+  el prefijo `resurte-admin-*`. Lo monta `AdminPwa`
+  (`src/app/admin/admin-pwa.tsx`) desde el layout: sustituye la
+  liga del manifest de la tienda que trae el layout raíz y registra
+  el SW; si algo de eso falla, el panel funciona como siempre. Los
+  iconos (`public/admin-icon-*.png`, `admin-apple-touch-icon.png`)
+  salen del logo de la tienda. El contrato vive en
+  `src/lib/admin-pwa.contract.test.ts`. Sin notificaciones push: el
+  canal de avisos del panel sigue siendo WhatsApp.
 - Ola 3 — presentaciones en WhatsApp (00232): cada presentación es
   un artículo del catálogo de Meta con retailer_id
   `<id del producto>--<slug de la variante>` (ver Catálogo). La

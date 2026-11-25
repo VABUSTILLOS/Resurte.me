@@ -3,6 +3,7 @@
 import { CreditCard, Building2, Store, Smartphone, Banknote, QrCode } from "lucide-react"
 import type { ReactNode } from "react"
 import type { PaymentMethod } from "@/types"
+import { DELIVERY_SLOTS } from "@/lib/delivery-slots"
 
 export type Step = "address" | "schedule" | "review" | "payment"
 
@@ -31,14 +32,11 @@ export const DEFAULT_ADDRESS_FORM: AddressForm = {
   references: "",
 }
 
-export const DELIVERY_TIMES = [
-  "8:00 AM — 10:00 AM",
-  "10:00 AM — 12:00 PM",
-  "12:00 PM — 2:00 PM",
-  "2:00 PM — 4:00 PM",
-  "4:00 PM — 6:00 PM",
-  "6:00 PM — 8:00 PM",
-]
+// Las franjas viven en `@/lib/delivery-slots` (fuente única desde
+// la Ola 7: las leen la web, WhatsApp, el panel y el servidor).
+// Aquí solo se proyectan las etiquetas, con el mismo orden y
+// texto de siempre.
+export const DELIVERY_TIMES = DELIVERY_SLOTS.map((slot) => slot.label)
 
 // Los próximos 7 días de entrega viven en `@/lib/delivery-days`: se calculan
 // sobre el día LOCAL del restaurante, no sobre el día UTC. Se reexporta

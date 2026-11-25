@@ -194,6 +194,7 @@ export const ADMIN_SECTIONS: ReadonlyArray<{
   // Operación
   { path: "/admin/pedidos", permission: "pedidos" },
   { path: "/admin/repartidores", permission: "pedidos" },
+  { path: "/admin/entregas", permission: "pedidos" },
   // Dinero de la red
   { path: "/admin/comisiones", permission: "comisiones" },
   { path: "/admin/foodos/dispersiones", permission: "comisiones" },

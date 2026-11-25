@@ -35,7 +35,15 @@
 
 import { missingColumnName } from "@/lib/admin/order-selects"
 import { getNextDays } from "@/lib/delivery-days"
-import { DEFAULT_TIMEZONE, localDateParts } from "@/lib/local-date"
+import {
+  DEFAULT_DELIVERY_SLOTS_CONFIG,
+  slotUnavailableReason,
+  slotsForDayKey,
+  type DeliverySlotsConfig,
+  type SlotTakenCounts,
+} from "@/lib/delivery-slots"
+import { fetchSlotTakenCounts, loadDeliverySlotsConfig } from "@/lib/delivery-slots-server"
+import { DEFAULT_TIMEZONE, localDateParts, minutesOfDay, parseHhMm } from "@/lib/local-date"
 import { logger } from "@/lib/logger"
 import type { createServiceClient } from "@/lib/supabase/service"
 import { WHATSAPP_ADDRESS_CAPTURE_WINDOW_HOURS } from "@/lib/whatsapp-order-config"
@@ -101,21 +109,13 @@ export interface WhatsAppScheduleOption {
 }
 
 /**
- * Ventanas de entrega: espejo de `DELIVERY_TIMES`
- * (src/components/checkout/checkout-shared.tsx), que es la lista que
- * la web ofrece. Aquí vive la copia porque el flujo es un módulo de
- * servidor y no puede importar un componente; si las ventanas del
- * checkout cambian, se cambia también esta lista — el `start` es la
- * hora que el servidor web usa para armar `scheduled_for`.
+ * Ventanas de entrega: desde la Ola 7 salen de la fuente única
+ * `DELIVERY_SLOTS` (src/lib/delivery-slots.ts), la misma lista
+ * que la web ofrece, filtrada por la configuración del panel
+ * (franjas por día de semana, hora de corte y capacidad). Con la
+ * configuración histórica el resultado es idéntico al de antes:
+ * las 6 franjas de siempre, todos los días.
  */
-const DELIVERY_WINDOWS: { start: string; startHour: number; label: string }[] = [
-  { start: "08:00", startHour: 8, label: "8:00 AM — 10:00 AM" },
-  { start: "10:00", startHour: 10, label: "10:00 AM — 12:00 PM" },
-  { start: "12:00", startHour: 12, label: "12:00 PM — 2:00 PM" },
-  { start: "14:00", startHour: 14, label: "2:00 PM — 4:00 PM" },
-  { start: "16:00", startHour: 16, label: "4:00 PM — 6:00 PM" },
-  { start: "18:00", startHour: 18, label: "6:00 PM — 8:00 PM" },
-]
 
 /** Cuántos días se ofrecen en la pregunta (Hoy, Mañana y pasado). */
 export const WHATSAPP_SCHEDULE_OPTION_COUNT = 3
@@ -123,25 +123,41 @@ export const WHATSAPP_SCHEDULE_OPTION_COUNT = 3
 /**
  * Las opciones de entrega que se le ofrecen al cliente.
  *
- * Para HOY la ventana es la primera que aún no empieza a la hora
- * local actual (si ya no cabe ninguna, hoy no se ofrece: prometer
- * "hoy" a las 19:30 con la última ventana ya empezada sería mentir).
- * Para los demás días, la primera ventana de la mañana.
+ * Para HOY la ventana es la primera configurada que aún no
+ * empieza a la hora local actual (si ya no cabe ninguna, hoy no
+ * se ofrece: prometer "hoy" a las 19:30 con la última ventana ya
+ * empezada sería mentir) — y con hora de corte configurada, hoy
+ * tampoco se ofrece si ya pasó el corte. Para los demás días, la
+ * primera ventana configurada que no esté llena.
  */
 export function buildWhatsAppScheduleOptions(
-  now: Date = new Date()
+  now: Date = new Date(),
+  config: DeliverySlotsConfig = DEFAULT_DELIVERY_SLOTS_CONFIG,
+  taken?: SlotTakenCounts
 ): WhatsAppScheduleOption[] {
   const days = getNextDays(DEFAULT_TIMEZONE, now)
   const { hour } = localDateParts(DEFAULT_TIMEZONE, now)
+  const cutoffMinutes = config.cutoffTime !== null ? parseHhMm(config.cutoffTime) : null
+  const todayCut =
+    cutoffMinutes !== null && minutesOfDay(DEFAULT_TIMEZONE, now) >= cutoffMinutes
 
   const options: WhatsAppScheduleOption[] = []
   days.forEach((day, idx) => {
     if (options.length >= WHATSAPP_SCHEDULE_OPTION_COUNT) return
-    let window = DELIVERY_WINDOWS[0]
-    if (idx === 0) {
-      window = DELIVERY_WINDOWS.find((w) => w.startHour > hour)
-      if (!window) return // hoy ya no cabe: la opción pasa a ser mañana
+    let candidates = slotsForDayKey(config, day.value)
+    if (config.capacityPerSlot !== null && taken) {
+      candidates = candidates.filter(
+        (slot) =>
+          slotUnavailableReason(config, { dayKey: day.value, slot, now, taken }) !== "slot_full"
+      )
     }
+    if (idx === 0) {
+      if (todayCut) return // hoy ya cortó: la opción pasa a ser mañana
+      const window = candidates.find((w) => w.startHour > hour)
+      if (!window) return // hoy ya no cabe: la opción pasa a ser mañana
+      candidates = [window]
+    }
+    const window = candidates[0]
     if (!window) return
     options.push({
       dayValue: day.value,
@@ -152,6 +168,27 @@ export function buildWhatsAppScheduleOptions(
     })
   })
   return options
+}
+
+/**
+ * Las opciones con la configuración vigente del panel: la carga
+ * el llamador asíncrono (el webhook) para que el constructor
+ * puro siga siendo puro. Sin capacidad configurada no se paga
+ * la consulta de ocupación.
+ */
+async function buildConfiguredScheduleOptions(
+  supabase: ServiceClient,
+  now: Date = new Date()
+): Promise<WhatsAppScheduleOption[]> {
+  const { config } = await loadDeliverySlotsConfig(supabase)
+  const taken =
+    config.capacityPerSlot !== null
+      ? await fetchSlotTakenCounts(
+          supabase,
+          getNextDays(DEFAULT_TIMEZONE, now).map((d) => d.value)
+        )
+      : undefined
+  return buildWhatsAppScheduleOptions(now, config, taken)
 }
 
 /**
@@ -341,7 +378,7 @@ export async function handleWhatsAppFlowReply(
         kind: "reprompt",
         step: "payment",
         orderId: order.id,
-        scheduleOptions: buildWhatsAppScheduleOptions(),
+        scheduleOptions: await buildConfiguredScheduleOptions(supabase),
       }
     }
 
@@ -370,12 +407,12 @@ export async function handleWhatsAppFlowReply(
       orderId: order.id,
       total: Number(order.total),
       method: choice,
-      scheduleOptions: buildWhatsAppScheduleOptions(),
+      scheduleOptions: await buildConfiguredScheduleOptions(supabase),
     }
   }
 
   // step === "schedule"
-  const options = buildWhatsAppScheduleOptions()
+  const options = await buildConfiguredScheduleOptions(supabase)
   const picked = parseWhatsAppScheduleChoice(input.text, options)
   if (!picked) {
     return { kind: "reprompt", step: "schedule", orderId: order.id, scheduleOptions: options }

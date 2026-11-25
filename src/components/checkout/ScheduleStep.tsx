@@ -13,6 +13,17 @@ interface ScheduleStepProps {
   savedAddressLabel?: string | null
   /** Regresa al paso de dirección para editarla. */
   onEditAddress?: () => void
+  /**
+   * Días ofrecidos (Ola 7): los pinta el llamador desde la
+   * disponibilidad del servidor. Sin la prop, los 7 días de
+   * siempre.
+   */
+  days?: readonly { value: string; label: string }[]
+  /**
+   * Franjas ofrecidas para el día elegido (Ola 7). Sin la prop,
+   * las 6 franjas de siempre.
+   */
+  times?: readonly string[]
 }
 
 export function ScheduleStep({
@@ -23,7 +34,11 @@ export function ScheduleStep({
   onContinue,
   savedAddressLabel,
   onEditAddress,
+  days,
+  times,
 }: ScheduleStepProps) {
+  const dayOptions = days ?? getNextDays()
+  const timeOptions = times ?? DELIVERY_TIMES
   return (
     <div>
       <h2 className="text-xl font-bold text-gray-900 mb-1">
@@ -56,7 +71,7 @@ export function ScheduleStep({
       {/* Date selection */}
       <h3 className="text-sm font-semibold text-gray-700 mb-3">Fecha</h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6">
-        {getNextDays().map((day) => (
+        {dayOptions.map((day) => (
           <button
             key={day.value}
             type="button"
@@ -76,7 +91,7 @@ export function ScheduleStep({
       {/* Time selection */}
       <h3 className="text-sm font-semibold text-gray-700 mb-3">Horario</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
-        {DELIVERY_TIMES.map((time) => (
+        {timeOptions.map((time) => (
           <button
             key={time}
             type="button"

@@ -83,6 +83,7 @@ const RESULT_LABEL: Record<string, string> = {
   insufficient_stock: "Faltó existencia",
   quantity_violation: "Cantidad fuera de mín/máx",
   invalid_items: "Un artículo ya no se vende así",
+  no_slot: "Sin franja de entrega ese día",
   error: "Error al generarlo",
 }
 

@@ -337,3 +337,50 @@ describe("degradación sin la migración 00228", () => {
     expect(fake.state.rows[0]?.wa_flow_step).toBe("payment")
   })
 })
+
+describe("buildWhatsAppScheduleOptions — configuración de franjas (Ola 7)", () => {
+  const ALL = ["08-10", "10-12", "12-14", "14-16", "16-18", "18-20"]
+  const week = (patch: Record<number, string[]> = {}) =>
+    Array.from({ length: 7 }, (_, i) => patch[i] ?? [...ALL])
+
+  it("un día cerrado no se ofrece: la opción brinca al siguiente día con entregas", () => {
+    // 2026-11-21 es sábado; el domingo 22 está cerrado.
+    const config = { cutoffTime: null, capacityPerSlot: null, week: week({ 0: [] }) }
+    const options = buildWhatsAppScheduleOptions(new Date("2026-11-21T09:00:00-06:00"), config)
+    expect(options.map((o) => o.dayValue)).toEqual(["2026-11-21", "2026-11-23", "2026-11-24"])
+  })
+
+  it("con hora de corte ya pasada, hoy no se ofrece aunque queden franjas", () => {
+    const config = { cutoffTime: "14:00", capacityPerSlot: null, week: week() }
+    const options = buildWhatsAppScheduleOptions(new Date("2026-11-24T15:00:00-06:00"), config)
+    expect(options.map((o) => o.dayValue)).toEqual(["2026-11-25", "2026-11-26", "2026-11-27"])
+    expect(options[0]?.windowLabel).toBe("8:00 AM — 10:00 AM")
+  })
+
+  it("antes del corte, hoy se ofrece con la primera franja que no ha empezado", () => {
+    const config = { cutoffTime: "18:00", capacityPerSlot: null, week: week() }
+    const options = buildWhatsAppScheduleOptions(new Date("2026-11-24T15:00:00-06:00"), config)
+    expect(options[0]?.dayValue).toBe("2026-11-24")
+    expect(options[0]?.windowLabel).toBe("4:00 PM — 6:00 PM")
+  })
+
+  it("una franja llena por capacidad se salta a la siguiente del día", () => {
+    const config = { cutoffTime: null, capacityPerSlot: 2, week: week() }
+    const taken = new Map([["2026-11-25|08-10", 2]])
+    const options = buildWhatsAppScheduleOptions(new Date("2026-11-24T19:30:00-06:00"), config, taken)
+    expect(options[0]?.dayValue).toBe("2026-11-25")
+    expect(options[0]?.windowLabel).toBe("10:00 AM — 12:00 PM")
+  })
+
+  it("las franjas apagadas de un día cambian la ventana ofrecida de ese día", () => {
+    // El martes 24 solo abre de 12:00 en adelante.
+    const config = {
+      cutoffTime: null,
+      capacityPerSlot: null,
+      week: week({ 2: ["12-14", "14-16", "16-18", "18-20"] }),
+    }
+    const options = buildWhatsAppScheduleOptions(new Date("2026-11-23T19:30:00-06:00"), config)
+    expect(options[0]?.dayValue).toBe("2026-11-24")
+    expect(options[0]?.windowLabel).toBe("12:00 PM — 2:00 PM")
+  })
+})

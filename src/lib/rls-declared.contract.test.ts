@@ -120,7 +120,7 @@ const FUENTES = MIGRATION_FILES.map((f) => sinComentarios(readFileSync(join(MIGR
 const MEDICION = medir(FUENTES)
 
 /**
- * Las 33 tablas con RLS encendida y ninguna política, con el archivo que
+ * Las 34 tablas con RLS encendida y ninguna política, con el archivo que
  * demuestra cómo se accede a cada una. Todas se leen y escriben con
  * `createServiceClient()`; `rate_limits` lo hace a través de la RPC
  * `consume_rate_limit`, cuyo `EXECUTE` quedó restringido a `service_role` en
@@ -153,6 +153,8 @@ const MODELO_DE_ACCESO: Record<string, string> = {
   competitor_prices:
     "scripts/alsuper-prices-sync.mjs (service_role) la escribe; la migración 00198 la lee en SQL para topar precios",
   delivery_drivers: "createServiceClient() desde src/app/api/admin/drivers/route.ts",
+  delivery_slots_config:
+    "createServiceClient() desde src/lib/delivery-slots-server.ts (configuración de franjas de entrega, 00236; la escribe /api/admin/delivery-slots y la leen el checkout, WhatsApp y los recurrentes)",
   email_logs: "createServiceClient() desde src/app/api/admin/email-logs/route.ts",
   foodos_payouts: "createServiceClient() desde src/app/api/admin/foodos/payouts/route.ts",
   geo_panel_checks: "createServiceClient() desde src/app/admin/seo-ia/actions.ts",
@@ -243,7 +245,7 @@ describe("perímetro — RLS sin políticas", () => {
     // Conteo fijo a propósito: es un tripwire, no un dato. Al añadir una tabla
     // con RLS y sin políticas hay que venir aquí y actualizarlo, que es lo que
     // obliga a mirar si de verdad está declarada en el registro.
-    expect(DECLARADAS).toHaveLength(33)
+    expect(DECLARADAS).toHaveLength(34)
   })
 
   it("ninguna entrada está vacía y todas nombran dónde vive el acceso", () => {

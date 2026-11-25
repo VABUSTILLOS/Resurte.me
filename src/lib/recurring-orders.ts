@@ -41,6 +41,8 @@ import { WHATSAPP_NUMBER } from "@/lib/business"
 import { DELIVERY_FEE_FLAT, validDeliveryFee } from "@/lib/checkout-config"
 import { MIN_ORDER_MXN } from "@/lib/commercial-facts"
 import { fetchCustomerPrices } from "@/lib/customer-prices"
+import { firstSlotForSystemOrder, slotScheduledFor } from "@/lib/delivery-slots"
+import { fetchSlotTakenCounts, loadDeliverySlotsConfig } from "@/lib/delivery-slots-server"
 import { logger } from "@/lib/logger"
 import { missingColumnName } from "@/lib/admin/order-selects"
 import { callStockRpc, describeStockConflicts, type StockConflict } from "@/lib/order-stock"
@@ -329,6 +331,7 @@ export type GenerateRecurringResult =
   | { kind: "insufficient_stock"; detail: string }
   | { kind: "quantity_violation"; detail: string }
   | { kind: "invalid_items"; detail: string }
+  | { kind: "no_slot"; detail: string }
   | { kind: "error"; detail: string }
 
 interface DbProductRow {
@@ -562,6 +565,27 @@ export async function generateRecurringOrder(
     return { kind: "error", detail: "no_city" }
   }
 
+  // ── Franja de entrega (Ola 7) ──────────────────────────────
+  // El pedido nace en la PRIMERA franja válida de su día según
+  // la configuración de entregas (franjas del día, capacidad y,
+  // si el día es hoy, la hora de corte). Con la configuración
+  // histórica esa es la de 8:00–10:00. Si el día no tiene
+  // ninguna franja válida, el ciclo no se genera —misma
+  // filosofía que el mínimo: no se mueve a otro día en
+  // silencio; se avisa al staff y la plantilla avanza—.
+  const { config: slotsConfig } = await loadDeliverySlotsConfig(supabase)
+  const slotTaken =
+    slotsConfig.capacityPerSlot !== null
+      ? await fetchSlotTakenCounts(supabase, [todayKey])
+      : undefined
+  const firstSlot = firstSlotForSystemOrder(slotsConfig, { dayKey: todayKey, taken: slotTaken })
+  if (!firstSlot) {
+    return {
+      kind: "no_slot",
+      detail: "ese día no tiene franjas de entrega disponibles según la configuración de entregas",
+    }
+  }
+
   // ── Insert del pedido ──────────────────────────────────────
   const insertOrder: Record<string, unknown> = {
     user_id: template.user_id,
@@ -574,7 +598,7 @@ export async function generateRecurringOrder(
     payment_method: template.payment_method,
     payment_status: "pending",
     priority: template.payment_method === "spei",
-    scheduled_for: new Date(`${todayKey}T12:00:00-06:00`).toISOString(),
+    scheduled_for: slotScheduledFor(todayKey, firstSlot),
     source: "recurring",
     customer_phone: profile.phone,
   }
@@ -676,6 +700,7 @@ const FAILURE_TEXT: Record<string, string> = {
   insufficient_stock: "faltó existencia",
   quantity_violation: "una cantidad quedó fuera del mínimo/máximo permitido",
   invalid_items: "un artículo ya no se vende como está en la plantilla",
+  no_slot: "no hubo franja de entrega disponible ese día",
   error: "hubo un error al generarlo",
 }
 
@@ -690,7 +715,8 @@ async function notifyStaffRecurringFailure(
       ? `subtotal $${result.subtotal.toFixed(2)}, faltan $${result.missingAmount.toFixed(2)}`
       : result.kind === "insufficient_stock" ||
           result.kind === "quantity_violation" ||
-          result.kind === "invalid_items"
+          result.kind === "invalid_items" ||
+          result.kind === "no_slot"
         ? result.detail
         : result.kind
   try {

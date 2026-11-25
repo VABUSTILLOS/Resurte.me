@@ -35,6 +35,10 @@ import { RemoveLineDialog } from "@/components/checkout/RemoveLineDialog"
 import { useOrderLines } from "@/components/checkout/use-order-lines"
 import { SocialProofBadge } from "@/components/checkout/social-proof"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
+import {
+  snapScheduleToAvailability,
+  useDeliveryAvailability,
+} from "@/hooks/use-delivery-availability"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
 import { useCheckoutOrder, type CheckoutPaidInfo, type CreatedOrder } from "@/components/checkout/use-checkout-order"
@@ -80,6 +84,13 @@ export function CheckoutDrawer() {
     date: getNextDays()[0]?.value ?? "",
     time: DELIVERY_TIMES[2] ?? "12:00 PM — 2:00 PM",
   })
+  // Disponibilidad de franjas (Ola 7): la selección EFECTIVA es
+  // la del cliente ajustada a lo que hoy se ofrece —si el día o
+  // la franja dejaron de ofrecerse, cae a la primera opción—.
+  // Se deriva en render, sin efecto: es lo que se pinta y lo que
+  // se envía al crear el pedido.
+  const availability = useDeliveryAvailability()
+  const effectiveSchedule = snapScheduleToAvailability(availability, schedule)
   // Bumps seleccionados: store compartido con el carrito y el checkout (ver
   // useSelectedBumps). Ya no es estado local del drawer, así que la selección
   // sobrevive a cerrar el drawer, salir del checkout y recargar la página.
@@ -188,7 +199,7 @@ export function CheckoutDrawer() {
   } = useCheckoutOrder({
     city,
     address,
-    schedule,
+    schedule: effectiveSchedule,
     phone,
     email,
     coupon,
@@ -678,8 +689,12 @@ export function CheckoutDrawer() {
 
           {step === "schedule" && (
             <ScheduleStep
-              schedule={schedule}
-              onDateChange={(value) => setSchedule((s) => ({ ...s, date: value }))}
+              schedule={effectiveSchedule}
+              days={availability}
+              times={availability.find((d) => d.value === effectiveSchedule.date)?.times}
+              onDateChange={(value) =>
+                setSchedule((s) => snapScheduleToAvailability(availability, { ...s, date: value }))
+              }
               onTimeChange={(value) => setSchedule((s) => ({ ...s, time: value }))}
               onBack={() => setStep("address")}
               onContinue={() => setStep("bumps")}
@@ -810,7 +825,7 @@ export function CheckoutDrawer() {
                       <span className="font-bold text-brand-700 text-lg">${total.toFixed(2)}</span>
                     </div>
                     <p className="text-[11px] text-gray-400 pt-1">
-                      Entrega: {schedule.date} · {schedule.time}
+                      Entrega: {effectiveSchedule.date} · {effectiveSchedule.time}
                     </p>
                   </div>
 
