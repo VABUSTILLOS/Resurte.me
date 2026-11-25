@@ -120,7 +120,7 @@ const FUENTES = MIGRATION_FILES.map((f) => sinComentarios(readFileSync(join(MIGR
 const MEDICION = medir(FUENTES)
 
 /**
- * Las 29 tablas con RLS encendida y ninguna política, con el archivo que
+ * Las 30 tablas con RLS encendida y ninguna política, con el archivo que
  * demuestra cómo se accede a cada una. Todas se leen y escriben con
  * `createServiceClient()`; `rate_limits` lo hace a través de la RPC
  * `consume_rate_limit`, cuyo `EXECUTE` quedó restringido a `service_role` en
@@ -157,6 +157,8 @@ const MODELO_DE_ACCESO: Record<string, string> = {
   leads: "createServiceClient() desde src/app/admin/actions.ts",
   low_stock_alert_state:
     "createServiceClient() desde src/lib/stock-notifications.ts (estado de la alerta de stock bajo al staff, 00230)",
+  order_payments:
+    "createServiceClient() desde src/lib/order-payments.ts (libro de pagos por pedido, 00233; lo escriben el webhook de Stripe y las rutas /api/admin/orders/[id]/payments)",
   order_upsells: "createServiceClient() desde src/app/api/admin/funnel/route.ts",
   product_suppliers: "createServiceClient() desde src/app/api/admin/suppliers/route.ts",
   // El archivo va nombrado porque es la única entrada del registro que no
@@ -235,7 +237,7 @@ describe("perímetro — RLS sin políticas", () => {
     // Conteo fijo a propósito: es un tripwire, no un dato. Al añadir una tabla
     // con RLS y sin políticas hay que venir aquí y actualizarlo, que es lo que
     // obliga a mirar si de verdad está declarada en el registro.
-    expect(DECLARADAS).toHaveLength(29)
+    expect(DECLARADAS).toHaveLength(30)
   })
 
   it("ninguna entrada está vacía y todas nombran dónde vive el acceso", () => {

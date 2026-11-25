@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
+import { computePaymentBalance, isMissingPaymentsTable } from "@/lib/order-payments"
 
 export const runtime = "nodejs"
 
@@ -73,6 +74,32 @@ export async function GET(
       return NextResponse.json({ error: "Enlace inválido o expirado" }, { status: 404 })
     }
 
+    // Abonos del libro de pagos (Ola 4, 00233): cuánto se ha pagado
+    // y cuánto falta, para que la página pueda decir «ya abonaste
+    // $X, te faltan $Y» junto al botón de pago con tarjeta. Es
+    // best-effort: sin la migración (o ante un fallo de lectura)
+    // viajan null y la página muestra solo el total, como antes.
+    let paidAmount: number | null = null
+    let paymentBalance: number | null = null
+    const { data: paymentRows, error: paymentsError } = await supabase
+      .from("order_payments")
+      .select("amount, status")
+      .eq("order_id", orderId)
+    if (!paymentsError && paymentRows) {
+      const balance = computePaymentBalance({
+        total: order.total,
+        paymentStatus: order.payment_status,
+        payments: paymentRows.map((p) => ({ amount: Number(p.amount), status: p.status })),
+      })
+      paidAmount = balance.paidAmount
+      paymentBalance = balance.balance
+    } else if (paymentsError && !isMissingPaymentsTable(paymentsError)) {
+      logger.warn("orders.track.ledger_read_failed", {
+        orderId: id,
+        error: paymentsError.message,
+      })
+    }
+
     const city = Array.isArray(order.cities) ? order.cities[0] : order.cities
     // Repartidor: solo el primer nombre y solo cuando va en camino.
     const driverRow = Array.isArray(order.delivery_drivers)
@@ -109,6 +136,8 @@ export async function GET(
           discount: order.discount != null ? Number(order.discount) : 0,
           delivery_fee: Number(order.delivery_fee),
           total: Number(order.total),
+          paid_amount: paidAmount,
+          balance: paymentBalance,
           scheduled_for: order.scheduled_for,
           created_at: order.created_at,
           city: city ?? null,

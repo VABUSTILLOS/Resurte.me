@@ -25,6 +25,22 @@
   editor lo muestra tal cual. El detalle del pedido y el ticket
   imprimible muestran la presentación desde `order_items.variant_label`
   (lectura best-effort con reintento sin la columna).
+- **Pagos y link de pago del pedido (Ola 4)**: el detalle del pedido monta
+  `PaymentsSection` (`src/app/admin/pedidos/payments-section.tsx`) sobre el
+  libro `order_payments` (migración 00233): muestra Total / Abonado / Saldo
+  (la regla del saldo vive en `src/lib/order-payments.ts`, no en el
+  componente), registra abonos manuales de cualquier método
+  (`POST /api/admin/orders/[id]/payments`, auditoría `order_payment`),
+  anula abonos (`DELETE …/payments/[paymentId]`, auditoría
+  `order_payment_void`; anular el abono que pagó el pedido lo devuelve a
+  `payment_status = 'pending'` sin tocar su estado) y genera/copia/envía
+  por WhatsApp el link de pago de Stripe del saldo
+  (`POST /api/admin/orders/[id]/payment-link`, auditoría
+  `order_payment_link`). El monto lo valida el servidor contra el saldo de
+  la base; el cliente solo propone. Sin la migración la sección muestra el
+  aviso de libro inactivo y los POST responden 409, nunca una pantalla
+  rota. El detalle completo de invariantes está en
+  `docs/agents/checkout.md`.
 - Toda ruta API de admin valida con `admin-auth.ts` y el layout tiene guard
   server-side (`getUserRole`); nunca exponer datos sin gate.
 - Dashboard (PR #18): KPIs vs ayer, alertas operativas, auto-refresh pausable,

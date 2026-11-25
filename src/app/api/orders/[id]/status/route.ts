@@ -24,6 +24,12 @@ import { notifyCashbackCredited } from "@/lib/notifications"
 import { logAdminAction } from "@/lib/audit-log"
 import { missingOptionalOrderColumn, type OrderQueryResult } from "@/lib/admin/order-selects"
 import { applyOrderCancellationEffects } from "@/lib/order-cancellation"
+import {
+  ORDER_PAYMENT_METHODS,
+  getOrderPaymentSummary,
+  recordOrderPayment,
+  type OrderPaymentMethod,
+} from "@/lib/order-payments"
 import type { OrderStatus, PaymentStatus } from "@/types"
 
 const VALID_STATUSES: OrderStatus[] = [
@@ -38,6 +44,8 @@ type CurrentOrderRow = {
   status: string
   payment_status: string
   customer_phone: string | null
+  total: number
+  payment_method: string | null
   coupon_code?: string | null
 }
 
@@ -116,7 +124,7 @@ export async function PATCH(
         .single()) as unknown as OrderQueryResult<CurrentOrderRow>
 
     let { data: currentOrder, error: fetchError } = await fetchCurrentOrder(
-      "status, payment_status, customer_phone, coupon_code"
+      "status, payment_status, customer_phone, coupon_code, total, payment_method"
     )
 
     // 42703 = orders.coupon_code aún no existe (migración 00114 sin aplicar).
@@ -125,7 +133,7 @@ export async function PATCH(
     if (missingOptionalOrderColumn(fetchError) === "coupon_code") {
       logger.warn("[API] orders.coupon_code no existe; actualizando sin liberar cupón")
       ;({ data: currentOrder, error: fetchError } = await fetchCurrentOrder(
-        "status, payment_status, customer_phone"
+        "status, payment_status, customer_phone, total, payment_method"
       ))
     }
 
@@ -235,6 +243,44 @@ export async function PATCH(
     // notifyCashbackCredited leyendo el monedero real, igual que la vía Stripe.
     if (payment_status === "paid" && oldPaymentStatus !== "paid") {
       void notifyCashbackCredited(orderId)
+    }
+
+    // Ola 4 — la confirmación manual también queda asentada en el
+    // libro de pagos (00233): se registra el saldo que faltaba con
+    // el método del pedido, para que el panel lea UN solo historial
+    // venga el pago de donde venga. Best-effort: sin la migración o
+    // ante un fallo del libro, la confirmación ya aplicada no se
+    // revierte — el libro se concilia después, el estado no espera.
+    if (payment_status === "paid" && oldPaymentStatus !== "paid") {
+      try {
+        const method = currentOrder.payment_method
+        if (method && (ORDER_PAYMENT_METHODS as readonly string[]).includes(method)) {
+          // El saldo se calcula con el estado ANTERIOR a esta
+          // confirmación: con `paid` el saldo derivado es cero por
+          // definición y nunca habría nada que asentar.
+          const orderBefore = {
+            id: orderId,
+            total: currentOrder.total,
+            payment_status: oldPaymentStatus,
+            status: oldStatus as string,
+          }
+          const summary = await getOrderPaymentSummary(supabase, orderBefore)
+          if (summary.available && summary.balance > 0) {
+            await recordOrderPayment(supabase, orderBefore, {
+              amount: summary.balance,
+              method: method as OrderPaymentMethod,
+              origin: "manual",
+              note: "Confirmación manual de pago",
+              createdBy: adminUser?.id ?? null,
+            })
+          }
+        }
+      } catch (ledgerErr) {
+        logger.warn("orders.status.ledger_write_failed", {
+          orderId: id,
+          error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+        })
+      }
     }
 
     // Devolver el inventario reservado (00143) y liberar el cupón consumido.

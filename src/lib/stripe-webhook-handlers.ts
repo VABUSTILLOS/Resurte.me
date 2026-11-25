@@ -3,6 +3,7 @@ import { confirmPaymentToCustomer, notifyCustomerStatusUpdate } from "@/lib/work
 import { sendOrderStatusEmail } from "@/lib/order-emails"
 import { notifyCashbackCredited } from "@/lib/notifications"
 import { isAmountSufficient, toCents } from "@/lib/payment-validation"
+import { recordOrderPayment } from "@/lib/order-payments"
 import { resolveRefundOutcome } from "@/lib/refund"
 import { logger } from "@/lib/logger"
 import { missingOptionalOrderColumn, type OrderQueryResult } from "@/lib/admin/order-selects"
@@ -40,6 +41,17 @@ export async function handlePaymentIntentSucceeded(
   paymentIntent: StripePaymentIntentLike
 ): Promise<void> {
   logger.info("stripe.payment.succeeded", { paymentIntent: paymentIntent.id, amount: paymentIntent.amount_received })
+
+  // Link de pago por pedido (Ola 4): el PaymentIntent nació de una
+  // Checkout Session generada para ESTE pedido y puede ser un abono
+  // parcial, así que la regla «monto >= total o amount_mismatch» de
+  // abajo no aplica: lo registra el libro de pagos, que marca
+  // pagado solo cuando el saldo se cubre. Ver
+  // handleOrderPaymentLinkSucceeded.
+  if (paymentIntent.metadata?.order_payment_link === "1") {
+    await handleOrderPaymentLinkSucceeded(supabase, paymentIntent)
+    return
+  }
 
   // Valida el monto recibido contra el total del pedido antes de marcar
   // como pagado. Evita marcar como pagado un intent con monto distinto
@@ -248,6 +260,141 @@ export async function handlePaymentIntentSucceeded(
         `⚠️ FoodOS amount mismatch: order ${lookupFoodosOrder.id} expected ${toCents(lookupFoodosOrder.total)}, received ${paymentIntent.amount_received}`
       )
     }
+  }
+}
+
+/**
+ * Pago acreditado de un link de pago por pedido (Ola 4): la Checkout
+ * Session se creó con `payment_intent_data.metadata.order_id`, así
+ * que el pedido se resuelve por metadata, no por la columna
+ * `stripe_payment_intent_id` (ese intent no es el del checkout web).
+ *
+ * El pago se registra en el libro (`order_payments`, origen
+ * 'stripe_link') y el pedido se marca pagado SOLO si el libro cubre
+ * el total: un link puede ser un anticipo y un anticipo no libera el
+ * pedido. La idempotencia la da el índice único del PaymentIntent
+ * en el libro: la re-entrega del evento (o el `checkout.session.
+ * completed` que llega por la misma compra) no duplica el abono.
+ *
+ * Sin la migración 00233 no hay libro: se conserva el
+ * comportamiento previo para el caso común —link por el saldo
+ * completo— comparando contra el total, y un abono parcial se
+ * registra en el log para conciliarlo a mano.
+ */
+export async function handleOrderPaymentLinkSucceeded(
+  supabase: ServiceClient,
+  paymentIntent: StripePaymentIntentLike
+): Promise<void> {
+  const orderId = Number(paymentIntent.metadata?.order_id)
+  if (!Number.isFinite(orderId) || orderId <= 0) {
+    logger.error("stripe.link_payment.sin_order_id", { paymentIntent: paymentIntent.id })
+    return
+  }
+
+  const { data: order, error } = await supabase
+    .from("orders")
+    .select("id, user_id, total, payment_status, status, customer_email")
+    .eq("id", orderId)
+    .maybeSingle()
+  if (error || !order) {
+    logger.error("stripe.link_payment.order_not_found", {
+      paymentIntent: paymentIntent.id,
+      orderId,
+      error: error?.message,
+    })
+    return
+  }
+
+  const amountMxn = (paymentIntent.amount_received ?? 0) / 100
+  if (amountMxn <= 0) {
+    logger.error("stripe.link_payment.sin_monto", { paymentIntent: paymentIntent.id, orderId })
+    return
+  }
+
+  const firePaidNotifications = () => {
+    after(() => {
+      confirmPaymentToCustomer(order.id).catch((e) =>
+        logger.error("Workflow: payment_confirmed failed:", e)
+      )
+      notifyCustomerStatusUpdate(order.id, "confirmed").catch((e) =>
+        logger.error("Workflow: status_update failed:", e)
+      )
+      sendOrderStatusEmail(order.id, "confirmed").catch((e) =>
+        logger.error("Email: order_status_confirmed failed:", e)
+      )
+      notifyCashbackCredited(order.id).catch((e) =>
+        logger.error("Notify: cashback_credited failed:", e)
+      )
+    })
+  }
+
+  const result = await recordOrderPayment(supabase, order, {
+    amount: amountMxn,
+    method: "card",
+    origin: "stripe_link",
+    stripePaymentIntentId: paymentIntent.id,
+    stripeCheckoutSessionId: paymentIntent.metadata?.checkout_session_id ?? null,
+  })
+
+  if (result.schemaMissing) {
+    // Degradación sin 00233: sin libro no hay parciales que
+    // cuadrar; el link por el saldo completo sigue marcando
+    // pagado como lo hacía el flujo previo.
+    if (order.payment_status !== "paid" && isAmountSufficient(paymentIntent.amount_received, order.total)) {
+      await supabase
+        .from("orders")
+        .update({
+          payment_status: "paid",
+          status: "confirmed",
+          stripe_payment_method_id: paymentIntent.payment_method ?? null,
+          stripe_customer_id: paymentIntent.customer ?? null,
+          customer_email: order.customer_email ?? paymentIntent.receipt_email ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.id)
+        .neq("payment_status", "paid")
+      firePaidNotifications()
+    } else if (order.payment_status !== "paid") {
+      logger.warn("stripe.link_payment.parcial_sin_libro", {
+        paymentIntent: paymentIntent.id,
+        orderId,
+        amount: amountMxn,
+        total: order.total,
+      })
+    }
+    return
+  }
+
+  if (!result.recorded) {
+    logger.error("stripe.link_payment.record_failed", {
+      paymentIntent: paymentIntent.id,
+      orderId,
+      error: result.error,
+    })
+    return
+  }
+
+  if (result.becamePaid) {
+    // Persiste el método/customer de Stripe como en el flujo del
+    // checkout web, para poder cobrar upsells off-session después.
+    if (paymentIntent.payment_method || paymentIntent.customer) {
+      await supabase
+        .from("orders")
+        .update({
+          stripe_payment_method_id: paymentIntent.payment_method ?? null,
+          stripe_customer_id: paymentIntent.customer ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.id)
+    }
+    firePaidNotifications()
+  } else if (!result.alreadyRecorded) {
+    logger.info("stripe.link_payment.parcial", {
+      paymentIntent: paymentIntent.id,
+      orderId,
+      amount: amountMxn,
+      balance: result.summary?.balance,
+    })
   }
 }
 

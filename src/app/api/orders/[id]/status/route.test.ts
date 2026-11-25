@@ -171,7 +171,7 @@ describe("PATCH /api/orders/[id]/status", () => {
     expect(res.status).toBe(200)
     // El primer fetch pide el cupón; el reintento lo omite.
     expect(orders.select).toHaveBeenNthCalledWith(1, expect.stringContaining("coupon_code"))
-    expect(orders.select).toHaveBeenNthCalledWith(2, "status, payment_status, customer_phone")
+    expect(orders.select).toHaveBeenNthCalledWith(2, "status, payment_status, customer_phone, total, payment_method")
     expect(onOrderStatusChange).toHaveBeenCalledWith(7, "pending", "confirmed")
   })
 
