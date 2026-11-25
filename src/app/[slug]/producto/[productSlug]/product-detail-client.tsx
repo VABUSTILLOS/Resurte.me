@@ -9,6 +9,7 @@ import { ProductCard } from "@/components/product/product-card"
 import { WhatsAppBadge, OrderByWhatsAppButton } from "@/components/whatsapp/whatsapp-button"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import { AccordionItem } from "@/components/ui/accordion-item"
+import { useCustomerPrice } from "@/hooks/use-customer-prices"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { StoreBreadcrumb } from "@/components/ui/store-breadcrumb"
 import Link from "next/link"
@@ -73,9 +74,15 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
 
   const allImages = product.images?.length ? product.images : [product.image_url]
 
+  // Precio especial del cliente con sesión (00234): solo sin
+  // presentaciones — con presentación manda el precio de la
+  // elegida. Para quien no lo tiene, la ficha pinta el público.
+  const customerPrice = useCustomerPrice(product.id)
+  const specialPrice = hasVariants ? null : customerPrice
+
   const displayPrice = selectedVariant
     ? (selectedVariant.sale_price ?? selectedVariant.price)
-    : (product.sale_price ?? product.price ?? 0)
+    : (specialPrice ?? product.sale_price ?? product.price ?? 0)
   const perUnit = unitPrice(displayPrice, product.unit)
   const originalPrice = selectedVariant ? selectedVariant.price : (product.price ?? 0)
   const hasDiscount = displayPrice < originalPrice
@@ -151,6 +158,7 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
           brand: product.brand,
           price: originalPrice,
           sale_price: product.sale_price ?? null,
+          customer_price: specialPrice,
           quantity: 1,
           stock_status: (product.stock_status ?? "in_stock") as "in_stock" | "low_stock" | "out_of_stock",
         })
@@ -350,6 +358,11 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
                       -{discountPercent}%
                     </span>
                   </>
+                )}
+                {specialPrice != null && !selectedVariant && (
+                  <span className="text-xs font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                    Tu precio especial
+                  </span>
                 )}
               </div>
               {hasDiscount && (

@@ -6,6 +6,7 @@ import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/order-la
 import { getUserPurchaseHistory } from "@/lib/wallet-actions"
 import type { OrderWithCashback, OrderItem } from "@/types"
 import { Package, Clock, ChevronRight, ArrowLeft } from "lucide-react"
+import { RecurringOrdersSection } from "@/components/shop/recurring-orders-section"
 import { RepeatOrderButton } from "@/components/shop/repeat-order-button"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
@@ -69,6 +70,8 @@ export default function OrderHistoryPage() {
           <p className="text-sm text-gray-500">{city.name}</p>
         </div>
       </div>
+
+      <RecurringOrdersSection />
 
       {loading ? (
         <PageSkeleton titleWidth="w-52" cards={3} />

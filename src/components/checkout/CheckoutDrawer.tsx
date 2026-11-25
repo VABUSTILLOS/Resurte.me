@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { AnalyticsEvents } from "@/lib/analytics"
+import { cartItemUnitPrice } from "@/lib/cart-prices"
 import {
   X,
   ShoppingBag,
@@ -222,7 +223,7 @@ export function CheckoutDrawer() {
             id: String(i.product_id),
             name: i.name,
             quantity: i.quantity,
-            price: i.sale_price ?? i.price,
+            price: cartItemUnitPrice(i),
           })),
           ...selectedBumps.map((b) => ({
             id: String(b.productId),

@@ -19,6 +19,7 @@ import {
   pickPreferredAddress,
   toAddressForm,
 } from "@/lib/address-book"
+import { cartItemUnitPrice } from "@/lib/cart-prices"
 import { getStoredUtm } from "@/lib/utm"
 import {
   clearPendingCardPayment,
@@ -497,7 +498,7 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
                 .map((item) => ({
                   product_id: item.product_id,
                   quantity: item.quantity,
-                  unit_price: item.sale_price ?? item.price,
+                  unit_price: cartItemUnitPrice(item),
                   // Con presentación (00232) el nombre la incluye (es
                   // lo que lee el personal en los avisos) y viaja su
                   // id: el servidor valida precio y existencia de ESA

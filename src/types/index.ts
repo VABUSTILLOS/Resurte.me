@@ -309,6 +309,16 @@ export interface CartItem {
   brand: string
   price: number
   sale_price: number | null
+  /**
+   * Precio especial del cliente con sesión para este producto
+   * (00234, `customer_product_prices`). Lo fija el CartProvider
+   * desde /api/customer-prices y manda sobre `sale_price` en
+   * `cartItemUnitPrice`; el servidor lo recalcula en
+   * POST /api/orders, así que un valor viejo o manipulado no se
+   * cobra: el match de totales lo rechaza. Nunca en líneas con
+   * presentación (la presentación cobra su propio precio).
+   */
+  customer_price?: number | null
   quantity: number
   stock_status: 'in_stock' | 'low_stock' | 'out_of_stock'
   /**
@@ -395,7 +405,7 @@ export interface OrderWithCashback {
   stripe_payment_intent_id?: string | null
   stripe_checkout_session_id?: string | null
   scheduled_for: string | null
-  source: 'web' | 'whatsapp'
+  source: 'web' | 'whatsapp' | 'recurring'
   cashback_credits: number | null
   cashback_tier: CashbackTier | null
   week_of_month: number | null

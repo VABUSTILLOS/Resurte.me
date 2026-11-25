@@ -13,6 +13,7 @@ import { calcCheckoutTotals, FREE_SHIPPING_THRESHOLD, DELIVERY_FEE_FLAT, countBu
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { WHATSAPP_HREF } from "@/lib/business"
+import { cartItemUnitPrice } from "@/lib/cart-prices"
 
 export default function CartPage() {
   const { cart, itemCount, subtotal, coupon, automaticDiscount, automaticApplied, removeItem, updateQuantity, clearCart, addItem, isLoaded } = useCart()
@@ -280,7 +281,7 @@ export default function CartPage() {
       {/* Cart items */}
       <div className="space-y-3 mb-8">
         {cart.items.map((item) => {
-          const itemPrice = item.sale_price ?? item.price
+          const itemPrice = cartItemUnitPrice(item)
           const itemTotal = itemPrice * item.quantity
 
           return (
@@ -325,9 +326,14 @@ export default function CartPage() {
                   <span className="text-sm font-bold text-[#1a1a1a]">
                     ${itemPrice.toFixed(2)}
                   </span>
-                  {item.sale_price && item.sale_price < item.price && (
+                  {itemPrice < item.price && (
                     <span className="text-xs text-[#B0B3B8] line-through">
                       ${item.price.toFixed(2)}
+                    </span>
+                  )}
+                  {item.customer_price != null && !item.variant_id && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5">
+                      Tu precio
                     </span>
                   )}
                 </div>
@@ -440,7 +446,7 @@ export default function CartPage() {
               cart.items
                 .map(
                   (item, i) =>
-                    `${i + 1}. ${item.quantity}× ${item.name}${item.variant_name ? ` (${item.variant_name})` : ""} — $${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}`
+                    `${i + 1}. ${item.quantity}× ${item.name}${item.variant_name ? ` (${item.variant_name})` : ""} — $${(cartItemUnitPrice(item) * item.quantity).toFixed(2)}`
                 )
                 .join("\n") +
               `\n\n*Total: $${bumpsTotal.toFixed(2)} MXN*\n\n¿Me confirman disponibilidad y tiempo de entrega?`

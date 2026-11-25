@@ -120,7 +120,7 @@ const FUENTES = MIGRATION_FILES.map((f) => sinComentarios(readFileSync(join(MIGR
 const MEDICION = medir(FUENTES)
 
 /**
- * Las 30 tablas con RLS encendida y ninguna política, con el archivo que
+ * Las 32 tablas con RLS encendida y ninguna política, con el archivo que
  * demuestra cómo se accede a cada una. Todas se leen y escriben con
  * `createServiceClient()`; `rate_limits` lo hace a través de la RPC
  * `consume_rate_limit`, cuyo `EXECUTE` quedó restringido a `service_role` en
@@ -142,6 +142,8 @@ const MODELO_DE_ACCESO: Record<string, string> = {
   crm_sequences: "createServiceClient() desde src/app/admin/actions.ts",
   crm_tasks:
     "createServiceClient() desde src/app/admin/actions.ts; declarada en COMMENT ON TABLE de 00185",
+  customer_product_prices:
+    "createServiceClient() desde src/lib/customer-prices.ts (precios especiales por cliente, 00234; los escriben las rutas /api/admin/customer-prices y los lee POST /api/orders)",
   // La primera entrada del registro cuyo acceso NO vive en `src/`: el único
   // lector es el SQL de la migración `00198` (topa el precio de venta contra
   // `unit_price`) y el único escritor es `scripts/alsuper-prices-sync.mjs`,
@@ -168,6 +170,8 @@ const MODELO_DE_ACCESO: Record<string, string> = {
   // EXECUTE). Ver `docs/OPS.md` §13.
   rate_limits:
     "RPC consume_rate_limit (EXECUTE sólo a service_role desde 00165) desde src/lib/rate-limit.ts, con el cliente de servicio",
+  recurring_orders:
+    "createServiceClient() desde src/lib/recurring-orders.ts (plantillas de pedidos recurrentes, 00234; las escriben /api/admin/recurring-orders y /api/recurring-orders y las ejecuta el cron diario)",
   stock_notifications:
     "createServiceClient() desde src/lib/stock-notifications.ts y src/app/api/stock-notifications/route.ts (suscripciones «avísame cuando haya», 00230)",
   suppliers: "createServiceClient() desde src/app/api/admin/suppliers/route.ts",
@@ -237,7 +241,7 @@ describe("perímetro — RLS sin políticas", () => {
     // Conteo fijo a propósito: es un tripwire, no un dato. Al añadir una tabla
     // con RLS y sin políticas hay que venir aquí y actualizarlo, que es lo que
     // obliga a mirar si de verdad está declarada en el registro.
-    expect(DECLARADAS).toHaveLength(30)
+    expect(DECLARADAS).toHaveLength(32)
   })
 
   it("ninguna entrada está vacía y todas nombran dónde vive el acceso", () => {

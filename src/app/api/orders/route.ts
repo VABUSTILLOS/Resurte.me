@@ -21,6 +21,7 @@ import {
   validateQuantityLimits,
 } from "@/lib/product-quantity-limits"
 import { processStockNotifications } from "@/lib/stock-notifications"
+import { fetchCustomerPrices } from "@/lib/customer-prices"
 import { fetchOrderVariantData, type OrderVariantRow } from "@/lib/product-variants"
 import { resolveBumpPricing } from "@/lib/order-bumps"
 import { insertAddressResilient } from "@/lib/orders-address"
@@ -492,12 +493,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Precios especiales del cliente con sesión (00234): la línea
+    // estándar SIN presentación se cobra a su precio especial si
+    // el cliente lo tiene asignado. Se leen de la BD aquí, con la
+    // sesión del pedido — nunca del payload. Sin sesión o sin la
+    // migración, el mapa viene vacío y todo se cobra al precio
+    // público de siempre.
+    const customerSpecialPrices = await fetchCustomerPrices(
+      supabase,
+      userId,
+      items
+        .filter((i) => i.item_type !== "bump" && !i.variant_id)
+        .map((i) => i.product_id)
+    )
+
     // Precio unitario real de una línea, desde la BD: el bump usa
     // el precio de catálogo validado contra sus reglas; la línea
-    // con presentación, el de LA VARIANTE (00232); el resto, el del
-    // producto (sale_price gana si existe). Lo usan el subtotal,
-    // los descuentos automáticos y el insert de ítems: una sola
-    // definición para que las tres cifras no puedan divergir.
+    // con presentación, el de LA VARIANTE (00232); la estándar del
+    // cliente con precio especial, ESE precio (00234); el resto,
+    // el del producto (sale_price gana si existe). Lo usan el
+    // subtotal, los descuentos automáticos y el insert de ítems:
+    // una sola definición para que las tres cifras no puedan
+    // divergir.
     const unitPriceOf = (item: OrderItemInput): number => {
       const db = getDbProduct(item.product_id)
       if (item.item_type === "bump") {
@@ -505,6 +522,8 @@ export async function POST(request: NextRequest) {
       }
       const variant = variantOf(item)
       if (variant) return variant.sale_price ?? variant.price
+      const special = customerSpecialPrices.get(item.product_id)
+      if (special !== undefined) return special
       return db.sale_price ?? db.price
     }
 

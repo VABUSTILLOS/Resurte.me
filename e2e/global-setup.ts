@@ -130,6 +130,7 @@ const ROUTES = [
   "/admin/operar",
   "/admin/proveedores",
   "/admin/recompensas",
+  "/admin/recurrentes",
   "/admin/repartidores",
   "/admin/seo-ia",
   "/admin/sistema",

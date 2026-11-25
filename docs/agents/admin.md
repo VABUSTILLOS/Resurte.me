@@ -181,6 +181,21 @@
   `processOrderRestockNotifications`); el cron diario corre el
   barrido `stock-notifications-sweep` como red de seguridad. Todo es
   best-effort: un fallo de aviso nunca rompe la venta.
+- Ola 5 — recurrentes y precios por cliente (00234): la sección
+  `/admin/recurrentes` (dominio `clientes`) opera las plantillas de
+  `recurring_orders` y la tabla `customer_product_prices` vía
+  `/api/admin/recurring-orders`, `/api/admin/customer-prices` y el
+  buscador `/api/admin/customers/search`. El alta de un precio
+  especial valida contra `products.cost` cuando el costo existe: un
+  especial por debajo del costo se rechaza en la ruta, no en el
+  checkout (bitácora `customer_price_set` con el valor anterior). La
+  edición de plantillas valida el conjunto fusionado con
+  `validateRecurringTemplateInput` y reanudar con la fecha vencida
+  recalcula `next_run_on` desde hoy (sin ráfaga de atrasados). El
+  cliente pausa/reanuda/cancela lo suyo desde «Mis pedidos»
+  (`/api/recurring-orders`); editar artículos es solo del panel.
+  Sin la migración, GET responde `available: false` y las
+  escrituras 409: la pantalla lo declara y no rompe.
 - Ola 3 — presentaciones en WhatsApp (00232): cada presentación es
   un artículo del catálogo de Meta con retailer_id
   `<id del producto>--<slug de la variante>` (ver Catálogo). La

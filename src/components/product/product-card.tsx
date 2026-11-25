@@ -5,6 +5,7 @@ import Image from "next/image"
 import type { Product } from "@/types"
 import { useCart } from "@/contexts/cart-context"
 import { useFavorites } from "@/contexts/favorites-context"
+import { useCustomerPrice } from "@/hooks/use-customer-prices"
 import { useToast } from "@/components/toast"
 import { cn, getProductTagline } from "@/lib/utils"
 import { formatUnitPrice, unitPrice } from "@/lib/unit-price"
@@ -55,9 +56,18 @@ export const ProductCard = memo(function ProductCard({
   // el stepper no saben qué presentación dar, y el servidor
   // rechaza la línea sin presentación.
   const hasVariants = product.has_variants === true
-  const displayPrice = hasVariants ? (product.variant_min_price ?? price) : price
-  const hasDiscount = !hasVariants && product.sale_price && product.sale_price < product.price
-  const perUnit = hasVariants ? null : unitPrice(price, product.unit)
+  // Precio especial del cliente con sesión (00234): solo en
+  // productos sin presentaciones (la presentación cobra la suya)
+  // y solo para quien lo tiene asignado; los demás ven el precio
+  // público de siempre.
+  const customerPrice = useCustomerPrice(product.id)
+  const specialPrice = hasVariants ? null : customerPrice
+  const displayPrice = hasVariants
+    ? (product.variant_min_price ?? price)
+    : (specialPrice ?? price)
+  const hasDiscount =
+    specialPrice == null && !hasVariants && product.sale_price && product.sale_price < product.price
+  const perUnit = hasVariants ? null : unitPrice(displayPrice, product.unit)
   const discountPercent = product.sale_price && product.sale_price < product.price
     ? Math.round((1 - product.sale_price / product.price) * 100)
     : 0
@@ -106,6 +116,7 @@ export const ProductCard = memo(function ProductCard({
       brand: product.brand,
       price: product.price,
       sale_price: product.sale_price ?? null,
+      customer_price: specialPrice,
       quantity: 1,
       stock_status: product.stock_status as "in_stock" | "low_stock" | "out_of_stock",
     })
@@ -113,7 +124,7 @@ export const ProductCard = memo(function ProductCard({
     AnalyticsEvents.addToCart({
       id: product.id,
       name: product.name,
-      price,
+      price: displayPrice,
     })
 
     // Micro-vibración táctil: confirma el agregado en móvil aunque el usuario
@@ -230,8 +241,18 @@ export const ProductCard = memo(function ProductCard({
 
             <div className="flex items-center gap-2 mt-1.5 sm:mt-2">
               <span className="text-sm sm:text-base font-bold text-[#1a1a1a]">
-                {hasVariants ? `desde $${displayPrice.toFixed(2)}` : `$${price.toFixed(2)}`}
+                {hasVariants ? `desde $${displayPrice.toFixed(2)}` : `$${displayPrice.toFixed(2)}`}
               </span>
+              {specialPrice != null && (
+                <>
+                  <span className="text-xs sm:text-sm text-[var(--text-secondary)] line-through">
+                    ${price.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5">
+                    Tu precio
+                  </span>
+                </>
+              )}
               {hasDiscount && (
                 <span className="text-xs sm:text-sm text-[var(--text-secondary)] line-through">
                   ${product.price.toFixed(2)}

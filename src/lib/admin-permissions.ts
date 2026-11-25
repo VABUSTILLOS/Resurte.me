@@ -205,6 +205,7 @@ export const ADMIN_SECTIONS: ReadonlyArray<{
   // Clientes
   { path: "/admin/usuarios", permission: "clientes" },
   { path: "/admin/recompensas", permission: "clientes" },
+  { path: "/admin/recurrentes", permission: "clientes" },
   { path: "/admin/restaurantes", permission: "clientes" },
   { path: "/admin/foodos/restaurantes", permission: "clientes" },
   { path: "/admin/operar", permission: "clientes" },

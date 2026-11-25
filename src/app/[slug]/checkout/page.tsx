@@ -32,6 +32,7 @@ import { RemoveLineDialog } from "@/components/checkout/RemoveLineDialog"
 import { useOrderLines } from "@/components/checkout/use-order-lines"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { WHATSAPP_HREF } from "@/lib/business"
+import { cartItemUnitPrice } from "@/lib/cart-prices"
 import { calcCheckoutTotals, DELIVERY_FEE_FLAT, MIN_ITEM_QUANTITY, countBumpUnits } from "@/lib/checkout-config"
 import {
   FIRST_STEP,
@@ -94,7 +95,7 @@ export default function CheckoutPage() {
       cart.items.map((i) => ({
         item_id: String(i.product_id),
         item_name: i.name,
-        price: i.sale_price ?? i.price,
+        price: cartItemUnitPrice(i),
         quantity: i.quantity,
       }))
     )
@@ -166,7 +167,7 @@ export default function CheckoutPage() {
             id: String(i.product_id),
             name: i.name,
             quantity: i.quantity,
-            price: i.sale_price ?? i.price,
+            price: cartItemUnitPrice(i),
           })),
           ...selectedBumps.map((b) => ({
             id: String(b.productId),
@@ -375,7 +376,7 @@ export default function CheckoutPage() {
                 cart.items
                   .map(
                     (item, i) =>
-                      `${i + 1}. ${item.quantity}× ${item.name} — $${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}`
+                      `${i + 1}. ${item.quantity}× ${item.name} — $${(cartItemUnitPrice(item) * item.quantity).toFixed(2)}`
                   )
                   .join("\n") +
                 `\n\n*Total:* $${total.toFixed(2)} MXN\n\n` +
