@@ -907,7 +907,16 @@
   `toAbsoluteImageUrl` — jamás /_next/image), cada una con pie
   «<nombre> — $<precio>» y registro `bot:ai-image` (autor «ia»
   en la bandeja). Best-effort: si una foto falla, el texto ya
-  salió y nada se rompe.
+  salió y nada se rompe. El pie de foto incluye además el link
+  público de la ficha. Precio de caja completa: los productos
+  que se venden por kilo y cuyo nombre declara la caja
+  («(caja 14.5 kg)») se cotizan con el total de la caja además
+  del kilo — en la línea del contexto inyectado, en el pie de
+  foto y en la ficha web — calculado siempre por
+  `boxPriceFor` (`unit-price.ts`), nunca guardado: el peso se
+  lee del nombre y la unidad decide si el precio es por kilo
+  (si la unidad ya es la caja, el precio ES el de la caja y no
+  se multiplica).
 - Bandeja de la tienda (`/admin/whatsapp/bandeja` +
   `/api/whatsapp/inbox`): proyecta `whatsapp_messages` agrupada
   por `phoneKey`, sin segundo almacén. El envío revalida la

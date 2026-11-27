@@ -157,6 +157,69 @@ export function normalizeBaseName(name: string): string {
 const PRESENTATION_TOKEN =
   /\bpor\b|\b\d+(?:[.,]\d+)?\s*(?:kg|kilos?|g|gr|gramos?|l|lt|litros?|ml|piezas?|pzas?|charolas?|manojos?|cajas?|bolsas?|paquetes?|docenas?)\b|\b(?:kilo|litro|pieza|charola|manojo|caja|bolsa|paquete|docena)s?\b/g
 
+// ============================================================
+// PRECIO DE CAJA COMPLETA — por kilo, pero se surte por caja
+// ============================================================
+// Hay productos cuyo precio es POR KILO pero que el cliente pide
+// por caja: "Pollo entero congelado Pilgrim's (caja 14.5 kg)".
+// Sin el total de la caja, quien atiende (la ficha, el asistente
+// de WhatsApp) presenta el precio del kilo como si fuera el de
+// la caja — y el cliente cree que la caja cuesta $74.
+// El peso de la caja vive en el nombre del producto: es el único
+// dato que existe. El total se CALCULA siempre, nunca se guarda:
+// si el precio por kilo cambia, la caja se mueve sola.
+
+export interface BoxPrice {
+  /** Peso de la caja en kg, tal como lo declara el nombre. */
+  kg: number
+  /** Total de la caja completa: precio por kilo × kg, a centavos. */
+  total: number
+}
+
+const BOX_WEIGHT_RE = /caja\s+(?:de\s+)?(\d+(?:[.,]\d+)?)\s*kg\b/i
+
+/** Peso de la caja declarado en el nombre ("(caja 14.5 kg)"), o null. */
+export function parseBoxWeightKg(name: string | null | undefined): number | null {
+  if (!name) return null
+  const match = BOX_WEIGHT_RE.exec(name)
+  if (!match) return null
+  const kg = Number(match[1]?.replace(",", "."))
+  return Number.isFinite(kg) && kg > 0 ? kg : null
+}
+
+/**
+ * ¿El precio del producto es por kilo? `products.unit` es texto
+ * libre: el catálogo trae "por kilo" (lo interpreta
+ * `parsePresentation`) y también "Kilo" a secas, que el parser de
+ * presentaciones no acepta pero que la ficha pinta como
+ * "Precio por kilo". Ambas formas cuentan.
+ */
+export function isPerKiloUnit(unit: string | null | undefined): boolean {
+  if (!unit) return false
+  const presentation = parsePresentation(unit)
+  if (presentation) return presentation.base === "kg" && presentation.quantity === 1
+  return /^(por\s+)?(kilo|kilogramo|kg)s?$/i.test(unit.trim())
+}
+
+/**
+ * Precio de la caja completa de un producto que se vende por kilo
+ * y cuyo nombre declara el peso de la caja. `null` en cualquier
+ * otro caso: el nombre no trae caja en kg (las cajas de piezas no
+ * se calculan: su precio ya es por caja) o el precio no es por
+ * kilo (si la unidad ya es la caja, el precio ES el de la caja).
+ */
+export function boxPriceFor(product: {
+  name: string
+  unit?: string | null
+  price: number
+}): BoxPrice | null {
+  if (!Number.isFinite(product.price) || product.price <= 0) return null
+  if (!isPerKiloUnit(product.unit)) return null
+  const kg = parseBoxWeightKg(product.name)
+  if (kg == null) return null
+  return { kg, total: round2(product.price * kg) }
+}
+
 export interface PresentationCandidate<T> {
   product: T
   unitPrice: UnitPrice

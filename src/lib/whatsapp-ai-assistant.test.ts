@@ -102,6 +102,28 @@ describe("buildCatalogContext", () => {
     expect(ctx).toContain("se vende por presentación, desde $68 MXN")
   })
 
+  it("si se vende por kilo en caja, la línea trae el total de la caja completa", () => {
+    const ctx = buildCatalogContext([
+      product({
+        name: "Pollo entero congelado Pilgrim's (caja 14.5 kg)",
+        slug: "pollo-entero-congelado-pilgrims-caja-145kg",
+        price: 74,
+        unit: "Kilo",
+      }),
+    ])
+    expect(ctx).toContain(
+      "- Pollo entero congelado Pilgrim's (caja 14.5 kg): $74 MXN por kilo — la caja completa de 14.5 kg cuesta $1,073 MXN"
+    )
+  })
+
+  it("con precio por caja (unidad caja) no se inventa un total por kilo", () => {
+    const ctx = buildCatalogContext([
+      product({ name: "Papa francesa 3/8 (caja 13.61 kg)", price: 685, unit: "caja" }),
+    ])
+    expect(ctx).toContain("- Papa francesa 3/8 (caja 13.61 kg): $685 MXN [ref:")
+    expect(ctx).not.toContain("caja completa")
+  })
+
   it("sin productos devuelve cadena vacía", () => {
     expect(buildCatalogContext([])).toBe("")
   })
@@ -151,6 +173,7 @@ describe("buildWhatsAppAiSystemPrompt", () => {
     expect(prompt).toContain("$500 MXN")
     expect(prompt).toContain("DERIVAR_A_HUMANO")
     expect(prompt).toContain("No prometas descuentos")
+    expect(prompt).toContain("Nunca presentes el precio por kilo como si fuera")
   })
 
   it("pide cerrar con la línea PRODUCTOS de referencias citadas", () => {
@@ -226,6 +249,8 @@ describe("resolveAiProductImages", () => {
         name: "Papa Blanca",
         price: 49,
         imageUrl: "https://resurte.me/images/papa-blanca.jpg",
+        url: "https://resurte.me/chihuahua/producto/papa-blanca",
+        box: null,
       },
     ])
   })
@@ -284,9 +309,26 @@ describe("resolveAiProductImages", () => {
     expect(images[0]?.price).toBe(68)
   })
 
-  it("el pie de foto es «nombre — $precio»", () => {
+  it("el pie de foto es «nombre — $precio» y el link de la ficha", () => {
     const images = resolveAiProductImages(["papa-blanca"], [papa])
-    expect(buildAiProductImageCaption(images[0]!)).toBe("Papa Blanca — $49 MXN")
+    expect(buildAiProductImageCaption(images[0]!)).toBe(
+      "Papa Blanca — $49 MXN\nhttps://resurte.me/chihuahua/producto/papa-blanca"
+    )
+  })
+
+  it("en productos por kilo en caja, el pie cotiza el kilo y la caja completa", () => {
+    const pollo = product({
+      name: "Pollo entero congelado Pilgrim's (caja 14.5 kg)",
+      slug: "pollo-entero-congelado-pilgrims-caja-145kg",
+      price: 74,
+      unit: "Kilo",
+    })
+    const images = resolveAiProductImages([pollo.slug], [pollo])
+    expect(images[0]?.box).toEqual({ kg: 14.5, total: 1073 })
+    expect(buildAiProductImageCaption(images[0]!)).toBe(
+      "Pollo entero congelado Pilgrim's (caja 14.5 kg) — $74 MXN por kilo · Caja completa (14.5 kg): $1,073 MXN\n" +
+        "https://resurte.me/chihuahua/producto/pollo-entero-congelado-pilgrims-caja-145kg"
+    )
   })
 })
 
@@ -348,6 +390,8 @@ describe("answerWhatsAppWithAi", () => {
           name: "Papa Blanca",
           price: 49,
           imageUrl: "https://resurte.me/images/papa-blanca.jpg",
+          url: "https://resurte.me/chihuahua/producto/papa-blanca",
+          box: null,
         },
       ])
     }
