@@ -15,7 +15,7 @@ import { StoreBreadcrumb } from "@/components/ui/store-breadcrumb"
 import Link from "next/link"
 import type { Category, Product, ProductVariant } from "@/types"
 import type { PresentationCandidate } from "@/lib/unit-price"
-import { formatUnitPrice, unitPrice } from "@/lib/unit-price"
+import { boxPriceFor, formatUnitPrice, unitPrice } from "@/lib/unit-price"
 import { getCategoryIcon } from "@/lib/utils"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
@@ -84,6 +84,14 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
     ? (selectedVariant.sale_price ?? selectedVariant.price)
     : (specialPrice ?? product.sale_price ?? product.price ?? 0)
   const perUnit = unitPrice(displayPrice, product.unit)
+  // Caja completa: solo cuando el producto se vende por kilo sin
+  // presentaciones y su nombre declara el peso de la caja; con una
+  // presentación elegida, el precio mostrado ya es el de esa
+  // presentación y la caja del producto base no aplica.
+  const boxPrice =
+    hasVariants || selectedVariant
+      ? null
+      : boxPriceFor({ name: product.name, unit: product.unit, price: displayPrice })
   const originalPrice = selectedVariant ? selectedVariant.price : (product.price ?? 0)
   const hasDiscount = displayPrice < originalPrice
   const discountPercent = hasDiscount && originalPrice > 0
@@ -379,6 +387,11 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
                   Precio por {product.unit.toLowerCase()}
                 </p>
               ) : null}
+              {boxPrice && (
+                <p className="text-[13px] font-medium text-[#1a1a1a] mt-1">
+                  Caja completa ({boxPrice.kg} kg): ${boxPrice.total.toFixed(2)}
+                </p>
+              )}
             </div>
 
             {/* Comparador de presentaciones (C13): solo aparece cuando el

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest"
 import {
+  boxPriceFor,
   comparePresentations,
   formatUnitPrice,
+  isPerKiloUnit,
   normalizeBaseName,
+  parseBoxWeightKg,
   parsePresentation,
   unitPrice,
 } from "./unit-price"
@@ -171,5 +174,77 @@ describe("comparePresentations", () => {
   it("ignora candidatos sin unidad interpretable", () => {
     const charola = { id: 9, name: "Jitomate Saladette charola", price: 200, unit: "charola" }
     expect(comparePresentations(jitomate1kg, [charola])).toEqual([])
+  })
+})
+
+describe("parseBoxWeightKg", () => {
+  it("lee el peso de la caja del nombre", () => {
+    expect(parseBoxWeightKg("Pollo entero congelado Pilgrim's (caja 14.5 kg)")).toBe(14.5)
+    expect(parseBoxWeightKg("Pollo empanizado tipo KFC (caja 13.61 kg)")).toBe(13.61)
+    expect(parseBoxWeightKg("Nuggets enchilados (caja 10 kg)")).toBe(10)
+    expect(parseBoxWeightKg("Queso crema (caja de 8 kg)")).toBe(8)
+  })
+
+  it("sin caja en kg devuelve null", () => {
+    expect(parseBoxWeightKg("Hamburguesa BM arrachera (caja 30 pzs de 150 g)")).toBeNull()
+    expect(parseBoxWeightKg("Papa Blanca")).toBeNull()
+    expect(parseBoxWeightKg(null)).toBeNull()
+    expect(parseBoxWeightKg(undefined)).toBeNull()
+  })
+})
+
+describe("isPerKiloUnit", () => {
+  it("acepta las formas por kilo del catálogo", () => {
+    expect(isPerKiloUnit("por kilo")).toBe(true)
+    expect(isPerKiloUnit("Kilo")).toBe(true)
+    expect(isPerKiloUnit("kilo")).toBe(true)
+    expect(isPerKiloUnit("kg")).toBe(true)
+  })
+
+  it("una presentación de 1 kg también es precio por kilo; las demás, no", () => {
+    expect(isPerKiloUnit("1 kg")).toBe(true)
+    expect(isPerKiloUnit("5 kg")).toBe(false)
+    expect(isPerKiloUnit("500 g")).toBe(false)
+  })
+
+  it("rechaza lo que no es precio por kilo", () => {
+    expect(isPerKiloUnit("caja")).toBe(false)
+    expect(isPerKiloUnit("por pieza")).toBe(false)
+    expect(isPerKiloUnit(null)).toBe(false)
+    expect(isPerKiloUnit(undefined)).toBe(false)
+  })
+})
+
+describe("boxPriceFor", () => {
+  it("calcula el total de la caja: kilo × peso de la caja", () => {
+    expect(
+      boxPriceFor({
+        name: "Pollo entero congelado Pilgrim's (caja 14.5 kg)",
+        unit: "Kilo",
+        price: 74,
+      })
+    ).toEqual({ kg: 14.5, total: 1073 })
+  })
+
+  it("redondea el total a centavos", () => {
+    expect(
+      boxPriceFor({ name: "Pollo empanizado (caja 13.61 kg)", unit: "por kilo", price: 50.25 })
+    ).toEqual({ kg: 13.61, total: 683.9 })
+  })
+
+  it("si la unidad ya es la caja, el precio no se multiplica", () => {
+    expect(
+      boxPriceFor({ name: "Papa francesa 3/8 (caja 13.61 kg)", unit: "caja", price: 685 })
+    ).toBeNull()
+  })
+
+  it("las cajas de piezas no se calculan", () => {
+    expect(
+      boxPriceFor({ name: "Hamburguesa BM (caja 30 pzs de 150 g)", unit: "Kilo", price: 74 })
+    ).toBeNull()
+  })
+
+  it("sin precio válido no hay caja", () => {
+    expect(boxPriceFor({ name: "Pollo (caja 14.5 kg)", unit: "Kilo", price: 0 })).toBeNull()
   })
 })

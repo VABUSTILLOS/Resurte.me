@@ -37,6 +37,9 @@
 // devuelve las fotos a enviar (tope 3); el webhook manda el
 // texto primero y las fotos después, como acompañamiento
 // best-effort: si una foto falla, la respuesta ya salió.
+// El pie de cada foto trae el link de la ficha y, si el
+// producto se vende por kilo en caja, el total de la caja
+// completa junto al precio por kilo.
 
 import { chatCompletionRaw } from "@/lib/ai/llm"
 import { getCachedVisibleProducts } from "@/lib/catalog-cache"
@@ -48,7 +51,9 @@ import {
   MIN_ORDER_MXN,
   formatMxn,
 } from "@/lib/commercial-facts"
+import { DEFAULT_CITY_SLUG } from "@/lib/cities"
 import { logger } from "@/lib/logger"
+import { boxPriceFor, type BoxPrice } from "@/lib/unit-price"
 import { getSpeiAccount, formatClabe } from "@/lib/spei-account"
 import { findProfileByPhone } from "@/lib/whatsapp-orders"
 import { setBotPaused } from "@/lib/whatsapp-conversation-controls"
@@ -189,6 +194,7 @@ export type AiCatalogProduct = Pick<
   | "stock_status"
   | "has_variants"
   | "variant_min_price"
+  | "unit"
 >
 
 /** Precio vigente del producto (oferta si la hay). */
@@ -210,7 +216,11 @@ export interface CatalogContextBuild {
 
 /**
  * Catálogo en líneas compactas para el prompt. Solo lo que la IA
- * puede afirmar: nombre, precio vigente y si está agotado. Cada
+ * puede afirmar: nombre, precio vigente y si está agotado. Si el
+ * producto se vende por kilo y su nombre declara una caja, la
+ * línea lo dice como tal y trae el total de la caja completa
+ * (calculado en `unit-price.ts`): sin eso, el modelo presentaba
+ * el precio del kilo como si fuera el de la caja. Cada
  * línea cierra con su referencia estable `[ref: slug]`: es el
  * identificador que el modelo cita en su línea PRODUCTOS para
  * que el servidor sepa qué fotos acompañan la respuesta. Se
@@ -235,6 +245,11 @@ export function buildCatalogContextEntries(
     }
     if (p.has_variants) {
       line += ` — se vende por presentación, desde ${formatMxn(p.variant_min_price ?? effective)}`
+    } else {
+      const box = boxPriceFor({ name: p.name, unit: p.unit, price: effective })
+      if (box) {
+        line += ` por kilo — la caja completa de ${box.kg} kg cuesta ${formatMxn(box.total)}`
+      }
     }
     if (p.stock_status === "out_of_stock") line += " — AGOTADO"
     line += ` [ref: ${p.slug}]`
@@ -313,6 +328,10 @@ export function buildWhatsAppAiSystemPrompt(): string {
       "`PRODUCTOS: papa-blanca, papa-francesa-38`. Es un registro interno para adjuntar las " +
       "fotos de esos productos: no lo comentes ni lo expliques. Si no mencionaste ningún " +
       "producto, escribe `PRODUCTOS: -`.",
+    "9. Si el CONTEXTO dice que un producto se vende por kilo y trae el precio de su caja " +
+      "completa, cuando pregunten por la caja da el TOTAL de la caja, y cuando pregunten " +
+      "por kilo da el precio por kilo. Nunca presentes el precio por kilo como si fuera " +
+      "el de la caja completa.",
     "",
     `Datos SPEI de la tienda (solo si el cliente pregunta cómo transferir): CLABE ${formatClabe(spei.clabe)}, ` +
       `${spei.banco}, beneficiario ${spei.beneficiario}, concepto = número de pedido.`,
@@ -392,6 +411,11 @@ export function extractMentionTrailer(text: string): { text: string; slugs: stri
   return { text: kept.join("\n"), slugs }
 }
 
+/** Link público de la ficha del producto: va en el pie de foto. */
+export function productPublicUrl(slug: string): string {
+  return `https://resurte.me/${DEFAULT_CITY_SLUG}/producto/${slug}`
+}
+
 /** Una foto lista para enviar: producto validado + URL directa. */
 export interface AiProductImage {
   slug: string
@@ -400,6 +424,14 @@ export interface AiProductImage {
   price: number
   /** URL directa absoluta: la misma que publica el feed de Meta. */
   imageUrl: string
+  /** Link público de la ficha: el pie de foto lo incluye siempre. */
+  url: string
+  /**
+   * Caja completa si el producto se vende por kilo y su nombre
+   * declara la caja (el pie de foto la cotiza junto al kilo);
+   * `null` en cualquier otro caso, incluidas las presentaciones.
+   */
+  box: BoxPrice | null
 }
 
 /**
@@ -425,19 +457,33 @@ export function resolveAiProductImages(
     if (!product) continue
     const imageUrl = toAbsoluteImageUrl(product.image_url)
     if (!imageUrl) continue
+    const price = displayPriceOf(product)
     images.push({
       slug: product.slug,
       name: product.name,
-      price: displayPriceOf(product),
+      price,
       imageUrl,
+      url: productPublicUrl(product.slug),
+      box: product.has_variants
+        ? null
+        : boxPriceFor({ name: product.name, unit: product.unit, price }),
     })
   }
   return images
 }
 
-/** Pie de foto de cada imagen: «<nombre> — $<precio>». */
+/**
+ * Pie de foto de cada imagen: «<nombre> — $<precio>» y, en la
+ * línea siguiente, el link de la ficha. Si el producto se vende
+ * por kilo en caja, el precio se rotula como tal y se suma el
+ * total de la caja completa: el pie es lo que el cliente lee
+ * junto a la foto, y sin el rótulo el kilo se leía como caja.
+ */
 export function buildAiProductImageCaption(product: AiProductImage): string {
-  return `${product.name} — ${formatMxn(product.price)}`
+  const headline = product.box
+    ? `${product.name} — ${formatMxn(product.price)} por kilo · Caja completa (${product.box.kg} kg): ${formatMxn(product.box.total)}`
+    : `${product.name} — ${formatMxn(product.price)}`
+  return `${headline}\n${product.url}`
 }
 
 // ============================================================
